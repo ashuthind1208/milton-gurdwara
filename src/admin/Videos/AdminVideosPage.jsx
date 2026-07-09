@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EyeIcon, PencilSquareIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
-import videoService, { CATEGORIES, PLATFORMS, getYouTubeEmbedUrl, getYouTubeThumbnail } from '../../services/videoService';
+import videoService, { CATEGORIES, getYouTubeEmbedUrl, getYouTubeThumbnail } from '../../services/videoService';
 
 const PAGE_SIZE = 10;
 const actionIconClass = 'h-4 w-4';

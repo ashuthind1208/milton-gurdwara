@@ -47,7 +47,7 @@ const defaultVideos = [
 const PLATFORMS = ['youtube', 'facebook', 'other'];
 const CATEGORIES = ['Samagam', 'Kirtan', 'Katha', 'Special', 'Youth', 'General'];
 
-export { PLATFORMS, CATEGORIES };
+export { CATEGORIES };
 
 const normalizeVideo = (video = {}, index = 0) => ({
   id: video.id || `vid-${Date.now()}-${index}`,
@@ -99,6 +99,12 @@ export function getYouTubeEmbedUrl(url) {
   const shortsMatch = url.match(/youtube\.com\/shorts\/([A-Za-z0-9_-]{11})/);
   if (shortsMatch) {
     return `https://www.youtube.com/embed/${shortsMatch[1]}`;
+  }
+
+  // Live: youtube.com/live/ID
+  const liveMatch = url.match(/youtube\.com\/live\/([A-Za-z0-9_-]{11})/);
+  if (liveMatch) {
+    return `https://www.youtube.com/embed/${liveMatch[1]}`;
   }
 
   // Standard watch?v=ID

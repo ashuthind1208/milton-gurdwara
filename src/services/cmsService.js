@@ -25,6 +25,114 @@ const defaultSchedule = {
   ]
 };
 
+const buildDefaultScheduleDay = (legacySchedule = defaultSchedule) => ({
+  id: 'schedule-default',
+  dateKey: 'default',
+  dateLabel: 'Daily Default',
+  title: 'Standard Daily Maryada',
+  isSpecial: false,
+  highlightTitle: '',
+  highlightNoteEn: '',
+  highlightNotePa: '',
+  entries: [
+    ...(legacySchedule.morning || []).map((item, index) => ({
+      id: item.id || `morning-${index + 1}`,
+      segment: 'morning',
+      timeEn: item.time || '',
+      timePa: '',
+      titleEn: item.label || '',
+      titlePa: '',
+      noteEn: '',
+      notePa: '',
+      isHighlighted: false,
+      isActive: true,
+      sortOrder: index + 1
+    })),
+    ...(legacySchedule.evening || []).map((item, index) => ({
+      id: item.id || `evening-${index + 1}`,
+      segment: 'evening',
+      timeEn: item.time || '',
+      timePa: '',
+      titleEn: item.label || '',
+      titlePa: '',
+      noteEn: '',
+      notePa: '',
+      isHighlighted: false,
+      isActive: true,
+      sortOrder: (legacySchedule.morning || []).length + index + 1
+    }))
+  ]
+});
+
+const normalizeScheduleTimelineEntry = (entry = {}, index = 0) => ({
+  id: entry.id || `schedule-entry-${Date.now()}-${index}`,
+  segment: ['morning', 'evening', 'special'].includes(entry.segment) ? entry.segment : 'morning',
+  timeEn: entry.timeEn || entry.time || '',
+  timePa: entry.timePa || '',
+  titleEn: entry.titleEn || entry.label || '',
+  titlePa: entry.titlePa || '',
+  noteEn: entry.noteEn || '',
+  notePa: entry.notePa || '',
+  isHighlighted: Boolean(entry.isHighlighted),
+  isActive: entry.isActive !== false,
+  sortOrder: Number.isFinite(Number(entry.sortOrder)) ? Number(entry.sortOrder) : index + 1
+});
+
+const normalizeScheduleDay = (day = {}, index = 0) => {
+  const normalizedDateKey = day.dateKey || day.date || (index === 0 ? 'default' : `override-${index + 1}`);
+  const entries = Array.isArray(day.entries) ? day.entries : [];
+  const normalizedEntries = entries
+    .map((entry, entryIndex) => normalizeScheduleTimelineEntry(entry, entryIndex))
+    .sort((left, right) => Number(left.sortOrder || 0) - Number(right.sortOrder || 0))
+    .map((entry, entryIndex) => ({ ...entry, sortOrder: entryIndex + 1 }));
+
+  return {
+    id: day.id || `schedule-day-${normalizedDateKey}`,
+    dateKey: normalizedDateKey,
+    dateLabel: day.dateLabel || (normalizedDateKey === 'default' ? 'Daily Default' : normalizedDateKey),
+    title: day.title || (normalizedDateKey === 'default' ? 'Standard Daily Maryada' : 'Special Day Schedule'),
+    isSpecial: normalizedDateKey === 'default' ? false : day.isSpecial !== false,
+    highlightTitle: day.highlightTitle || '',
+    highlightNoteEn: day.highlightNoteEn || '',
+    highlightNotePa: day.highlightNotePa || '',
+    entries: normalizedEntries
+  };
+};
+
+const normalizeScheduleDays = (scheduleDays = [], legacySchedule = defaultSchedule) => {
+  const sourceDays = Array.isArray(scheduleDays) && scheduleDays.length > 0
+    ? scheduleDays.map((day, index) => normalizeScheduleDay(day, index))
+    : [normalizeScheduleDay(buildDefaultScheduleDay(legacySchedule), 0)];
+
+  const hasDefault = sourceDays.some((day) => day.dateKey === 'default');
+  if (hasDefault) {
+    return sourceDays;
+  }
+
+  return [normalizeScheduleDay(buildDefaultScheduleDay(legacySchedule), 0), ...sourceDays];
+};
+
+const resolveScheduleForDate = (scheduleDays = [], dateKey = 'default') => {
+  const normalizedDays = normalizeScheduleDays(scheduleDays, defaultSchedule);
+  return normalizedDays.find((day) => day.dateKey === dateKey)
+    || normalizedDays.find((day) => day.dateKey === 'default')
+    || normalizedDays[0];
+};
+
+const deriveLegacyScheduleFromDay = (day) => {
+  const normalizedDay = day || normalizeScheduleDay(buildDefaultScheduleDay(defaultSchedule));
+  const toLegacyItem = (entry, index, prefix) => ({
+    id: entry.id || `${prefix}-${index + 1}`,
+    time: entry.timeEn || '',
+    label: entry.titleEn || ''
+  });
+
+  return {
+    morning: normalizedDay.entries.filter((entry) => entry.segment === 'morning').map((entry, index) => toLegacyItem(entry, index, 'morning')),
+    evening: normalizedDay.entries.filter((entry) => entry.segment === 'evening').map((entry, index) => toLegacyItem(entry, index, 'evening'))
+  };
+};
+
 const defaultPageContent = {
   about: {
     heroTitle: 'About Our Gurdwara',
@@ -172,7 +280,11 @@ const normalizeAllPageContent = (allContent = {}) => ({
   contact: normalizePageEntry(allContent.contact, defaultPageContent.contact)
 });
 
-const normalizeContent = (content) => ({
+const normalizeContent = (content) => {
+  const normalizedScheduleDays = normalizeScheduleDays(content.scheduleDays, content.schedule || defaultSchedule);
+  const defaultScheduleDay = resolveScheduleForDate(normalizedScheduleDays, 'default');
+
+  return {
   ...defaultContent,
   ...content,
   hero: {
@@ -180,10 +292,8 @@ const normalizeContent = (content) => ({
     ...(content.hero || {}),
     slides: normalizeSlides(content.hero?.slides || defaultContent.hero.slides)
   },
-  schedule: {
-    morning: normalizeScheduleEntries(content.schedule?.morning || defaultSchedule.morning, 'morning'),
-    evening: normalizeScheduleEntries(content.schedule?.evening || defaultSchedule.evening, 'evening')
-  },
+  scheduleDays: normalizedScheduleDays,
+  schedule: deriveLegacyScheduleFromDay(defaultScheduleDay),
   langarItems: (content.langarItems || defaultLangarItems).map((item, index) => ({
     id: item.id || `langar-${index + 1}`,
     name: item.name || '',
@@ -192,7 +302,8 @@ const normalizeContent = (content) => ({
     expiryDate: item.expiryDate || '',
     needed: typeof item.needed === 'boolean' ? item.needed : true
   }))
-});
+  };
+};
 
 const persistContent = (nextValue) => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(nextValue));
@@ -295,6 +406,7 @@ const cmsService = {
             evening: normalizeScheduleEntries(payload.schedule.evening || current.schedule.evening, 'evening')
           }
         : current.schedule,
+      scheduleDays: payload.scheduleDays || current.scheduleDays,
       langarItems: payload.langarItems || current.langarItems
     };
 
@@ -397,15 +509,80 @@ const cmsService = {
   },
   updateSchedule: async (schedule) => {
     const current = readHomeContent();
+    const normalizedDays = normalizeScheduleDays(current.scheduleDays, current.schedule || defaultSchedule);
+
+    if (Array.isArray(schedule.scheduleDays)) {
+      const nextValue = {
+        ...current,
+        scheduleDays: normalizeScheduleDays(schedule.scheduleDays, current.schedule || defaultSchedule)
+      };
+
+      return mockResponse(normalizeContent(persistContent(nextValue)).scheduleDays);
+    }
+
+    if (schedule.day) {
+      const nextDay = normalizeScheduleDay(schedule.day);
+      const remaining = normalizedDays.filter((item) => item.dateKey !== nextDay.dateKey);
+      const nextValue = {
+        ...current,
+        scheduleDays: [...remaining, nextDay].sort((left, right) => left.dateKey.localeCompare(right.dateKey))
+      };
+
+      return mockResponse(normalizeContent(persistContent(nextValue)).scheduleDays);
+    }
+
     const nextValue = {
       ...current,
       schedule: {
         morning: normalizeScheduleEntries(schedule.morning || [], 'morning'),
         evening: normalizeScheduleEntries(schedule.evening || [], 'evening')
-      }
+      },
+      scheduleDays: normalizeScheduleDays([], {
+        morning: normalizeScheduleEntries(schedule.morning || [], 'morning'),
+        evening: normalizeScheduleEntries(schedule.evening || [], 'evening')
+      })
     };
 
     return mockResponse(normalizeContent(persistContent(nextValue)).schedule);
+  },
+  getScheduleForDate: async (dateKey) => {
+    const current = readHomeContent();
+    return mockResponse(resolveScheduleForDate(current.scheduleDays, dateKey || 'default'));
+  },
+  copyScheduleDay: async ({ sourceDateKey, targetDateKey }) => {
+    const current = readHomeContent();
+    const normalizedDays = normalizeScheduleDays(current.scheduleDays, current.schedule || defaultSchedule);
+    const sourceDay = resolveScheduleForDate(normalizedDays, sourceDateKey || 'default');
+    const copiedDay = normalizeScheduleDay({
+      ...sourceDay,
+      id: `schedule-day-${targetDateKey}`,
+      dateKey: targetDateKey,
+      dateLabel: targetDateKey,
+      title: sourceDay.title,
+      isSpecial: targetDateKey !== 'default',
+      entries: sourceDay.entries.map((entry) => ({ ...entry, id: `schedule-entry-${Date.now()}-${entry.id}` }))
+    });
+
+    const remaining = normalizedDays.filter((item) => item.dateKey !== targetDateKey);
+    const nextValue = {
+      ...current,
+      scheduleDays: [...remaining, copiedDay].sort((left, right) => left.dateKey.localeCompare(right.dateKey))
+    };
+
+    return mockResponse(normalizeContent(persistContent(nextValue)).scheduleDays);
+  },
+  removeScheduleDay: async (dateKey) => {
+    const current = readHomeContent();
+    if (!dateKey || dateKey === 'default') {
+      return mockResponse(normalizeContent(current).scheduleDays);
+    }
+
+    const nextValue = {
+      ...current,
+      scheduleDays: normalizeScheduleDays(current.scheduleDays, current.schedule || defaultSchedule).filter((day) => day.dateKey !== dateKey)
+    };
+
+    return mockResponse(normalizeContent(persistContent(nextValue)).scheduleDays);
   },
   getAllPageContent: async () => mockResponse(readAllPageContent()),
   getPageContent: async (pageKey) => {

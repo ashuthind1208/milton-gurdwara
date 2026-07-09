@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckIcon, XMarkIcon, TrashIcon, EyeIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, PencilSquareIcon, PlusIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import userService from '../../services/userService';
@@ -17,21 +17,41 @@ const statusClassMap = {
 
 const actionIconClass = 'h-4 w-4';
 
+const userFormDefaults = {
+  name: '',
+  email: '',
+  phone: '',
+  address: '',
+  role: 'Member'
+};
+
 const AdminUsersPage = () => {
   const queryClient = useQueryClient();
   const [activeFilter, setActiveFilter] = useState('All');
   const [viewUser, setViewUser] = useState(null);
   const [editUserId, setEditUserId] = useState('');
+  const [createUserOpen, setCreateUserOpen] = useState(false);
   const [approvalNotice, setApprovalNotice] = useState('');
-  const form = useForm({ defaultValues: { name: '', role: 'Editor', email: '', phone: '', address: '', memberType: 'Member' } });
-  const editForm = useForm({ defaultValues: { name: '', role: 'Editor', email: '', phone: '', address: '', memberType: 'Member' } });
-  const { data: users = [] } = useQuery({ queryKey: ['admin-users'], queryFn: () => userService.getUsers().then((res) => res.data) });
+
+  const form = useForm({ defaultValues: userFormDefaults });
+  const editForm = useForm({ defaultValues: userFormDefaults });
+
+  const { data: users = [] } = useQuery({
+    queryKey: ['admin-users'],
+    queryFn: () => userService.getUsers().then((res) => res.data)
+  });
 
   const createMutation = useMutation({
-    mutationFn: (values) => userService.createUser(values),
+    mutationFn: (values) => userService.createUser({
+      ...values,
+      approvalStatus: values.role === 'Admin' || values.role === 'Super Admin' ? 'approved' : 'pending',
+      isActive: true,
+      registrationComplete: true
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-      form.reset({ name: '', role: 'Editor', email: '', phone: '', address: '', memberType: 'Member' });
+      form.reset(userFormDefaults);
+      setCreateUserOpen(false);
     }
   });
 
@@ -77,6 +97,13 @@ const AdminUsersPage = () => {
     }
   });
 
+  const toggleActiveMutation = useMutation({
+    mutationFn: ({ id, isActive }) => userService.updateUser(id, { isActive }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+    }
+  });
+
   const filteredUsers = useMemo(() => {
     if (activeFilter === 'All') {
       return users;
@@ -92,8 +119,7 @@ const AdminUsersPage = () => {
       email: user.email || '',
       phone: user.phone || '',
       address: user.address || '',
-      memberType: user.memberType || 'Member',
-      role: user.role || 'Editor'
+      role: user.role || 'Member'
     });
   };
 
@@ -102,156 +128,187 @@ const AdminUsersPage = () => {
     setViewUser(user);
   };
 
+  const openCreateUser = () => {
+    form.reset(userFormDefaults);
+    setCreateUserOpen(true);
+  };
+
   const closeModals = () => {
     setViewUser(null);
     setEditUserId('');
+    setCreateUserOpen(false);
+  };
+
+  const renderActivePill = (user) => {
+    const isActive = user.isActive !== false;
+
+    return (
+      <button
+        type="button"
+        onClick={() => toggleActiveMutation.mutate({ id: user.id, isActive: !isActive })}
+        disabled={toggleActiveMutation.isPending}
+        className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold transition ${isActive ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300' : 'border-slate-300 bg-slate-100 text-slate-700 hover:border-slate-400'} disabled:cursor-not-allowed disabled:opacity-50`}
+      >
+        {isActive ? 'Active' : 'Inactive'}
+      </button>
+    );
   };
 
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-3xl font-bold">Users and Roles</h1>
-      <Card>
-        <h2 className="font-heading text-xl font-semibold">Add User</h2>
-        <form className="mt-4 grid gap-3 md:grid-cols-3" onSubmit={form.handleSubmit((values) => createMutation.mutate(values))}>
-          <label className="text-sm">Name
-            <input {...form.register('name', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-          </label>
-          <label className="text-sm">Email
-            <input type="email" {...form.register('email', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-          </label>
-          <label className="text-sm">Phone
-            <input {...form.register('phone')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-          </label>
-          <label className="text-sm md:col-span-2">Address
-            <input {...form.register('address')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-          </label>
-          <label className="text-sm">Member Type
-            <select {...form.register('memberType')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
-              <option>Member</option>
-              <option>Volunteer</option>
-              <option>Admin</option>
-            </select>
-          </label>
-          <label className="text-sm">Role
-            <select {...form.register('role')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
-              <option>Super Admin</option>
-              <option>Editor</option>
-              <option>Finance</option>
-              <option>Volunteer Coordinator</option>
-            </select>
-          </label>
-          <div className="md:col-span-3">
-            <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? 'Adding...' : 'Add User'}</Button>
-          </div>
-        </form>
-      </Card>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="font-heading text-3xl font-bold">Users and Roles</h1>
+        <Button type="button" onClick={openCreateUser} className="inline-flex items-center gap-1.5">
+          <PlusIcon className="h-4 w-4" /> Add User
+        </Button>
+      </div>
+
       <Card>
         {approvalNotice ? (
           <p className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">{approvalNotice}</p>
         ) : null}
+
         <div className="mb-4 flex flex-wrap gap-2">
           {FILTERS.map((filter) => (
             <button
               key={filter}
               type="button"
               onClick={() => setActiveFilter(filter)}
-              className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${activeFilter === filter ? 'bg-brand-blue text-white' : 'border border-slate-300 text-slate-700 hover:bg-slate-50'}`}
+              className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${activeFilter === filter ? 'bg-brand-blue text-white' : 'border border-slate-300 text-slate-700 hover:bg-slate-50'}`}
             >
               {filter}
             </button>
           ))}
         </div>
-        <div className="overflow-x-auto">
+
+        <div className="overflow-x-auto rounded-xl border border-slate-200">
           <table className="min-w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 text-slate-500">
-                <th className="py-2 pr-3">User</th>
-                <th className="py-2 pr-3">Email</th>
-                <th className="py-2 pr-3">Type</th>
-                <th className="py-2 pr-3">Role</th>
-                <th className="py-2 pr-3">Approval</th>
-                <th className="py-2 pr-3">Action</th>
+            <thead className="bg-slate-50 text-slate-500">
+              <tr>
+                <th className="px-3 py-2.5">User</th>
+                <th className="px-3 py-2.5">Email</th>
+                <th className="px-3 py-2.5">Role</th>
+                <th className="px-3 py-2.5">Approval</th>
+                <th className="px-3 py-2.5">Status</th>
+                <th className="px-3 py-2.5">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredUsers.map((user) => (
-                <tr key={user.id} className="border-b border-slate-100">
-                  <td className="py-2 pr-3">
-                    <div className="flex items-center gap-2">
-                      <img src={user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}`} alt={user.name} className="h-8 w-8 rounded-full object-cover" />
-                      <span className="font-semibold text-slate-800">{user.name}</span>
-                    </div>
-                  </td>
-                  <td className="py-2 pr-3">{user.email}</td>
-                  <td className="py-2 pr-3">{user.memberType || '-'}</td>
-                  <td className="py-2 pr-3">{user.role || '-'}</td>
-                  <td className="py-2 pr-3">
-                    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${statusClassMap[user.approvalStatus || 'pending'] || statusClassMap.pending}`}>
-                      {user.approvalStatus || 'pending'}
-                    </span>
-                  </td>
-                  <td className="py-2 pr-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => openViewUser(user)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 text-slate-700 transition hover:bg-slate-100"
-                        aria-label="View user"
-                        title="View"
-                      >
-                        <EyeIcon className={actionIconClass} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openEditUser(user)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-200 text-blue-700 transition hover:bg-blue-50"
-                        aria-label="Edit user"
-                        title="Edit"
-                      >
-                        <PencilSquareIcon className={actionIconClass} />
-                      </button>
-                      <button
-                        type="button"
-                        disabled={approvalMutation.isPending || user.approvalStatus === 'approved'}
-                        onClick={() => approvalMutation.mutate({ id: user.id, approvalStatus: 'approved' })}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-40"
-                        aria-label="Approve user"
-                        title="Approve"
-                      >
-                        <CheckIcon className={actionIconClass} />
-                      </button>
-                      <button
-                        type="button"
-                        disabled={approvalMutation.isPending || user.approvalStatus === 'rejected'}
-                        onClick={() => approvalMutation.mutate({ id: user.id, approvalStatus: 'rejected' })}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-amber-200 text-amber-700 transition hover:bg-amber-50 disabled:opacity-40"
-                        aria-label="Reject user"
-                        title="Reject"
-                      >
-                        <XMarkIcon className={actionIconClass} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeMutation.mutate(user.id)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-700 transition hover:bg-red-50"
-                        aria-label="Delete user"
-                        title="Delete"
-                      >
-                        <TrashIcon className={actionIconClass} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {filteredUsers.map((user) => {
+                const approvalStatus = String(user.approvalStatus || 'pending').toLowerCase();
+                return (
+                  <tr key={user.id} className="border-t border-slate-100">
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <img src={user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}`} alt={user.name} className="h-8 w-8 rounded-full object-cover" />
+                        <span className="font-medium text-slate-800">{user.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5 text-slate-700">{user.email}</td>
+                    <td className="px-3 py-2.5 text-slate-700">{user.role || '-'}</td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${statusClassMap[approvalStatus] || statusClassMap.pending}`}>
+                          {approvalStatus}
+                        </span>
+                        {approvalStatus !== 'approved' ? (
+                          <button
+                            type="button"
+                            onClick={() => approvalMutation.mutate({ id: user.id, approvalStatus: 'approved' })}
+                            disabled={approvalMutation.isPending}
+                            className="rounded-md border border-emerald-200 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                          >
+                            Approve
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5">{renderActivePill(user)}</td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openViewUser(user)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 text-slate-700 transition hover:bg-slate-100"
+                          aria-label="View user"
+                          title="View"
+                        >
+                          <EyeIcon className={actionIconClass} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openEditUser(user)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-200 text-blue-700 transition hover:bg-blue-50"
+                          aria-label="Edit user"
+                          title="Edit"
+                        >
+                          <PencilSquareIcon className={actionIconClass} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeMutation.mutate(user.id)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-700 transition hover:bg-red-50"
+                          aria-label="Delete user"
+                          title="Delete"
+                        >
+                          <TrashIcon className={actionIconClass} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td className="py-4 text-center text-slate-500" colSpan={6}>No users found for this tab.</td>
+                  <td className="px-3 py-4 text-center text-slate-500" colSpan={6}>No users found for this tab.</td>
                 </tr>
               ) : null}
             </tbody>
           </table>
         </div>
       </Card>
+
+      {createUserOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/50" onClick={closeModals} aria-hidden="true" />
+          <div className="relative z-10 w-full max-w-3xl rounded-2xl bg-white p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="font-heading text-lg font-semibold">Add User</h3>
+              <button type="button" onClick={closeModals} className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700" aria-label="Close add user modal">
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <form className="mt-4 grid gap-3 md:grid-cols-3" onSubmit={form.handleSubmit((values) => createMutation.mutate(values))}>
+              <label className="text-sm">Name
+                <input {...form.register('name', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="text-sm">Email
+                <input type="email" {...form.register('email', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="text-sm">Phone
+                <input {...form.register('phone')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="text-sm md:col-span-2">Address
+                <input {...form.register('address')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="text-sm">Role
+                <select {...form.register('role')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
+                  <option>Member</option>
+                  <option>Volunteer</option>
+                  <option>Admin</option>
+                  <option>Super Admin</option>
+                </select>
+              </label>
+              <div className="md:col-span-3 flex gap-2">
+                <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? 'Adding...' : 'Add User'}</Button>
+                <Button type="button" variant="ghost" onClick={closeModals}>Cancel</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
       {viewUser ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/50" onClick={closeModals} aria-hidden="true" />
@@ -270,8 +327,9 @@ const AdminUsersPage = () => {
               <p><span className="font-semibold">Email:</span> {viewUser.email || '-'}</p>
               <p><span className="font-semibold">Phone:</span> {viewUser.phone || '-'}</p>
               <p><span className="font-semibold">Address:</span> {viewUser.address || '-'}</p>
-              <p><span className="font-semibold">Member Type:</span> {viewUser.memberType || '-'}</p>
               <p><span className="font-semibold">Role:</span> {viewUser.role || '-'}</p>
+              <p><span className="font-semibold">Approval:</span> {viewUser.approvalStatus || 'pending'}</p>
+              <p><span className="font-semibold">Status:</span> {viewUser.isActive === false ? 'Inactive' : 'Active'}</p>
             </div>
             <div className="mt-5 flex justify-end">
               <Button type="button" variant="ghost" onClick={closeModals}>Close</Button>
@@ -279,6 +337,7 @@ const AdminUsersPage = () => {
           </div>
         </div>
       ) : null}
+
       {editUserId ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/50" onClick={closeModals} aria-hidden="true" />
@@ -302,19 +361,12 @@ const AdminUsersPage = () => {
               <label className="text-sm md:col-span-2">Address
                 <input {...editForm.register('address')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
-              <label className="text-sm">Member Type
-                <select {...editForm.register('memberType')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
+              <label className="text-sm">Role
+                <select {...editForm.register('role')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
                   <option>Member</option>
                   <option>Volunteer</option>
                   <option>Admin</option>
-                </select>
-              </label>
-              <label className="text-sm">Role
-                <select {...editForm.register('role')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
                   <option>Super Admin</option>
-                  <option>Editor</option>
-                  <option>Finance</option>
-                  <option>Volunteer Coordinator</option>
                 </select>
               </label>
               <div className="md:col-span-3 flex gap-2">

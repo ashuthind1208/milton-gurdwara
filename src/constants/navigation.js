@@ -27,6 +27,7 @@ export const adminNav = [
   { label: 'Gallery Folders', path: '/admin/gallery' },
   { label: 'Library', path: '/admin/library' },
   { label: 'Videos', path: '/admin/videos' },
+  { label: 'Streaming', path: '/admin/streaming' },
   { label: 'Advertisements', path: '/admin/advertisements' },
   { label: 'Events', path: '/admin/events' },
   { label: 'Donations', path: '/admin/donations' },

@@ -20,9 +20,8 @@ export const siteConfig = {
 };
 
 export const userRoles = {
-  SUPER_ADMIN: 'SUPER_ADMIN',
-  ADMIN: 'ADMIN',
-  EDITOR: 'EDITOR',
-  VOLUNTEER_COORDINATOR: 'VOLUNTEER_COORDINATOR',
-  FINANCE: 'FINANCE'
+  SUPER_ADMIN: 'Super Admin',
+  ADMIN: 'Admin',
+  MEMBER: 'Member',
+  VOLUNTEER: 'Volunteer'
 };

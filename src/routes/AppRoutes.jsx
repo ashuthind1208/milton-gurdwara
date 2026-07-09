@@ -13,6 +13,7 @@ const HukamnamaPage = lazy(() => import('../pages/Hukamnama/HukamnamaPage'));
 const EventsPage = lazy(() => import('../pages/Events/EventsPage'));
 const SevaPage = lazy(() => import('../pages/Seva/SevaPage'));
 const DonationPage = lazy(() => import('../pages/Donation/DonationPage'));
+const DonationSuccessPage = lazy(() => import('../pages/Donation/DonationSuccessPage'));
 const GalleryPage = lazy(() => import('../pages/Gallery/GalleryPage'));
 const NewsPage = lazy(() => import('../pages/News/NewsPage'));
 const LibraryPage = lazy(() => import('../pages/Library/LibraryPage'));
@@ -32,6 +33,7 @@ const AdminSevaOpportunitiesPage = lazy(() => import('../admin/SevaOpportunities
 const AdminGalleryPage = lazy(() => import('../admin/Gallery/AdminGalleryPage'));
 const AdminLibraryPage = lazy(() => import('../admin/Library/AdminLibraryPage'));
 const AdminVideosPage = lazy(() => import('../admin/Videos/AdminVideosPage'));
+const AdminStreamingPage = lazy(() => import('../admin/Streaming/AdminStreamingPage'));
 const AdminAdvertisementsPage = lazy(() => import('../admin/Advertisements/AdminAdvertisementsPage'));
 const AdminEventsPage = lazy(() => import('../admin/Events/AdminEventsPage'));
 const AdminDonationsPage = lazy(() => import('../admin/Donations/AdminDonationsPage'));
@@ -39,6 +41,9 @@ const AdminUsersPage = lazy(() => import('../admin/Users/AdminUsersPage'));
 const AdminAnalyticsPage = lazy(() => import('../admin/Analytics/AdminAnalyticsPage'));
 
 const LoadingFallback = () => <div className="py-20 text-center text-slate-600">Loading page...</div>;
+
+const FULL_ADMIN_ROLES = [userRoles.SUPER_ADMIN, userRoles.ADMIN];
+const LIMITED_ADMIN_ROLES = [userRoles.SUPER_ADMIN, userRoles.ADMIN, userRoles.MEMBER, userRoles.VOLUNTEER];
 
 const AppRoutes = () => {
   return (
@@ -54,6 +59,7 @@ const AppRoutes = () => {
           <Route path="/join" element={<Navigate to="/login?mode=join" replace />} />
           <Route path="/seva" element={<SevaPage />} />
           <Route path="/donation" element={<DonationPage />} />
+          <Route path="/donationsuccess" element={<DonationSuccessPage />} />
           <Route path="/gallery" element={<GalleryPage />} />
           <Route path="/news" element={<NewsPage />} />
           <Route path="/library" element={<LibraryPage />} />
@@ -63,7 +69,7 @@ const AppRoutes = () => {
           <Route path="/login" element={<LoginPage />} />
         </Route>
 
-        <Route element={<ProtectedRoute allowedRoles={Object.values(userRoles)} />}>
+        <Route element={<ProtectedRoute allowedRoles={FULL_ADMIN_ROLES} />}>
           <Route element={<AdminLayout />}>
             <Route path="/admin/cms" element={<AdminCmsPage />} />
             <Route path="/admin/news" element={<AdminNewsPage />} />
@@ -77,13 +83,14 @@ const AppRoutes = () => {
           </Route>
         </Route>
 
-        <Route element={<ProtectedRoute />}>
+        <Route element={<ProtectedRoute allowedRoles={LIMITED_ADMIN_ROLES} />}>
           <Route element={<AdminLayout />}>
             <Route path="/admin" element={<AdminDashboardPage />} />
             <Route path="/admin/hukamnama" element={<AdminHukamnamaPage />} />
             <Route path="/admin/gallery" element={<AdminGalleryPage />} />
             <Route path="/admin/library" element={<AdminLibraryPage />} />
             <Route path="/admin/videos" element={<AdminVideosPage />} />
+            <Route path="/admin/streaming" element={<AdminStreamingPage />} />
             <Route path="/admin/seva-opportunities" element={<AdminSevaOpportunitiesPage />} />
             <Route path="/admin/events" element={<AdminEventsPage />} />
           </Route>

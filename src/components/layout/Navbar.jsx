@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   Bars3Icon,
   XMarkIcon,
@@ -19,13 +20,16 @@ import { publicNav } from '../../constants/navigation';
 import { siteConfig } from '../../constants/siteConfig';
 import gurdwaraLogo from '../../assets/gurdwara-logo.webp';
 import { getNanakshahiDate } from '../../utils/punjabiCalendar';
+import streamingService from '../../services/streamingService';
+import StreamingModal from '../common/StreamingModal';
+import AudioPillPlayer from '../common/AudioPillPlayer';
 
 const navClass = ({ isActive }) =>
   `border-b-[3px] px-3 py-2 text-base font-semibold tracking-tight transition ${isActive ? 'border-brand-saffron text-brand-blue' : 'border-transparent text-slate-600 hover:border-slate-200 hover:text-brand-blue'}`;
 
 const iconClass = 'h-4.5 w-4.5';
-
 const socialGlyphClass = 'h-3.5 w-3.5';
+const streamGlyphClass = 'h-6 w-6';
 
 const WebsiteGlyph = () => (
   <svg viewBox="0 0 24 24" className={socialGlyphClass} aria-hidden="true">
@@ -35,9 +39,17 @@ const WebsiteGlyph = () => (
 );
 
 const YouTubeGlyph = () => (
-  <svg viewBox="0 0 24 24" className={socialGlyphClass} aria-hidden="true">
+  <svg viewBox="0 0 24 24" className={streamGlyphClass} aria-hidden="true">
     <path d="M22 12c0 2.5-.3 4.2-.7 5.2a3.6 3.6 0 0 1-2 2C18.2 19.6 16.5 20 12 20s-6.2-.4-7.3-.8a3.6 3.6 0 0 1-2-2C2.3 16.2 2 14.5 2 12s.3-4.2.7-5.2a3.6 3.6 0 0 1 2-2C5.8 4.4 7.5 4 12 4s6.2.4 7.3.8a3.6 3.6 0 0 1 2 2c.4 1 .7 2.7.7 5.2Z" fill="currentColor" />
     <path d="m10 9 5 3-5 3V9Z" fill="#0f172a" />
+  </svg>
+);
+
+const LiveStreamGlyph = () => (
+  <svg viewBox="0 0 24 24" className={streamGlyphClass} aria-hidden="true">
+    <path d="M22 12c0 2.5-.3 4.2-.7 5.2a3.6 3.6 0 0 1-2 2C18.2 19.6 16.5 20 12 20s-6.2-.4-7.3-.8a3.6 3.6 0 0 1-2-2C2.3 16.2 2 14.5 2 12s.3-4.2.7-5.2a3.6 3.6 0 0 1 2-2C5.8 4.4 7.5 4 12 4s6.2.4 7.3.8a3.6 3.6 0 0 1 2 2c.4 1 .7 2.7.7 5.2Z" fill="#0a4d9f" />
+    <path d="m10 9 5 3-5 3V9Z" fill="#ffffff" />
+    <circle cx="19" cy="6.5" r="1.6" fill="#f5a623" />
   </svg>
 );
 
@@ -75,8 +87,13 @@ const Navbar = () => {
   const [open, setOpen] = useState(false);
   const [isKirtanPlaying, setIsKirtanPlaying] = useState(false);
   const [isKirtanLoading, setIsKirtanLoading] = useState(false);
+  const [streamModalState, setStreamModalState] = useState({ open: false, id: '' });
   const liveAudioRef = useRef(null);
   const nanakshahiDate = useMemo(() => getNanakshahiDate(new Date()), []);
+  const { data: streamingItems = [] } = useQuery({
+    queryKey: ['streaming-config'],
+    queryFn: () => streamingService.getStreamingItems().then((res) => res.data)
+  });
 
   const libraryFromRight = rightMenu.find((item) => item.path === '/library');
   const leftMenuBalanced = libraryFromRight ? [...leftMenu, libraryFromRight] : leftMenu;
@@ -105,9 +122,16 @@ const Navbar = () => {
     }
   };
 
-  const statusDotClass = isKirtanPlaying
-    ? 'bg-emerald-400'
-    : (isKirtanLoading ? 'bg-amber-300' : 'bg-red-400');
+  const statusDotClass = isKirtanPlaying ? 'bg-emerald-400' : (isKirtanLoading ? 'bg-amber-300' : 'bg-red-400');
+  const featuredStream = streamingItems.find((entry) => entry.active) || streamingItems[0] || null;
+  const liveStreams = useMemo(
+    () => streamingItems.filter((entry) => entry?.streamUrl && entry?.active),
+    [streamingItems]
+  );
+
+  const openStreamModal = (id) => {
+    setStreamModalState({ open: true, id });
+  };
 
   return (
     <header className="sticky top-0 z-50 bg-gradient-to-b from-white via-white to-slate-50/60 shadow-[0_4px_18px_-4px_rgba(10,77,159,0.09)] backdrop-blur-md">
@@ -152,14 +176,14 @@ const Navbar = () => {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <p>{siteConfig.contact.phone} | {siteConfig.contact.email}</p>
+            <p className="max-w-[300px] truncate whitespace-nowrap px-0.5 text-[11px] font-extrabold leading-none tracking-tight text-blue-50">{nanakshahiDate.labelPa}</p>
             <Link to="/login?mode=admin&next=/admin" className="rounded-full border border-blue-200/40 px-2 py-0.5 text-[11px] font-semibold text-blue-50 hover:bg-blue-800/40">Admin Portal</Link>
             <Link to="/login?mode=join&type=volunteer" className="rounded-full border border-blue-200/40 px-2 py-0.5 text-[11px] font-semibold text-blue-50 hover:bg-blue-800/40">Join Volunteer</Link>
             <a href={siteConfig.baseUrl} target="_blank" rel="noreferrer" className="text-blue-50/90 transition hover:text-white" aria-label="Website">
               <WebsiteGlyph />
             </a>
             <a href={siteConfig.social.youtube} target="_blank" rel="noreferrer" className="text-blue-50/90 transition hover:text-white" aria-label="YouTube">
-              <YouTubeGlyph />
+                <YouTubeGlyph />
             </a>
             <a href={siteConfig.social.facebook} target="_blank" rel="noreferrer" className="text-blue-50/90 transition hover:text-white" aria-label="Facebook">
               <FacebookGlyph />
@@ -170,9 +194,10 @@ const Navbar = () => {
           </div>
         </div>
       </div>
+
       <div className="mx-auto grid max-w-7xl grid-cols-1 items-center px-4 py-3 md:px-6 lg:grid-cols-[1fr_auto_1fr]">
         <nav className="hidden w-full items-center justify-between pr-8 lg:flex" aria-label="Left navigation">
-            {leftMenuBalanced.map((item) => {
+          {leftMenuBalanced.map((item) => {
             const Icon = item.icon;
             return (
               <NavLink key={item.path} to={item.path} className={navClass}>
@@ -181,12 +206,15 @@ const Navbar = () => {
             );
           })}
         </nav>
-        <Link to="/" className="mx-8 flex items-center justify-center px-3 text-center font-heading text-brand-blue">
+
+        <Link to="/" className="mx-8 flex flex-col items-center justify-center px-3 text-center font-heading text-brand-blue">
           <img src={gurdwaraLogo} alt="Gurdwara Singh Sabha Milton logo" className="h-[7.5rem] w-[7.5rem] rounded-full border-2 border-brand-saffron object-cover shadow-[0_4px_16px_rgba(245,166,35,0.25)]" />
+          <span aria-hidden="true" className="mt-1 h-[1.75rem]" />
         </Link>
-        <div className="hidden w-full items-center justify-between pl-8 lg:flex">
+
+        <div className="hidden w-full items-center justify-end pl-8 lg:flex">
           <nav className="flex w-full items-center justify-between" aria-label="Right navigation">
-              {rightMenuBalanced.map((item) => {
+            {rightMenuBalanced.map((item) => {
               const Icon = item.icon;
               return (
                 <NavLink key={item.path} to={item.path} className={navClass}>
@@ -196,7 +224,9 @@ const Navbar = () => {
             })}
           </nav>
         </div>
+
         <button
+          type="button"
           onClick={() => setOpen((prev) => !prev)}
           className="absolute right-4 top-[70px] rounded-lg p-2 text-slate-700 lg:hidden"
           aria-label="Open mobile menu"
@@ -205,13 +235,68 @@ const Navbar = () => {
           {open ? <XMarkIcon className="h-6 w-6" /> : <Bars3Icon className="h-6 w-6" />}
         </button>
       </div>
-      <div className="pb-3 text-center">
-        <p className="text-base font-extrabold tracking-wide text-brand-blue md:text-lg">
-          <span className="text-brand-blue">{nanakshahiDate.labelPa}</span>
-        </p>
+
+      <div className="lg:hidden px-4 pb-2">
+        <AudioPillPlayer
+          label="Live Kirtan"
+          subtitle="Sri Darbar Sahib audio"
+          src={siteConfig.liveKirtanStreamUrl}
+          className="w-full"
+        />
       </div>
+
+      <div className="hidden pb-3 md:block">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-end gap-2 px-4 md:px-6">
+          {liveStreams.length > 0
+            ? liveStreams.map((stream) => {
+                const title = stream.title || 'Live Stream';
+                const buttonLabel = title.length > 50 ? `${title.slice(0, 50)}...` : title;
+
+                return (
+                  <button
+                    key={stream.id}
+                    type="button"
+                    onClick={() => openStreamModal(stream.id)}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-brand-blue/20 bg-gradient-to-r from-white via-blue-50 to-amber-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-brand-blue shadow-[0_4px_14px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-brand-blue/40"
+                  >
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-amber-100 text-brand-blue shadow-inner">
+                      <LiveStreamGlyph />
+                    </span>
+                    <span className="max-w-[320px] animate-pulse truncate">{buttonLabel}</span>
+                  </button>
+                );
+              })
+            : null}
+        </div>
+      </div>
+
+      {streamModalState.open ? (
+        <StreamingModal
+          open={streamModalState.open}
+          streams={streamingItems}
+          initialStreamId={streamModalState.id || featuredStream?.id || ''}
+          onClose={() => setStreamModalState({ open: false, id: '' })}
+        />
+      ) : null}
+
       {open ? (
         <div className="border-t border-slate-100 bg-gradient-to-b from-white to-slate-50 px-4 py-3 lg:hidden">
+          <div className="mb-3 grid gap-2 sm:grid-cols-2">
+            <Link
+              to="/login?mode=admin&next=/admin"
+              className="rounded-xl border border-brand-blue/20 bg-brand-blue px-3 py-2 text-center text-sm font-semibold text-white"
+              onClick={() => setOpen(false)}
+            >
+              Admin Portal
+            </Link>
+            <Link
+              to="/login?mode=join&type=volunteer"
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-sm font-semibold text-slate-700"
+              onClick={() => setOpen(false)}
+            >
+              Join Volunteer
+            </Link>
+          </div>
           <div className="grid gap-2">
             {publicNav.map((item) => (
               <NavLink key={item.path} to={item.path} className={navClass} onClick={() => setOpen(false)}>

@@ -36,14 +36,17 @@ const mapRoleByEmail = (email) => {
     : null;
 };
 
+const getAssignedRole = ({ email, fallbackRole = userRoles.MEMBER }) => mapRoleByEmail(email) || fallbackRole;
+
 const authService = {
   login: async ({ email }) => {
     const resolvedEmail = email || mockUser.email;
+    const assignedRole = getAssignedRole({ email: resolvedEmail, fallbackRole: userRoles.MEMBER });
     const persisted = await userService.upsertUserByEmail({
       name: resolvedEmail.split('@')[0],
       email: resolvedEmail,
-      role: mapRoleByEmail(resolvedEmail) ? 'Super Admin' : 'Member',
-      memberType: mapRoleByEmail(resolvedEmail) ? 'Admin' : 'Member',
+      role: assignedRole,
+      memberType: assignedRole === userRoles.VOLUNTEER ? 'Volunteer' : (assignedRole === userRoles.MEMBER ? 'Member' : 'Admin'),
       authProvider: 'LOCAL',
       registrationComplete: false
     }).then((res) => res.data);
@@ -54,7 +57,7 @@ const authService = {
         ...mockUser,
         ...persisted,
         email: resolvedEmail,
-        role: mapRoleByEmail(resolvedEmail)
+        role: assignedRole
       }
     });
   },
@@ -69,14 +72,16 @@ const authService = {
       throw error;
     }
 
-    const existingMemberType = existingUser?.memberType || (role ? 'Admin' : 'Member');
+    const fallbackRole = existingUser?.role || (role || userRoles.MEMBER);
+    const assignedRole = getAssignedRole({ email: resolvedEmail, fallbackRole });
+    const existingMemberType = existingUser?.memberType || (assignedRole === userRoles.VOLUNTEER ? 'Volunteer' : assignedRole === userRoles.MEMBER ? 'Member' : 'Admin');
     const existingRegistrationComplete = Boolean(existingUser?.registrationComplete);
-    const existingApprovalStatus = existingUser?.approvalStatus || (role ? 'approved' : 'pending');
+    const existingApprovalStatus = existingUser?.approvalStatus || (assignedRole === userRoles.SUPER_ADMIN || assignedRole === userRoles.ADMIN ? 'approved' : 'pending');
 
     const persisted = await userService.upsertUserByEmail({
       name: existingUser?.name || name || resolvedEmail.split('@')[0],
       email: resolvedEmail,
-      role: role ? 'Super Admin' : 'Member',
+      role: assignedRole,
       memberType: existingMemberType,
       authProvider: 'GOOGLE',
       avatarUrl: avatarUrl || existingUser?.avatarUrl,
@@ -93,19 +98,21 @@ const authService = {
         id: persisted.id,
         name: persisted.name,
         email: resolvedEmail,
-        role,
+        role: assignedRole,
         authProvider: 'GOOGLE'
       },
       wasExistingUser: Boolean(existingUser)
     });
   },
-  completeRegistration: async ({ email, name, phone, address, memberType, avatarUrl }) => {
+  completeRegistration: async ({ email, name, phone, address, memberType, role, avatarUrl }) => {
+    const assignedRole = getAssignedRole({ email, fallbackRole: role || userRoles.MEMBER });
     const updatedUser = await userService.completeRegistration({
       email,
       name,
       phone,
       address,
-      memberType: memberType || 'Member',
+      memberType: memberType || (assignedRole === userRoles.VOLUNTEER ? 'Volunteer' : assignedRole === userRoles.MEMBER ? 'Member' : 'Admin'),
+      role: assignedRole,
       avatarUrl
     }).then((res) => res.data);
 
@@ -113,7 +120,7 @@ const authService = {
       token: `google-mock-token-${Date.now()}`,
       user: {
         ...updatedUser,
-        role: mapRoleByEmail(updatedUser.email)
+        role: getAssignedRole({ email: updatedUser.email, fallbackRole: updatedUser.role || assignedRole })
       }
     });
   },

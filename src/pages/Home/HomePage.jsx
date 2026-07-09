@@ -25,6 +25,64 @@ const toDateKey = (value = new Date()) => {
   return `${year}-${month}-${day}`;
 };
 
+const parseTimeToken = (token) => {
+  const match = String(token || '').trim().match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!match) {
+    return null;
+  }
+
+  let hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const meridiem = match[3].toUpperCase();
+
+  if (meridiem === 'PM' && hours < 12) {
+    hours += 12;
+  }
+  if (meridiem === 'AM' && hours === 12) {
+    hours = 0;
+  }
+
+  return (hours * 60) + minutes;
+};
+
+const resolveScheduleRowState = (timeEn, now = new Date()) => {
+  const input = String(timeEn || '').trim();
+  if (!input) {
+    return { isCurrent: false, isPast: false };
+  }
+
+  const parts = input.split(/\s*-\s*/);
+  const startMinutes = parseTimeToken(parts[0]);
+  const endMinutes = parseTimeToken(parts[1] || '');
+  if (startMinutes == null) {
+    return { isCurrent: false, isPast: false };
+  }
+
+  const nowMinutes = (now.getHours() * 60) + now.getMinutes();
+  if (endMinutes != null) {
+    return {
+      isCurrent: nowMinutes >= startMinutes && nowMinutes <= endMinutes,
+      isPast: nowMinutes > endMinutes
+    };
+  }
+
+  return {
+    isCurrent: Math.abs(nowMinutes - startMinutes) <= 20,
+    isPast: nowMinutes > startMinutes + 20
+  };
+};
+
+const resolveScheduleStartMinutes = (timeEn) => {
+  const input = String(timeEn || '').trim();
+  if (!input) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const parts = input.split(/\s*-\s*/);
+  const startMinutes = parseTimeToken(parts[0]);
+  return startMinutes == null ? Number.POSITIVE_INFINITY : startMinutes;
+};
+
 const HomePage = () => {
   const DAILY_MUKHWAK_AUDIO = 'https://hs.sgpc.net/uploadhukamnama/hukamnama.mp3';
   const navigate = useNavigate();
@@ -54,6 +112,48 @@ const HomePage = () => {
     || dailyHukamnamaBySlot?.morning
     || dailyHukamnamaBySlot?.evening
     || currentHukamnama;
+  const resolvedScheduleDay = useMemo(() => {
+    const scheduleDays = Array.isArray(cmsData?.scheduleDays) ? cmsData.scheduleDays : [];
+    const fallbackEntries = [
+      ...(cmsData?.schedule?.morning || []).map((item) => ({ ...item, segment: 'morning', titleEn: item.label || '', timeEn: item.time || '' })),
+      ...(cmsData?.schedule?.evening || []).map((item) => ({ ...item, segment: 'evening', titleEn: item.label || '', timeEn: item.time || '' }))
+    ];
+
+    if (scheduleDays.length === 0) {
+      return {
+        dateKey: 'default',
+        title: 'Daily Schedule',
+        highlightTitle: '',
+        highlightNoteEn: '',
+        highlightNotePa: '',
+        entries: fallbackEntries
+      };
+    }
+
+    return scheduleDays.find((day) => day.dateKey === todayDateKey)
+      || scheduleDays.find((day) => day.dateKey === 'default')
+      || scheduleDays[0];
+  }, [cmsData, todayDateKey]);
+  const scheduleRows = useMemo(() => {
+    const entries = Array.isArray(resolvedScheduleDay?.entries) ? [...resolvedScheduleDay.entries] : [];
+
+    entries.sort((left, right) => {
+      const leftMinutes = resolveScheduleStartMinutes(left.timeEn);
+      const rightMinutes = resolveScheduleStartMinutes(right.timeEn);
+
+      if (leftMinutes !== rightMinutes) {
+        return leftMinutes - rightMinutes;
+      }
+
+      return Number(left.sortOrder || 0) - Number(right.sortOrder || 0);
+    });
+
+    return entries.map((item) => ({
+      ...item,
+      ...resolveScheduleRowState(item.timeEn, new Date())
+    }));
+  }, [resolvedScheduleDay]);
+  const isTodaySpecial = resolvedScheduleDay?.dateKey === todayDateKey && resolvedScheduleDay?.isSpecial !== false;
   const hukamnamaLines = activeHukamnama?.lines || [];
   const hukamnamaMeta = activeHukamnama?.metadata || {};
   const volunteerOptions = ['Langar', 'Cleaning', 'Parking', 'Teaching', 'Events'];
@@ -253,31 +353,49 @@ const HomePage = () => {
               </div>
             </div>
 
-            <section className="rounded-xl border border-slate-200 bg-white px-5 py-4">
-              <SectionTitle title="Daily Schedule" subtitle="Morning and evening maryada." />
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <h3 className="font-heading text-base font-semibold text-brand-blue">Morning</h3>
-                  <ul className="mt-2 space-y-2 text-xs text-slate-700">
-                    {(cmsData?.schedule?.morning || []).map((item) => (
-                      <li key={item.id} className="flex items-center gap-2 rounded-xl bg-slate-50 px-2.5 py-2 whitespace-nowrap overflow-hidden">
-                        <span className="shrink-0 rounded-full bg-brand-blue px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">{item.time}</span>
-                        <span className="truncate leading-none">{item.label}</span>
-                      </li>
-                    ))}
-                  </ul>
+            <section className={`relative rounded-xl border px-5 py-4 ${isTodaySpecial ? 'border-amber-300 bg-amber-50/40' : 'border-slate-200 bg-white'}`}>
+              {isTodaySpecial ? (
+                <div className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full border border-amber-300 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-800">
+                  <span aria-hidden="true">✦</span>
+                  Special Day
                 </div>
-                <div>
-                  <h3 className="font-heading text-base font-semibold text-brand-blue">Evening</h3>
-                  <ul className="mt-2 space-y-2 text-xs text-slate-700">
-                    {(cmsData?.schedule?.evening || []).map((item) => (
-                      <li key={item.id} className="flex items-center gap-2 rounded-xl bg-slate-50 px-2.5 py-2 whitespace-nowrap overflow-hidden">
-                        <span className="shrink-0 rounded-full bg-brand-blue px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">{item.time}</span>
-                        <span className="truncate leading-none">{item.label}</span>
-                      </li>
-                    ))}
-                  </ul>
+              ) : null}
+
+              <div className={`flex flex-wrap items-start justify-between gap-3 ${isTodaySpecial ? 'pt-8' : ''}`}>
+                <SectionTitle title="Daily Schedule" subtitle={isTodaySpecial ? 'Today is a special event schedule.' : 'Morning and evening maryada, with event-day overrides when needed.'} />
+                <div className="px-1 py-1 text-xs font-semibold text-slate-500">
+                  {resolvedScheduleDay?.dateKey === 'default' ? 'Default day' : `For ${resolvedScheduleDay?.dateKey}`}
                 </div>
+              </div>
+
+              <div className="mt-3 overflow-x-auto">
+                <table className="min-w-full border-collapse text-left">
+                  <tbody>
+                    {scheduleRows.length === 0 ? (
+                      <tr>
+                        <td className="py-4 text-sm text-slate-500">No schedule items available for this day.</td>
+                      </tr>
+                    ) : scheduleRows.map((item) => (
+                      <tr key={item.id} className={`border-t border-slate-200 ${item.isCurrent ? 'animate-pulse bg-brand-blue/15' : item.isHighlighted ? 'bg-sky-50/40' : 'bg-transparent'} ${item.isActive === false ? 'opacity-45' : ''}`}>
+                        <td className="w-[145px] py-3 pr-4 pl-2 align-top">
+                          <div className="flex items-start gap-3">
+                            <span className={`mt-1 inline-flex h-3 w-3 rounded-full ${item.isCurrent ? 'bg-green-500 shadow-[0_0_0_6px_rgba(34,197,94,0.18)]' : item.isHighlighted ? 'bg-brand-blue/80' : 'bg-slate-300'}`} />
+                            <div>
+                              <p className="whitespace-nowrap text-sm font-bold leading-none text-slate-900">{item.timeEn || 'Time TBD'}</p>
+                              {item.timePa ? <p className="mt-1 text-xs font-medium text-slate-500">{item.timePa}</p> : null}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 align-top">
+                          <p className="text-sm font-semibold text-slate-900">{item.titleEn || 'Untitled schedule item'}</p>
+                          {item.titlePa ? <p className="mt-1 text-sm text-brand-saffron">{item.titlePa}</p> : null}
+                          {item.noteEn ? <p className="mt-1 text-xs text-slate-600">{item.noteEn}</p> : null}
+                          {item.notePa ? <p className="mt-1 text-xs text-slate-500">{item.notePa}</p> : null}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </section>
           </div>

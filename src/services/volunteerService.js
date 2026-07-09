@@ -1,4 +1,5 @@
 import { mockResponse } from './mockApi';
+import userService from './userService';
 
 const STORAGE_KEY = 'ssm-volunteer-registrations';
 const OPPORTUNITIES_STORAGE_KEY = 'ssm-seva-opportunities';
@@ -154,6 +155,21 @@ const volunteerService = {
 
     allRecords.unshift(record);
     writeRegistrations(allRecords);
+
+    try {
+      await userService.upsertUserByEmail({
+        name: payload.name,
+        email: payload.email,
+        phone: payload.phone || '',
+        memberType: 'Volunteer',
+        role: 'Volunteer',
+        authProvider: 'LOCAL',
+        registrationComplete: true,
+        approvalStatus: 'pending'
+      });
+    } catch {
+      // Do not block volunteer registration if user upsert fails.
+    }
 
     return mockResponse({ success: true, payload: record });
   },

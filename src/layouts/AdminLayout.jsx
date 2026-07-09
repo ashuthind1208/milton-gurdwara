@@ -3,6 +3,8 @@ import { adminNav } from '../constants/navigation';
 import { useAuth } from '../context/AuthContext';
 import gurdwaraLogo from '../assets/gurdwara-logo.webp';
 
+const FULL_ACCESS_ROLES = new Set(['Super Admin', 'Admin']);
+
 const MEMBER_VISIBLE_PATHS = [
   '/admin',
   '/admin/hukamnama',
@@ -10,6 +12,7 @@ const MEMBER_VISIBLE_PATHS = [
   '/admin/gallery',
   '/admin/library',
   '/admin/videos',
+  '/admin/streaming',
   '/admin/events'
 ];
 
@@ -22,7 +25,8 @@ const AdminLayout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const firstName = getFirstName(user?.name);
-  const visibleNav = user?.role
+  const hasFullAccess = FULL_ACCESS_ROLES.has(String(user?.role || ''));
+  const visibleNav = hasFullAccess
     ? adminNav
     : adminNav.filter((item) => MEMBER_VISIBLE_PATHS.includes(item.path));
 
@@ -55,16 +59,16 @@ const AdminLayout = () => {
       </aside>
       <main className="p-4 md:p-8">
         <div className="mb-6 flex justify-end">
-          <div className="flex w-full max-w-md items-center gap-3 rounded-2xl border border-slate-200 bg-gradient-to-r from-white to-blue-50 px-4 py-3 shadow-sm">
-            <img src={user?.avatarUrl || gurdwaraLogo} alt={user?.name || 'Profile'} className="h-11 w-11 rounded-full border border-slate-300 object-cover" />
+          <div className="flex w-full max-w-sm items-center gap-2.5 rounded-xl border border-slate-200/80 bg-white/85 px-3 py-2 shadow-[0_4px_14px_-10px_rgba(15,23,42,0.45)] backdrop-blur">
+            <img src={user?.avatarUrl || gurdwaraLogo} alt={user?.name || 'Profile'} className="h-9 w-9 rounded-full border border-slate-200 object-cover" />
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Welcome Back</p>
-              <p className="truncate text-lg font-bold text-slate-800">{firstName}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Signed in</p>
+              <p className="truncate text-sm font-semibold text-slate-700">{firstName}</p>
             </div>
             <button
               type="button"
               onClick={handleLogout}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:border-brand-blue hover:text-brand-blue"
+              className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
             >
               Logout
             </button>

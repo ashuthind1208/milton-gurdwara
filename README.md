@@ -1,70 +1,59 @@
-# Getting Started with Create React App
+# Singh Sabha Milton
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## Donation Recording via Stripe Webhooks
 
-## Available Scripts
+This project now supports webhook-based Stripe donation recording so successful payments are saved even if a donor closes the browser after checkout.
 
-In the project directory, you can run:
+### What was added
 
-### `npm start`
+1. Backend Checkout Session creation endpoint:
+	- `POST /api/stripe/create-checkout-session`
+	- Uses Stripe Checkout with `submit_type: donate` and `custom_unit_amount`.
+	- Stores donor/campaign details in Stripe `metadata`.
+2. Backend webhook endpoint:
+	- `POST /api/stripe/webhook`
+	- Verifies Stripe signature using `STRIPE_WEBHOOK_SECRET`.
+	- Persists `checkout.session.completed` records into `server/data/donations.json`.
+3. Backend donation read endpoints:
+	- `GET /api/donations`
+	- `GET /api/donations/summary`
+4. Frontend integration:
+	- Donation flow creates Stripe Checkout Sessions through backend.
+	- Admin donation list merges webhook records.
+	- Campaign totals include webhook-donation summaries.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+### Environment variables required
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+Add these to `.env.local`:
 
-### `npm test`
+1. `STRIPE_SECRET_KEY=sk_test_...` (or live key)
+2. `STRIPE_WEBHOOK_SECRET=whsec_...`
+3. `STRIPE_CURRENCY=cad` (optional, defaults to `cad`)
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### Stripe Dashboard setup
 
-### `npm run build`
+1. Go to Stripe Dashboard -> Developers -> Webhooks.
+2. Add endpoint URL:
+	- Local dev with Stripe CLI forwarding: `http://127.0.0.1:4242/api/stripe/webhook`
+	- Production: `https://your-domain/api/stripe/webhook`
+3. Subscribe to event:
+	- `checkout.session.completed`
+4. Copy Signing Secret into `STRIPE_WEBHOOK_SECRET`.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Local testing flow
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+1. Start app:
+	- `npm start`
+2. In another terminal, forward Stripe webhooks to local backend:
+	- `stripe listen --forward-to 127.0.0.1:4242/api/stripe/webhook`
+3. Perform a test donation from the site.
+4. Verify:
+	- Donation appears in Admin -> Donations
+	- `server/data/donations.json` contains the webhook record
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### Scripts
 
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+1. `npm start` starts both:
+	- Frontend (`react-scripts start`)
+	- Local Stripe helper API (`server/index.js`)
+2. `npm run build` builds the React app.

@@ -12,6 +12,7 @@ import authService from '../../services/authService';
 
 const MEMBER_CONTRIBUTOR_PATHS = ['/admin/events', '/admin/seva-opportunities'];
 const PENDING_APPROVAL_NOTICE = 'Your registration is pending admin approval. You can sign in again once approved.';
+const FULL_ACCESS_ROLES = new Set(['Super Admin', 'Admin']);
 
 const resolveMemberContributorPath = (candidatePath) => {
   if (MEMBER_CONTRIBUTOR_PATHS.includes(candidatePath)) {
@@ -21,7 +22,7 @@ const resolveMemberContributorPath = (candidatePath) => {
 };
 
 const getApprovalMessage = (user, role) => {
-  if (role) {
+  if (FULL_ACCESS_ROLES.has(String(role || ''))) {
     return '';
   }
 
@@ -57,7 +58,8 @@ const LoginPage = () => {
       email: '',
       phone: '',
       address: '',
-      memberType: 'Member'
+      memberType: 'Member',
+      role: 'Member'
     }
   });
   const { reset: resetRegistrationForm } = registrationForm;
@@ -65,7 +67,7 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [pendingRegistrationUser, setPendingRegistrationUser] = useState(null);
-  const [oauthRedirectContext, setOauthRedirectContext] = useState({ isJoinMode: false, preferredPath: '' });
+  const [oauthRedirectContext, setOauthRedirectContext] = useState({ isJoinMode: false, preferredPath: '', requestedRole: 'Member' });
   const [autoOAuthTriggered, setAutoOAuthTriggered] = useState(false);
 
   const { loginWithGoogle, completeRegistration, loading } = useAuth();
@@ -77,11 +79,14 @@ const LoginPage = () => {
   const searchParams = new URLSearchParams(location.search || '');
   const isJoinMode = searchParams.get('mode') === 'join';
   const nextPath = searchParams.get('next') || '';
+  const roleType = searchParams.get('type') || '';
   const allowMockGoogleLogin = process.env.REACT_APP_ALLOW_MOCK_GOOGLE_LOGIN === 'true';
+  const requestedSignupRole = roleType === 'volunteer' ? 'Volunteer' : 'Member';
 
   const preferredPath = fromPath || nextPath;
   const effectiveIsJoinMode = isJoinMode || oauthRedirectContext.isJoinMode;
   const effectivePreferredPath = preferredPath || oauthRedirectContext.preferredPath;
+  const effectiveRequestedRole = oauthRedirectContext.requestedRole || requestedSignupRole;
   const isMemberContributorPath = useMemo(
     () => MEMBER_CONTRIBUTOR_PATHS.includes(effectivePreferredPath),
     [effectivePreferredPath]
@@ -95,10 +100,12 @@ const LoginPage = () => {
       window.localStorage.setItem('ssm_login_mode', effectiveIsJoinMode ? 'join' : '');
       window.sessionStorage.setItem('ssm_post_login_next', effectivePreferredPath || '');
       window.localStorage.setItem('ssm_post_login_next', effectivePreferredPath || '');
+      window.sessionStorage.setItem('ssm_signup_role', effectiveRequestedRole || 'Member');
+      window.localStorage.setItem('ssm_signup_role', effectiveRequestedRole || 'Member');
     } catch {
       // Ignore storage errors and rely on OAuth state.
     }
-  }, [effectiveIsJoinMode, effectivePreferredPath]);
+  }, [effectiveIsJoinMode, effectivePreferredPath, effectiveRequestedRole]);
 
   const consumeAuthIntent = (hashParams) => {
     const fromState = hashParams.get('state');
@@ -107,16 +114,20 @@ const LoginPage = () => {
     let intent = '';
     let loginMode = '';
     let postLoginNext = '';
+    let signupRole = 'Member';
     try {
       intent = window.sessionStorage.getItem('ssm_auth_intent') || window.localStorage.getItem('ssm_auth_intent') || '';
       loginMode = window.sessionStorage.getItem('ssm_login_mode') || window.localStorage.getItem('ssm_login_mode') || '';
       postLoginNext = window.sessionStorage.getItem('ssm_post_login_next') || window.localStorage.getItem('ssm_post_login_next') || '';
+      signupRole = window.sessionStorage.getItem('ssm_signup_role') || window.localStorage.getItem('ssm_signup_role') || 'Member';
       window.sessionStorage.removeItem('ssm_auth_intent');
       window.localStorage.removeItem('ssm_auth_intent');
       window.sessionStorage.removeItem('ssm_login_mode');
       window.localStorage.removeItem('ssm_login_mode');
       window.sessionStorage.removeItem('ssm_post_login_next');
       window.localStorage.removeItem('ssm_post_login_next');
+      window.sessionStorage.removeItem('ssm_signup_role');
+      window.localStorage.removeItem('ssm_signup_role');
     } catch {
       // Ignore storage errors and use defaults.
     }
@@ -124,7 +135,8 @@ const LoginPage = () => {
     return {
       authIntent: authIntentFromState || (intent === 'signup' ? 'signup' : 'signin'),
       recoveredIsJoinMode: loginMode === 'join',
-      recoveredPreferredPath: postLoginNext || ''
+      recoveredPreferredPath: postLoginNext || '',
+      recoveredRequestedRole: signupRole || 'Member'
     };
   };
 
@@ -137,11 +149,10 @@ const LoginPage = () => {
       email: user?.email || profile?.email || '',
       phone: user?.phone || '',
       address: user?.address || '',
-      memberType: effectiveIsJoinMode || intent === 'signup'
-        ? 'Member'
-        : (user?.memberType || (role ? 'Admin' : 'Member'))
+      memberType: effectiveRequestedRole === 'Volunteer' ? 'Volunteer' : 'Member',
+      role: effectiveRequestedRole === 'Volunteer' ? 'Volunteer' : 'Member'
     });
-  }, [effectiveIsJoinMode, resetRegistrationForm]);
+  }, [effectiveRequestedRole, resetRegistrationForm]);
 
   useEffect(() => {
     if (accessNotice === 'approval_pending') {
@@ -195,15 +206,17 @@ const LoginPage = () => {
 
       let profile = null;
       try {
-        const { authIntent, recoveredIsJoinMode, recoveredPreferredPath } = consumeAuthIntent(hashParams);
+        const { authIntent, recoveredIsJoinMode, recoveredPreferredPath, recoveredRequestedRole } = consumeAuthIntent(hashParams);
         const callbackIsJoinMode = effectiveIsJoinMode || recoveredIsJoinMode;
         const callbackPreferredPath = effectivePreferredPath || recoveredPreferredPath;
+        const callbackRequestedRole = recoveredRequestedRole || effectiveRequestedRole;
         const callbackIsMemberContributorPath = MEMBER_CONTRIBUTOR_PATHS.includes(callbackPreferredPath);
 
-        if (recoveredIsJoinMode || recoveredPreferredPath) {
+        if (recoveredIsJoinMode || recoveredPreferredPath || recoveredRequestedRole) {
           setOauthRedirectContext({
             isJoinMode: recoveredIsJoinMode,
-            preferredPath: recoveredPreferredPath
+            preferredPath: recoveredPreferredPath,
+            requestedRole: callbackRequestedRole
           });
         }
 
@@ -256,7 +269,7 @@ const LoginPage = () => {
               return;
             }
 
-            if (callbackPreferredPath.startsWith('/admin') && !role && !callbackIsMemberContributorPath) {
+            if (callbackPreferredPath.startsWith('/admin') && !FULL_ACCESS_ROLES.has(String(role || '')) && !callbackIsMemberContributorPath) {
               setError('This Google account does not have admin access.');
               return;
             }
@@ -275,7 +288,7 @@ const LoginPage = () => {
           return;
         }
 
-        if (callbackPreferredPath.startsWith('/admin') && !role && !callbackIsMemberContributorPath) {
+        if (callbackPreferredPath.startsWith('/admin') && !FULL_ACCESS_ROLES.has(String(role || '')) && !callbackIsMemberContributorPath) {
           navigate(resolveMemberContributorPath(callbackPreferredPath), { replace: true });
           return;
         }
@@ -304,7 +317,7 @@ const LoginPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [effectiveIsJoinMode, effectivePreferredPath, loginWithGoogle, navigate, openRegistrationWithNotice]);
+  }, [effectiveIsJoinMode, effectivePreferredPath, effectiveRequestedRole, loginWithGoogle, navigate, openRegistrationWithNotice]);
 
   const handleGoogleSignIn = useCallback(async (intent = 'signin') => {
     setError('');
@@ -368,7 +381,7 @@ const LoginPage = () => {
             return;
           }
 
-          if (effectivePreferredPath.startsWith('/admin') && !role && !isMemberContributorPath) {
+          if (effectivePreferredPath.startsWith('/admin') && !FULL_ACCESS_ROLES.has(String(role || '')) && !isMemberContributorPath) {
             setError('This Google account does not have admin access.');
             return;
           }
@@ -387,7 +400,7 @@ const LoginPage = () => {
         return;
       }
 
-      if (effectivePreferredPath.startsWith('/admin') && !role && !isMemberContributorPath) {
+      if (effectivePreferredPath.startsWith('/admin') && !FULL_ACCESS_ROLES.has(String(role || '')) && !isMemberContributorPath) {
         navigate(resolveMemberContributorPath(effectivePreferredPath), { replace: true });
         return;
       }
@@ -405,12 +418,14 @@ const LoginPage = () => {
   const onCompleteRegistration = async (values) => {
     setError('');
     setNotice('');
-    const safeMemberType = 'Member';
+    const safeRole = effectiveRequestedRole === 'Volunteer' ? 'Volunteer' : 'Member';
+    const safeMemberType = safeRole === 'Volunteer' ? 'Volunteer' : 'Member';
 
     try {
       const response = await completeRegistration({
         ...values,
         memberType: safeMemberType,
+        role: safeRole,
         avatarUrl: pendingRegistrationUser?.avatarUrl || ''
       });
 
@@ -423,7 +438,7 @@ const LoginPage = () => {
         return;
       }
 
-      if (effectivePreferredPath.startsWith('/admin') && !role && !isMemberContributorPath) {
+      if (effectivePreferredPath.startsWith('/admin') && !FULL_ACCESS_ROLES.has(String(role || '')) && !isMemberContributorPath) {
         navigate(resolveMemberContributorPath(effectivePreferredPath), { replace: true });
         return;
       }
@@ -501,7 +516,7 @@ const LoginPage = () => {
               </label>
 
               <label className="text-sm">Role
-                <input value="Member" readOnly className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5" />
+                <input value={effectiveRequestedRole === 'Volunteer' ? 'Volunteer' : 'Member'} readOnly className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5" />
               </label>
 
               <label className="text-sm md:col-span-2">Address
