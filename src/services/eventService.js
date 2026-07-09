@@ -9,7 +9,8 @@ const seedEvents = [
     date: '2026-07-12T10:00:00.000Z',
     location: 'Main Darbar Hall',
     category: 'Paath',
-    registrations: 96
+    registrations: 96,
+    active: true
   },
   {
     id: 2,
@@ -17,7 +18,8 @@ const seedEvents = [
     date: '2026-07-18T16:00:00.000Z',
     location: 'Community Classroom',
     category: 'Workshop',
-    registrations: 54
+    registrations: 54,
+    active: true
   },
   {
     id: 3,
@@ -25,7 +27,8 @@ const seedEvents = [
     date: '2026-07-20T09:00:00.000Z',
     location: 'Langar Hall',
     category: 'Seva',
-    registrations: 122
+    registrations: 122,
+    active: true
   }
 ];
 
@@ -60,7 +63,8 @@ const eventService = {
       location: payload.location,
       category: payload.category,
       registrations: Number(payload.registrations || 0),
-      registrants: []
+      registrants: [],
+      active: typeof payload.active === 'boolean' ? payload.active : true
     };
     const next = [record, ...allEvents];
     writeEvents(next);
@@ -73,7 +77,8 @@ const eventService = {
             ...event,
             ...payload,
             registrations: Number(payload.registrations ?? event.registrations ?? 0),
-            registrants: Array.isArray(payload.registrants) ? payload.registrants : (event.registrants || [])
+            registrants: Array.isArray(payload.registrants) ? payload.registrants : (event.registrants || []),
+            active: typeof payload.active === 'boolean' ? payload.active : (typeof event.active === 'boolean' ? event.active : true)
           }
         : event
     ));

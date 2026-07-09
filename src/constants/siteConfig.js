@@ -13,7 +13,10 @@ export const siteConfig = {
     youtube: 'https://www.youtube.com/@SinghSabhaMilton',
     facebook: 'https://facebook.com/singhsabhamilton',
     instagram: 'https://www.instagram.com/miltongurdwara/'
-  }
+  },
+  liveKirtanStreamUrl:
+    process.env.REACT_APP_DARBAR_SAHIB_STREAM_URL ||
+    'https://live.sgpc.net:8442/;'
 };
 
 export const userRoles = {

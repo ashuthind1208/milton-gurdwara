@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useLocation } from 'react-router-dom';
 
 const fallbackContent = {
   eyebrow: 'Waheguru Ji Ka Khalsa, Waheguru Ji Ki Fateh',
@@ -23,21 +24,41 @@ const fallbackContent = {
 };
 
 const HomeHeroBanner = ({ content, actions, topRightSlot, onSlideAction }) => {
+  const location = useLocation();
+  const isHomeRoute = location.pathname === '/';
   const resolvedContent = content || fallbackContent;
   const slides = useMemo(() => resolvedContent.slides || [], [resolvedContent]);
   const [index, setIndex] = useState(0);
+  const [isDocumentVisible, setIsDocumentVisible] = useState(() => document.visibilityState === 'visible');
 
   useEffect(() => {
-    if (slides.length <= 1) {
+    const onVisibilityChange = () => {
+      setIsDocumentVisible(document.visibilityState === 'visible');
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (slides.length <= 1 || !isHomeRoute || !isDocumentVisible) {
       return undefined;
     }
 
-    const timer = setInterval(() => {
+    const timer = window.setInterval(() => {
       setIndex((prev) => (prev + 1) % slides.length);
     }, 4500);
 
-    return () => clearInterval(timer);
-  }, [slides.length]);
+    return () => window.clearInterval(timer);
+  }, [isDocumentVisible, isHomeRoute, slides.length]);
+
+  useEffect(() => {
+    if (index >= slides.length && slides.length > 0) {
+      setIndex(0);
+    }
+  }, [index, slides.length]);
 
   const activeSlide = slides[index] || {};
   const activeEyebrow = activeSlide.eyebrow || resolvedContent.eyebrow;
@@ -90,7 +111,7 @@ const HomeHeroBanner = ({ content, actions, topRightSlot, onSlideAction }) => {
             <button
               type="button"
               onClick={() => onSlideAction?.(activeSlide.secondaryCtaPath)}
-              className="inline-flex items-center justify-center rounded-xl bg-brand-blue px-5 py-2.5 font-medium text-white transition hover:bg-blue-800"
+              className="inline-flex items-center justify-center rounded-xl border border-white/70 bg-transparent px-5 py-2.5 font-medium text-white transition hover:bg-white/10"
             >
               {activeSlide.secondaryCtaLabel}
             </button>

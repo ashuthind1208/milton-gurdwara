@@ -43,6 +43,19 @@ const normalizeFolderUrl = (value) => {
   return raw.startsWith('www.') ? `https://${raw}` : raw;
 };
 
+const normalizeBool = (value, fallback = true) => {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  if (value === 'true' || value === '1') {
+    return true;
+  }
+  if (value === 'false' || value === '0') {
+    return false;
+  }
+  return fallback;
+};
+
 const getDriveFolderEmbedUrl = (folderUrl) => {
   const value = String(folderUrl || '');
   const folderMatch = value.match(/drive\.google\.com\/drive\/folders\/([^/?]+)/);
@@ -51,6 +64,22 @@ const getDriveFolderEmbedUrl = (folderUrl) => {
   }
 
   return `https://drive.google.com/embeddedfolderview?id=${folderMatch[1]}#grid`;
+};
+
+const getDropboxFolderEmbedUrl = (folderUrl) => {
+  const value = String(folderUrl || '');
+  if (!/dropbox\.com\//.test(value)) {
+    return '';
+  }
+
+  try {
+    const parsed = new URL(value);
+    parsed.searchParams.set('raw', '1');
+    parsed.searchParams.set('preview', '1');
+    return parsed.toString();
+  } catch {
+    return value;
+  }
 };
 
 const isFolderLikeUrl = (url) => {
@@ -96,7 +125,12 @@ const seedAlbums = [
   {
     id: 'album-1',
     title: 'Vaisakhi 2026',
+    description: 'Nagar kirtan, kirtan diwan, and langar seva memories.',
     eventDate: '2026-04-14',
+    frontImage: 'https://images.unsplash.com/photo-1585241936939-be4099591252?auto=format&fit=crop&w=1200&q=80',
+    googleDriveFolderUrl: '',
+    dropboxFolderUrl: '',
+    isActive: true,
     images: [
       {
         id: 'img-1',
@@ -108,7 +142,12 @@ const seedAlbums = [
   {
     id: 'album-2',
     title: 'Gurpurab Celebration',
+    description: 'Gurpurab kirtan and sangat gathering highlights.',
     eventDate: '2026-06-21',
+    frontImage: 'https://images.unsplash.com/photo-1592861956120-e524fc739696?auto=format&fit=crop&w=1200&q=80',
+    googleDriveFolderUrl: '',
+    dropboxFolderUrl: '',
+    isActive: true,
     images: [
       {
         id: 'img-2',
@@ -125,18 +164,28 @@ const normalizeAlbum = (album) => {
     .filter((image) => Boolean(image.url));
 
   const folderFromImage = expandedItems.find((image) => isFolderLikeUrl(image.url))?.url || '';
-  const folderUrl = normalizeFolderUrl(album.folderUrl || album.sourceFolderUrl || folderFromImage || '');
-  const folderEmbedUrl = getDriveFolderEmbedUrl(folderUrl);
+  const googleDriveFolderUrl = normalizeFolderUrl(album.googleDriveFolderUrl || '');
+  const dropboxFolderUrl = normalizeFolderUrl(album.dropboxFolderUrl || '');
+  const folderUrl = normalizeFolderUrl(album.folderUrl || album.sourceFolderUrl || googleDriveFolderUrl || dropboxFolderUrl || folderFromImage || '');
+  const folderEmbedUrl = getDriveFolderEmbedUrl(googleDriveFolderUrl || folderUrl)
+    || getDropboxFolderEmbedUrl(dropboxFolderUrl || folderUrl);
   const images = expandedItems.filter((image) => !isFolderLikeUrl(image.url));
+  const frontImage = normalizeUrl(album.frontImage || album.cover || images[0]?.url || '');
+  const isActive = normalizeBool(album.isActive, true);
 
   return {
     id: album.id,
     title: album.title || '',
+    description: album.description || '',
     eventDate: album.eventDate || '',
+    frontImage,
+    googleDriveFolderUrl,
+    dropboxFolderUrl,
+    isActive,
     folderUrl,
     folderEmbedUrl,
     images,
-    cover: images[0]?.url || '',
+    cover: frontImage || images[0]?.url || '',
     items: images.length
   };
 };
@@ -164,11 +213,17 @@ const writeAlbums = (records) => {
 
 const galleryService = {
   getAlbums: async () => mockResponse(readAlbums()),
+  getPublicAlbums: async () => mockResponse(readAlbums().filter((album) => album.isActive)),
   createAlbum: async (payload) => {
     const record = normalizeAlbum({
       id: `album-${Date.now()}`,
       title: payload.title,
+      description: payload.description,
       eventDate: payload.eventDate,
+      frontImage: payload.frontImage,
+      googleDriveFolderUrl: payload.googleDriveFolderUrl,
+      dropboxFolderUrl: payload.dropboxFolderUrl,
+      isActive: payload.isActive,
       folderUrl: payload.folderUrl,
       images: payload.images || []
     });

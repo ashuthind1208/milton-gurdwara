@@ -25,6 +25,36 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  const loginWithGoogle = useCallback(async (payload) => {
+    setLoading(true);
+    try {
+      const response = await authService.loginWithGoogle(payload || {});
+      setUser(response.data.user);
+      setToken(response.data.token);
+      localStorage.setItem('gurdwara_user', JSON.stringify(response.data.user));
+      localStorage.setItem('gurdwara_token', response.data.token);
+      return response;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const completeRegistration = useCallback(async (payload) => {
+    setLoading(true);
+    try {
+      const response = await authService.completeRegistration(payload || {});
+      setUser(response.data.user);
+      if (response.data.token) {
+        setToken(response.data.token);
+        localStorage.setItem('gurdwara_token', response.data.token);
+      }
+      localStorage.setItem('gurdwara_user', JSON.stringify(response.data.user));
+      return response;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const logout = useCallback(async () => {
     await authService.logout();
     setUser(null);
@@ -34,8 +64,8 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const value = useMemo(
-    () => ({ user, token, loading, isAuthenticated: Boolean(token), login, logout }),
-    [user, token, loading, login, logout]
+    () => ({ user, token, loading, isAuthenticated: Boolean(token), login, loginWithGoogle, completeRegistration, logout }),
+    [user, token, loading, login, loginWithGoogle, completeRegistration, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -30,7 +30,7 @@ const HomePage = () => {
   const navigate = useNavigate();
   const meta = useSeoMeta('Home', 'Daily hukamnama, events, seva, donations, and Sikh education for the sangat.');
   const { data: events = [] } = useQuery({ queryKey: ['events'], queryFn: () => eventService.getEvents().then((res) => res.data) });
-  const { data: albums = [] } = useQuery({ queryKey: ['albums'], queryFn: () => galleryService.getAlbums().then((res) => res.data) });
+  const { data: albums = [] } = useQuery({ queryKey: ['albums'], queryFn: () => galleryService.getPublicAlbums().then((res) => res.data) });
   const { data: cmsData } = useQuery({ queryKey: ['cms-home'], queryFn: () => cmsService.getHomeContent().then((res) => res.data) });
   const { data: currentHukamnama } = useQuery({ queryKey: ['current-hukamnama'], queryFn: () => hukamnamaService.getCurrentHukamnama().then((res) => res.data) });
   const todayDateKey = toDateKey(new Date());
@@ -168,13 +168,13 @@ const HomePage = () => {
                 <button
                   key={`${groupIndex}-${event.id}`}
                   type="button"
-                  className="ticker-item ticker-item-home mx-1 inline-flex items-center gap-2 rounded-full border border-brand-blue/20 bg-white/85 px-3 py-1 text-xs font-black uppercase tracking-wide text-brand-blue transition hover:-translate-y-0.5 hover:bg-brand-blue hover:text-white"
+                  className="ticker-item ticker-item-home mx-1 inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white/95 px-3 py-1 text-xs font-black uppercase tracking-wide text-slate-900 transition hover:-translate-y-0.5 hover:bg-slate-200 hover:text-slate-900"
                   onClick={() => setSelectedTickerEvent(event)}
                 >
                   <span className="h-1.5 w-1.5 rounded-full bg-brand-saffron" />
                   <span className="hidden font-black sm:inline">{event.category}</span>
                   <span className="max-w-[190px] truncate font-black sm:max-w-[280px]">{event.title}</span>
-                  <span className="ticker-item-date rounded-full bg-brand-blue/10 px-2 py-0.5 text-[10px] font-bold text-brand-blue group-hover:text-white">
+                  <span className="ticker-item-date rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-900">
                     {new Date(event.date).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}
                   </span>
                 </button>

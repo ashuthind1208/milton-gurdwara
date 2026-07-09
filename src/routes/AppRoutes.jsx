@@ -16,6 +16,7 @@ const DonationPage = lazy(() => import('../pages/Donation/DonationPage'));
 const GalleryPage = lazy(() => import('../pages/Gallery/GalleryPage'));
 const NewsPage = lazy(() => import('../pages/News/NewsPage'));
 const LibraryPage = lazy(() => import('../pages/Library/LibraryPage'));
+const VideosPage = lazy(() => import('../pages/Videos/VideosPage'));
 const FaqPage = lazy(() => import('../pages/FAQ/FaqPage'));
 const ContactPage = lazy(() => import('../pages/Contact/ContactPage'));
 const LoginPage = lazy(() => import('../pages/Auth/LoginPage'));
@@ -29,6 +30,8 @@ const AdminLangarPage = lazy(() => import('../admin/Langar/AdminLangarPage'));
 const AdminSubscribersPage = lazy(() => import('../admin/Subscribers/AdminSubscribersPage'));
 const AdminSevaOpportunitiesPage = lazy(() => import('../admin/SevaOpportunities/AdminSevaOpportunitiesPage'));
 const AdminGalleryPage = lazy(() => import('../admin/Gallery/AdminGalleryPage'));
+const AdminLibraryPage = lazy(() => import('../admin/Library/AdminLibraryPage'));
+const AdminVideosPage = lazy(() => import('../admin/Videos/AdminVideosPage'));
 const AdminAdvertisementsPage = lazy(() => import('../admin/Advertisements/AdminAdvertisementsPage'));
 const AdminEventsPage = lazy(() => import('../admin/Events/AdminEventsPage'));
 const AdminDonationsPage = lazy(() => import('../admin/Donations/AdminDonationsPage'));
@@ -48,11 +51,13 @@ const AppRoutes = () => {
           <Route path="/gurbani-library" element={<GurbaniLibraryPage />} />
           <Route path="/hukamnama" element={<HukamnamaPage />} />
           <Route path="/events" element={<EventsPage />} />
+          <Route path="/join" element={<Navigate to="/login?mode=join" replace />} />
           <Route path="/seva" element={<SevaPage />} />
           <Route path="/donation" element={<DonationPage />} />
           <Route path="/gallery" element={<GalleryPage />} />
           <Route path="/news" element={<NewsPage />} />
           <Route path="/library" element={<LibraryPage />} />
+          <Route path="/videos" element={<VideosPage />} />
           <Route path="/faq" element={<FaqPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/login" element={<LoginPage />} />
@@ -60,20 +65,27 @@ const AppRoutes = () => {
 
         <Route element={<ProtectedRoute allowedRoles={Object.values(userRoles)} />}>
           <Route element={<AdminLayout />}>
-            <Route path="/admin" element={<AdminDashboardPage />} />
             <Route path="/admin/cms" element={<AdminCmsPage />} />
             <Route path="/admin/news" element={<AdminNewsPage />} />
             <Route path="/admin/schedule" element={<AdminSchedulePage />} />
-            <Route path="/admin/hukamnama" element={<AdminHukamnamaPage />} />
             <Route path="/admin/langar" element={<AdminLangarPage />} />
             <Route path="/admin/subscribers" element={<AdminSubscribersPage />} />
-            <Route path="/admin/seva-opportunities" element={<AdminSevaOpportunitiesPage />} />
-            <Route path="/admin/gallery" element={<AdminGalleryPage />} />
             <Route path="/admin/advertisements" element={<AdminAdvertisementsPage />} />
-            <Route path="/admin/events" element={<AdminEventsPage />} />
             <Route path="/admin/donations" element={<AdminDonationsPage />} />
             <Route path="/admin/users" element={<AdminUsersPage />} />
             <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
+          </Route>
+        </Route>
+
+        <Route element={<ProtectedRoute />}>
+          <Route element={<AdminLayout />}>
+            <Route path="/admin" element={<AdminDashboardPage />} />
+            <Route path="/admin/hukamnama" element={<AdminHukamnamaPage />} />
+            <Route path="/admin/gallery" element={<AdminGalleryPage />} />
+            <Route path="/admin/library" element={<AdminLibraryPage />} />
+            <Route path="/admin/videos" element={<AdminVideosPage />} />
+            <Route path="/admin/seva-opportunities" element={<AdminSevaOpportunitiesPage />} />
+            <Route path="/admin/events" element={<AdminEventsPage />} />
           </Route>
         </Route>
 

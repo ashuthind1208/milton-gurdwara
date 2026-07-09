@@ -1,26 +1,51 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  CheckIcon,
+  EyeIcon,
+  PencilSquareIcon,
+  TrashIcon
+} from '@heroicons/react/24/outline';
 import Card from '../../components/ui/Card';
 import eventService from '../../services/eventService';
 import { formatDate } from '../../utils/formatters';
 import Button from '../../components/ui/Button';
+import { siteConfig } from '../../constants/siteConfig';
+import { downloadRegistrationCsv, downloadRegistrationPdf } from '../../utils/csvExport';
+
+const actionIconClass = 'h-4 w-4';
+
+const defaultForm = {
+  title: '',
+  date: '',
+  location: '',
+  category: 'Paath',
+  registrations: 0,
+  active: true
+};
 
 const AdminEventsPage = () => {
   const queryClient = useQueryClient();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [viewEvent, setViewEvent] = useState(null);
   const [editingEvent, setEditingEvent] = useState(null);
-  const [registrationsEvent, setRegistrationsEvent] = useState(null);
-  const createForm = useForm({ defaultValues: { title: '', date: '', location: '', category: 'Paath', registrations: 0 } });
-  const editForm = useForm({ defaultValues: { title: '', date: '', location: '', category: 'Paath', registrations: 0 } });
 
-  const { data: events = [] } = useQuery({ queryKey: ['admin-events'], queryFn: () => eventService.getEvents().then((res) => res.data) });
+  const createForm = useForm({ defaultValues: defaultForm });
+  const editForm = useForm({ defaultValues: defaultForm });
+
+  const { data: events = [] } = useQuery({
+    queryKey: ['admin-events'],
+    queryFn: () => eventService.getEvents().then((res) => res.data)
+  });
 
   const createMutation = useMutation({
     mutationFn: (values) => eventService.createEvent(values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-events'] });
       queryClient.invalidateQueries({ queryKey: ['events'] });
-      createForm.reset({ title: '', date: '', location: '', category: 'Paath', registrations: 0 });
+      createForm.reset(defaultForm);
+      setCreateOpen(false);
     }
   });
 
@@ -33,11 +58,21 @@ const AdminEventsPage = () => {
     }
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (id) => eventService.removeEvent(id),
+  const toggleActiveMutation = useMutation({
+    mutationFn: ({ id, active }) => eventService.updateEvent(id, { active }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-events'] });
       queryClient.invalidateQueries({ queryKey: ['events'] });
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => eventService.removeEvent(id),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-events'] });
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      setViewEvent((prev) => (prev?.id === id ? null : prev));
+      setEditingEvent((prev) => (prev?.id === id ? null : prev));
     }
   });
 
@@ -46,7 +81,9 @@ const AdminEventsPage = () => {
     onSuccess: (updatedEvent) => {
       queryClient.invalidateQueries({ queryKey: ['admin-events'] });
       queryClient.invalidateQueries({ queryKey: ['events'] });
-      setRegistrationsEvent(updatedEvent || null);
+      if (updatedEvent?.id) {
+        setViewEvent(updatedEvent);
+      }
     }
   });
 
@@ -57,65 +94,214 @@ const AdminEventsPage = () => {
       date: event.date ? event.date.slice(0, 16) : '',
       location: event.location,
       category: event.category,
-      registrations: event.registrations
+      registrations: event.registrations || 0,
+      active: typeof event.active === 'boolean' ? event.active : true
+    });
+  };
+
+  const closeModals = () => {
+    setCreateOpen(false);
+    setViewEvent(null);
+    setEditingEvent(null);
+  };
+
+  const exportEventRegistrations = async (event, format) => {
+    const registrants = event?.registrants || [];
+    if (registrants.length === 0) {
+      return;
+    }
+
+    const rows = registrants.map((entry) => [
+      entry.name || 'Anonymous',
+      entry.phone || entry.contact || '',
+      ''
+    ]);
+
+    const safeTitle = (event?.title || 'event').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const eventDate = event?.date ? new Date(event.date) : null;
+    const serviceDate = eventDate && !Number.isNaN(eventDate.getTime())
+      ? eventDate.toLocaleDateString('en-CA')
+      : '-';
+    const serviceTime = eventDate && !Number.isNaN(eventDate.getTime())
+      ? eventDate.toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })
+      : '-';
+    const payload = {
+      organizationName: siteConfig.name,
+      serviceName: event?.title || 'Event Registration',
+      serviceDate,
+      serviceTime,
+      headers: ['Name', 'Number', 'Arrived'],
+      rows
+    };
+
+    if (format === 'pdf') {
+      await downloadRegistrationPdf({
+        ...payload,
+        fileName: `${safeTitle || 'event'}-registrations.pdf`
+      });
+      return;
+    }
+
+    downloadRegistrationCsv({
+      ...payload,
+      fileName: `${safeTitle || 'event'}-registrations.csv`
     });
   };
 
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-3xl font-bold">Event Management</h1>
-      <Card>
-        <h2 className="font-heading text-xl font-semibold">Create Event</h2>
-        <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={createForm.handleSubmit((values) => createMutation.mutate(values))}>
-          <label className="text-sm">Title
-            <input {...createForm.register('title', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-          </label>
-          <label className="text-sm">Date and Time
-            <input type="datetime-local" {...createForm.register('date', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-          </label>
-          <label className="text-sm">Location
-            <input {...createForm.register('location', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-          </label>
-          <label className="text-sm">Category
-            <select {...createForm.register('category')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
-              <option>Paath</option>
-              <option>Workshop</option>
-              <option>Seva</option>
-              <option>Kirtan</option>
-            </select>
-          </label>
-          <label className="text-sm md:col-span-2">Expected Registrations
-            <input type="number" min="0" {...createForm.register('registrations')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-          </label>
-          <div className="md:col-span-2">
-            <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? 'Creating...' : 'Create Event'}</Button>
-          </div>
-        </form>
-      </Card>
-      <div className="space-y-3">
-        {events.map((event) => (
-          <Card key={event.id} className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="font-semibold">{event.title}</p>
-              <p className="text-sm text-slate-600 dark:text-slate-300">{formatDate(event.date)} | {event.category}</p>
-              <p className="text-xs text-slate-500">{event.location}</p>
-              <p className="text-xs font-semibold text-brand-blue">Registered: {event.registrations || (event.registrants || []).length || 0}</p>
-            </div>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setRegistrationsEvent(event)} className="rounded-lg border border-brand-blue/30 px-3 py-1.5 text-sm font-semibold text-brand-blue">Registrations</button>
-              <button type="button" onClick={() => openEdit(event)} className="rounded-lg bg-slate-200 px-3 py-1.5 text-sm dark:bg-slate-700">Edit</button>
-              <button type="button" onClick={() => deleteMutation.mutate(event.id)} className="rounded-lg bg-red-100 px-3 py-1.5 text-sm text-red-700 dark:bg-red-900/30">Delete</button>
-            </div>
-          </Card>
-        ))}
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="font-heading text-3xl font-bold">Events</h1>
+        <Button type="button" onClick={() => setCreateOpen(true)}>Add New Event</Button>
       </div>
+
+      <Card>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+                <th className="py-2 pr-3">Title</th>
+                <th className="py-2 pr-3">Date</th>
+                <th className="py-2 pr-3">Category</th>
+                <th className="py-2 pr-3">Registrations</th>
+                <th className="py-2 pr-3">Status</th>
+                <th className="py-2 pr-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {events.map((event) => (
+                <tr key={event.id} className="border-b border-slate-100">
+                  <td className="py-2 pr-3">
+                    <p className="font-semibold text-slate-800">{event.title || 'Untitled'}</p>
+                    <p className="text-xs text-slate-500">{event.location || '-'}</p>
+                  </td>
+                  <td className="py-2 pr-3">{formatDate(event.date)}</td>
+                  <td className="py-2 pr-3">{event.category || '-'}</td>
+                  <td className="py-2 pr-3">{event.registrations || (event.registrants || []).length || 0}</td>
+                  <td className="py-2 pr-3">
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${event.active === false ? 'bg-slate-200 text-slate-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                      {event.active === false ? 'Inactive' : 'Active'}
+                    </span>
+                  </td>
+                  <td className="py-2 pr-3">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleActiveMutation.mutate({ id: event.id, active: event.active === false })}
+                        className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border ${event.active === false ? 'border-slate-300 text-slate-700 hover:bg-slate-100' : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}
+                        title={event.active === false ? 'Mark active' : 'Mark inactive'}
+                        aria-label={event.active === false ? 'Mark active' : 'Mark inactive'}
+                      >
+                        <CheckIcon className={actionIconClass} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setViewEvent(event)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100"
+                        title="View"
+                        aria-label="View"
+                      >
+                        <EyeIcon className={actionIconClass} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openEdit(event)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50"
+                        title="Edit"
+                        aria-label="Edit"
+                      >
+                        <PencilSquareIcon className={actionIconClass} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => exportEventRegistrations(event, 'csv')}
+                        disabled={(event.registrants || []).length === 0}
+                        className="inline-flex h-8 items-center justify-center rounded-lg border border-indigo-200 px-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        title="Download CSV"
+                        aria-label="Download CSV"
+                      >
+                        CSV
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => exportEventRegistrations(event, 'pdf')}
+                        disabled={(event.registrants || []).length === 0}
+                        className="inline-flex h-8 items-center justify-center rounded-lg border border-indigo-200 px-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        title="Download PDF"
+                        aria-label="Download PDF"
+                      >
+                        PDF
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteMutation.mutate(event.id)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-700 hover:bg-red-50"
+                        title="Delete"
+                        aria-label="Delete"
+                      >
+                        <TrashIcon className={actionIconClass} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {events.length === 0 ? (
+                <tr>
+                  <td className="py-4 text-center text-slate-500" colSpan={6}>No events found.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {createOpen ? (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/45 px-4">
+          <div className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="font-heading text-xl font-semibold">Add Event</h3>
+              <button type="button" className="rounded-md border border-slate-300 px-2 py-1 text-sm" onClick={closeModals}>Close</button>
+            </div>
+            <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={createForm.handleSubmit((values) => createMutation.mutate(values))}>
+              <label className="text-sm">Title
+                <input {...createForm.register('title', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="text-sm">Date and Time
+                <input type="datetime-local" {...createForm.register('date', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="text-sm">Location
+                <input {...createForm.register('location', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="text-sm">Category
+                <select {...createForm.register('category')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
+                  <option>Paath</option>
+                  <option>Workshop</option>
+                  <option>Seva</option>
+                  <option>Kirtan</option>
+                </select>
+              </label>
+              <label className="text-sm">Expected Registrations
+                <input type="number" min="0" {...createForm.register('registrations')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="text-sm flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 mt-6">
+                <input type="checkbox" {...createForm.register('active')} />
+                <span>Active</span>
+              </label>
+              <div className="md:col-span-2 flex gap-2">
+                <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? 'Saving...' : 'Create Event'}</Button>
+                <Button type="button" variant="ghost" onClick={closeModals}>Cancel</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
       {editingEvent ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/45 px-4">
-          <div className="w-full max-w-xl rounded-xl bg-white p-5 shadow-xl">
+          <div className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl">
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-heading text-xl font-semibold">Edit Event</h3>
-              <button type="button" className="rounded-md border border-slate-300 px-2 py-1 text-sm" onClick={() => setEditingEvent(null)}>Close</button>
+              <button type="button" className="rounded-md border border-slate-300 px-2 py-1 text-sm" onClick={closeModals}>Close</button>
             </div>
             <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={editForm.handleSubmit((values) => updateMutation.mutate({ id: editingEvent.id, values }))}>
               <label className="text-sm">Title
@@ -135,30 +321,41 @@ const AdminEventsPage = () => {
                   <option>Kirtan</option>
                 </select>
               </label>
-              <label className="text-sm md:col-span-2">Registrations
+              <label className="text-sm">Registrations
                 <input type="number" min="0" {...editForm.register('registrations')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="text-sm flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 mt-6">
+                <input type="checkbox" {...editForm.register('active')} />
+                <span>Active</span>
               </label>
               <div className="md:col-span-2 flex gap-2">
                 <Button type="submit" disabled={updateMutation.isPending}>{updateMutation.isPending ? 'Saving...' : 'Save Changes'}</Button>
-                <button type="button" className="rounded-lg border border-slate-300 px-4 py-2 text-sm" onClick={() => setEditingEvent(null)}>Cancel</button>
+                <Button type="button" variant="ghost" onClick={closeModals}>Cancel</Button>
               </div>
             </form>
           </div>
         </div>
       ) : null}
 
-      {registrationsEvent ? (
+      {viewEvent ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/45 px-4">
           <div className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl">
             <div className="flex items-center justify-between gap-3">
-              <h3 className="font-heading text-xl font-semibold">Registrations • {registrationsEvent.title}</h3>
-              <button type="button" className="rounded-md border border-slate-300 px-2 py-1 text-sm" onClick={() => setRegistrationsEvent(null)}>Close</button>
+              <h3 className="font-heading text-xl font-semibold">Event Details</h3>
+              <button type="button" className="rounded-md border border-slate-300 px-2 py-1 text-sm" onClick={closeModals}>Close</button>
             </div>
-            <p className="mt-1 text-xs text-slate-500">Total: {registrationsEvent.registrations || 0}</p>
-            <div className="mt-4 max-h-[60vh] space-y-2 overflow-y-auto pr-1">
-              {(registrationsEvent.registrants || []).length === 0 ? (
+            <div className="mt-4 grid gap-2 text-sm text-slate-700 md:grid-cols-2">
+              <p><span className="font-semibold">Title:</span> {viewEvent.title || '-'}</p>
+              <p><span className="font-semibold">Date:</span> {formatDate(viewEvent.date)}</p>
+              <p><span className="font-semibold">Category:</span> {viewEvent.category || '-'}</p>
+              <p><span className="font-semibold">Location:</span> {viewEvent.location || '-'}</p>
+              <p><span className="font-semibold">Status:</span> {viewEvent.active === false ? 'Inactive' : 'Active'}</p>
+              <p><span className="font-semibold">Total Registrations:</span> {viewEvent.registrations || (viewEvent.registrants || []).length || 0}</p>
+            </div>
+            <div className="mt-4 max-h-[45vh] space-y-2 overflow-y-auto pr-1">
+              {(viewEvent.registrants || []).length === 0 ? (
                 <p className="text-sm text-slate-500">No registrations captured yet.</p>
-              ) : (registrationsEvent.registrants || []).map((entry) => (
+              ) : (viewEvent.registrants || []).map((entry) => (
                 <div key={entry.id} className="rounded-lg border border-slate-200 px-3 py-2">
                   <div className="flex items-start justify-between gap-2">
                     <div>
@@ -167,7 +364,7 @@ const AdminEventsPage = () => {
                     </div>
                     <button
                       type="button"
-                      onClick={() => removeRegistrantMutation.mutate({ eventId: registrationsEvent.id, registrantId: entry.id })}
+                      onClick={() => removeRegistrantMutation.mutate({ eventId: viewEvent.id, registrantId: entry.id })}
                       className="rounded-md border border-red-200 px-2 py-0.5 text-xs font-semibold text-red-700"
                     >
                       Remove

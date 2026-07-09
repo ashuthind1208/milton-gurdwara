@@ -3,7 +3,7 @@ import Card from '../ui/Card';
 import gurdwaraLogo from '../../assets/gurdwara-logo.webp';
 
 const GalleryCard = ({ album }) => {
-  const [imageSrc, setImageSrc] = useState(album.cover || gurdwaraLogo);
+  const [imageSrc, setImageSrc] = useState(album.frontImage || album.cover || gurdwaraLogo);
   const previewCaption = album.images?.[0]?.caption;
 
   return (
@@ -12,7 +12,7 @@ const GalleryCard = ({ album }) => {
       <div className="p-4">
         <h3 className="font-heading text-lg font-semibold text-slate-900 dark:text-white">{album.title}</h3>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{album.items} image links{album.eventDate ? ` • ${album.eventDate}` : ''}</p>
-        {previewCaption ? <p className="mt-2 text-xs text-slate-500">{previewCaption}</p> : <p className="mt-2 text-xs text-slate-500">No caption added yet.</p>}
+        {album.description ? <p className="mt-2 text-xs text-slate-500 line-clamp-2">{album.description}</p> : previewCaption ? <p className="mt-2 text-xs text-slate-500">{previewCaption}</p> : <p className="mt-2 text-xs text-slate-500">No description added yet.</p>}
       </div>
     </Card>
   );

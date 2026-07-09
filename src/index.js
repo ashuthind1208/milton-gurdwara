@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, HashRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { HelmetProvider } from 'react-helmet-async';
 import './index.css';
@@ -18,6 +18,8 @@ const queryClient = new QueryClient({
   }
 });
 
+const Router = process.env.NODE_ENV === 'development' ? BrowserRouter : HashRouter;
+
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
@@ -25,9 +27,9 @@ root.render(
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
           <AuthProvider>
-            <BrowserRouter>
+            <Router>
               <App />
-            </BrowserRouter>
+            </Router>
           </AuthProvider>
         </ThemeProvider>
       </QueryClientProvider>

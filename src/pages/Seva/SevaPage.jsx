@@ -90,6 +90,13 @@ const SevaPage = () => {
       label: `${item.sevaType} • ${formatDateLabel(item.date)}${item.time ? ` • ${item.time}` : ''} • ${item.registered}/${item.totalRequired}`
     })), [enrichedOpportunities]);
 
+  const sevaTickerItems = useMemo(() => {
+    if (enrichedOpportunities.length === 0) {
+      return [];
+    }
+    return Array.from({ length: 6 }).flatMap(() => enrichedOpportunities);
+  }, [enrichedOpportunities]);
+
   return (
     <div className="space-y-6">
       <Seo {...meta} />
@@ -106,21 +113,35 @@ const SevaPage = () => {
         {sevaOpportunities.length === 0 ? (
           <Card><p className="text-sm text-slate-500">No seva opportunities available right now.</p></Card>
         ) : (
-          <section className="ticker-shell overflow-hidden bg-white py-1.5">
-            <div className="ticker-track">
-              {[0, 1].map((groupIndex) => (
-                <div key={groupIndex} className="ticker-group">
-                  {enrichedOpportunities.map((item) => (
-                    <p key={`${groupIndex}-${item.id}`} className="ticker-item px-6 text-sm text-slate-700">
-                      <span className="font-bold text-brand-blue">{item.sevaType}</span> • {formatDateLabel(item.date)}{item.time ? ` • ${item.time}` : ''} • <span className={`font-semibold ${item.isOpen ? 'text-brand-green' : 'text-red-600'}`}>{item.registered}/{item.totalRequired}</span>
-                    </p>
-                  ))}
-                </div>
+          <section className="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden border-y border-brand-blue/70 bg-brand-blue py-2.5">
+            <div className="seva-ticker-track flex min-w-max items-center gap-8 whitespace-nowrap px-4 md:px-8">
+              {sevaTickerItems.map((item, index) => (
+                <p key={`${item.id}-${index}`} className="inline-flex items-center gap-2.5">
+                  <span className="text-sm font-black text-white">{formatDateLabel(item.date)}</span>
+                  <span className="text-base font-black text-white">{item.sevaType}</span>
+                  <span className="text-base font-black text-brand-saffron">{item.time || 'Time TBD'}</span>
+                  <span className="text-sm font-extrabold text-white/95">{item.registered}/{item.totalRequired} registered</span>
+                  <span className={`text-sm font-extrabold ${item.isOpen ? 'text-emerald-300' : 'text-red-300'}`}>{item.isOpen ? 'Open' : 'Closed'}</span>
+                  <span className="text-white/80">|</span>
+                </p>
               ))}
             </div>
           </section>
         )}
       </section>
+
+      <style>{`
+        .seva-ticker-track {
+          animation: sevaTickerFlow 115s linear infinite;
+        }
+        .seva-ticker-track:hover {
+          animation-play-state: paused;
+        }
+        @keyframes sevaTickerFlow {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+      `}</style>
 
       <section>
         <div className="space-y-3">

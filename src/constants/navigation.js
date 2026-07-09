@@ -8,8 +8,9 @@ export const publicNav = [
   { label: 'Seva', path: '/seva' },
   { label: 'Donation', path: '/donation' },
   { label: 'Gallery', path: '/gallery' },
-  { label: 'News', path: '/news' },
   { label: 'Library', path: '/library' },
+  { label: 'News', path: '/news' },
+  { label: 'Videos', path: '/videos' },
   { label: 'FAQ', path: '/faq' },
   { label: 'Contact', path: '/contact' }
 ];
@@ -24,6 +25,8 @@ export const adminNav = [
   { label: 'Subscribers', path: '/admin/subscribers' },
   { label: 'Seva Opportunities', path: '/admin/seva-opportunities' },
   { label: 'Gallery Folders', path: '/admin/gallery' },
+  { label: 'Library', path: '/admin/library' },
+  { label: 'Videos', path: '/admin/videos' },
   { label: 'Advertisements', path: '/admin/advertisements' },
   { label: 'Events', path: '/admin/events' },
   { label: 'Donations', path: '/admin/donations' },

@@ -13,7 +13,7 @@ const GalleryPage = () => {
   const meta = useSeoMeta('Gallery', 'Photo and video albums with searchable highlights.');
   const location = useLocation();
   const [selectedAlbum, setSelectedAlbum] = useState(null);
-  const { data: albums = [] } = useQuery({ queryKey: ['gallery'], queryFn: () => galleryService.getAlbums().then((res) => res.data) });
+  const { data: albums = [] } = useQuery({ queryKey: ['gallery-public'], queryFn: () => galleryService.getPublicAlbums().then((res) => res.data) });
   const { data: content } = useQuery({
     queryKey: ['page-content', 'gallery'],
     queryFn: () => cmsService.getPageContent('gallery').then((res) => res.data)
@@ -51,6 +51,7 @@ const GalleryPage = () => {
               <div>
                 <h3 className="font-heading text-xl font-semibold text-slate-900">{selectedAlbum.title}</h3>
                 <p className="text-xs text-slate-500">{selectedAlbum.eventDate || 'No date'} • {selectedAlbum.items} photos{selectedAlbum.folderUrl ? ' • Folder linked' : ''}</p>
+                {selectedAlbum.description ? <p className="mt-1 text-xs text-slate-500">{selectedAlbum.description}</p> : null}
               </div>
               <button type="button" onClick={() => setSelectedAlbum(null)} className="rounded-md border border-slate-300 px-3 py-1 text-sm">Close</button>
             </div>

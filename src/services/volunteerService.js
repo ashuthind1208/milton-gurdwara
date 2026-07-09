@@ -4,10 +4,26 @@ const STORAGE_KEY = 'ssm-volunteer-registrations';
 const OPPORTUNITIES_STORAGE_KEY = 'ssm-seva-opportunities';
 
 const defaultSevaOpportunities = [
-  { id: 'op-1', sevaType: 'Langar', date: '2026-07-12', time: '10:00 AM - 1:00 PM', totalVolunteersRequired: 10, expiryDate: '2026-07-11' },
-  { id: 'op-2', sevaType: 'Parking', date: '2026-07-12', time: '9:30 AM - 12:30 PM', totalVolunteersRequired: 8, expiryDate: '2026-07-11' },
-  { id: 'op-3', sevaType: 'Cleaning', date: '2026-07-13', time: '6:30 PM - 8:00 PM', totalVolunteersRequired: 6, expiryDate: '2026-07-12' }
+  { id: 'op-1', sevaType: 'Langar', date: '2026-07-12', time: '10:00 AM - 1:00 PM', totalVolunteersRequired: 10, expiryDate: '2026-07-11', active: true },
+  { id: 'op-2', sevaType: 'Parking', date: '2026-07-12', time: '9:30 AM - 12:30 PM', totalVolunteersRequired: 8, expiryDate: '2026-07-11', active: true },
+  { id: 'op-3', sevaType: 'Cleaning', date: '2026-07-13', time: '6:30 PM - 8:00 PM', totalVolunteersRequired: 6, expiryDate: '2026-07-12', active: true }
 ];
+
+const normalizeBoolean = (value, fallback = true) => {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const lowered = value.toLowerCase();
+    if (lowered === 'true') {
+      return true;
+    }
+    if (lowered === 'false') {
+      return false;
+    }
+  }
+  return fallback;
+};
 
 const readRegistrations = () => {
   try {
@@ -24,7 +40,8 @@ const normalizeOpportunity = (item, index = 0) => ({
   date: item.date || toIsoDate(Date.now()),
   time: item.time || '',
   totalVolunteersRequired: Math.max(1, Number(item.totalVolunteersRequired) || 10),
-  expiryDate: item.expiryDate || item.date || toIsoDate(Date.now())
+  expiryDate: item.expiryDate || item.date || toIsoDate(Date.now()),
+  active: normalizeBoolean(item.active, true)
 });
 
 const writeRegistrations = (records) => {
@@ -78,7 +95,8 @@ const volunteerService = {
       date: payload.date,
       time: payload.time || '',
       totalVolunteersRequired: payload.totalVolunteersRequired,
-      expiryDate: payload.expiryDate
+      expiryDate: payload.expiryDate,
+      active: normalizeBoolean(payload.active, true)
     });
     const next = [record, ...readSevaOpportunities()];
     writeSevaOpportunities(next);

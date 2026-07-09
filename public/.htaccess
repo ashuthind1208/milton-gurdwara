@@ -1,0 +1,18 @@
+Options -MultiViews
+DirectoryIndex index.html
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Serve real files and directories directly
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # SPA fallback for all client-side routes
+  RewriteRule . /index.html [L]
+</IfModule>
+
+# Extra fallback when rewrite module is unavailable or bypassed
+ErrorDocument 404 /index.html
