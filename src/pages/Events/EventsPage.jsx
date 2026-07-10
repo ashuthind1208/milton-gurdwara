@@ -13,6 +13,7 @@ import useSeoMeta from '../../hooks/useSeoMeta';
 import Seo from '../../components/common/Seo';
 import Button from '../../components/ui/Button';
 import cmsService from '../../services/cmsService';
+import advertisementService from '../../services/advertisementService';
 
 const locales = { 'en-US': enUS };
 const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales });
@@ -29,6 +30,13 @@ const EventsPage = () => {
     queryKey: ['page-content', 'events'],
     queryFn: () => cmsService.getPageContent('events').then((res) => res.data)
   });
+  const { data: ads = [] } = useQuery({
+    queryKey: ['advertisements'],
+    queryFn: () => advertisementService.getAds().then((res) => res.data)
+  });
+
+  const eventsTopAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Events Top Banner').slice(0, 2), [ads]);
+  const eventsFooterAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Events Footer Banner').slice(0, 2), [ads]);
 
   const registrationMutation = useMutation({
     mutationFn: (values) => eventService.registerForEvent({
@@ -65,6 +73,17 @@ const EventsPage = () => {
     <div className="space-y-8">
       <Seo {...meta} />
       <PageHero title={content?.heroTitle || 'Events and Registrations'} description={content?.heroDescription || 'Switch between calendar and list views, filter by category, and RSVP online.'} />
+      {eventsTopAds.length > 0 ? (
+        <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+          <div className="grid gap-2 md:grid-cols-2">
+            {eventsTopAds.map((ad) => (
+              <a key={ad.id} href={ad.targetLink || ad.website || '#'} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30">
+                {ad.bannerUrl || ad.imageUrl ? <img src={ad.bannerUrl || ad.imageUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
+              </a>
+            ))}
+          </div>
+        </section>
+      ) : null}
       {content?.intro ? <p className="rounded-xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-700">{content.intro}</p> : null}
       {content?.mediaUrl ? <img src={content.mediaUrl} alt="Events banner" className="h-56 w-full rounded-xl object-cover" loading="lazy" /> : null}
       <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
@@ -120,6 +139,18 @@ const EventsPage = () => {
             </div>
           </div>
         </div>
+      ) : null}
+
+      {eventsFooterAds.length > 0 ? (
+        <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+          <div className="grid gap-2 md:grid-cols-2">
+            {eventsFooterAds.map((ad) => (
+              <a key={ad.id} href={ad.targetLink || ad.website || '#'} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30">
+                {ad.bannerUrl || ad.imageUrl ? <img src={ad.bannerUrl || ad.imageUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
+              </a>
+            ))}
+          </div>
+        </section>
       ) : null}
     </div>
   );

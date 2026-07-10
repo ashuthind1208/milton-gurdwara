@@ -8,6 +8,7 @@ import useSeoMeta from '../../hooks/useSeoMeta';
 import Seo from '../../components/common/Seo';
 import Card from '../../components/ui/Card';
 import libraryService from '../../services/libraryService';
+import advertisementService from '../../services/advertisementService';
 import { getYouTubeEmbedUrl, getYouTubeThumbnail } from '../../services/videoService';
 
 const PAGE_SIZE = 10;
@@ -53,10 +54,17 @@ const LibraryPage = () => {
     queryFn: () => libraryService.getLibraryData().then((res) => res.data)
   });
 
+  const { data: ads = [] } = useQuery({
+    queryKey: ['advertisements'],
+    queryFn: () => advertisementService.getAds().then((res) => res.data)
+  });
+
   const physicalBooks = useMemo(() => libraryData?.physicalBooks || [], [libraryData]);
   const digitalResources = useMemo(() => libraryData?.digitalResources || [], [libraryData]);
   const programUpdates = useMemo(() => libraryData?.programUpdates || [], [libraryData]);
   const mediaResources = useMemo(() => libraryData?.mediaResources || [], [libraryData]);
+  const libraryTopAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Library Top Banner').slice(0, 2), [ads]);
+  const libraryFooterAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Library Footer Banner').slice(0, 2), [ads]);
 
   const physicalTotalPages = Math.max(1, Math.ceil(physicalBooks.length / PAGE_SIZE));
   const digitalTotalPages = Math.max(1, Math.ceil(digitalResources.length / PAGE_SIZE));
@@ -90,7 +98,7 @@ const LibraryPage = () => {
     if (programUpdates.length === 0) {
       return [];
     }
-    return Array.from({ length: 6 }).flatMap(() => programUpdates);
+    return programUpdates.slice(0, 12);
   }, [programUpdates]);
 
   const activeIssueRecords = useMemo(() => (
@@ -105,15 +113,27 @@ const LibraryPage = () => {
         description="Track available hard-copy books and browse downloadable Sikh learning material in one place."
       />
 
+      {libraryTopAds.length > 0 ? (
+        <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+          <div className="grid gap-2 md:grid-cols-2">
+            {libraryTopAds.map((ad) => (
+              <a key={ad.id} href={ad.targetLink || ad.website || '#'} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30">
+                {ad.bannerUrl || ad.imageUrl ? <img src={ad.bannerUrl || ad.imageUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
+              </a>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <section className="space-y-2">
         <div className="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden border-y border-brand-blue/70 bg-brand-blue px-3 py-2 text-white">
-          <div className="relative overflow-hidden">
-            <div className="library-ticker-track flex min-w-max items-center gap-8 whitespace-nowrap px-2">
-              {libraryTickerItems.map((entry, index) => (
+          <div className="ticker-mask px-2">
+            <div className="ticker-track ticker-speed-medium">
+              {[...libraryTickerItems, ...libraryTickerItems].map((entry, index) => (
                 <button
                   key={`${entry.id}-${index}`}
                   type="button"
-                  className="inline-flex items-center gap-2.5 text-left"
+                  className="inline-flex shrink-0 items-center gap-2.5 pr-8 text-left"
                   onClick={() => setSessionModalId(entry.id)}
                 >
                   <span className="text-sm font-black text-white">{entry.scheduleDate || 'TBA'}</span>
@@ -127,21 +147,8 @@ const LibraryPage = () => {
             </div>
           </div>
         </div>
-        <p className="text-xs text-slate-500">Hover to pause. Click any ticker item to view full details.</p>
+        <p className="text-xs text-slate-500">Click any update item to view full details.</p>
       </section>
-
-      <style>{`
-        .library-ticker-track {
-          animation: libraryTickerFlow 115s linear infinite;
-        }
-        .library-ticker-track:hover {
-          animation-play-state: paused;
-        }
-        @keyframes libraryTickerFlow {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-      `}</style>
 
       <div className="grid gap-5 xl:grid-cols-2">
         <Card className="border border-amber-200/70 bg-gradient-to-br from-amber-50 via-white to-orange-50">
@@ -417,6 +424,18 @@ const LibraryPage = () => {
             </div>
           </div>
         </div>
+      ) : null}
+
+      {libraryFooterAds.length > 0 ? (
+        <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+          <div className="grid gap-2 md:grid-cols-2">
+            {libraryFooterAds.map((ad) => (
+              <a key={ad.id} href={ad.targetLink || ad.website || '#'} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30">
+                {ad.bannerUrl || ad.imageUrl ? <img src={ad.bannerUrl || ad.imageUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
+              </a>
+            ))}
+          </div>
+        </section>
       ) : null}
     </div>
   );

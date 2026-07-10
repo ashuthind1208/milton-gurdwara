@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CalendarDaysIcon, CheckCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { getStreamingEmbedUrl, verifyStreamingAvailability } from '../../services/streamingService';
+import { CheckCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { getStreamingEmbedUrl, resolveStreamingLive } from '../../services/streamingService';
+import { getYouTubeEmbedUrl } from '../../services/videoService';
+import gurdwaraLogo from '../../assets/gurdwara-logo.webp';
 
 const sendYouTubeCommand = (iframe, func, args = []) => {
   if (!iframe?.contentWindow) {
@@ -18,8 +20,41 @@ const sendYouTubeCommand = (iframe, func, args = []) => {
   );
 };
 
+const isYouTubeSource = (value = '') => /youtube\.com|youtu\.be|^@|\bUC[A-Za-z0-9_-]{20,}\b/i.test(String(value || '').trim());
+
+const isChannelLikeSource = (value = '') => {
+  const input = String(value || '').trim();
+  if (!input) {
+    return false;
+  }
+
+  if (/^@/i.test(input) || /^UC[A-Za-z0-9_-]{20,}$/i.test(input)) {
+    return true;
+  }
+
+  return /youtube\.com\/@|youtube\.com\/channel\//i.test(input);
+};
+
+const isDirectYouTubeVideoSource = (value = '') => {
+  const input = String(value || '').trim();
+  if (!input) {
+    return false;
+  }
+
+  if (input.includes('youtube.com/embed/')) {
+    return true;
+  }
+
+  return Boolean(
+    input.match(/youtu\.be\/[A-Za-z0-9_-]{11}/i)
+    || input.match(/[?&]v=[A-Za-z0-9_-]{11}/i)
+    || input.match(/youtube\.com\/(shorts|live)\/[A-Za-z0-9_-]{11}/i)
+  );
+};
+
 const StreamingModal = ({ open, streams = [], initialStreamId = '', onClose }) => {
-  const [status, setStatus] = useState({ loading: false, available: false, checkedAt: '', reason: '', embedUrl: '' });
+  const [resolvedLiveEmbed, setResolvedLiveEmbed] = useState('');
+  const [isResolvingLive, setIsResolvingLive] = useState(false);
 
   const streamItems = useMemo(() => {
     const rawItems = Array.isArray(streams) ? streams : [];
@@ -40,38 +75,87 @@ const StreamingModal = ({ open, streams = [], initialStreamId = '', onClose }) =
   }, [initialStreamId, streamItems]);
 
   useEffect(() => {
-    if (!open) {
-      return;
+    let mounted = true;
+    setResolvedLiveEmbed('');
+    setIsResolvingLive(false);
+
+    const source = String(selectedStream?.streamUrl || '').trim();
+    if (!source) {
+      return () => {
+        mounted = false;
+      };
     }
 
-    let mounted = true;
-    setStatus({ loading: true, available: false, checkedAt: '', reason: '', embedUrl: '' });
+    const youtubeSource = isYouTubeSource(source);
+    const channelLikeSource = isChannelLikeSource(source);
+    const hasDirectEmbed = youtubeSource
+      ? isDirectYouTubeVideoSource(source) && Boolean(getYouTubeEmbedUrl(source))
+      : Boolean(getStreamingEmbedUrl(source));
 
-    verifyStreamingAvailability(selectedStream || undefined).then((result) => {
-      if (!mounted) {
-        return;
-      }
+    if (hasDirectEmbed) {
+      return () => {
+        mounted = false;
+      };
+    }
 
-      setStatus({
-        loading: false,
-        available: Boolean(result.available),
-        checkedAt: result.checkedAt || '',
-        reason: result.reason || '',
-        embedUrl: result.embedUrl || ''
+    if (!youtubeSource || !channelLikeSource) {
+      return () => {
+        mounted = false;
+      };
+    }
+
+    setIsResolvingLive(true);
+
+    resolveStreamingLive(source)
+      .then((result) => {
+        if (!mounted) {
+          return;
+        }
+
+        if (result?.available && result?.embedUrl) {
+          setResolvedLiveEmbed(String(result.embedUrl));
+          setIsResolvingLive(false);
+          return;
+        }
+
+        const channelId = String(result?.channelId || '').trim();
+        if (/^UC[A-Za-z0-9_-]{20,}$/i.test(channelId)) {
+          setResolvedLiveEmbed(`https://www.youtube.com/embed/live_stream?channel=${channelId}`);
+        }
+
+        setIsResolvingLive(false);
+      })
+      .catch(() => {
+        if (mounted) {
+          setResolvedLiveEmbed('');
+          setIsResolvingLive(false);
+        }
       });
-    });
 
     return () => {
       mounted = false;
     };
-  }, [open, selectedStream]);
+  }, [selectedStream?.streamUrl]);
 
   if (!open) {
     return null;
   }
 
-  const resolvedEmbedUrl = status.embedUrl || getStreamingEmbedUrl(selectedStream?.streamUrl);
-  const canPlay = Boolean(selectedStream?.active && resolvedEmbedUrl && status.available);
+  const sourceUrl = String(selectedStream?.streamUrl || '').trim();
+  const youtubeSource = isYouTubeSource(sourceUrl);
+  const channelLikeSource = isChannelLikeSource(sourceUrl);
+  const parsedYouTubeEmbedUrl = youtubeSource ? getYouTubeEmbedUrl(sourceUrl) : '';
+  const directEmbedUrl = youtubeSource
+    ? (isDirectYouTubeVideoSource(sourceUrl) ? parsedYouTubeEmbedUrl : '')
+    : getStreamingEmbedUrl(sourceUrl);
+  const channelFallbackEmbed = youtubeSource && !isDirectYouTubeVideoSource(sourceUrl)
+    ? parsedYouTubeEmbedUrl
+    : '';
+  const resolvedEmbedUrl = resolvedLiveEmbed || directEmbedUrl || channelFallbackEmbed;
+  const canPlay = Boolean(
+    selectedStream?.active
+    && (channelLikeSource ? (resolvedLiveEmbed || channelFallbackEmbed) : resolvedEmbedUrl)
+  );
 
   return createPortal(
     <div
@@ -97,25 +181,15 @@ const StreamingModal = ({ open, streams = [], initialStreamId = '', onClose }) =
             <div className="border-b border-slate-100 px-5 py-4 pr-14">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.3em] text-brand-blue">Live Streaming</p>
-                  <h3 className="mt-1 text-xl font-bold text-slate-900">{selectedStream?.title || 'Streaming'}</h3>
-                  <p className="mt-1 text-sm text-slate-600">{selectedStream?.text || 'Live stream for the sangat.'}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.3em] text-brand-blue">Live Stream</p>
+                  <h3 className="mt-1 text-xl font-bold text-slate-900">{selectedStream?.title || 'Live Stream'}</h3>
+                  <p className="mt-1 text-sm text-slate-600">{selectedStream?.text || 'Playing now in popup'}</p>
                 </div>
                 <div className="flex flex-wrap items-center justify-end gap-2 pr-12 text-xs">
                   <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold ${selectedStream?.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
                     <CheckCircleIcon className="h-4 w-4" />
                     {selectedStream?.active ? 'Active' : 'Inactive'}
                   </span>
-                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold ${status.available ? 'bg-blue-100 text-brand-blue' : 'bg-amber-100 text-amber-800'}`}>
-                    <CheckCircleIcon className="h-4 w-4" />
-                    {status.loading ? 'Checking...' : status.available ? 'Confirmed' : 'Pending'}
-                  </span>
-                  {status.checkedAt ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-600">
-                      <CalendarDaysIcon className="h-4 w-4" />
-                      {new Date(status.checkedAt).toLocaleDateString()}
-                    </span>
-                  ) : null}
                 </div>
               </div>
             </div>
@@ -145,10 +219,25 @@ const StreamingModal = ({ open, streams = [], initialStreamId = '', onClose }) =
                 ) : (
                   <div className="flex h-full items-center justify-center px-6 text-center text-white">
                     <div>
-                      <p className="text-lg font-semibold">Stream is not available right now.</p>
-                      <p className="mt-2 text-sm text-slate-300">
-                        {status.loading ? 'Checking availability...' : status.reason === 'not_live' ? 'No live broadcast is active right now.' : 'Please try again after the stream is marked active.'}
-                      </p>
+                      {isResolvingLive ? (
+                        <>
+                          <p className="text-lg font-semibold">Loading live stream...</p>
+                          <p className="mt-2 text-sm text-slate-300">Please wait while we connect to the channel.</p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex min-h-[320px] w-full flex-col items-center justify-center bg-brand-blue px-6 py-8 text-center">
+                            <img
+                              src={gurdwaraLogo}
+                              alt="Gurdwara Singh Sabha Milton logo"
+                              className="h-24 w-24 rounded-full border-2 border-white/75 object-cover shadow-lg"
+                            />
+                            <p className="mt-5 max-w-lg text-base font-semibold leading-relaxed text-white">
+                              We are sorry, but the video is unavailable or streaming is closed. Please check back later.
+                            </p>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}

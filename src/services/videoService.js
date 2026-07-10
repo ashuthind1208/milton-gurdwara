@@ -84,31 +84,39 @@ export function getYouTubeEmbedUrl(url) {
     return '';
   }
 
+  const input = String(url).trim();
+
   // Already an embed URL.
-  if (url.includes('youtube.com/embed/')) {
-    return url;
+  if (input.includes('youtube.com/embed/')) {
+    return input;
+  }
+
+  // Channel source: direct channel ID or channel URL.
+  const channelIdMatch = input.match(/(?:youtube\.com\/channel\/)?(UC[A-Za-z0-9_-]{20,})/i);
+  if (channelIdMatch?.[1]) {
+    return `https://www.youtube.com/embed/live_stream?channel=${channelIdMatch[1]}`;
   }
 
   // Short URL: youtu.be/ID
-  const shortMatch = url.match(/youtu\.be\/([A-Za-z0-9_-]{11})/);
+  const shortMatch = input.match(/youtu\.be\/([A-Za-z0-9_-]{11})/);
   if (shortMatch) {
     return `https://www.youtube.com/embed/${shortMatch[1]}`;
   }
 
   // Shorts: youtube.com/shorts/ID
-  const shortsMatch = url.match(/youtube\.com\/shorts\/([A-Za-z0-9_-]{11})/);
+  const shortsMatch = input.match(/youtube\.com\/shorts\/([A-Za-z0-9_-]{11})/);
   if (shortsMatch) {
     return `https://www.youtube.com/embed/${shortsMatch[1]}`;
   }
 
   // Live: youtube.com/live/ID
-  const liveMatch = url.match(/youtube\.com\/live\/([A-Za-z0-9_-]{11})/);
+  const liveMatch = input.match(/youtube\.com\/live\/([A-Za-z0-9_-]{11})/);
   if (liveMatch) {
     return `https://www.youtube.com/embed/${liveMatch[1]}`;
   }
 
   // Standard watch?v=ID
-  const watchMatch = url.match(/[?&]v=([A-Za-z0-9_-]{11})/);
+  const watchMatch = input.match(/[?&]v=([A-Za-z0-9_-]{11})/);
   if (watchMatch) {
     return `https://www.youtube.com/embed/${watchMatch[1]}`;
   }

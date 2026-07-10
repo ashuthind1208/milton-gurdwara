@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import VolunteerForm from '../../components/forms/VolunteerForm';
 import Card from '../../components/ui/Card';
 import volunteerService from '../../services/volunteerService';
+import advertisementService from '../../services/advertisementService';
 import useSeoMeta from '../../hooks/useSeoMeta';
 import Seo from '../../components/common/Seo';
 
@@ -13,11 +14,18 @@ const formatDateLabel = (value) => {
   return new Date(`${value}T00:00:00`).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
+const formatShortDate = (value) => {
+  if (!value) {
+    return 'TBD';
+  }
+  return new Date(`${value}T00:00:00`).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+};
+
 const SevaPage = () => {
   const meta = useSeoMeta('Seva', 'Volunteer opportunities for langar, parking, teaching, and events.');
   const queryClient = useQueryClient();
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
-  const [selectedSevaFilter, setSelectedSevaFilter] = useState('All');
+  const [volunteerModalOpportunityId, setVolunteerModalOpportunityId] = useState('');
 
   const { data: registrations = [] } = useQuery({
     queryKey: ['admin-volunteers'],
@@ -28,6 +36,14 @@ const SevaPage = () => {
     queryKey: ['seva-opportunities'],
     queryFn: () => volunteerService.getSevaOpportunities().then((res) => res.data)
   });
+
+  const { data: ads = [] } = useQuery({
+    queryKey: ['advertisements'],
+    queryFn: () => advertisementService.getAds().then((res) => res.data)
+  });
+
+  const sevaTopAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Seva Top Banner').slice(0, 2), [ads]);
+  const sevaFooterAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Seva Footer Banner').slice(0, 2), [ads]);
 
   const onSubmit = async (payload) => {
     try {
@@ -43,19 +59,6 @@ const SevaPage = () => {
       window.alert(error?.message || 'Unable to register for seva right now.');
     }
   };
-
-  const filterOptions = useMemo(() => {
-    const optionSet = new Set([
-      ...sevaOpportunities.map((item) => item.sevaType).filter(Boolean),
-      ...registrations.map((entry) => entry.sevaType || entry.area).filter(Boolean)
-    ]);
-    return ['All', ...Array.from(optionSet)];
-  }, [registrations, sevaOpportunities]);
-
-  const filteredRegistrations = useMemo(
-    () => registrations.filter((entry) => selectedSevaFilter === 'All' || (entry.sevaType || entry.area) === selectedSevaFilter),
-    [registrations, selectedSevaFilter]
-  );
 
   const registrationsByOpportunity = useMemo(() => registrations.reduce((acc, entry) => {
     if (!entry.opportunityId) {
@@ -83,6 +86,70 @@ const SevaPage = () => {
     });
   }, [sevaOpportunities, registrationsByOpportunity]);
 
+  const sevaStats = useMemo(() => {
+    if (enrichedOpportunities.length === 0) {
+      return {
+        totalOpenOpportunities: 0,
+        totalVolunteersNeeded: 0,
+        totalRegistered: 0,
+        totalOpenSpots: 0,
+        nextSevaDate: '',
+        completionRate: 0
+      };
+    }
+
+    const totalOpenOpportunities = enrichedOpportunities.filter((item) => item.isOpen).length;
+    const totalVolunteersNeeded = enrichedOpportunities.reduce((sum, item) => sum + item.totalRequired, 0);
+    const totalRegistered = enrichedOpportunities.reduce((sum, item) => sum + item.registered, 0);
+    const totalOpenSpots = Math.max(0, totalVolunteersNeeded - totalRegistered);
+    const completionRate = totalVolunteersNeeded > 0 ? Math.min(100, Math.round((totalRegistered / totalVolunteersNeeded) * 100)) : 0;
+    const nextOpen = enrichedOpportunities
+      .filter((item) => item.isOpen)
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
+
+    return {
+      totalOpenOpportunities,
+      totalVolunteersNeeded,
+      totalRegistered,
+      totalOpenSpots,
+      nextSevaDate: nextOpen?.date || '',
+      completionRate
+    };
+  }, [enrichedOpportunities]);
+
+  const topNeedOpportunities = useMemo(
+    () => [...enrichedOpportunities]
+      .filter((item) => item.isOpen)
+      .sort((a, b) => (b.totalRequired - b.registered) - (a.totalRequired - a.registered))
+      .slice(0, 3),
+    [enrichedOpportunities]
+  );
+
+  const volunteerRowsByOpportunity = useMemo(() => {
+    const rowsById = {};
+    enrichedOpportunities.forEach((opportunity) => {
+      rowsById[opportunity.id] = registrations.filter((entry) => (
+        entry.opportunityId === opportunity.id
+        || (
+          !entry.opportunityId
+          && (entry.sevaType || entry.area) === opportunity.sevaType
+          && (entry.sevaDate || entry.date) === opportunity.date
+        )
+      ));
+    });
+    return rowsById;
+  }, [enrichedOpportunities, registrations]);
+
+  const activeVolunteerOpportunity = useMemo(
+    () => enrichedOpportunities.find((item) => item.id === volunteerModalOpportunityId) || null,
+    [enrichedOpportunities, volunteerModalOpportunityId]
+  );
+
+  const activeVolunteerRows = useMemo(
+    () => (volunteerModalOpportunityId ? (volunteerRowsByOpportunity[volunteerModalOpportunityId] || []) : []),
+    [volunteerModalOpportunityId, volunteerRowsByOpportunity]
+  );
+
   const selectableOptions = useMemo(() => enrichedOpportunities
     .filter((item) => item.isOpen)
     .map((item) => ({
@@ -94,7 +161,7 @@ const SevaPage = () => {
     if (enrichedOpportunities.length === 0) {
       return [];
     }
-    return Array.from({ length: 6 }).flatMap(() => enrichedOpportunities);
+    return enrichedOpportunities.slice(0, 12);
   }, [enrichedOpportunities]);
 
   return (
@@ -114,70 +181,193 @@ const SevaPage = () => {
           <Card><p className="text-sm text-slate-500">No seva opportunities available right now.</p></Card>
         ) : (
           <section className="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden border-y border-brand-blue/70 bg-brand-blue py-2.5">
-            <div className="seva-ticker-track flex min-w-max items-center gap-8 whitespace-nowrap px-4 md:px-8">
-              {sevaTickerItems.map((item, index) => (
-                <p key={`${item.id}-${index}`} className="inline-flex items-center gap-2.5">
-                  <span className="text-sm font-black text-white">{formatDateLabel(item.date)}</span>
-                  <span className="text-base font-black text-white">{item.sevaType}</span>
-                  <span className="text-base font-black text-brand-saffron">{item.time || 'Time TBD'}</span>
-                  <span className="text-sm font-extrabold text-white/95">{item.registered}/{item.totalRequired} registered</span>
-                  <span className={`text-sm font-extrabold ${item.isOpen ? 'text-emerald-300' : 'text-red-300'}`}>{item.isOpen ? 'Open' : 'Closed'}</span>
-                  <span className="text-white/80">|</span>
-                </p>
-              ))}
+            <div className="ticker-mask px-4 md:px-8">
+              <div className="ticker-track ticker-speed-slow">
+                {[...sevaTickerItems, ...sevaTickerItems].map((item, index) => (
+                  <p key={`${item.id}-${index}`} className="inline-flex shrink-0 items-center gap-2.5 pr-8">
+                    <span className="text-sm font-black text-white">{formatDateLabel(item.date)}</span>
+                    <span className="text-base font-black text-white">{item.sevaType}</span>
+                    <span className="text-base font-black text-brand-saffron">{item.time || 'Time TBD'}</span>
+                    <span className="text-sm font-extrabold text-white/95">{item.registered}/{item.totalRequired} registered</span>
+                    <span className={`text-sm font-extrabold ${item.isOpen ? 'text-emerald-300' : 'text-red-300'}`}>{item.isOpen ? 'Open' : 'Closed'}</span>
+                    <span className="text-white/80">|</span>
+                  </p>
+                ))}
+              </div>
             </div>
           </section>
         )}
       </section>
 
-      <style>{`
-        .seva-ticker-track {
-          animation: sevaTickerFlow 115s linear infinite;
-        }
-        .seva-ticker-track:hover {
-          animation-play-state: paused;
-        }
-        @keyframes sevaTickerFlow {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-      `}</style>
-
-      <section>
-        <div className="space-y-3">
-          <p className="text-sm font-semibold text-slate-700">Who is volunteering</p>
-          <div className="flex flex-wrap gap-2">
-            {filterOptions.map((option) => {
-              const isActive = option === selectedSevaFilter;
-              return (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => setSelectedSevaFilter(option)}
-                  className={`rounded-full px-3 py-1 text-xs font-semibold transition ${isActive ? 'bg-brand-saffron text-brand-navy shadow-sm' : 'bg-brand-cream text-brand-blue hover:bg-brand-saffron/30'}`}
-                >
-                  {option}
-                </button>
-              );
-            })}
+      {sevaTopAds.length > 0 ? (
+        <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+          <div className="grid gap-2 md:grid-cols-2">
+            {sevaTopAds.map((ad) => (
+              <a key={ad.id} href={ad.targetLink || ad.website || '#'} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30">
+                {ad.bannerUrl || ad.imageUrl ? <img src={ad.bannerUrl || ad.imageUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
+              </a>
+            ))}
           </div>
-        </div>
+        </section>
+      ) : null}
 
-        <Card className="mt-5 rounded-none border-x-0 px-0 shadow-none hover:translate-y-0 hover:shadow-none">
-          {filteredRegistrations.length === 0 ? (
-            <p className="px-4 text-sm text-slate-500">No volunteers found for the selected seva filter.</p>
-          ) : (
-            <ul className="space-y-2 px-2">
-              {filteredRegistrations.map((entry) => (
-                <li key={entry.id} className="rounded-md bg-slate-50 px-3 py-2">
-                  <p className="text-sm font-semibold text-slate-800">{entry.name}</p>
-                  <p className="mt-0.5 text-xs text-slate-600">{entry.sevaType || entry.area} • {entry.sevaDate || entry.date}{entry.sevaTime ? ` • ${entry.sevaTime}` : ''}</p>
-                </li>
-              ))}
-            </ul>
-          )}
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Card className="border border-brand-blue/20 bg-gradient-to-br from-blue-50 to-white">
+          <p className="text-xs font-semibold uppercase tracking-wide text-brand-blue">Open Opportunities</p>
+          <p className="mt-2 text-3xl font-black text-slate-900">{sevaStats.totalOpenOpportunities}</p>
+          <p className="mt-1 text-xs text-slate-600">Currently accepting volunteer registrations.</p>
+        </Card>
+        <Card className="border border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white">
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">Registered Sevadars</p>
+          <p className="mt-2 text-3xl font-black text-slate-900">{sevaStats.totalRegistered}</p>
+          <p className="mt-1 text-xs text-slate-600">Across all listed seva sessions.</p>
+        </Card>
+        <Card className="border border-amber-200/80 bg-gradient-to-br from-amber-50 to-white">
+          <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Open Spots</p>
+          <p className="mt-2 text-3xl font-black text-slate-900">{sevaStats.totalOpenSpots}</p>
+          <p className="mt-1 text-xs text-slate-600">Remaining places for the next seva cycles.</p>
+        </Card>
+        <Card className="border border-violet-200/70 bg-gradient-to-br from-violet-50 to-white">
+          <p className="text-xs font-semibold uppercase tracking-wide text-violet-800">Next Seva Date</p>
+          <p className="mt-2 text-2xl font-black text-slate-900">{formatShortDate(sevaStats.nextSevaDate)}</p>
+          <p className="mt-1 text-xs text-slate-600">Upcoming open seva opportunity.</p>
         </Card>
       </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-heading text-2xl font-bold text-slate-900">Seva Readiness Overview</h2>
+            <p className="text-sm text-slate-600">A quick snapshot of capacity, participation, and what needs support next.</p>
+          </div>
+          <span className="rounded-full bg-brand-blue px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">{sevaStats.completionRate}% filled</span>
+        </div>
+        <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-brand-blue via-blue-500 to-brand-saffron"
+            style={{ width: `${sevaStats.completionRate}%` }}
+            aria-label="Seva capacity fill progress"
+          />
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          {topNeedOpportunities.map((item) => {
+            const remaining = Math.max(0, item.totalRequired - item.registered);
+            return (
+              <div key={item.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <p className="text-sm font-bold text-slate-900">{item.sevaType}</p>
+                <p className="text-xs text-slate-600">{formatDateLabel(item.date)} • {item.time || 'Time TBD'}</p>
+                <p className="mt-1 text-xs font-semibold text-amber-700">{remaining} more sevadars needed</p>
+              </div>
+            );
+          })}
+          {topNeedOpportunities.length === 0 ? (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 sm:col-span-3">
+              <p className="text-sm text-slate-600">No open opportunities at the moment. Please check again soon.</p>
+            </div>
+          ) : null}
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-heading text-2xl font-bold text-slate-900">Opportunity Details</h2>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Live status by session</p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {enrichedOpportunities.map((item) => {
+            const remaining = Math.max(0, item.totalRequired - item.registered);
+            const fillPercent = Math.min(100, Math.round((item.registered / item.totalRequired) * 100));
+            const volunteerCount = volunteerRowsByOpportunity[item.id]?.length || 0;
+            return (
+              <Card key={item.id} className="border border-slate-200 bg-white">
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="text-lg font-bold text-slate-900">{item.sevaType}</h3>
+                  <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${item.isOpen ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700'}`}>
+                    {item.isOpen ? 'Open' : 'Closed'}
+                  </span>
+                </div>
+                <p className="mt-1 text-sm text-slate-600">{formatDateLabel(item.date)} • {item.time || 'Time TBD'}</p>
+                <p className="mt-1 text-xs text-slate-500">Registration closes: {formatDateLabel(item.expiryDate)}</p>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div className="h-full rounded-full bg-brand-blue" style={{ width: `${fillPercent}%` }} />
+                </div>
+                <div className="mt-2 flex items-center justify-between text-xs text-slate-700">
+                  <span>{item.registered}/{item.totalRequired} registered</span>
+                  <span>{remaining} spots left</span>
+                </div>
+                <button
+                  type="button"
+                  className="mt-3 inline-flex rounded-lg border border-brand-blue/25 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-brand-blue hover:border-brand-blue/45"
+                  onClick={() => setVolunteerModalOpportunityId(item.id)}
+                >
+                  View Volunteers ({volunteerCount})
+                </button>
+              </Card>
+            );
+          })}
+        </div>
+      </section>
+
+      {sevaFooterAds.length > 0 ? (
+        <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+          <div className="grid gap-2 md:grid-cols-2">
+            {sevaFooterAds.map((ad) => (
+              <a key={ad.id} href={ad.targetLink || ad.website || '#'} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30">
+                {ad.bannerUrl || ad.imageUrl ? <img src={ad.bannerUrl || ad.imageUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
+              </a>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {activeVolunteerOpportunity ? (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-900/45 px-4 py-6">
+          <div className="w-full max-w-4xl rounded-xl bg-white p-5 shadow-xl">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="font-heading text-xl font-semibold">Volunteers • {activeVolunteerOpportunity.sevaType}</h3>
+                <p className="text-xs text-slate-600">{formatDateLabel(activeVolunteerOpportunity.date)}{activeVolunteerOpportunity.time ? ` • ${activeVolunteerOpportunity.time}` : ''}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setVolunteerModalOpportunityId('')}
+                className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+                  <tr>
+                    <th className="px-3 py-2">Name</th>
+                    <th className="px-3 py-2">Category</th>
+                    <th className="px-3 py-2">Date</th>
+                    <th className="px-3 py-2">Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeVolunteerRows.length > 0 ? (
+                    activeVolunteerRows.map((entry) => (
+                      <tr key={entry.id} className="border-t border-slate-100">
+                        <td className="px-3 py-2 font-semibold text-slate-800">{entry.name || '-'}</td>
+                        <td className="px-3 py-2 text-slate-700">{entry.sevaType || entry.area || activeVolunteerOpportunity.sevaType}</td>
+                        <td className="px-3 py-2 text-slate-700">{entry.sevaDate || entry.date || '-'}</td>
+                        <td className="px-3 py-2 text-slate-700">{entry.sevaTime || activeVolunteerOpportunity.time || 'TBD'}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="px-3 py-4 text-center text-slate-500">No volunteers registered yet for this seva opportunity.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {isRegisterModalOpen ? (
         <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-900/45 px-4 py-6">

@@ -4,14 +4,32 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EyeIcon, PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
-import advertisementService from '../../services/advertisementService';
+import advertisementService, { AD_PLACEMENT_OPTIONS } from '../../services/advertisementService';
 
-const placementOptions = [
-  'Global Banner',
-  'Homepage Sidebar',
-  'Homepage Footer',
-  'Events Sidebar'
-];
+const placementOptions = AD_PLACEMENT_OPTIONS;
+
+const groupedPlacementOptions = [
+  {
+    label: 'Homepage',
+    options: placementOptions.filter((option) => option.startsWith('Homepage') || option === 'Global Banner')
+  },
+  {
+    label: 'Seva Page',
+    options: placementOptions.filter((option) => option.startsWith('Seva '))
+  },
+  {
+    label: 'Donation Page',
+    options: placementOptions.filter((option) => option.startsWith('Donation '))
+  },
+  {
+    label: 'Library Page',
+    options: placementOptions.filter((option) => option.startsWith('Library '))
+  },
+  {
+    label: 'Events Page',
+    options: placementOptions.filter((option) => option.startsWith('Events '))
+  }
+].filter((group) => group.options.length > 0);
 
 const emptyFormValues = {
   title: '',
@@ -170,7 +188,11 @@ const AdminAdvertisementsPage = () => {
               </label>
               <label className="text-sm">Placement
                 <select disabled={isViewMode} {...form.register('placement')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50">
-                  {placementOptions.map((option) => <option key={option}>{option}</option>)}
+                  {groupedPlacementOptions.map((group) => (
+                    <optgroup key={group.label} label={group.label}>
+                      {group.options.map((option) => <option key={option}>{option}</option>)}
+                    </optgroup>
+                  ))}
                 </select>
               </label>
               <label className="text-sm md:col-span-2">Content

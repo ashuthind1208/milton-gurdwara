@@ -315,6 +315,55 @@ const parseYouTubeChannelSource = (value = '') => {
     return null;
   }
 
+  const extractVideoId = (rawValue = '') => {
+    const raw = String(rawValue || '').trim();
+    if (!raw) {
+      return '';
+    }
+
+    if (/^[A-Za-z0-9_-]{11}$/.test(raw)) {
+      return raw;
+    }
+
+    try {
+      const parsed = new URL(raw);
+      const host = parsed.hostname.toLowerCase();
+
+      if (host.includes('youtu.be')) {
+        const candidate = parsed.pathname.split('/').filter(Boolean)[0] || '';
+        if (/^[A-Za-z0-9_-]{11}$/.test(candidate)) {
+          return candidate;
+        }
+      }
+
+      if (host.includes('youtube.com')) {
+        const fromQuery = parsed.searchParams.get('v') || '';
+        if (/^[A-Za-z0-9_-]{11}$/.test(fromQuery)) {
+          return fromQuery;
+        }
+
+        const parts = parsed.pathname.split('/').filter(Boolean);
+        const liveIndex = parts.findIndex((part) => ['live', 'embed', 'shorts'].includes(part.toLowerCase()));
+        if (liveIndex >= 0) {
+          const candidate = parts[liveIndex + 1] || '';
+          if (/^[A-Za-z0-9_-]{11}$/.test(candidate)) {
+            return candidate;
+          }
+        }
+      }
+    } catch {
+      // Ignore URL parsing errors and fall back to regex matching.
+    }
+
+    const fallbackMatch = raw.match(/(?:v=|youtu\.be\/|\/live\/|\/embed\/|\/shorts\/)([A-Za-z0-9_-]{11})/i);
+    return fallbackMatch ? fallbackMatch[1] : '';
+  };
+
+  const videoId = extractVideoId(input);
+  if (videoId) {
+    return { type: 'videoId', value: videoId };
+  }
+
   const channelMatch = input.match(/youtube\.com\/channel\/([A-Za-z0-9_-]+)/i) || input.match(/\b(UC[A-Za-z0-9_-]{20,})\b/i);
   if (channelMatch) {
     return { type: 'channelId', value: channelMatch[1] };
@@ -340,6 +389,138 @@ const resolveYouTubeLiveVideo = async (source) => {
     const error = new Error('Enter a YouTube channel URL, handle, or channel ID.');
     error.status = 400;
     throw error;
+  }
+
+  const fetchVideoDetails = async (videoId) => {
+    const liveDetailsUrl = new URL('https://www.googleapis.com/youtube/v3/videos');
+    liveDetailsUrl.searchParams.set('part', 'snippet,liveStreamingDetails,statistics,status');
+    liveDetailsUrl.searchParams.set('id', videoId);
+    liveDetailsUrl.searchParams.set('key', youtubeApiKey);
+
+    const liveDetailsResponse = await fetch(liveDetailsUrl);
+    const liveDetailsPayload = await liveDetailsResponse.json().catch(() => ({}));
+    const liveVideo = liveDetailsPayload?.items?.[0] || null;
+
+    if (!liveDetailsResponse.ok || !liveVideo) {
+      return null;
+    }
+
+    const liveSnippet = liveVideo?.snippet || {};
+    const liveStreamingDetails = liveVideo?.liveStreamingDetails || {};
+    const statistics = liveVideo?.statistics || {};
+    const rawViewers = Number(liveStreamingDetails?.concurrentViewers);
+    const rawTotalViews = Number(statistics?.viewCount);
+    const liveBroadcastContent = String(liveSnippet?.liveBroadcastContent || '').toLowerCase();
+    const hasConcurrentViewers = Number.isFinite(rawViewers) && rawViewers >= 0;
+    const hasLiveWindow = Boolean(liveStreamingDetails?.actualStartTime) && !liveStreamingDetails?.actualEndTime;
+    const isLive = liveBroadcastContent === 'live' || hasConcurrentViewers || hasLiveWindow;
+
+    return {
+      isLive,
+      channelId: String(liveSnippet?.channelId || ''),
+      videoId,
+      title: String(liveSnippet?.title || ''),
+      channelTitle: String(liveSnippet?.channelTitle || ''),
+      concurrentViewers: hasConcurrentViewers ? rawViewers : null,
+      totalViews: Number.isFinite(rawTotalViews) && rawTotalViews >= 0 ? rawTotalViews : null,
+      embedUrl: `https://www.youtube.com/embed/${videoId}`,
+      watchUrl: `https://www.youtube.com/watch?v=${videoId}`
+    };
+  };
+
+  const extractVideoIdFromUrl = (value = '') => {
+    const raw = String(value || '').trim();
+    if (!raw) {
+      return '';
+    }
+
+    try {
+      const parsed = new URL(raw);
+      const v = parsed.searchParams.get('v') || '';
+      if (/^[A-Za-z0-9_-]{11}$/.test(v)) {
+        return v;
+      }
+    } catch {
+      // Ignore URL parsing errors.
+    }
+
+    const match = raw.match(/(?:v=|youtu\.be\/|\/embed\/|\/live\/|\/shorts\/)([A-Za-z0-9_-]{11})/i);
+    return match ? match[1] : '';
+  };
+
+  const resolveLiveVideoIdFromChannelPage = async (sourceType, sourceValue, resolvedChannelId) => {
+    const candidates = [];
+
+    if (sourceType === 'handle' && sourceValue) {
+      candidates.push(`https://www.youtube.com/@${sourceValue}/live`);
+    }
+    if (resolvedChannelId) {
+      candidates.push(`https://www.youtube.com/channel/${resolvedChannelId}/live`);
+    }
+
+    for (const candidate of candidates) {
+      try {
+        const pageResponse = await fetch(candidate, {
+          redirect: 'follow',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; SinghSabhaMiltonBot/1.0)'
+          }
+        });
+
+        if (!pageResponse.ok) {
+          continue;
+        }
+
+        const redirectedVideoId = extractVideoIdFromUrl(pageResponse.url || '');
+        if (redirectedVideoId) {
+          return redirectedVideoId;
+        }
+
+        const html = await pageResponse.text();
+        const htmlVideoIdMatch = html.match(/"videoId":"([A-Za-z0-9_-]{11})"/);
+        if (htmlVideoIdMatch?.[1]) {
+          return htmlVideoIdMatch[1];
+        }
+      } catch {
+        // Ignore fallback lookup errors and continue to the next candidate.
+      }
+    }
+
+    return '';
+  };
+
+  if (parsedSource.type === 'videoId') {
+    const videoDetails = await fetchVideoDetails(parsedSource.value);
+
+    if (videoDetails?.isLive) {
+      return {
+        available: true,
+        reason: '',
+        checkedAt: new Date().toISOString(),
+        channelId: videoDetails.channelId,
+        videoId: videoDetails.videoId,
+        title: videoDetails.title,
+        channelTitle: videoDetails.channelTitle,
+        concurrentViewers: videoDetails.concurrentViewers,
+        totalViews: videoDetails.totalViews,
+        embedUrl: videoDetails.embedUrl,
+        watchUrl: videoDetails.watchUrl
+      };
+    }
+
+    return {
+      available: false,
+      reason: 'not_live',
+      checkedAt: new Date().toISOString(),
+      channelId: videoDetails?.channelId || '',
+      videoId: parsedSource.value,
+      title: videoDetails?.title || '',
+      channelTitle: videoDetails?.channelTitle || '',
+      concurrentViewers: null,
+      totalViews: videoDetails?.totalViews ?? null,
+      embedUrl: videoDetails?.embedUrl || `https://www.youtube.com/embed/${parsedSource.value}`,
+      watchUrl: videoDetails?.watchUrl || `https://www.youtube.com/watch?v=${parsedSource.value}`
+    };
   }
 
   let channelId = parsedSource.value;
@@ -372,29 +553,58 @@ const resolveYouTubeLiveVideo = async (source) => {
   const searchResponse = await fetch(searchUrl);
   const searchPayload = await searchResponse.json();
   const liveItem = searchPayload?.items?.[0] || null;
-  const videoId = liveItem?.id?.videoId || '';
+  let videoId = liveItem?.id?.videoId || '';
 
-  if (!searchResponse.ok || !videoId) {
+  if (!videoId) {
+    videoId = await resolveLiveVideoIdFromChannelPage(parsedSource.type, parsedSource.value, channelId);
+  }
+
+  if (!videoId) {
     return {
       available: false,
-      reason: 'not_live',
+      reason: searchResponse.ok ? 'not_live' : 'lookup_failed',
       checkedAt: new Date().toISOString(),
       channelId,
       videoId: '',
+      title: '',
+      channelTitle: '',
+      concurrentViewers: null,
+      totalViews: null,
       embedUrl: '',
       watchUrl: ''
     };
   }
 
-  const embedUrl = `https://www.youtube.com/embed/${videoId}`;
+  const liveDetails = await fetchVideoDetails(videoId);
+
+  if (!liveDetails) {
+    return {
+      available: false,
+      reason: 'lookup_failed',
+      checkedAt: new Date().toISOString(),
+      channelId,
+      videoId,
+      title: '',
+      channelTitle: '',
+      concurrentViewers: null,
+      totalViews: null,
+      embedUrl: '',
+      watchUrl: ''
+    };
+  }
+
   return {
     available: true,
     reason: '',
     checkedAt: new Date().toISOString(),
-    channelId,
-    videoId,
-    embedUrl,
-    watchUrl: `https://www.youtube.com/watch?v=${videoId}`
+    channelId: liveDetails.channelId || channelId,
+    videoId: liveDetails.videoId,
+    title: liveDetails.title,
+    channelTitle: liveDetails.channelTitle,
+    concurrentViewers: liveDetails.concurrentViewers,
+    totalViews: liveDetails.totalViews,
+    embedUrl: liveDetails.embedUrl,
+    watchUrl: liveDetails.watchUrl
   };
 };
 

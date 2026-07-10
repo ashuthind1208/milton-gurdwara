@@ -40,4 +40,41 @@
   .glass {
     @apply bg-white/70 backdrop-blur-lg dark:bg-slate-900/70;
   }
+
+  .ticker-mask {
+    overflow: hidden;
+    width: 100%;
+  }
+
+  .ticker-track {
+    display: inline-flex;
+    align-items: center;
+    width: max-content;
+    white-space: nowrap;
+    will-change: transform;
+    animation-name: ticker-scroll-left;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+  }
+
+  .ticker-track:hover {
+    animation-play-state: paused;
+  }
+
+  .ticker-speed-slow {
+    animation-duration: 38s;
+  }
+
+  .ticker-speed-medium {
+    animation-duration: 34s;
+  }
+}
+
+@keyframes ticker-scroll-left {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
 }

@@ -76,7 +76,11 @@ const resolveYouTubeLive = async (sourceUrl) => {
     embedUrl: payload.data?.embedUrl || '',
     watchUrl: payload.data?.watchUrl || '',
     channelId: payload.data?.channelId || '',
-    videoId: payload.data?.videoId || ''
+    videoId: payload.data?.videoId || '',
+    title: payload.data?.title || '',
+    channelTitle: payload.data?.channelTitle || '',
+    concurrentViewers: payload.data?.concurrentViewers ?? null,
+    totalViews: payload.data?.totalViews ?? null
   };
 };
 

@@ -2,6 +2,21 @@ import { mockResponse } from './mockApi';
 
 const STORAGE_KEY = 'ssm-advertisements';
 
+export const AD_PLACEMENT_OPTIONS = [
+  'Global Banner',
+  'Homepage Sidebar',
+  'Homepage Footer',
+  'Events Sidebar',
+  'Seva Top Banner',
+  'Seva Footer Banner',
+  'Donation Top Banner',
+  'Donation Footer Banner',
+  'Library Top Banner',
+  'Library Footer Banner',
+  'Events Top Banner',
+  'Events Footer Banner'
+];
+
 const seedAds = [
   {
     id: 'ad-1',

@@ -307,7 +307,7 @@ const AdminDonationsPage = () => {
             <input
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Search donor, email, receipt, campaign"
+              placeholder="Search donor, campaign, amount"
               className="w-full bg-transparent text-sm outline-none"
             />
           </label>
@@ -333,11 +333,8 @@ const AdminDonationsPage = () => {
               <tr className="border-b border-slate-200 text-slate-500">
                 <th className="py-2 pr-3">Date</th>
                 <th className="py-2 pr-3">Donor</th>
-                <th className="py-2 pr-3">Email</th>
                 <th className="py-2 pr-3">Campaign</th>
                 <th className="py-2 pr-3">Amount</th>
-                <th className="py-2 pr-3">Receipt</th>
-                <th className="py-2 pr-3">Email Sent</th>
                 <th className="py-2 pr-3">Actions</th>
               </tr>
             </thead>
@@ -346,7 +343,6 @@ const AdminDonationsPage = () => {
                 <tr key={entry.id} className="border-b border-slate-100">
                   <td className="py-2 pr-3">{new Date(entry.createdAt).toLocaleDateString()}</td>
                   <td className="py-2 pr-3 font-semibold text-slate-800">{entry.donorName}</td>
-                  <td className="py-2 pr-3">{entry.donorEmail || '-'}</td>
                   <td className="py-2 pr-3">
                     <div>
                       <p className="font-medium text-slate-800">{entry.campaignName}</p>
@@ -354,8 +350,6 @@ const AdminDonationsPage = () => {
                     </div>
                   </td>
                   <td className="py-2 pr-3 font-semibold text-slate-800">{formatCurrency(entry.amount)}</td>
-                  <td className="py-2 pr-3">{entry.receiptId}</td>
-                  <td className="py-2 pr-3">{entry.emailSent ? 'Yes' : 'No'}</td>
                   <td className="py-2 pr-3">
                     <button
                       type="button"
@@ -370,7 +364,7 @@ const AdminDonationsPage = () => {
               ))}
               {pagedDonations.length === 0 ? (
                 <tr>
-                  <td className="py-3 text-slate-500" colSpan={8}>No donations found for the current filters.</td>
+                  <td className="py-3 text-slate-500" colSpan={5}>No donations found for the current filters.</td>
                 </tr>
               ) : null}
             </tbody>

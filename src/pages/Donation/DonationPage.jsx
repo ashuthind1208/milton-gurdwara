@@ -5,6 +5,7 @@ import DonationForm from '../../components/forms/DonationForm';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import donationService from '../../services/donationService';
+import advertisementService from '../../services/advertisementService';
 import { formatCurrency } from '../../utils/formatters';
 import useSeoMeta from '../../hooks/useSeoMeta';
 import Seo from '../../components/common/Seo';
@@ -22,6 +23,14 @@ const DonationPage = () => {
     queryKey: ['campaigns'],
     queryFn: () => donationService.getCampaigns().then((res) => res.data)
   });
+
+  const { data: ads = [] } = useQuery({
+    queryKey: ['advertisements'],
+    queryFn: () => advertisementService.getAds().then((res) => res.data)
+  });
+
+  const donationTopAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Donation Top Banner').slice(0, 2), [ads]);
+  const donationFooterAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Donation Footer Banner').slice(0, 2), [ads]);
 
   const openCampaigns = useMemo(() => campaigns.filter((campaign) => !campaign.isClosed), [campaigns]);
 
@@ -68,6 +77,18 @@ const DonationPage = () => {
         title="Daswand | Donation"
         description="Support the sangat through daswand. Fill details once, then pay securely with Stripe popup checkout."
       />
+
+      {donationTopAds.length > 0 ? (
+        <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+          <div className="grid gap-2 md:grid-cols-2">
+            {donationTopAds.map((ad) => (
+              <a key={ad.id} href={ad.targetLink || ad.website || '#'} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30">
+                {ad.bannerUrl || ad.imageUrl ? <img src={ad.bannerUrl || ad.imageUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
+              </a>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
         <section className="space-y-4">
@@ -129,6 +150,18 @@ const DonationPage = () => {
           })}
         </section>
       </div>
+
+      {donationFooterAds.length > 0 ? (
+        <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+          <div className="grid gap-2 md:grid-cols-2">
+            {donationFooterAds.map((ad) => (
+              <a key={ad.id} href={ad.targetLink || ad.website || '#'} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30">
+                {ad.bannerUrl || ad.imageUrl ? <img src={ad.bannerUrl || ad.imageUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
+              </a>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 };

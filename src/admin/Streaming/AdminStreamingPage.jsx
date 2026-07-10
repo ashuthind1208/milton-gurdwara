@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { EyeIcon, PencilSquareIcon, PowerIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, PencilSquareIcon, PowerIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import streamingService, { verifyStreamingAvailability } from '../../services/streamingService';
@@ -29,6 +29,10 @@ const AdminStreamingPage = () => {
   });
 
   const rows = useMemo(() => streamingItems || [], [streamingItems]);
+  const isMiltonPrimaryStream = (stream = {}) => {
+    const haystack = `${stream?.title || ''} ${stream?.text || ''} ${stream?.streamUrl || ''}`.toLowerCase();
+    return haystack.includes('milton') || haystack.includes('singh sabha');
+  };
   const currentStreaming = useMemo(() => rows.find((entry) => entry.id === modalState.id) || null, [modalState.id, rows]);
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const visibleRows = useMemo(() => {
@@ -105,6 +109,11 @@ const AdminStreamingPage = () => {
     onSuccess: () => invalidate()
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id) => streamingService.removeStreaming(id),
+    onSuccess: () => invalidate()
+  });
+
   const openModal = (mode, id = '') => setModalState({ open: true, mode, id });
   const closeModal = () => setModalState({ open: false, mode: 'view', id: '' });
 
@@ -149,6 +158,20 @@ const AdminStreamingPage = () => {
                       </button>
                       <button type="button" onClick={() => toggleMutation.mutate({ id: row.id, active: !row.active })} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:border-brand-blue hover:text-brand-blue" aria-label={row.active ? 'Deactivate stream' : 'Activate stream'}>
                         <PowerIcon className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!isMiltonPrimaryStream(row)) {
+                            deleteMutation.mutate(row.id);
+                          }
+                        }}
+                        disabled={isMiltonPrimaryStream(row) || deleteMutation.isPending}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:border-red-500 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label={isMiltonPrimaryStream(row) ? 'Milton main stream cannot be deleted' : 'Delete stream'}
+                        title={isMiltonPrimaryStream(row) ? 'Milton main stream cannot be deleted' : 'Delete stream'}
+                      >
+                        <TrashIcon className="h-4 w-4" />
                       </button>
                     </div>
                   </td>

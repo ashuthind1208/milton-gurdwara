@@ -60,14 +60,10 @@ const VideosPage = () => {
           <div className="grid gap-4 md:grid-cols-2">
             {featured.slice(0, 2).map((video) => {
               const thumb = getThumb(video);
-              const platformLabel = video.platform === 'youtube' ? 'Play YouTube Video' : 'Watch on Facebook';
               return (
                 <div key={video.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                   <button type="button" onClick={() => setActiveVideo(video)} className="group relative block aspect-video w-full overflow-hidden bg-slate-900">
                     {thumb ? <img src={thumb} alt={video.title} className="h-full w-full object-cover opacity-80 transition group-hover:opacity-60" /> : <div className="h-full w-full bg-gradient-to-br from-slate-700 to-slate-900" />}
-                    <span className="absolute inset-0 flex items-center justify-center text-white">
-                      <span className="rounded-full bg-black/50 px-3 py-1.5 text-sm font-semibold">{platformLabel}</span>
-                    </span>
                   </button>
                   <div className="p-3">
                     <p className="text-xs font-semibold uppercase tracking-wide text-brand-blue">{video.category}</p>
@@ -99,7 +95,6 @@ const VideosPage = () => {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {visibleVideos.map((video) => {
             const thumb = getThumb(video);
-            const isFb = video.platform === 'facebook';
 
             return (
               <Card key={video.id} className="overflow-hidden p-0">
@@ -109,9 +104,6 @@ const VideosPage = () => {
                   className="group relative block aspect-video w-full overflow-hidden bg-slate-900"
                 >
                   {thumb ? <img src={thumb} alt={video.title} className="h-full w-full object-cover opacity-80 transition group-hover:opacity-60" /> : <div className="h-full w-full bg-gradient-to-br from-slate-700 to-slate-900" />}
-                  <span className="absolute inset-0 flex items-center justify-center">
-                    <span className="rounded-full bg-black/50 px-3 py-1.5 text-sm font-semibold text-white">{isFb ? 'Watch on Facebook' : 'Play YouTube Video'}</span>
-                  </span>
                 </button>
                 <div className="p-3">
                   <div className="flex items-start justify-between gap-2">

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 
 const fallbackContent = {
@@ -29,30 +28,6 @@ const HomeHeroBanner = ({ content, actions, topRightSlot, onSlideAction }) => {
   const resolvedContent = content || fallbackContent;
   const slides = useMemo(() => resolvedContent.slides || [], [resolvedContent]);
   const [index, setIndex] = useState(0);
-  const [isDocumentVisible, setIsDocumentVisible] = useState(() => document.visibilityState === 'visible');
-
-  useEffect(() => {
-    const onVisibilityChange = () => {
-      setIsDocumentVisible(document.visibilityState === 'visible');
-    };
-
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibilityChange);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (slides.length <= 1 || !isHomeRoute || !isDocumentVisible) {
-      return undefined;
-    }
-
-    const timer = window.setInterval(() => {
-      setIndex((prev) => (prev + 1) % slides.length);
-    }, 4500);
-
-    return () => window.clearInterval(timer);
-  }, [isDocumentVisible, isHomeRoute, slides.length]);
 
   useEffect(() => {
     if (index >= slides.length && slides.length > 0) {
@@ -67,18 +42,13 @@ const HomeHeroBanner = ({ content, actions, topRightSlot, onSlideAction }) => {
 
   return (
     <section className="relative overflow-hidden rounded-3xl border border-brand-blue/20 shadow-soft">
-      <AnimatePresence mode="wait">
-        <motion.img
-          key={activeSlide.image || index}
-          src={activeSlide.image}
-          alt={activeSlide.heading || 'Hero slide'}
-          className="h-[360px] w-full object-cover opacity-35 md:h-[440px]"
-          initial={{ opacity: 0.3, scale: 1.04 }}
-          animate={{ opacity: 0.35, scale: 1 }}
-          exit={{ opacity: 0.3 }}
-          transition={{ duration: 0.45 }}
-        />
-      </AnimatePresence>
+      <img
+        src={activeSlide.image}
+        alt={activeSlide.heading || 'Hero slide'}
+        className="h-[360px] w-full object-cover opacity-35 md:h-[440px]"
+        loading="eager"
+        decoding="async"
+      />
 
       <div className="absolute inset-0 bg-gradient-to-r from-brand-navy via-brand-blue/78 to-brand-blue/62" />
 
@@ -88,12 +58,7 @@ const HomeHeroBanner = ({ content, actions, topRightSlot, onSlideAction }) => {
         </div>
       ) : null}
 
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35 }}
-        className="absolute inset-0 flex flex-col justify-center p-6 pt-24 text-white md:p-10 md:pt-10"
-      >
+      <div className="absolute inset-0 flex flex-col justify-center p-6 pt-24 text-white md:p-10 md:pt-10">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-saffron">{activeEyebrow}</p>
         <h1 className="mt-3 max-w-3xl font-heading text-3xl font-bold leading-tight md:text-5xl">{activeTitle}</h1>
         <p className="mt-3 max-w-3xl text-sm text-blue-50 md:text-base">{activeDescription}</p>
@@ -131,20 +96,22 @@ const HomeHeroBanner = ({ content, actions, topRightSlot, onSlideAction }) => {
             ) : null}
           </div>
         ) : null}
-      </motion.div>
-
-      <div className="absolute bottom-5 right-5 z-10 flex gap-2 md:bottom-6 md:right-6">
-        {slides.map((slide, dotIndex) => (
-          <button
-            key={`${slide.title || slide.heading}-${dotIndex}`}
-            onClick={() => setIndex(dotIndex)}
-            className={`h-2.5 rounded-full transition ${
-              dotIndex === index ? 'w-7 bg-brand-saffron' : 'w-2.5 bg-white/65'
-            }`}
-            aria-label={`Show slide ${dotIndex + 1}`}
-          />
-        ))}
       </div>
+
+      {isHomeRoute && slides.length > 1 ? (
+        <div className="absolute bottom-5 right-5 z-10 flex gap-2 md:bottom-6 md:right-6">
+          {slides.map((slide, dotIndex) => (
+            <button
+              key={`${slide.title || slide.heading}-${dotIndex}`}
+              onClick={() => setIndex(dotIndex)}
+              className={`h-2.5 rounded-full transition ${
+                dotIndex === index ? 'w-7 bg-brand-saffron' : 'w-2.5 bg-white/65'
+              }`}
+              aria-label={`Show slide ${dotIndex + 1}`}
+            />
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 };
