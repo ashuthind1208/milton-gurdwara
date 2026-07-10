@@ -8,11 +8,13 @@ const defaultStreaming = {
   id: 'stream-1',
   title: 'Live Streaming',
   text: 'YouTube live stream for sangat',
-  streamUrl: siteConfig.liveKirtanStreamUrl,
-  active: Boolean(siteConfig.liveKirtanStreamUrl),
+  streamUrl: siteConfig.social.youtube,
+  active: Boolean(siteConfig.social.youtube),
   updatedAt: new Date().toISOString(),
   checkedAt: new Date().toISOString()
 };
+
+const isYouTubeSource = (value = '') => /youtube\.com|youtu\.be|^@|\bUC[A-Za-z0-9_-]{20,}\b/i.test(String(value || '').trim());
 
 const normalizeStreaming = (streaming = {}, index = 0) => ({
   id: streaming.id || `stream-${Date.now()}-${index}`,
@@ -54,10 +56,38 @@ const writeStreamingItems = (records) => {
 
 const resolveEmbedUrl = (streamUrl) => getYouTubeEmbedUrl(streamUrl) || String(streamUrl || '');
 
+const resolveYouTubeLive = async (sourceUrl) => {
+  const response = await fetch(`/api/streaming/youtube/live?source=${encodeURIComponent(String(sourceUrl || ''))}`);
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok || !payload?.ok) {
+    return {
+      available: false,
+      checkedAt: new Date().toISOString(),
+      reason: payload?.message || 'lookup_failed',
+      embedUrl: ''
+    };
+  }
+
+  return {
+    available: Boolean(payload.data?.available),
+    checkedAt: payload.data?.checkedAt || new Date().toISOString(),
+    reason: payload.data?.reason || '',
+    embedUrl: payload.data?.embedUrl || '',
+    watchUrl: payload.data?.watchUrl || '',
+    channelId: payload.data?.channelId || '',
+    videoId: payload.data?.videoId || ''
+  };
+};
+
 export const verifyStreamingAvailability = async (streaming = readStreamingItems()[0]) => {
   const normalized = normalizeStreaming(streaming);
   if (!normalized.active || !normalized.streamUrl) {
     return { available: false, checkedAt: new Date().toISOString(), reason: 'inactive' };
+  }
+
+  if (isYouTubeSource(normalized.streamUrl)) {
+    return resolveYouTubeLive(normalized.streamUrl);
   }
 
   const embedUrl = resolveEmbedUrl(normalized.streamUrl);
@@ -146,5 +176,7 @@ const streamingService = {
 };
 
 export const getStreamingEmbedUrl = resolveEmbedUrl;
+
+export const resolveStreamingLive = async (sourceUrl) => resolveYouTubeLive(sourceUrl);
 
 export default streamingService;

@@ -19,7 +19,7 @@ const sendYouTubeCommand = (iframe, func, args = []) => {
 };
 
 const StreamingModal = ({ open, streams = [], initialStreamId = '', onClose }) => {
-  const [status, setStatus] = useState({ loading: false, available: false, checkedAt: '', reason: '' });
+  const [status, setStatus] = useState({ loading: false, available: false, checkedAt: '', reason: '', embedUrl: '' });
 
   const streamItems = useMemo(() => {
     const rawItems = Array.isArray(streams) ? streams : [];
@@ -39,23 +39,13 @@ const StreamingModal = ({ open, streams = [], initialStreamId = '', onClose }) =
       || streamItems[0];
   }, [initialStreamId, streamItems]);
 
-  const embedUrl = useMemo(() => getStreamingEmbedUrl(selectedStream?.streamUrl), [selectedStream?.streamUrl]);
-  const autoplayUrl = useMemo(() => {
-    if (!embedUrl) {
-      return '';
-    }
-
-    const separator = embedUrl.includes('?') ? '&' : '?';
-    return `${embedUrl}${separator}autoplay=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
-  }, [embedUrl]);
-
   useEffect(() => {
     if (!open) {
       return;
     }
 
     let mounted = true;
-    setStatus({ loading: true, available: false, checkedAt: '', reason: '' });
+    setStatus({ loading: true, available: false, checkedAt: '', reason: '', embedUrl: '' });
 
     verifyStreamingAvailability(selectedStream || undefined).then((result) => {
       if (!mounted) {
@@ -66,7 +56,8 @@ const StreamingModal = ({ open, streams = [], initialStreamId = '', onClose }) =
         loading: false,
         available: Boolean(result.available),
         checkedAt: result.checkedAt || '',
-        reason: result.reason || ''
+        reason: result.reason || '',
+        embedUrl: result.embedUrl || ''
       });
     });
 
@@ -79,7 +70,8 @@ const StreamingModal = ({ open, streams = [], initialStreamId = '', onClose }) =
     return null;
   }
 
-  const canPlay = Boolean(selectedStream?.active && autoplayUrl && status.available);
+  const resolvedEmbedUrl = status.embedUrl || getStreamingEmbedUrl(selectedStream?.streamUrl);
+  const canPlay = Boolean(selectedStream?.active && resolvedEmbedUrl && status.available);
 
   return createPortal(
     <div
@@ -132,7 +124,7 @@ const StreamingModal = ({ open, streams = [], initialStreamId = '', onClose }) =
                 {canPlay ? (
                   <iframe
                     className="h-full w-full"
-                    src={autoplayUrl}
+                      src={`${resolvedEmbedUrl}${resolvedEmbedUrl.includes('?') ? '&' : '?'}autoplay=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`}
                     title={selectedStream?.title || 'Live stream'}
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     allowFullScreen
@@ -155,7 +147,7 @@ const StreamingModal = ({ open, streams = [], initialStreamId = '', onClose }) =
                     <div>
                       <p className="text-lg font-semibold">Stream is not available right now.</p>
                       <p className="mt-2 text-sm text-slate-300">
-                        {status.loading ? 'Checking availability...' : 'Please try again after the stream is marked active.'}
+                        {status.loading ? 'Checking availability...' : status.reason === 'not_live' ? 'No live broadcast is active right now.' : 'Please try again after the stream is marked active.'}
                       </p>
                     </div>
                   </div>

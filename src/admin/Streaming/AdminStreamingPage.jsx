@@ -5,11 +5,12 @@ import { EyeIcon, PencilSquareIcon, PowerIcon, XMarkIcon } from '@heroicons/reac
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import streamingService, { verifyStreamingAvailability } from '../../services/streamingService';
+import { siteConfig } from '../../constants/siteConfig';
 
 const emptyForm = {
   title: 'Live Streaming',
   text: 'YouTube live stream for sangat',
-  streamUrl: '',
+  streamUrl: siteConfig.social.youtube,
   active: true
 };
 
@@ -112,7 +113,7 @@ const AdminStreamingPage = () => {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-heading text-3xl font-bold text-slate-900">Streaming</h1>
-          <p className="mt-1 text-sm text-slate-600">Manage the single live stream link used by the header preview and the sangat stream page.</p>
+          <p className="mt-1 text-sm text-slate-600">Manage the single live source used by the header preview and the sangat stream page. Enter a YouTube channel URL, handle, or channel ID so the app can resolve the current live video only.</p>
         </div>
         <Button type="button" onClick={() => openModal('add', '')}>Add Stream</Button>
       </div>
@@ -209,9 +210,10 @@ const AdminStreamingPage = () => {
                   <input {...form.register('text', { required: true })} maxLength={48} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
                 </label>
                 <label className="text-sm font-semibold text-slate-700 md:col-span-2">
-                  Streaming URL
-                  <input {...form.register('streamUrl', { required: true })} placeholder="https://www.youtube.com/watch?v=..." className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+                  YouTube channel URL / handle / channel ID
+                  <input {...form.register('streamUrl', { required: true })} placeholder="https://www.youtube.com/@SinghSabhaMilton or UC..." className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
                 </label>
+                <p className="-mt-1 text-xs text-slate-500 md:col-span-2">Do not paste the live watch URL. Paste the channel source so the site always resolves the current live broadcast and avoids VOD playback.</p>
                 <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 md:col-span-2">
                   <input type="checkbox" {...form.register('active')} className="h-4 w-4 rounded border-slate-300" />
                   Active stream

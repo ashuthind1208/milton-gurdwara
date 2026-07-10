@@ -8,6 +8,7 @@ const port = Number(process.env.PORT || 4242);
 const stripeSecretKey = String(process.env.STRIPE_SECRET_KEY || '').trim();
 const stripeWebhookSecret = String(process.env.STRIPE_WEBHOOK_SECRET || '').trim();
 const stripeCurrency = String(process.env.STRIPE_CURRENCY || 'cad').toLowerCase();
+const youtubeApiKey = String(process.env.YOUTUBE_API_KEY || '').trim();
 const dataDir = path.resolve(__dirname, 'data');
 const donationsPath = path.join(dataDir, 'donations.json');
 const usersPath = path.join(dataDir, 'users.json');
@@ -308,6 +309,95 @@ const summarizeByCampaign = (donations) => {
   return map;
 };
 
+const parseYouTubeChannelSource = (value = '') => {
+  const input = String(value || '').trim();
+  if (!input) {
+    return null;
+  }
+
+  const channelMatch = input.match(/youtube\.com\/channel\/([A-Za-z0-9_-]+)/i) || input.match(/\b(UC[A-Za-z0-9_-]{20,})\b/i);
+  if (channelMatch) {
+    return { type: 'channelId', value: channelMatch[1] };
+  }
+
+  const handleMatch = input.match(/youtube\.com\/@([A-Za-z0-9._-]+)/i) || input.match(/^@([A-Za-z0-9._-]+)$/i);
+  if (handleMatch) {
+    return { type: 'handle', value: handleMatch[1] };
+  }
+
+  return null;
+};
+
+const resolveYouTubeLiveVideo = async (source) => {
+  if (!youtubeApiKey) {
+    const error = new Error('YOUTUBE_API_KEY is not configured on the server.');
+    error.status = 500;
+    throw error;
+  }
+
+  const parsedSource = parseYouTubeChannelSource(source);
+  if (!parsedSource) {
+    const error = new Error('Enter a YouTube channel URL, handle, or channel ID.');
+    error.status = 400;
+    throw error;
+  }
+
+  let channelId = parsedSource.value;
+
+  if (parsedSource.type === 'handle') {
+    const channelLookupUrl = new URL('https://www.googleapis.com/youtube/v3/channels');
+    channelLookupUrl.searchParams.set('part', 'id');
+    channelLookupUrl.searchParams.set('forHandle', parsedSource.value);
+    channelLookupUrl.searchParams.set('key', youtubeApiKey);
+
+    const channelResponse = await fetch(channelLookupUrl);
+    const channelPayload = await channelResponse.json();
+    channelId = channelPayload?.items?.[0]?.id || '';
+
+    if (!channelResponse.ok || !channelId) {
+      const error = new Error('Unable to resolve the YouTube channel handle.');
+      error.status = 404;
+      throw error;
+    }
+  }
+
+  const searchUrl = new URL('https://www.googleapis.com/youtube/v3/search');
+  searchUrl.searchParams.set('part', 'snippet');
+  searchUrl.searchParams.set('channelId', channelId);
+  searchUrl.searchParams.set('eventType', 'live');
+  searchUrl.searchParams.set('type', 'video');
+  searchUrl.searchParams.set('maxResults', '1');
+  searchUrl.searchParams.set('key', youtubeApiKey);
+
+  const searchResponse = await fetch(searchUrl);
+  const searchPayload = await searchResponse.json();
+  const liveItem = searchPayload?.items?.[0] || null;
+  const videoId = liveItem?.id?.videoId || '';
+
+  if (!searchResponse.ok || !videoId) {
+    return {
+      available: false,
+      reason: 'not_live',
+      checkedAt: new Date().toISOString(),
+      channelId,
+      videoId: '',
+      embedUrl: '',
+      watchUrl: ''
+    };
+  }
+
+  const embedUrl = `https://www.youtube.com/embed/${videoId}`;
+  return {
+    available: true,
+    reason: '',
+    checkedAt: new Date().toISOString(),
+    channelId,
+    videoId,
+    embedUrl,
+    watchUrl: `https://www.youtube.com/watch?v=${videoId}`
+  };
+};
+
 const server = http.createServer(async (request, response) => {
   const requestUrl = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
 
@@ -446,6 +536,26 @@ const server = http.createServer(async (request, response) => {
       sendJson(response, error.statusCode || 500, {
         ok: false,
         message: error.message || 'Unable to resolve Stripe payment details.'
+      });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/streaming/youtube/live' && request.method === 'GET') {
+    try {
+      const source = requestUrl.searchParams.get('source') || requestUrl.searchParams.get('channelId') || requestUrl.searchParams.get('channelUrl') || '';
+      const liveDetails = await resolveYouTubeLiveVideo(source);
+      sendJson(response, 200, {
+        ok: true,
+        data: {
+          source,
+          ...liveDetails
+        }
+      });
+    } catch (error) {
+      sendJson(response, error.status || 500, {
+        ok: false,
+        message: error.message || 'Unable to resolve the live YouTube stream.'
       });
     }
     return;
