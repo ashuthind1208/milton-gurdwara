@@ -57,10 +57,6 @@
     animation-iteration-count: infinite;
   }
 
-  .ticker-track:hover {
-    animation-play-state: paused;
-  }
-
   .ticker-speed-slow {
     animation-duration: 38s;
   }
@@ -76,6 +72,12 @@
   }
   to {
     transform: translateX(-50%);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ticker-track:hover {
+    animation-play-state: paused;
   }
 }
 

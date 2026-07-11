@@ -20,6 +20,16 @@ const getAdminEmails = () => {
     .filter(Boolean);
 };
 
+const resolveMemberType = (role) => {
+  if (role === userRoles.SUPER_ADMIN || role === userRoles.ADMIN) {
+    return 'Admin';
+  }
+  if (role === userRoles.VOLUNTEER) {
+    return 'Volunteer';
+  }
+  return 'Member';
+};
+
 const mapRoleByEmail = (email) => {
   const adminEmails = getAdminEmails();
   const normalizedEmail = String(email || '').toLowerCase();
@@ -46,7 +56,7 @@ const authService = {
       name: resolvedEmail.split('@')[0],
       email: resolvedEmail,
       role: assignedRole,
-      memberType: assignedRole === userRoles.VOLUNTEER ? 'Volunteer' : (assignedRole === userRoles.MEMBER ? 'Member' : 'Admin'),
+      memberType: resolveMemberType(assignedRole),
       authProvider: 'LOCAL',
       registrationComplete: false
     }).then((res) => res.data);
@@ -74,9 +84,11 @@ const authService = {
 
     const fallbackRole = existingUser?.role || (role || userRoles.MEMBER);
     const assignedRole = getAssignedRole({ email: resolvedEmail, fallbackRole });
-    const existingMemberType = existingUser?.memberType || (assignedRole === userRoles.VOLUNTEER ? 'Volunteer' : assignedRole === userRoles.MEMBER ? 'Member' : 'Admin');
+    const existingMemberType = resolveMemberType(assignedRole);
     const existingRegistrationComplete = Boolean(existingUser?.registrationComplete);
-    const existingApprovalStatus = existingUser?.approvalStatus || (assignedRole === userRoles.SUPER_ADMIN || assignedRole === userRoles.ADMIN ? 'approved' : 'pending');
+    const existingApprovalStatus = assignedRole === userRoles.SUPER_ADMIN || assignedRole === userRoles.ADMIN
+      ? 'approved'
+      : (existingUser?.approvalStatus || 'pending');
 
     const persisted = await userService.upsertUserByEmail({
       name: existingUser?.name || name || resolvedEmail.split('@')[0],
@@ -84,7 +96,7 @@ const authService = {
       role: assignedRole,
       memberType: existingMemberType,
       authProvider: 'GOOGLE',
-      avatarUrl: avatarUrl || existingUser?.avatarUrl,
+      avatarUrl: avatarUrl || existingUser?.avatarUrl || existingUser?.picture || existingUser?.photoURL,
       phone: existingUser?.phone || '',
       address: existingUser?.address || '',
       registrationComplete: intent === 'signin' ? true : existingRegistrationComplete,
@@ -111,7 +123,7 @@ const authService = {
       name,
       phone,
       address,
-      memberType: memberType || (assignedRole === userRoles.VOLUNTEER ? 'Volunteer' : assignedRole === userRoles.MEMBER ? 'Member' : 'Admin'),
+      memberType: memberType || resolveMemberType(assignedRole),
       role: assignedRole,
       avatarUrl
     }).then((res) => res.data);

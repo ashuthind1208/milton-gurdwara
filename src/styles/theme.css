@@ -97,10 +97,6 @@
   flex-shrink: 0;
 }
 
-.ticker-shell:hover .ticker-track {
-  animation-play-state: paused;
-}
-
 .ticker-item {
   color: var(--brand-blue);
   font-weight: 700;
@@ -114,16 +110,22 @@
 .modal-meta-track {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  white-space: normal;
   width: 100%;
-  animation: none;
 }
 
 .modal-meta-group {
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
+}
+
+.modal-meta-scroll {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  width: max-content;
+  will-change: transform;
+  animation: modal-meta-scroll 18s linear infinite;
 }
 
 .modal-meta-item {
@@ -138,6 +140,16 @@
 
 .modal-meta-shell:hover .modal-meta-track {
   animation-play-state: paused;
+}
+
+@keyframes modal-meta-scroll {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
 }
 
 @keyframes ticker-rtl {
@@ -168,5 +180,15 @@
 
   .ticker-shell-home {
     animation: none;
+  }
+
+  .modal-meta-scroll {
+    animation: none;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ticker-shell:hover .ticker-track {
+    animation-play-state: paused;
   }
 }

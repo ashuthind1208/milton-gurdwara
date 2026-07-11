@@ -23,8 +23,7 @@ const normalizeAd = (ad, index = 0) => ({
   title: ad.title || '',
   content: ad.content || '',
   website: ad.website || '',
-  imageUrl: ad.imageUrl || '',
-  bannerUrl: ad.bannerUrl || '',
+  bannerUrl: ad.bannerUrl || ad.imageUrl || '',
   targetLink: ad.targetLink || ad.website || '',
   placement: ad.placement || 'Homepage Sidebar',
   active: typeof ad.active === 'boolean' ? ad.active : true
@@ -41,14 +40,18 @@ const advertisementService = {
   },
 
   createAd: async (payload) => {
-    const record = normalizeAd({ ...payload, id: `ad-${Date.now()}` });
+    const { imageUrl: _imageUrl, ...payloadWithoutImage } = payload || {};
+    void _imageUrl;
+    const record = normalizeAd({ ...payloadWithoutImage, id: `ad-${Date.now()}` });
     const created = await contentApiService.create(RESOURCE, record);
     return { data: normalizeAd(created || record) };
   },
 
   updateAd: async (id, payload) => {
-    const updated = await contentApiService.update(RESOURCE, id, payload);
-    return { data: normalizeAd(updated || { id, ...payload }) };
+    const { imageUrl: _imageUrl, ...payloadWithoutImage } = payload || {};
+    void _imageUrl;
+    const updated = await contentApiService.update(RESOURCE, id, payloadWithoutImage);
+    return { data: normalizeAd(updated || { id, ...payloadWithoutImage }) };
   },
 
   removeAd: async (id) => {

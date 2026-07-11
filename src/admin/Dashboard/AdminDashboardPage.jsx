@@ -88,6 +88,13 @@ const SummaryCard = ({ label, value, sublabel, tone = 'text-slate-900', icon: Ic
 
 const EmptyState = ({ text }) => <p className="text-sm text-slate-500">{text}</p>;
 
+const ROLE_COLORS = {
+  'Super Admin': '#0B4EA2',
+  Admin: '#1d4ed8',
+  Member: '#f4a300',
+  Volunteer: '#10b981'
+};
+
 const AdminDashboardPage = () => {
   const todayDateKey = toDateKey(new Date());
 
@@ -251,11 +258,17 @@ const AdminDashboardPage = () => {
     datasets: [
       {
         data: Object.values(roleBreakdown),
-        backgroundColor: ['#0B4EA2', '#1d4ed8', '#f4a300', '#10b981'],
+        backgroundColor: Object.keys(roleBreakdown).map((role) => ROLE_COLORS[role] || '#94a3b8'),
         borderWidth: 0
       }
     ]
   };
+
+  const roleLegendItems = Object.entries(roleBreakdown).map(([role, count]) => ({
+    role,
+    count,
+    color: ROLE_COLORS[role] || '#94a3b8'
+  }));
 
   const campaignChartData = {
     labels: Object.keys(campaignBreakdown),
@@ -351,7 +364,7 @@ const AdminDashboardPage = () => {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Role Distribution</p>
-                <h2 className="font-heading text-xl font-semibold text-slate-900">Access mix</h2>
+                <h2 className="font-heading text-xl font-semibold text-slate-900">Type of Users</h2>
               </div>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{users.length} users</span>
             </div>
@@ -360,10 +373,19 @@ const AdminDashboardPage = () => {
                 data={roleChartData}
                 options={{
                   maintainAspectRatio: false,
-                  plugins: { legend: { position: 'bottom' } },
+                  plugins: { legend: { display: false } },
                   cutout: '62%'
                 }}
               />
+            </div>
+            <div className="mt-4 flex flex-nowrap items-center gap-2 overflow-x-auto whitespace-nowrap pb-1">
+              {roleLegendItems.map((item) => (
+                <span key={item.role} className="inline-flex shrink-0 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                  <span>{item.role}</span>
+                  <span className="text-slate-500">{item.count}</span>
+                </span>
+              ))}
             </div>
           </Card>
 

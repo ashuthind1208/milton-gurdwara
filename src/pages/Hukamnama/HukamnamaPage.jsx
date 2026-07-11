@@ -35,6 +35,7 @@ const HukamnamaPage = () => {
     queryFn: () => hukamnamaService.getCurrentHukamnama().then((res) => res.data)
   });
   const currentAng = Math.max(1, Number(currentHukamnama?.ang || 0));
+
   const { data: readAlongAudio } = useQuery({
     queryKey: ['hukamnama-read-along-page', currentAng],
     queryFn: () => hukamnamaService.getReadAlongAudioUrl(currentAng).then((res) => res.data),

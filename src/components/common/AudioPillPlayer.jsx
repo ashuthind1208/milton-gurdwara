@@ -9,7 +9,8 @@ const AudioPillPlayer = ({
   className = '',
   accent = 'light',
   stream = false,
-  showProgress = false
+  showProgress = false,
+  stopSignal = 0
 }) => {
   const audioRef = useRef(null);
   const seekAppliedRef = useRef(false);
@@ -30,6 +31,18 @@ const AudioPillPlayer = ({
   useEffect(() => {
     seekAppliedRef.current = false;
   }, [resolvedSrc]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) {
+      return;
+    }
+
+    audio.pause();
+    audio.currentTime = 0;
+    setIsPlaying(false);
+    setCurrentTime(0);
+  }, [stopSignal]);
 
   useEffect(() => {
     const audio = audioRef.current;

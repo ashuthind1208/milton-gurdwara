@@ -37,7 +37,6 @@ const emptyFormValues = {
   title: '',
   content: '',
   website: '',
-  imageUrl: '',
   bannerUrl: '',
   targetLink: '',
   placement: 'Homepage Sidebar',
@@ -52,7 +51,7 @@ const AdminAdvertisementsPage = () => {
     defaultValues: emptyFormValues
   });
   const [uploadingField, setUploadingField] = useState('');
-  const [uploadProgress, setUploadProgress] = useState({ imageUrl: 0, bannerUrl: 0 });
+  const [uploadProgress, setUploadProgress] = useState({ bannerUrl: 0 });
   const [uploadStatus, setUploadStatus] = useState({ type: 'success', message: '' });
 
   const { data: ads = [] } = useQuery({
@@ -95,7 +94,6 @@ const AdminAdvertisementsPage = () => {
         title: ad.title || '',
         content: ad.content || '',
         website: ad.website || '',
-        imageUrl: ad.imageUrl || '',
         bannerUrl: ad.bannerUrl || '',
         targetLink: ad.targetLink || '',
         placement: ad.placement || 'Homepage Sidebar',
@@ -242,27 +240,9 @@ const AdminAdvertisementsPage = () => {
               <label className="text-sm">Target Link
                 <input disabled={isViewMode} {...form.register('targetLink')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
               </label>
-              <label className="text-sm">Image URL
-                <input disabled={isViewMode} {...form.register('imageUrl')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
-                {!isViewMode ? (
-                  <>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="mt-2 block w-full text-xs"
-                      onChange={(event) => uploadAndSetField('imageUrl', event.target.files?.[0])}
-                    />
-                    <p className="mt-1 text-xs text-slate-500">{uploadingField === 'imageUrl' ? `Uploading image... ${uploadProgress.imageUrl}%` : 'Paste URL or upload image file (max 15MB).'}</p>
-                    {uploadingField === 'imageUrl' ? (
-                      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                        <div className="h-full bg-brand-blue transition-all" style={{ width: `${uploadProgress.imageUrl}%` }} />
-                      </div>
-                    ) : null}
-                  </>
-                ) : null}
-              </label>
               <label className="text-sm">Banner URL
                 <input disabled={isViewMode} {...form.register('bannerUrl')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
+                <p className="mt-1 text-xs text-slate-500">Recommended banner size: 1200 x 300 px (4:1) for best fit on homepage sections.</p>
                 {!isViewMode ? (
                   <>
                     <input

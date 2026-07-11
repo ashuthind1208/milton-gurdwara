@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
+const https = require('https');
 const { URL } = require('url');
 const Stripe = require('stripe');
 
@@ -62,6 +63,7 @@ const volunteerReminderBaseUrl = String(process.env.VOLUNTEER_REMINDER_BASE_URL 
 const volunteerReminderHtmlTemplateEnabled = String(process.env.VOLUNTEER_REMINDER_HTML_TEMPLATE_ENABLED || 'true').trim().toLowerCase() !== 'false';
 const volunteerReminderDays = [10, 5, 2, 1];
 let volunteerReminderSweepRunning = false;
+const darbarSahibStreamSource = String(process.env.DARBAR_SAHIB_STREAM_PROXY_TARGET || 'http://live.sgpc.net:4835/;').trim();
 
 const buildLogoDataUri = () => {
   const candidates = [
@@ -219,6 +221,63 @@ const readBody = async (request) => {
     chunks.push(Buffer.from(chunk));
   }
   return Buffer.concat(chunks);
+};
+
+const proxyAudioStream = (request, response, targetUrlString) => {
+  const targetUrl = new URL(targetUrlString);
+  const client = targetUrl.protocol === 'https:' ? https : http;
+  const upstreamMethod = request.method === 'HEAD' ? 'HEAD' : 'GET';
+
+  const proxyRequest = client.request(targetUrl, {
+    method: upstreamMethod,
+    headers: {
+      'User-Agent': request.headers['user-agent'] || 'Mozilla/5.0',
+      'Icy-MetaData': '1',
+      Accept: '*/*'
+    }
+  }, (proxyResponse) => {
+    const headers = {
+      'Content-Type': proxyResponse.headers['content-type'] || 'audio/aacp',
+      'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Content-Type, Range, Icy-MetaData',
+      'Access-Control-Allow-Methods': 'GET,HEAD,OPTIONS'
+    };
+
+    ['icy-notice1', 'icy-notice2', 'icy-name', 'icy-genre', 'icy-br', 'icy-sr', 'icy-url', 'icy-pub'].forEach((headerName) => {
+      if (proxyResponse.headers[headerName]) {
+        headers[headerName] = proxyResponse.headers[headerName];
+      }
+    });
+
+    response.writeHead(proxyResponse.statusCode || 200, headers);
+
+    if (request.method === 'HEAD') {
+      response.end();
+      proxyResponse.destroy();
+      return;
+    }
+
+    proxyResponse.pipe(response);
+  });
+
+  proxyRequest.setTimeout(15000, () => {
+    proxyRequest.destroy(new Error('Stream request timed out'));
+  });
+
+  proxyRequest.on('error', (error) => {
+    if (!response.headersSent) {
+      sendJson(response, 502, {
+        ok: false,
+        message: error.message || 'Unable to proxy the live stream.'
+      });
+      return;
+    }
+
+    response.destroy(error);
+  });
+
+  proxyRequest.end();
 };
 
 const ensureStorage = () => {
@@ -1574,6 +1633,18 @@ const server = http.createServer(async (request, response) => {
       webhookConfigured: Boolean(stripeWebhookSecret),
       eventsDatabaseConfigured: eventsDb.hasDatabaseConnection
     });
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/streaming/darbar-sahib/live' && (request.method === 'GET' || request.method === 'HEAD')) {
+    try {
+      proxyAudioStream(request, response, darbarSahibStreamSource);
+    } catch (error) {
+      sendJson(response, 500, {
+        ok: false,
+        message: error.message || 'Unable to start the Darbar Sahib live stream.'
+      });
+    }
     return;
   }
 

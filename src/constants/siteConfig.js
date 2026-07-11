@@ -7,6 +7,25 @@ const sanitizeStreamUrl = (value = '') => {
   return trimmed.replace(/[;\s]+$/, '');
 };
 
+const darbarSahibStreamProxyUrl = '/api/streaming/darbar-sahib/live';
+
+const normalizeDarbarSahibStreamUrl = (value = '') => {
+  const sanitized = sanitizeStreamUrl(value);
+  if (!sanitized) {
+    return darbarSahibStreamProxyUrl;
+  }
+
+  if (sanitized.startsWith('/api/streaming/darbar-sahib/live')) {
+    return sanitized;
+  }
+
+  if (/live\.sgpc\.net|sgpc\.net/i.test(sanitized)) {
+    return darbarSahibStreamProxyUrl;
+  }
+
+  return sanitized;
+};
+
 export const siteConfig = {
   name: 'Singh Sabha Milton Gurdwara',
   shortName: 'Singh Sabha Milton',
@@ -23,9 +42,9 @@ export const siteConfig = {
     facebook: 'https://facebook.com/singhsabhamilton',
     instagram: 'https://www.instagram.com/miltongurdwara/'
   },
-  liveKirtanStreamUrl: sanitizeStreamUrl(
+  liveKirtanStreamUrl: normalizeDarbarSahibStreamUrl(
     process.env.REACT_APP_DARBAR_SAHIB_STREAM_URL ||
-    'https://live.sgpc.net:8442/'
+    darbarSahibStreamProxyUrl
   )
 };
 

@@ -21,7 +21,7 @@ const seedUsers = [
   {
     id: 'user-2',
     name: 'Kirandeep Kaur',
-    role: 'Editor',
+    role: 'Admin',
     email: 'editor@singhsabhamilton.org',
     phone: '',
     address: '',
@@ -35,11 +35,11 @@ const seedUsers = [
   {
     id: 'user-3',
     name: 'Manveer Singh',
-    role: 'Finance',
+    role: 'Member',
     email: 'finance@singhsabhamilton.org',
     phone: '',
     address: '',
-    memberType: 'Admin',
+    memberType: 'Member',
     authProvider: 'LOCAL',
     avatarUrl: '',
     registrationComplete: true,
@@ -83,21 +83,24 @@ const normalizeRole = (value) => {
 };
 
 const resolveMemberType = (role, fallback) => {
-  if (fallback) {
-    return fallback;
-  }
   if (role === 'Super Admin' || role === 'Admin' || role === 'Editor' || role === 'Finance') {
     return 'Admin';
   }
   if (role === 'Volunteer') {
     return 'Volunteer';
   }
-  return 'Member';
+  return fallback || 'Member';
 };
+
+const resolveAvatarUrl = (user = {}) => (
+  user.avatarUrl || user.picture || user.photoURL || user.imageUrl || user.profileImageUrl || ''
+);
 
 const normalizeUser = (user = {}) => {
   const role = normalizeRole(user.role);
   const memberType = resolveMemberType(role, user.memberType || '');
+  const resolvedAvatarUrl = resolveAvatarUrl(user);
+  const isPrivilegedRole = role === 'Super Admin' || role === 'Admin' || memberType === 'Admin';
 
   return {
     id: user.id || `user-${Date.now()}`,
@@ -108,10 +111,10 @@ const normalizeUser = (user = {}) => {
     address: user.address || '',
     memberType,
     authProvider: user.authProvider || 'LOCAL',
-    avatarUrl: user.avatarUrl || user.picture || '',
+    avatarUrl: resolvedAvatarUrl,
     registrationComplete: Boolean(user.registrationComplete),
     isActive: user.isActive !== false,
-    approvalStatus: user.approvalStatus || (memberType === 'Admin' ? 'approved' : 'pending'),
+    approvalStatus: user.approvalStatus || (isPrivilegedRole ? 'approved' : 'pending'),
     approvalUpdatedAt: user.approvalUpdatedAt || '',
     createdAt: user.createdAt || new Date().toISOString(),
     updatedAt: user.updatedAt || new Date().toISOString()
@@ -177,14 +180,15 @@ const userService = {
 
     const existing = await findUserByEmail(normalizedEmail);
     const base = existing || normalizeUser({ email: normalizedEmail, name, avatarUrl });
-    const resolvedMemberType = memberType || base.memberType || 'Member';
-    const approvalStatus = resolvedMemberType === 'Admin' ? 'approved' : 'pending';
+    const resolvedRole = normalizeRole(role || base.role);
+    const resolvedMemberType = resolveMemberType(resolvedRole, memberType || base.memberType || 'Member');
+    const approvalStatus = resolvedRole === 'Super Admin' || resolvedRole === 'Admin' || resolvedMemberType === 'Admin' ? 'approved' : 'pending';
     const updated = normalizeUser({
       ...base,
       name: name || base.name,
       phone: phone || '',
       address: address || '',
-      role: role || base.role,
+      role: resolvedRole,
       memberType: resolvedMemberType,
       avatarUrl: avatarUrl || base.avatarUrl,
       registrationComplete: true,

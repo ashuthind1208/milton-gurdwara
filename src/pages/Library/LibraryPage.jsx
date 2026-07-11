@@ -1,8 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { BookOpenIcon, DocumentTextIcon } from '@heroicons/react/24/solid';
-import { Link } from 'react-router-dom';
 import PageHero from '../../components/common/PageHero';
 import useSeoMeta from '../../hooks/useSeoMeta';
 import Seo from '../../components/common/Seo';
@@ -39,6 +38,102 @@ const Pagination = ({ page, total, onChange }) => {
       </button>
     </div>
   );
+};
+
+const getYouTubeVideoId = (url) => {
+  const embedUrl = getYouTubeEmbedUrl(url);
+  const match = embedUrl.match(/embed\/([A-Za-z0-9_-]{11})/);
+  return match ? match[1] : '';
+};
+
+const loadYouTubeIFrameApi = (() => {
+  let apiPromise = null;
+
+  return () => {
+    if (typeof window === 'undefined') {
+      return Promise.resolve(null);
+    }
+
+    if (window.YT?.Player) {
+      return Promise.resolve(window.YT);
+    }
+
+    if (apiPromise) {
+      return apiPromise;
+    }
+
+    apiPromise = new Promise((resolve) => {
+      const existingScript = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
+      const previousCallback = window.onYouTubeIframeAPIReady;
+
+      window.onYouTubeIframeAPIReady = () => {
+        if (typeof previousCallback === 'function') {
+          previousCallback();
+        }
+        resolve(window.YT);
+      };
+
+      if (!existingScript) {
+        const script = document.createElement('script');
+        script.src = 'https://www.youtube.com/iframe_api';
+        script.async = true;
+        script.onerror = () => resolve(null);
+        document.head.appendChild(script);
+      }
+    });
+
+    return apiPromise;
+  };
+})();
+
+const YouTubeAutoPlayPlayer = ({ url, title, className = '' }) => {
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const videoId = getYouTubeVideoId(url);
+    if (!videoId || !containerRef.current) {
+      return undefined;
+    }
+
+    let player = null;
+    let cancelled = false;
+
+    loadYouTubeIFrameApi().then((YT) => {
+      if (cancelled || !YT?.Player || !containerRef.current) {
+        return;
+      }
+
+      player = new YT.Player(containerRef.current, {
+        videoId,
+        playerVars: {
+          autoplay: 1,
+          controls: 1,
+          rel: 0,
+          modestbranding: 1,
+          playsinline: 1
+        },
+        events: {
+          onReady: (event) => {
+            try {
+              event.target.setVolume(50);
+              event.target.playVideo();
+            } catch {
+              // Ignore player API errors and keep the embedded player visible.
+            }
+          }
+        }
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      if (player?.destroy) {
+        player.destroy();
+      }
+    };
+  }, [url]);
+
+  return <div ref={containerRef} className={className} aria-label={title} />;
 };
 
 const LibraryPage = () => {
@@ -118,7 +213,7 @@ const LibraryPage = () => {
           <div className="grid gap-2 md:grid-cols-2">
             {libraryTopAds.map((ad) => (
               <a key={ad.id} href={ad.targetLink || ad.website || '#'} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30">
-                {ad.bannerUrl || ad.imageUrl ? <img src={ad.bannerUrl || ad.imageUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
+                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
               </a>
             ))}
           </div>
@@ -353,10 +448,9 @@ const LibraryPage = () => {
         <section>
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
-              <h3 className="font-heading text-lg font-semibold text-brand-blue">Media Resources</h3>
+              <h3 className="font-heading text-2xl font-semibold text-brand-blue md:text-3xl">Media Resources</h3>
               <p className="text-xs text-slate-600">YouTube videos and audio links for learning more about Sikhism.</p>
             </div>
-            <Link to="/videos" className="text-xs font-semibold text-brand-blue hover:underline">More Videos →</Link>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {mediaResources.slice(0, 6).map((entry) => {
@@ -401,12 +495,10 @@ const LibraryPage = () => {
           <div className="relative z-10 w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl max-h-[92vh] overflow-y-auto">
             <div className="w-full bg-black">
               <div className="mx-auto aspect-[16/9] w-full max-h-[72vh]">
-                <iframe
-                  className="h-full w-full"
-                  src={getYouTubeEmbedUrl(mediaModalEntry.url)}
+                <YouTubeAutoPlayPlayer
+                  url={mediaModalEntry.url}
                   title={mediaModalEntry.title}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
+                  className="h-full w-full"
                 />
               </div>
             </div>
@@ -431,7 +523,7 @@ const LibraryPage = () => {
           <div className="grid gap-2 md:grid-cols-2">
             {libraryFooterAds.map((ad) => (
               <a key={ad.id} href={ad.targetLink || ad.website || '#'} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30">
-                {ad.bannerUrl || ad.imageUrl ? <img src={ad.bannerUrl || ad.imageUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
+                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
               </a>
             ))}
           </div>

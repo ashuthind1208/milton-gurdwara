@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import AudioPillPlayer from '../../components/common/AudioPillPlayer';
@@ -99,6 +99,8 @@ const HomePage = () => {
   const [hukamnamaSlot, setHukamnamaSlot] = useState('morning');
   const [selectedSevaCategory, setSelectedSevaCategory] = useState('All');
   const [selectedSevaPage, setSelectedSevaPage] = useState(1);
+  const [homeReadAlongStopToken, setHomeReadAlongStopToken] = useState(0);
+  const previousSelectedContentTypeRef = useRef(null);
 
   const tickerItems = useMemo(() => (events.length > 0 ? events : []), [events]);
   const latestArticle = useMemo(
@@ -158,11 +160,28 @@ const HomePage = () => {
   const volunteerOptions = ['Langar', 'Cleaning', 'Parking', 'Teaching', 'Events'];
   const readAlongConfig = useMemo(() => hukamnamaService.getReadAlongConfig(), []);
   const homeHukamnamaAng = Math.max(1, Number(activeHukamnama?.ang || 0));
+  const hukamnamaMetaPills = [
+    activeHukamnama?.updatedAt ? { key: 'date', label: new Date(activeHukamnama.updatedAt).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' }) } : null,
+    activeHukamnama?.slot ? { key: 'slot', label: `Slot: ${activeHukamnama.slot}` } : null,
+    activeHukamnama?.metadata?.raag ? { key: 'raag', label: `Raag: ${activeHukamnama.metadata.raag}` } : null,
+    activeHukamnama?.metadata?.writer ? { key: 'writer', label: `Written by: ${activeHukamnama.metadata.writer}` } : null
+  ].filter(Boolean);
   const { data: homeReadAlongAudio, isFetching: homeReadAlongLoading } = useQuery({
     queryKey: ['home-hukamnama-read-along', homeHukamnamaAng],
     queryFn: () => hukamnamaService.getReadAlongAudioUrl(homeHukamnamaAng).then((res) => res.data),
     enabled: homeHukamnamaAng > 0 && readAlongConfig.enabled
   });
+
+  useEffect(() => {
+    const previousSelectedContentType = previousSelectedContentTypeRef.current;
+    const currentSelectedContentType = selectedContentLink?.type || null;
+
+    if (previousSelectedContentType === 'hukamnama' && currentSelectedContentType !== 'hukamnama') {
+      setHomeReadAlongStopToken((value) => value + 1);
+    }
+
+    previousSelectedContentTypeRef.current = currentSelectedContentType;
+  }, [selectedContentLink]);
 
   const featuredAlbum = albums[0];
   const globalBannerAds = ads.filter((ad) => ad.active && ad.placement === 'Global Banner').slice(0, 2);
@@ -241,15 +260,6 @@ const HomePage = () => {
     setSelectedContentLink(previewMap[path] || null);
   };
 
-  const modalHukamnamaAng = selectedContentLink?.type === 'hukamnama'
-    ? Math.max(1, Number(activeHukamnama?.ang || 1))
-    : 0;
-  const { data: hukamnamaReadAlong, isFetching: readAlongLoading } = useQuery({
-    queryKey: ['hukamnama-read-along', modalHukamnamaAng],
-    queryFn: () => hukamnamaService.getReadAlongAudioUrl(modalHukamnamaAng).then((res) => res.data),
-    enabled: modalHukamnamaAng > 0 && readAlongConfig.enabled
-  });
-
   return (
     <div className="space-y-3">
       <Seo {...meta} />
@@ -290,7 +300,7 @@ const HomePage = () => {
           <div className="grid gap-2 md:grid-cols-2">
             {globalBannerAds.map((ad) => (
               <a key={ad.id} href={ad.targetLink || ad.website || '#'} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30">
-                {ad.bannerUrl || ad.imageUrl ? <img src={ad.bannerUrl || ad.imageUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
+                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full bg-slate-50 p-1 object-contain md:h-28" loading="lazy" /> : null}
               </a>
             ))}
           </div>
@@ -326,6 +336,7 @@ const HomePage = () => {
                       label="Singh Sabha Milton"
                       subtitle={`${hukamnamaSlot} | Ang ${homeHukamnamaAng}`}
                       src={homeReadAlongAudio.url}
+                      stopSignal={homeReadAlongStopToken}
                     />
                   ) : (
                     <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
@@ -445,7 +456,7 @@ const HomePage = () => {
 
             {homeSidebarAds.map((ad) => (
               <a key={ad.id} href={ad.targetLink || ad.website || '#'} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl border border-slate-200 bg-white hover:border-brand-blue/30">
-                {ad.bannerUrl || ad.imageUrl ? <img src={ad.bannerUrl || ad.imageUrl} alt={ad.title || 'Advertisement'} className="h-28 w-full object-cover" loading="lazy" /> : null}
+                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-28 w-full bg-slate-50 p-2 object-contain md:h-32" loading="lazy" /> : null}
               </a>
             ))}
           </div>
@@ -457,7 +468,7 @@ const HomePage = () => {
           <div className="grid gap-2 md:grid-cols-2">
             {homeFooterAds.map((ad) => (
               <a key={ad.id} href={ad.targetLink || ad.website || '#'} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30">
-                {ad.bannerUrl || ad.imageUrl ? <img src={ad.bannerUrl || ad.imageUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
+                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full bg-slate-50 p-1 object-contain md:h-28" loading="lazy" /> : null}
               </a>
             ))}
           </div>
@@ -493,14 +504,37 @@ const HomePage = () => {
 
       {selectedContentLink ? (
         <div className="fixed inset-0 z-[75] flex items-center justify-center bg-slate-900/45 px-3 py-4 sm:px-4">
-          <div className="w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-5">
+          <div className="w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 {selectedContentLink.type === 'hukamnama' ? (
-                  <div className="flex flex-wrap gap-2">
-                    {activeHukamnama?.ang ? <p className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">Ang {activeHukamnama.ang}</p> : null}
-                    {activeHukamnama?.updatedAt ? <p className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{new Date(activeHukamnama.updatedAt).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' })}</p> : null}
-                    {activeHukamnama?.slot ? <p className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 capitalize">{activeHukamnama.slot}</p> : null}
+                  <div>
+                    <div className="modal-meta-shell sm:hidden">
+                      <div className="modal-meta-track modal-meta-scroll gap-2 pb-1 pr-1">
+                        <div className="modal-meta-group gap-2 pr-2">
+                          {hukamnamaMetaPills.map((pill) => (
+                            <p key={pill.key} className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700">
+                              {pill.label}
+                            </p>
+                          ))}
+                        </div>
+                        <div className="modal-meta-group gap-2 pr-2" aria-hidden="true">
+                          {hukamnamaMetaPills.map((pill) => (
+                            <p key={`${pill.key}-clone`} className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700">
+                              {pill.label}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="hidden flex-nowrap gap-2 overflow-x-auto pb-1 pr-1 sm:flex">
+                      {hukamnamaMetaPills.map((pill) => (
+                        <p key={pill.key} className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700">
+                          {pill.label}
+                        </p>
+                      ))}
+                    </div>
+                    {activeHukamnama?.ang ? <h3 className="mt-3 pt-1 font-heading text-3xl font-bold leading-tight text-slate-900 sm:text-4xl">ਅੰਗ {activeHukamnama.ang} | Ang {activeHukamnama.ang}</h3> : null}
                   </div>
                 ) : (
                   <>
@@ -512,30 +546,12 @@ const HomePage = () => {
               <button
                 type="button"
                 onClick={() => setSelectedContentLink(null)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 text-lg leading-none text-slate-700"
+                className="inline-flex h-8 w-8 shrink-0 flex-none items-center justify-center rounded-full border border-brand-blue bg-brand-blue text-lg leading-none text-white shadow-[0_8px_18px_rgba(10,77,159,0.3)] transition hover:border-brand-saffron hover:bg-brand-saffron hover:text-white"
                 aria-label="Close modal"
               >
                 ×
               </button>
             </div>
-
-            {selectedContentLink.type === 'hukamnama' ? (
-              <div className="mt-3 w-full sm:w-[260px] sm:flex-shrink-0">
-                {hukamnamaReadAlong?.url ? (
-                  <AudioPillPlayer
-                    label="Read Along Audio"
-                    subtitle={`Ang ${modalHukamnamaAng}`}
-                    src={hukamnamaReadAlong.url}
-                  />
-                ) : (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                    {!readAlongConfig.enabled
-                      ? 'Read along audio is currently disabled.'
-                      : (readAlongLoading ? 'Loading read along audio...' : `Read along audio is unavailable for Ang ${modalHukamnamaAng}.`)}
-                  </div>
-                )}
-              </div>
-            ) : null}
 
             {selectedContentLink.type === 'hukamnama' ? (
               <>
@@ -623,10 +639,12 @@ const HomePage = () => {
               </div>
             )}
 
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:gap-3">
-              {selectedContentLink.path ? <Link to={selectedContentLink.path} onClick={() => setSelectedContentLink(null)} className="rounded-md bg-brand-blue px-3 py-2 text-center text-sm font-semibold text-white">Open Full Page</Link> : null}
-              <button type="button" onClick={() => setSelectedContentLink(null)} className="rounded-md border border-slate-300 px-3 py-2 text-sm">Close</button>
-            </div>
+            {selectedContentLink.type !== 'hukamnama' ? (
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:gap-3">
+                {selectedContentLink.path ? <Link to={selectedContentLink.path} onClick={() => setSelectedContentLink(null)} className="rounded-md bg-brand-blue px-3 py-2 text-center text-sm font-semibold text-white">Open Full Page</Link> : null}
+                <button type="button" onClick={() => setSelectedContentLink(null)} className="rounded-md border border-slate-300 px-3 py-2 text-sm">Close</button>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}

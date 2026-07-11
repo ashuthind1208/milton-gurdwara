@@ -17,6 +17,8 @@ const statusClassMap = {
 
 const actionIconClass = 'h-4 w-4';
 
+const getAvatarUrl = (user = {}) => user.avatarUrl || user.picture || user.photoURL || '';
+
 const userFormDefaults = {
   name: '',
   email: '',
@@ -196,11 +198,17 @@ const AdminUsersPage = () => {
             <tbody>
               {filteredUsers.map((user) => {
                 const approvalStatus = String(user.approvalStatus || 'pending').toLowerCase();
+                const avatarUrl = getAvatarUrl(user);
                 return (
                   <tr key={user.id} className="border-t border-slate-100">
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-2">
-                        <img src={user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}`} alt={user.name} className="h-8 w-8 rounded-full object-cover" />
+                        <img
+                          src={avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}`}
+                          alt={user.name}
+                          className="h-8 w-8 rounded-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
                         <span className="font-medium text-slate-800">{user.name}</span>
                       </div>
                     </td>
@@ -323,6 +331,7 @@ const AdminUsersPage = () => {
               </button>
             </div>
             <div className="mt-4 grid gap-2 text-sm text-slate-700 md:grid-cols-2">
+              <p><span className="font-semibold">Avatar:</span> {getAvatarUrl(viewUser) || 'Not set'}</p>
               <p><span className="font-semibold">Name:</span> {viewUser.name || '-'}</p>
               <p><span className="font-semibold">Email:</span> {viewUser.email || '-'}</p>
               <p><span className="font-semibold">Phone:</span> {viewUser.phone || '-'}</p>

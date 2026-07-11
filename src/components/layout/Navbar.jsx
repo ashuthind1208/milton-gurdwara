@@ -262,6 +262,13 @@ const Navbar = () => {
       return;
     }
 
+    const baseStreamUrl = String(siteConfig.liveKirtanStreamUrl || '').trim();
+    if (!baseStreamUrl) {
+      setIsKirtanPlaying(false);
+      setIsKirtanLoading(false);
+      return;
+    }
+
     if (isKirtanPlaying) {
       liveAudioRef.current.pause();
       setIsKirtanPlaying(false);
@@ -270,7 +277,11 @@ const Navbar = () => {
     }
 
     try {
+      const separator = baseStreamUrl.includes('?') ? '&' : '?';
+      const refreshedUrl = `${baseStreamUrl}${separator}t=${Date.now()}`;
       setIsKirtanLoading(true);
+      liveAudioRef.current.src = refreshedUrl;
+      liveAudioRef.current.load();
       await liveAudioRef.current.play();
       setIsKirtanPlaying(true);
       setIsKirtanLoading(false);
@@ -362,8 +373,9 @@ const Navbar = () => {
         </div>
       </div>
 
-      <div className="mx-auto max-w-7xl bg-gradient-to-r from-blue-50/55 via-white/95 to-amber-50/45 px-4 md:px-6">
-        <div className={`relative hidden items-center transition-[min-height,padding] duration-500 ease-in-out lg:flex ${isCompact ? 'min-h-[86px] py-2' : 'min-h-[146px] py-2'}`}>
+      <div className="w-full bg-gradient-to-r from-blue-50/55 via-white/95 to-amber-50/45">
+        <div className="mx-auto max-w-7xl px-4 md:px-6">
+          <div className={`relative hidden items-center transition-[min-height,padding] duration-500 ease-in-out lg:flex ${isCompact ? 'min-h-[86px] py-2' : 'min-h-[146px] py-2'}`}>
           <Link
             to="/"
             preventScrollReset={isCompact}
@@ -437,7 +449,7 @@ const Navbar = () => {
             </div>
           )}
         </div>
-
+      </div>
       </div>
 
       <div className="lg:hidden px-4 pb-4 pt-1">

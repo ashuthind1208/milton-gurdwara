@@ -22,7 +22,6 @@ export const adminNav = [
   { label: 'Daily Schedule', path: '/admin/schedule' },
   { label: 'Hukamnama', path: '/admin/hukamnama' },
   { label: 'Seva Items', path: '/admin/langar' },
-  { label: 'Subscribers', path: '/admin/subscribers' },
   { label: 'Seva Opportunities', path: '/admin/seva-opportunities' },
   { label: 'Gallery Folders', path: '/admin/gallery' },
   { label: 'Library', path: '/admin/library' },
