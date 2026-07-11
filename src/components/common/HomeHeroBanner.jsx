@@ -35,6 +35,18 @@ const HomeHeroBanner = ({ content, actions, topRightSlot, onSlideAction }) => {
     }
   }, [index, slides.length]);
 
+  useEffect(() => {
+    if (!isHomeRoute || slides.length <= 1) {
+      return undefined;
+    }
+
+    const rotationTimer = window.setInterval(() => {
+      setIndex((prev) => (prev + 1) % slides.length);
+    }, 5000);
+
+    return () => window.clearInterval(rotationTimer);
+  }, [isHomeRoute, slides.length]);
+
   const activeSlide = slides[index] || {};
   const activeEyebrow = activeSlide.eyebrow || resolvedContent.eyebrow;
   const activeTitle = activeSlide.title || activeSlide.heading || resolvedContent.title;

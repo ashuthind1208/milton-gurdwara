@@ -1,10 +1,40 @@
 import { mockResponse } from './mockApi';
+import contentApiService from './contentApiService';
 
 const SETTINGS_KEY = 'ssm-hukamnama-settings';
 const CACHE_KEY = 'ssm-hukamnama-cache';
 const HISTORY_KEY = 'ssm-hukamnama-history';
 const ENTRIES_KEY = 'ssm-hukamnama-entries';
 const DAILY_MUKHWAK_AUDIO = 'https://hs.sgpc.net/uploadhukamnama/hukamnama.mp3';
+const RESOURCE_PREFIX = 'hukamnama';
+const DEFAULT_READ_ALONG_EXACT_BASE = 'https://backend.searchgurbani.com/storage/audio/sggs-gms';
+const DEFAULT_READ_ALONG_ARCHIVE_ITEM = 'ang-0001-0013';
+const DEFAULT_READ_ALONG_BASE_URL = `https://archive.org/download/${DEFAULT_READ_ALONG_ARCHIVE_ITEM}`;
+const DEFAULT_READ_ALONG_METADATA_URL = `https://archive.org/metadata/${DEFAULT_READ_ALONG_ARCHIVE_ITEM}`;
+const DEFAULT_READ_ALONG_MAP_URL = 'https://gurbaniprakash.org/assets/data/sggs_audio_map.json';
+const parseEnvBoolean = (value, fallback = true) => {
+  if (typeof value !== 'string') {
+    return fallback;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) {
+    return true;
+  }
+  if (['0', 'false', 'no', 'off'].includes(normalized)) {
+    return false;
+  }
+
+  return fallback;
+};
+const READ_ALONG_ENABLED = parseEnvBoolean(process.env.REACT_APP_HUKAMNAMA_READ_ALONG_ENABLED, true);
+const READ_ALONG_EXACT_BASE_URL = String(process.env.REACT_APP_HUKAMNAMA_READ_ALONG_EXACT_BASE_URL || DEFAULT_READ_ALONG_EXACT_BASE).trim().replace(/\/$/, '');
+const READ_ALONG_BASE_URL = String(process.env.REACT_APP_HUKAMNAMA_READ_ALONG_BASE_URL || DEFAULT_READ_ALONG_BASE_URL).trim();
+const READ_ALONG_METADATA_URL = String(process.env.REACT_APP_HUKAMNAMA_READ_ALONG_METADATA_URL || DEFAULT_READ_ALONG_METADATA_URL).trim();
+const READ_ALONG_MAP_URL = String(process.env.REACT_APP_HUKAMNAMA_READ_ALONG_MAP_URL || DEFAULT_READ_ALONG_MAP_URL).trim();
+const READ_ALONG_CACHE_KEY = 'ssm-hukamnama-read-along-cache-v3';
+const READ_ALONG_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+let readAlongRangesCache = null;
 
 const isUnavailable = (value) => !value || value === 'Not available' || value === 'Not available from source API';
 
@@ -92,17 +122,19 @@ const fallbackEntry = {
   ]
 };
 
-const readJson = (key, fallback) => {
+const toResourceName = (key) => `${RESOURCE_PREFIX}_${String(key || '').toLowerCase().replace(/[^a-z0-9]+/g, '_')}`;
+
+const readJson = async (key, fallback) => {
   try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
+    const payload = await contentApiService.getSingleton(toResourceName(key), null);
+    return payload ?? fallback;
   } catch {
     return fallback;
   }
 };
 
-const writeJson = (key, value) => {
-  localStorage.setItem(key, JSON.stringify(value));
+const writeJson = async (key, value) => {
+  await contentApiService.setSingleton(toResourceName(key), value);
 };
 
 const toDateKey = (value = new Date()) => {
@@ -123,7 +155,212 @@ const toDateKey = (value = new Date()) => {
 
 const normalizeSlot = (slot) => (String(slot || '').toLowerCase() === 'evening' ? 'evening' : 'morning');
 
-const readSettings = () => readJson(SETTINGS_KEY, {
+const parseReadAlongRanges = (files = []) => {
+  return (Array.isArray(files) ? files : [])
+    .map((file) => ({
+      name: String(file?.name || '').trim(),
+      lengthSeconds: Number(file?.length) || 0
+    }))
+    .map(({ name, lengthSeconds }) => {
+      const match = name.match(/^Ang-(\d{4})-(\d{4})\.mp3$/i);
+      if (!match) {
+        return null;
+      }
+
+      const start = Number(match[1]);
+      const end = Number(match[2]);
+      if (!Number.isFinite(start) || !Number.isFinite(end)) {
+        return null;
+      }
+
+      return { name, start, end, lengthSeconds };
+    })
+    .filter(Boolean)
+    .sort((left, right) => left.start - right.start);
+};
+
+const parseReadAlongMapRanges = (entries = []) => {
+  return (Array.isArray(entries) ? entries : [])
+    .map((entry) => {
+      const name = String(entry?.audio_file || '').trim();
+      const start = Number(entry?.start_page);
+      const end = Number(entry?.end_page);
+      const startLine = Number(entry?.start_line) || 1;
+      const endLine = Number(entry?.end_line) || 35;
+      if (!name || !Number.isFinite(start) || !Number.isFinite(end)) {
+        return null;
+      }
+
+      return {
+        name,
+        start,
+        end,
+        startLine,
+        endLine,
+        lengthSeconds: 0
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => left.start - right.start);
+};
+
+const readReadAlongCache = () => {
+  try {
+    const raw = localStorage.getItem(READ_ALONG_CACHE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.ranges) || !Number.isFinite(parsed.updatedAt)) {
+      return null;
+    }
+
+    if ((Date.now() - parsed.updatedAt) > READ_ALONG_CACHE_TTL_MS) {
+      return null;
+    }
+
+    return parsed.ranges;
+  } catch {
+    return null;
+  }
+};
+
+const writeReadAlongCache = (ranges) => {
+  try {
+    localStorage.setItem(READ_ALONG_CACHE_KEY, JSON.stringify({
+      updatedAt: Date.now(),
+      ranges
+    }));
+  } catch {
+    // Ignore cache write failures.
+  }
+};
+
+const getReadAlongRanges = async () => {
+  if (!READ_ALONG_ENABLED || (!READ_ALONG_MAP_URL && !READ_ALONG_METADATA_URL)) {
+    return [];
+  }
+
+  if (Array.isArray(readAlongRangesCache) && readAlongRangesCache.length > 0) {
+    return readAlongRangesCache;
+  }
+
+  const cachedRanges = readReadAlongCache();
+  if (Array.isArray(cachedRanges) && cachedRanges.length > 0) {
+    readAlongRangesCache = cachedRanges;
+    return cachedRanges;
+  }
+
+  try {
+    const [mapRanges, metadataRanges] = await Promise.all([
+      (async () => {
+        if (!READ_ALONG_MAP_URL) {
+          return [];
+        }
+
+        try {
+          const response = await fetch(READ_ALONG_MAP_URL);
+          if (!response.ok) {
+            return [];
+          }
+
+          const payload = await response.json();
+          return parseReadAlongMapRanges(payload);
+        } catch {
+          return [];
+        }
+      })(),
+      (async () => {
+        if (!READ_ALONG_METADATA_URL) {
+          return [];
+        }
+
+        try {
+          const response = await fetch(READ_ALONG_METADATA_URL);
+          if (!response.ok) {
+            return [];
+          }
+
+          const payload = await response.json();
+          return parseReadAlongRanges(payload?.files || []);
+        } catch {
+          return [];
+        }
+      })()
+    ]);
+
+    const metadataByName = new Map(metadataRanges.map((item) => [item.name, item]));
+    const ranges = (mapRanges.length > 0 ? mapRanges : metadataRanges)
+      .map((item) => {
+        const metadataItem = metadataByName.get(item.name);
+        return {
+          ...item,
+          lengthSeconds: Number(metadataItem?.lengthSeconds || item.lengthSeconds || 0)
+        };
+      })
+      .sort((left, right) => left.start - right.start);
+
+    if (ranges.length > 0) {
+      readAlongRangesCache = ranges;
+      writeReadAlongCache(ranges);
+    }
+
+    return ranges;
+  } catch {
+    return [];
+  }
+};
+
+const resolveReadAlongAudio = (ang, ranges = []) => {
+  if (!READ_ALONG_BASE_URL) {
+    return {
+      url: '',
+      rangeStart: 0,
+      rangeEnd: 0,
+      startAtSeconds: 0
+    };
+  }
+
+  const safeAng = Math.max(1, Number(ang) || 1);
+  const matches = (Array.isArray(ranges) ? ranges : []).filter((entry) => safeAng >= entry.start && safeAng <= entry.end);
+  if (!matches.length) {
+    return {
+      url: '',
+      rangeStart: 0,
+      rangeEnd: 0,
+      startAtSeconds: 0
+    };
+  }
+
+  const match = matches.sort((left, right) => {
+    const leftSpan = (left.end - left.start) || Number.MAX_SAFE_INTEGER;
+    const rightSpan = (right.end - right.start) || Number.MAX_SAFE_INTEGER;
+    if (leftSpan !== rightSpan) {
+      return leftSpan - rightSpan;
+    }
+    return left.start - right.start;
+  })[0];
+
+  const spanCount = Math.max(1, (match.end - match.start) + 1);
+  const rawStep = (Number(match.lengthSeconds) || 0) / spanCount;
+  const stepSeconds = Number.isFinite(rawStep) && rawStep > 0 ? rawStep : 0;
+  const offsetIndex = Math.max(0, safeAng - match.start);
+  const startAtSeconds = stepSeconds > 0 ? Math.floor(offsetIndex * stepSeconds) : 0;
+
+  return {
+    url: `${READ_ALONG_BASE_URL}/${encodeURIComponent(match.name)}`,
+    rangeStart: match.start,
+    rangeEnd: match.end,
+    startAtSeconds
+  };
+};
+
+// Keep legacy resolver helpers available for rapid rollback without triggering lint warnings.
+void getReadAlongRanges;
+void resolveReadAlongAudio;
+
+const readSettings = async () => readJson(SETTINGS_KEY, {
   ang: fallbackEntry.ang,
   source: fallbackEntry.source,
   metadata: fallbackEntry.metadata,
@@ -144,8 +381,8 @@ const normalizeScheduledEntry = (entry, fallbackDate, fallbackSlot) => {
   };
 };
 
-const readScheduledEntries = () => {
-  const raw = readJson(ENTRIES_KEY, {});
+const readScheduledEntries = async () => {
+  const raw = await readJson(ENTRIES_KEY, {});
   return Object.entries(raw || {}).reduce((acc, [date, slots]) => {
     const normalizedDate = toDateKey(date);
     const morning = slots?.morning ? normalizeScheduledEntry(slots.morning, normalizedDate, 'morning') : null;
@@ -157,8 +394,8 @@ const readScheduledEntries = () => {
   }, {});
 };
 
-const writeScheduledEntries = (entries) => {
-  writeJson(ENTRIES_KEY, entries);
+const writeScheduledEntries = async (entries) => {
+  await writeJson(ENTRIES_KEY, entries);
 };
 
 const transformAngResponse = (data, ang) => ({
@@ -186,7 +423,7 @@ const transformAngResponse = (data, ang) => ({
 });
 
 const fetchAngData = async (ang) => {
-  const cache = readJson(CACHE_KEY, {});
+  const cache = await readJson(CACHE_KEY, {});
   if (cache[ang]) {
     return { ...normalizeEntry(cache[ang]), isFallback: false };
   }
@@ -211,21 +448,27 @@ const fetchAngData = async (ang) => {
     }
 
     const transformed = normalizeEntry(transformAngResponse(payload, ang));
-    writeJson(CACHE_KEY, { ...cache, [ang]: transformed });
+    await writeJson(CACHE_KEY, { ...cache, [ang]: transformed });
     return { ...transformed, isFallback: false };
   } catch {
     return { ...normalizeEntry(cache[ang] || { ...fallbackEntry, ang }), isFallback: true };
   }
 };
 
-const writeHistory = (entry) => {
-  const history = readJson(HISTORY_KEY, []);
+const writeHistory = async (entry) => {
+  const history = await readJson(HISTORY_KEY, []);
   const filtered = history.filter((item) => !(item.date === entry.date && item.slot === entry.slot));
   const nextHistory = [entry, ...filtered].slice(0, 120);
-  writeJson(HISTORY_KEY, nextHistory);
+  await writeJson(HISTORY_KEY, nextHistory);
 };
 
 const hukamnamaService = {
+  getReadAlongConfig: () => ({
+    enabled: READ_ALONG_ENABLED,
+    source: READ_ALONG_EXACT_BASE_URL,
+    metadataUrl: READ_ALONG_METADATA_URL,
+    mapUrl: READ_ALONG_MAP_URL
+  }),
   getAngPreview: async (ang) => {
     const safeAng = Math.max(1, Number(ang) || 1);
     const angData = await fetchAngData(safeAng);
@@ -241,7 +484,7 @@ const hukamnamaService = {
   },
   getDailyHukamnama: async (dateValue) => {
     const date = toDateKey(dateValue || new Date());
-    const entries = readScheduledEntries();
+    const entries = await readScheduledEntries();
     return mockResponse({
       date,
       morning: entries[date]?.morning || null,
@@ -250,13 +493,13 @@ const hukamnamaService = {
   },
   getCurrentHukamnama: async () => {
     const today = toDateKey(new Date());
-    const entries = readScheduledEntries();
+    const entries = await readScheduledEntries();
     const todayEntry = entries[today]?.morning || entries[today]?.evening;
     if (todayEntry) {
       return mockResponse(todayEntry);
     }
 
-    const settings = normalizeEntry(readSettings());
+    const settings = normalizeEntry(await readSettings());
     const angData = await fetchAngData(settings.ang);
 
     if (!angData.isFallback) {
@@ -267,7 +510,7 @@ const hukamnamaService = {
         lines: angData.lines,
         updatedAt: settings.updatedAt || new Date().toISOString()
       };
-      writeJson(SETTINGS_KEY, normalizeEntry(nextSettings));
+      await writeJson(SETTINGS_KEY, normalizeEntry(nextSettings));
       return mockResponse({ ...nextSettings, ang: settings.ang, audioUrl: settings.audioUrl || DAILY_MUKHWAK_AUDIO });
     }
 
@@ -281,7 +524,7 @@ const hukamnamaService = {
     const safeAng = Math.max(1, Number(ang) || 1);
     const dateKey = toDateKey(date || new Date());
     const normalizedSlot = normalizeSlot(slot);
-    const entries = readScheduledEntries();
+    const entries = await readScheduledEntries();
 
     if (entries[dateKey]?.[normalizedSlot]) {
       throw new Error(`Hukamnama for ${dateKey} (${normalizedSlot}) is already set.`);
@@ -310,13 +553,13 @@ const hukamnamaService = {
       }
     };
 
-    writeScheduledEntries(nextEntries);
+    await writeScheduledEntries(nextEntries);
 
     if (dateKey === toDateKey(new Date())) {
-      writeJson(SETTINGS_KEY, normalizeEntry(nextEntry));
+      await writeJson(SETTINGS_KEY, normalizeEntry(nextEntry));
     }
 
-    writeHistory({
+    await writeHistory({
       ang: safeAng,
       date: dateKey,
       slot: normalizedSlot,
@@ -334,7 +577,7 @@ const hukamnamaService = {
   },
   getArchiveByDate: async (dateValue) => {
     const date = toDateKey(dateValue || new Date());
-    const entries = readScheduledEntries();
+    const entries = await readScheduledEntries();
     return mockResponse({
       date,
       morning: entries[date]?.morning || null,
@@ -342,7 +585,7 @@ const hukamnamaService = {
     });
   },
   getArchiveCalendar: async () => {
-    const entries = readScheduledEntries();
+    const entries = await readScheduledEntries();
     const payload = Object.entries(entries).map(([date, slots]) => ({
       date,
       hasMorning: Boolean(slots?.morning),
@@ -352,7 +595,7 @@ const hukamnamaService = {
     return mockResponse(payload);
   },
   getArchive: async () => {
-    const entries = readScheduledEntries();
+    const entries = await readScheduledEntries();
     const flattened = Object.values(entries)
       .flatMap((day) => [day?.morning, day?.evening])
       .filter(Boolean)
@@ -372,7 +615,34 @@ const hukamnamaService = {
       return mockResponse(flattened);
     }
 
-    return mockResponse(readJson(HISTORY_KEY, []));
+    return mockResponse(await readJson(HISTORY_KEY, []));
+  },
+  getReadAlongAudioUrl: async (ang) => {
+    const safeAng = Math.max(1, Number(ang) || 1);
+    if (!READ_ALONG_ENABLED) {
+      return mockResponse({
+        ang: safeAng,
+        url: '',
+        available: false,
+        enabled: false,
+        source: READ_ALONG_EXACT_BASE_URL,
+        rangeStart: 0,
+        rangeEnd: 0,
+        startAtSeconds: 0
+      });
+    }
+    const url = `${READ_ALONG_EXACT_BASE_URL}/gms-${safeAng}.mp3`;
+
+    return mockResponse({
+      ang: safeAng,
+      url,
+      available: Boolean(url),
+      enabled: true,
+      source: READ_ALONG_EXACT_BASE_URL,
+      rangeStart: safeAng,
+      rangeEnd: safeAng,
+      startAtSeconds: 0
+    });
   }
 };
 

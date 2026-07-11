@@ -1,8 +1,9 @@
 import { mockResponse } from './mockApi';
 import { siteConfig } from '../constants/siteConfig';
 import { getYouTubeEmbedUrl } from './videoService';
+import contentApiService from './contentApiService';
 
-const STORAGE_KEY = 'ssm-streaming-config';
+const RESOURCE = 'streaming_configs';
 
 const defaultStreaming = {
   id: 'stream-1',
@@ -16,43 +17,37 @@ const defaultStreaming = {
 
 const isYouTubeSource = (value = '') => /youtube\.com|youtu\.be|^@|\bUC[A-Za-z0-9_-]{20,}\b/i.test(String(value || '').trim());
 
+const normalizeBoolean = (value, fallback = false) => {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true' || normalized === '1' || normalized === 'yes') {
+      return true;
+    }
+    if (normalized === 'false' || normalized === '0' || normalized === 'no') {
+      return false;
+    }
+  }
+
+  if (typeof value === 'number') {
+    return value !== 0;
+  }
+
+  return fallback;
+};
+
 const normalizeStreaming = (streaming = {}, index = 0) => ({
-  id: streaming.id || `stream-${Date.now()}-${index}`,
-  title: streaming.title || defaultStreaming.title,
-  text: streaming.text || defaultStreaming.text,
-  streamUrl: streaming.streamUrl || defaultStreaming.streamUrl,
-  active: Boolean(streaming.active ?? defaultStreaming.active),
-  updatedAt: streaming.updatedAt || new Date().toISOString(),
-  checkedAt: streaming.checkedAt || ''
+  id: String(streaming.id || `stream-${Date.now()}-${index}`),
+  title: String(streaming.title ?? streaming.stream_title ?? defaultStreaming.title),
+  text: String(streaming.text ?? streaming.stream_text ?? defaultStreaming.text),
+  streamUrl: String(streaming.streamUrl ?? streaming.stream_url ?? defaultStreaming.streamUrl),
+  active: normalizeBoolean(streaming.active, defaultStreaming.active),
+  updatedAt: String(streaming.updatedAt ?? streaming.updated_at ?? new Date().toISOString()),
+  checkedAt: String(streaming.checkedAt ?? streaming.checked_at ?? '')
 });
-
-const readStreamingItems = () => {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return [normalizeStreaming(defaultStreaming, 0)];
-    }
-
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      return parsed.map((entry, index) => normalizeStreaming(entry, index));
-    }
-
-    return [normalizeStreaming(parsed, 0)];
-  } catch {
-    return [normalizeStreaming(defaultStreaming, 0)];
-  }
-};
-
-const writeStreamingItems = (records) => {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-  } catch {
-    // Ignore localStorage write errors in mock mode.
-  }
-
-  return records;
-};
 
 const resolveEmbedUrl = (streamUrl) => getYouTubeEmbedUrl(streamUrl) || String(streamUrl || '');
 
@@ -84,8 +79,20 @@ const resolveYouTubeLive = async (sourceUrl) => {
   };
 };
 
-export const verifyStreamingAvailability = async (streaming = readStreamingItems()[0]) => {
-  const normalized = normalizeStreaming(streaming);
+const ensureSeedStreaming = async () => {
+  const rows = await contentApiService.list(RESOURCE);
+  if (rows.length > 0) {
+    return rows.map((row, index) => normalizeStreaming(row, index));
+  }
+
+  await contentApiService.create(RESOURCE, normalizeStreaming(defaultStreaming));
+  const seeded = await contentApiService.list(RESOURCE);
+  return seeded.map((row, index) => normalizeStreaming(row, index));
+};
+
+export const verifyStreamingAvailability = async (streaming) => {
+  const list = streaming ? [streaming] : await ensureSeedStreaming();
+  const normalized = normalizeStreaming(list[0]);
   if (!normalized.active || !normalized.streamUrl) {
     return { available: false, checkedAt: new Date().toISOString(), reason: 'inactive' };
   }
@@ -108,41 +115,41 @@ export const verifyStreamingAvailability = async (streaming = readStreamingItems
 };
 
 const streamingService = {
-  getStreamingItems: async () => mockResponse(readStreamingItems()),
+  getStreamingItems: async () => {
+    const rows = await ensureSeedStreaming();
+    return mockResponse(rows.map((row, index) => normalizeStreaming(row, index)));
+  },
+
   getStreaming: async () => {
-    const items = readStreamingItems();
-    return mockResponse(items.find((entry) => entry.active) || items[0] || null);
+    const rows = await ensureSeedStreaming();
+    return mockResponse(rows.find((entry) => entry.active) || rows[0] || null);
   },
+
   addStreaming: async (payload) => {
-    const items = readStreamingItems();
-    const nextItem = normalizeStreaming({
-      ...payload,
-      id: `stream-${Date.now()}`,
-      updatedAt: new Date().toISOString()
-    });
-    return mockResponse(writeStreamingItems([nextItem, ...items]));
+    const record = normalizeStreaming({ ...payload, id: `stream-${Date.now()}`, updatedAt: new Date().toISOString() });
+    await contentApiService.create(RESOURCE, record);
+    const rows = await contentApiService.list(RESOURCE);
+    return mockResponse(rows.map((row, index) => normalizeStreaming(row, index)));
   },
+
   updateStreaming: async (id, payload) => {
-    const items = readStreamingItems();
-    const next = items.map((entry, index) => (
-      entry.id === id
-        ? normalizeStreaming({
-            ...entry,
-            ...payload,
-            id,
-            updatedAt: new Date().toISOString()
-          }, index)
-        : entry
-    ));
-    return mockResponse(writeStreamingItems(next));
+    const rows = await contentApiService.list(RESOURCE);
+    const existing = rows.find((entry) => entry.id === id) || { id };
+    const updated = normalizeStreaming({ ...existing, ...payload, id, updatedAt: new Date().toISOString() });
+    await contentApiService.update(RESOURCE, id, updated);
+    const next = await contentApiService.list(RESOURCE);
+    return mockResponse(next.map((row, index) => normalizeStreaming(row, index)));
   },
+
   removeStreaming: async (id) => {
-    const next = readStreamingItems().filter((entry) => entry.id !== id);
-    return mockResponse(writeStreamingItems(next));
+    await contentApiService.remove(RESOURCE, id);
+    const rows = await contentApiService.list(RESOURCE);
+    return mockResponse(rows.map((row, index) => normalizeStreaming(row, index)));
   },
+
   setStreamingActive: async (idOrActive, activeValue) => {
-    const items = readStreamingItems();
-    if (items.length === 0) {
+    const rows = await ensureSeedStreaming();
+    if (rows.length === 0) {
       return mockResponse([]);
     }
 
@@ -150,7 +157,7 @@ const streamingService = {
     let nextActive = false;
 
     if (typeof idOrActive === 'boolean') {
-      const target = items.find((entry) => entry.active) || items[0];
+      const target = rows.find((entry) => entry.active) || rows[0];
       targetId = target?.id || '';
       nextActive = idOrActive;
     } else {
@@ -158,29 +165,32 @@ const streamingService = {
       nextActive = Boolean(activeValue);
     }
 
-    const next = items.map((entry, index) => (
-      entry.id === targetId
-        ? normalizeStreaming({
-            ...entry,
-            active: nextActive,
-            updatedAt: new Date().toISOString()
-          }, index)
-        : entry
-    ));
+    const target = rows.find((entry) => entry.id === targetId);
+    if (!target) {
+      return mockResponse(rows);
+    }
 
-    return mockResponse(writeStreamingItems(next));
+    await contentApiService.update(RESOURCE, targetId, {
+      ...target,
+      active: nextActive,
+      updatedAt: new Date().toISOString()
+    });
+
+    const next = await contentApiService.list(RESOURCE);
+    return mockResponse(next.map((row, index) => normalizeStreaming(row, index)));
   },
+
   saveStreaming: async (payload) => {
     if (payload?.id) {
       return streamingService.updateStreaming(payload.id, payload);
     }
     return streamingService.addStreaming(payload);
   },
+
   verifyStreamingAvailability
 };
 
 export const getStreamingEmbedUrl = resolveEmbedUrl;
-
 export const resolveStreamingLive = async (sourceUrl) => resolveYouTubeLive(sourceUrl);
 
 export default streamingService;

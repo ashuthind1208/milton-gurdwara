@@ -5,13 +5,18 @@ const AudioPillPlayer = ({
   label,
   subtitle,
   src,
+  startAtSeconds = 0,
   className = '',
   accent = 'light',
-  stream = false
+  stream = false,
+  showProgress = false
 }) => {
   const audioRef = useRef(null);
+  const seekAppliedRef = useRef(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
 
   const resolvedSrc = useMemo(() => {
     if (!stream) {
@@ -23,14 +28,41 @@ const AudioPillPlayer = ({
   }, [src, stream]);
 
   useEffect(() => {
+    seekAppliedRef.current = false;
+  }, [resolvedSrc]);
+
+  useEffect(() => {
     const audio = audioRef.current;
     if (!audio) {
       return undefined;
     }
 
+    const tryApplySeek = () => {
+      if (seekAppliedRef.current) {
+        return;
+      }
+
+      const seekTo = Math.max(0, Number(startAtSeconds) || 0);
+      if (seekTo <= 0 || Number.isNaN(seekTo)) {
+        seekAppliedRef.current = true;
+        return;
+      }
+
+      try {
+        audio.currentTime = seekTo;
+      } catch {
+        return;
+      }
+
+      seekAppliedRef.current = true;
+    };
+
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
     const onEnded = () => setIsPlaying(false);
+    const onLoadedMetadata = () => setDuration(Number(audio.duration) || 0);
+    const onDurationChange = () => setDuration(Number(audio.duration) || 0);
+    const onTimeUpdate = () => setCurrentTime(Number(audio.currentTime) || 0);
     const onError = () => {
       setHasError(true);
       setIsPlaying(false);
@@ -39,16 +71,28 @@ const AudioPillPlayer = ({
     audio.addEventListener('play', onPlay);
     audio.addEventListener('pause', onPause);
     audio.addEventListener('ended', onEnded);
+    audio.addEventListener('loadedmetadata', onLoadedMetadata);
+    audio.addEventListener('durationchange', onDurationChange);
+    audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('error', onError);
+    audio.addEventListener('loadedmetadata', tryApplySeek);
+
+    if (audio.readyState >= 1) {
+      tryApplySeek();
+    }
 
     return () => {
       audio.pause();
       audio.removeEventListener('play', onPlay);
       audio.removeEventListener('pause', onPause);
       audio.removeEventListener('ended', onEnded);
+      audio.removeEventListener('loadedmetadata', onLoadedMetadata);
+      audio.removeEventListener('durationchange', onDurationChange);
+      audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('error', onError);
+      audio.removeEventListener('loadedmetadata', tryApplySeek);
     };
-  }, []);
+  }, [startAtSeconds, resolvedSrc]);
 
   const togglePlayback = async () => {
     const audio = audioRef.current;
@@ -77,6 +121,8 @@ const AudioPillPlayer = ({
 
   const subtitleClasses = accent === 'dark' ? 'text-blue-100/80' : 'text-slate-500';
   const pulseClasses = isPlaying ? 'bg-green-400 animate-pulse' : accent === 'dark' ? 'bg-white/35' : 'bg-slate-300';
+  const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : 0;
+  const progressPercent = safeDuration > 0 ? Math.min(100, Math.max(0, (currentTime / safeDuration) * 100)) : 0;
 
   return (
     <div className={`rounded-2xl border px-3 py-2 shadow-lg ${toneClasses} ${className}`}>
@@ -98,6 +144,13 @@ const AudioPillPlayer = ({
 
         <span className={`ml-auto h-2.5 w-2.5 rounded-full ${pulseClasses}`} />
       </div>
+      {showProgress ? (
+        <div className="mt-3">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+            <div className="h-full rounded-full bg-brand-blue transition-all duration-150" style={{ width: `${progressPercent}%` }} />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

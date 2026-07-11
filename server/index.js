@@ -4,6 +4,43 @@ const http = require('http');
 const { URL } = require('url');
 const Stripe = require('stripe');
 
+const loadEnvFile = (filePath) => {
+  if (!fs.existsSync(filePath)) {
+    return;
+  }
+
+  const content = fs.readFileSync(filePath, 'utf8');
+  content.split(/\r?\n/).forEach((line) => {
+    const trimmed = String(line || '').trim();
+    if (!trimmed || trimmed.startsWith('#')) {
+      return;
+    }
+
+    const eqIndex = trimmed.indexOf('=');
+    if (eqIndex < 0) {
+      return;
+    }
+
+    const key = trimmed.slice(0, eqIndex).trim();
+    if (!key || Object.prototype.hasOwnProperty.call(process.env, key)) {
+      return;
+    }
+
+    let value = trimmed.slice(eqIndex + 1).trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+
+    process.env[key] = value;
+  });
+};
+
+const workspaceRoot = path.resolve(__dirname, '..');
+loadEnvFile(path.join(workspaceRoot, '.env'));
+loadEnvFile(path.join(workspaceRoot, '.env.local'));
+
+const eventsDb = require('./db/postgres');
+
 const port = Number(process.env.PORT || 4242);
 const stripeSecretKey = String(process.env.STRIPE_SECRET_KEY || '').trim();
 const stripeWebhookSecret = String(process.env.STRIPE_WEBHOOK_SECRET || '').trim();
@@ -12,6 +49,45 @@ const youtubeApiKey = String(process.env.YOUTUBE_API_KEY || '').trim();
 const dataDir = path.resolve(__dirname, 'data');
 const donationsPath = path.join(dataDir, 'donations.json');
 const usersPath = path.join(dataDir, 'users.json');
+const contentStorePath = path.join(dataDir, 'content-store.json');
+const volunteerReminderLogPath = path.join(dataDir, 'volunteer-reminder-log.json');
+const uploadsDir = path.resolve(__dirname, 'uploads');
+const maxUploadBytes = 15 * 1024 * 1024;
+const volunteerReminderWebhookUrl = String(
+  process.env.VOLUNTEER_REMINDER_WEBHOOK_URL || process.env.REACT_APP_APPROVAL_EMAIL_WEBHOOK_URL || ''
+).trim();
+const volunteerReminderLogoUrl = String(process.env.VOLUNTEER_REMINDER_LOGO_URL || '').trim();
+const volunteerReminderSiteName = String(process.env.VOLUNTEER_REMINDER_ORG_NAME || 'Singh Sabha Milton Gurdwara').trim();
+const volunteerReminderBaseUrl = String(process.env.VOLUNTEER_REMINDER_BASE_URL || 'http://localhost:3001').trim().replace(/\/$/, '');
+const volunteerReminderHtmlTemplateEnabled = String(process.env.VOLUNTEER_REMINDER_HTML_TEMPLATE_ENABLED || 'true').trim().toLowerCase() !== 'false';
+const volunteerReminderDays = [10, 5, 2, 1];
+let volunteerReminderSweepRunning = false;
+
+const buildLogoDataUri = () => {
+  const candidates = [
+    path.join(workspaceRoot, 'src', 'assets', 'gurdwara-logo.webp'),
+    path.join(workspaceRoot, 'public', 'gurdwara-logo.webp')
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      if (!fs.existsSync(candidate)) {
+        continue;
+      }
+      const binary = fs.readFileSync(candidate);
+      if (!binary?.length) {
+        continue;
+      }
+      return `data:image/webp;base64,${binary.toString('base64')}`;
+    } catch {
+      // Ignore logo read failure and continue to next source.
+    }
+  }
+
+  return '';
+};
+
+const embeddedVolunteerReminderLogo = buildLogoDataUri();
 
 const seedUsers = [
   {
@@ -31,14 +107,108 @@ const seedUsers = [
   }
 ];
 
+const seedEvents = [
+  {
+    id: 1,
+    title: 'Sundar Gutka Paath Samagam',
+    date: '2026-07-12T10:00:00.000Z',
+    endDate: '2026-07-12T12:00:00.000Z',
+    location: 'Main Darbar Hall',
+    category: 'Paath',
+    registrations: 96,
+    active: true
+  },
+  {
+    id: 2,
+    title: 'Youth Kirtan Workshop',
+    date: '2026-07-18T16:00:00.000Z',
+    endDate: '2026-07-18T18:00:00.000Z',
+    location: 'Community Classroom',
+    category: 'Workshop',
+    registrations: 54,
+    active: true
+  },
+  {
+    id: 3,
+    title: 'Monthly Langar Seva Day',
+    date: '2026-07-20T09:00:00.000Z',
+    endDate: '2026-07-20T12:00:00.000Z',
+    location: 'Langar Hall',
+    category: 'Seva',
+    registrations: 122,
+    active: true
+  }
+];
+
+const seedDonationCampaigns = [
+  {
+    name: 'Langar Fund',
+    description: 'Monthly langar and seva support.',
+    raised: 42000,
+    target: 60000,
+    isActive: true,
+    paymentProvider: 'STRIPE',
+    paymentLink: 'https://donate.stripe.com/test_aFa28sdWJexZ11F3ZE6Ri00',
+    stripeBuyButtonId: '',
+    stripePublishableKey: ''
+  },
+  {
+    name: 'Building Fund',
+    description: 'Expansion and maintenance project support.',
+    raised: 110000,
+    target: 250000,
+    isActive: true,
+    paymentProvider: 'PAYPAL',
+    paymentLink: '',
+    stripeBuyButtonId: '',
+    stripePublishableKey: ''
+  },
+  {
+    name: 'Education Seva',
+    description: 'Punjabi and gurmat classes for youth.',
+    raised: 18000,
+    target: 30000,
+    isActive: true,
+    paymentProvider: 'STRIPE',
+    paymentLink: 'https://donate.stripe.com/test_aFa28sdWJexZ11F3ZE6Ri00',
+    stripeBuyButtonId: '',
+    stripePublishableKey: ''
+  }
+];
+
+const defaultAnalyticsMetrics = {
+  visitorsToday: 1842,
+  donationAmount: 12650,
+  eventRegistrations: 312,
+  volunteers: 88,
+  bounceRate: 34,
+  avgSession: '04:12'
+};
+
+const defaultAnalyticsTrend = [
+  { name: 'Mon', visitors: 1200, donations: 900 },
+  { name: 'Tue', visitors: 1320, donations: 1100 },
+  { name: 'Wed', visitors: 1510, donations: 1200 },
+  { name: 'Thu', visitors: 1480, donations: 980 },
+  { name: 'Fri', visitors: 1760, donations: 1520 },
+  { name: 'Sat', visitors: 2100, donations: 1900 },
+  { name: 'Sun', visitors: 2300, donations: 2050 }
+];
+
 const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
+
+let donationCampaignsFallback = seedDonationCampaigns.map((campaign, index) => ({
+  id: index + 1,
+  ...campaign
+}));
+let donationPendingFallback = [];
 
 const sendJson = (response, statusCode, payload) => {
   response.writeHead(statusCode, {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Stripe-Signature',
-    'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS'
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS'
   });
   response.end(JSON.stringify(payload));
 };
@@ -55,12 +225,595 @@ const ensureStorage = () => {
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
   if (!fs.existsSync(donationsPath)) {
     fs.writeFileSync(donationsPath, '[]', 'utf8');
   }
   if (!fs.existsSync(usersPath)) {
     fs.writeFileSync(usersPath, JSON.stringify(seedUsers, null, 2), 'utf8');
   }
+  if (!fs.existsSync(contentStorePath)) {
+    fs.writeFileSync(contentStorePath, JSON.stringify({ items: {}, singletons: {} }, null, 2), 'utf8');
+  }
+  if (!fs.existsSync(volunteerReminderLogPath)) {
+    fs.writeFileSync(volunteerReminderLogPath, JSON.stringify({ sent: {} }, null, 2), 'utf8');
+  }
+};
+
+const readVolunteerReminderLog = () => {
+  ensureStorage();
+  try {
+    const raw = fs.readFileSync(volunteerReminderLogPath, 'utf8');
+    const parsed = JSON.parse(raw);
+    const sent = parsed && typeof parsed.sent === 'object' && parsed.sent ? parsed.sent : {};
+    return { sent };
+  } catch {
+    return { sent: {} };
+  }
+};
+
+const writeVolunteerReminderLog = (payload) => {
+  ensureStorage();
+  const next = {
+    sent: payload && typeof payload.sent === 'object' && payload.sent ? payload.sent : {}
+  };
+  fs.writeFileSync(volunteerReminderLogPath, JSON.stringify(next, null, 2), 'utf8');
+};
+
+const readContentStore = () => {
+  ensureStorage();
+  try {
+    const content = fs.readFileSync(contentStorePath, 'utf8');
+    const parsed = JSON.parse(content);
+    const items = parsed && typeof parsed.items === 'object' && parsed.items ? parsed.items : {};
+    const singletons = parsed && typeof parsed.singletons === 'object' && parsed.singletons ? parsed.singletons : {};
+    return { items, singletons };
+  } catch {
+    return { items: {}, singletons: {} };
+  }
+};
+
+const writeContentStore = (store) => {
+  ensureStorage();
+  const normalized = {
+    items: store && typeof store.items === 'object' && store.items ? store.items : {},
+    singletons: store && typeof store.singletons === 'object' && store.singletons ? store.singletons : {}
+  };
+  fs.writeFileSync(contentStorePath, JSON.stringify(normalized, null, 2), 'utf8');
+};
+
+const listContentItemsFallback = (resource) => {
+  const store = readContentStore();
+  const rows = store.items[resource];
+  return Array.isArray(rows) ? rows : [];
+};
+
+const createContentItemFallback = (resource, payload = {}) => {
+  const store = readContentStore();
+  const rows = Array.isArray(store.items[resource]) ? [...store.items[resource]] : [];
+  const next = {
+    ...(payload || {}),
+    id: String(payload?.id || `${resource}-${Date.now()}`)
+  };
+  rows.unshift(next);
+  store.items[resource] = rows;
+  writeContentStore(store);
+  return next;
+};
+
+const updateContentItemFallback = (resource, id, payload = {}) => {
+  const store = readContentStore();
+  const rows = Array.isArray(store.items[resource]) ? [...store.items[resource]] : [];
+  const index = rows.findIndex((row) => String(row?.id) === String(id));
+  if (index < 0) {
+    return null;
+  }
+
+  const updated = {
+    ...rows[index],
+    ...(payload || {}),
+    id: rows[index]?.id || id
+  };
+
+  rows[index] = updated;
+  store.items[resource] = rows;
+  writeContentStore(store);
+  return updated;
+};
+
+const removeContentItemFallback = (resource, id) => {
+  const store = readContentStore();
+  const rows = Array.isArray(store.items[resource]) ? store.items[resource] : [];
+  store.items[resource] = rows.filter((row) => String(row?.id) !== String(id));
+  writeContentStore(store);
+  return { success: true };
+};
+
+const getContentSingletonFallback = (resource) => {
+  const store = readContentStore();
+  return store.singletons[resource] ?? null;
+};
+
+const setContentSingletonFallback = (resource, payload) => {
+  const store = readContentStore();
+  store.singletons[resource] = payload;
+  writeContentStore(store);
+  return payload;
+};
+
+const getUtcStartOfDay = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+};
+
+const getDaysUntilDate = (dateValue) => {
+  const target = getUtcStartOfDay(dateValue);
+  if (target == null) {
+    return null;
+  }
+
+  const now = new Date();
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return Math.round((target - today) / (24 * 60 * 60 * 1000));
+};
+
+const normalizeVolunteerRegistrationForReminder = (entry = {}) => {
+  const id = String(entry.id || '').trim();
+  const email = String(entry.email || '').trim().toLowerCase();
+  const sevaDate = String(entry.sevaDate || entry.seva_date || entry.date || '').trim();
+  const sevaType = String(entry.sevaType || entry.seva_type || entry.area || 'Seva').trim();
+  const sevaTime = String(entry.sevaTime || entry.seva_time || entry.time || '').trim();
+  const name = String(entry.name || 'Volunteer').trim();
+  const status = String(entry.status || '').trim().toLowerCase();
+  const contactPreference = String(entry.contactPreference || entry.contact_preference || 'Email').trim().toLowerCase();
+  const wantsEventEmails = entry.wantsEventEmails == null
+    ? entry.wants_event_emails == null
+      ? true
+      : Boolean(entry.wants_event_emails)
+    : Boolean(entry.wantsEventEmails);
+
+  return {
+    id,
+    opportunityId: String(entry.opportunityId || entry.opportunity_id || '').trim(),
+    email,
+    name,
+    sevaDate,
+    sevaType,
+    sevaTime,
+    status,
+    contactPreference,
+    wantsEventEmails
+  };
+};
+
+const getSevaOpportunitiesMap = async () => {
+  const opportunityRows = eventsDb.hasDatabaseConnection
+    ? await eventsDb.listItems('seva_opportunities')
+    : listContentItemsFallback('seva_opportunities');
+
+  return new Map(
+    (Array.isArray(opportunityRows) ? opportunityRows : []).map((row) => [String(row.id || ''), row || {}])
+  );
+};
+
+const getVolunteerRegistrationsForReminder = async () => {
+  const opportunityMap = await getSevaOpportunitiesMap();
+
+  const rows = eventsDb.hasDatabaseConnection
+    ? await eventsDb.listItems('volunteer_registrations')
+    : listContentItemsFallback('volunteer_registrations');
+
+  return (Array.isArray(rows) ? rows : []).map((row) => {
+    const registration = normalizeVolunteerRegistrationForReminder(row);
+    const opportunityId = String(row?.opportunityId || row?.opportunity_id || '').trim();
+    const linkedOpportunity = opportunityId ? opportunityMap.get(opportunityId) : null;
+
+    if (!linkedOpportunity) {
+      return registration;
+    }
+
+    return {
+      ...registration,
+      sevaDate: String(linkedOpportunity.date || registration.sevaDate || ''),
+      sevaTime: String(linkedOpportunity.time || registration.sevaTime || ''),
+      sevaType: String(linkedOpportunity.sevaType || registration.sevaType || 'Seva')
+    };
+  });
+};
+
+const formatSevaDateLabel = (value) => {
+  if (!value) {
+    return 'Date TBD';
+  }
+
+  try {
+    return new Date(`${value}T00:00:00`).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' });
+  } catch {
+    return value;
+  }
+};
+
+const escapeHtml = (value) => String(value || '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const buildVolunteerReminderEmail = ({ registration, daysRemaining = null, manual = false }) => {
+  const sevaDateLabel = formatSevaDateLabel(registration.sevaDate);
+  const timeLabel = registration.sevaTime || 'Time TBD';
+  const logoSrc = volunteerReminderLogoUrl || `${volunteerReminderBaseUrl}/gurdwara-logo.webp` || embeddedVolunteerReminderLogo;
+  const greetingLine = 'ਵਾਹਿਗੁਰੂ ਜੀ ਕਾ ਖਾਲਸਾ, ਵਾਹਿਗੁਰੂ ਜੀ ਕੀ ਫਤਿਹ';
+  const requesterNameBase = String(registration.name || 'Aashoodeep singh Singh').trim().replace(/[.\s]+$/g, '');
+  const requesterName = `${requesterNameBase}.`;
+
+  const subject = manual
+    ? `${registration.sevaType} Seva Details | ${volunteerReminderSiteName}`
+    : `Seva Reminder (${daysRemaining} day${daysRemaining === 1 ? '' : 's'}): ${registration.sevaType}`;
+
+  const text = [
+    greetingLine,
+    '',
+    requesterName,
+    '',
+    'This is a manual seva notification from admin.',
+    '',
+    `Seva Type: ${registration.sevaType}`,
+    `Seva Date: ${sevaDateLabel}`,
+    `Seva Time: ${timeLabel}`,
+    `Gurdwara: ${volunteerReminderSiteName}`,
+    '',
+    'Kindly arrive a little early and check in with the seva coordinator.',
+    'Thank you for serving the sangat.'
+  ].join('\n');
+
+  if (!volunteerReminderHtmlTemplateEnabled) {
+    return { subject, text, html: '' };
+  }
+
+  const html = `
+  <div style="background:#f5f8fc;padding:28px 14px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:660px;margin:0 auto;background:#ffffff;border:1px solid #dbe7f6;border-radius:14px;overflow:hidden;">
+      <tr>
+        <td style="padding:28px 24px 14px;text-align:center;">
+          ${logoSrc ? `<img src="${escapeHtml(logoSrc)}" alt="${escapeHtml(volunteerReminderSiteName)} logo" width="92" height="92" style="display:block;margin:0 auto 18px;object-fit:contain;background:#ffffff;border-radius:50%;"/>` : ''}
+          <div style="font-size:18px;line-height:1.6;font-weight:700;color:#0f172a;">${escapeHtml(greetingLine)}</div>
+          <div style="margin-top:12px;font-size:16px;line-height:1.7;color:#334155;font-weight:600;">${escapeHtml(requesterName)}</div>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:0 28px 28px;">
+          <div style="font-size:15px;line-height:1.8;color:#334155;margin-bottom:14px;">This is a manual seva notification from admin.</div>
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border:1px solid #d7e3f3;border-radius:12px;overflow:hidden;background:#fbfdff;margin-bottom:16px;">
+            <tr>
+              <td style="width:34%;padding:12px 14px;background:#eef5ff;border-bottom:1px solid #d7e3f3;font-size:14px;font-weight:700;color:#0a4d9f;">Seva Type</td>
+              <td style="padding:12px 14px;border-bottom:1px solid #d7e3f3;font-size:17px;font-weight:800;color:#0f172a;">${escapeHtml(registration.sevaType || 'Seva')}</td>
+            </tr>
+            <tr>
+              <td style="padding:12px 14px;background:#eef5ff;border-bottom:1px solid #d7e3f3;font-size:14px;font-weight:700;color:#0a4d9f;">Seva Date</td>
+              <td style="padding:12px 14px;border-bottom:1px solid #d7e3f3;font-size:17px;font-weight:800;color:#0f172a;">${escapeHtml(sevaDateLabel)}</td>
+            </tr>
+            <tr>
+              <td style="padding:12px 14px;background:#eef5ff;border-bottom:1px solid #d7e3f3;font-size:14px;font-weight:700;color:#0a4d9f;">Seva Time</td>
+              <td style="padding:12px 14px;border-bottom:1px solid #d7e3f3;font-size:17px;font-weight:800;color:#0f172a;">${escapeHtml(timeLabel)}</td>
+            </tr>
+            <tr>
+              <td style="padding:12px 14px;background:#eef5ff;font-size:14px;font-weight:700;color:#0a4d9f;">Gurdwara</td>
+              <td style="padding:12px 14px;font-size:17px;font-weight:800;color:#0f172a;">${escapeHtml(volunteerReminderSiteName)}</td>
+            </tr>
+          </table>
+          <div style="font-size:15px;line-height:1.8;color:#334155;">
+            Kindly arrive a little early and check in with the seva coordinator.<br/>
+            Thank you for serving the sangat.
+          </div>
+        </td>
+      </tr>
+    </table>
+  </div>`;
+
+  return { subject, text, html };
+};
+
+const sendVolunteerReminderEmail = async (registration, options = {}) => {
+  if (!volunteerReminderWebhookUrl) {
+    return { sent: false, reason: 'missing_webhook' };
+  }
+
+  const daysRemaining = Number.isFinite(Number(options.daysRemaining)) ? Number(options.daysRemaining) : null;
+  const manual = options.manual === true;
+  const template = buildVolunteerReminderEmail({ registration, daysRemaining, manual });
+  const htmlBody = String(template?.html || '').trim();
+
+  const payload = {
+    type: manual ? 'volunteer-seva-manual' : 'volunteer-seva-reminder',
+    to: registration.email,
+    name: registration.name,
+    subject: template.subject,
+    message: template.text,
+    text: template.text,
+    html: htmlBody,
+    bodyHtml: htmlBody,
+    bodyText: template.text,
+    templateType: htmlBody ? 'html' : 'text',
+    metadata: {
+      reminderDays: daysRemaining,
+      sevaType: registration.sevaType,
+      sevaDate: registration.sevaDate,
+      sevaTime: registration.sevaTime,
+      registrationId: registration.id,
+      opportunityId: registration.opportunityId || '',
+      manual
+    },
+    sentAt: new Date().toISOString()
+  };
+
+  try {
+    const response = await fetch(volunteerReminderWebhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      return { sent: false, reason: 'webhook_error' };
+    }
+
+    return { sent: true };
+  } catch {
+    return { sent: false, reason: 'network_error' };
+  }
+};
+
+const buildOpportunityEmailPreview = async (opportunityId) => {
+  const normalizedOpportunityId = String(opportunityId || '').trim();
+  if (!normalizedOpportunityId) {
+    const error = new Error('Opportunity id is required.');
+    error.status = 400;
+    throw error;
+  }
+
+  const opportunityMap = await getSevaOpportunitiesMap();
+  const selectedOpportunity = opportunityMap.get(normalizedOpportunityId);
+  if (!selectedOpportunity) {
+    const error = new Error('Seva opportunity not found.');
+    error.status = 404;
+    throw error;
+  }
+
+  const registrations = await getVolunteerRegistrationsForReminder();
+  const matching = registrations.filter((entry) => {
+    const linked = String(entry.opportunityId || '') === normalizedOpportunityId;
+    const legacyMatch = !entry.opportunityId
+      && String(entry.sevaType || '').trim().toLowerCase() === String(selectedOpportunity.sevaType || '').trim().toLowerCase()
+      && String(entry.sevaDate || '').trim() === String(selectedOpportunity.date || '').trim();
+    return linked || legacyMatch;
+  });
+
+  const sample = matching[0] || {
+    id: `preview-${normalizedOpportunityId}`,
+    opportunityId: normalizedOpportunityId,
+    email: 'volunteer@example.com',
+    name: 'Sevadar',
+    sevaDate: String(selectedOpportunity.date || ''),
+    sevaType: String(selectedOpportunity.sevaType || 'Seva'),
+    sevaTime: String(selectedOpportunity.time || ''),
+    status: 'pending',
+    contactPreference: 'email',
+    wantsEventEmails: true
+  };
+
+  const template = buildVolunteerReminderEmail({ registration: sample, manual: true });
+  return template;
+};
+
+const sendManualOpportunityReminders = async (opportunityId) => {
+  const normalizedOpportunityId = String(opportunityId || '').trim();
+  if (!normalizedOpportunityId) {
+    const error = new Error('Opportunity id is required.');
+    error.status = 400;
+    throw error;
+  }
+
+  const opportunityMap = await getSevaOpportunitiesMap();
+  const selectedOpportunity = opportunityMap.get(normalizedOpportunityId);
+  if (!selectedOpportunity) {
+    const error = new Error('Seva opportunity not found.');
+    error.status = 404;
+    throw error;
+  }
+
+  const registrations = await getVolunteerRegistrationsForReminder();
+  const matching = registrations.filter((entry) => {
+    const linked = String(entry.opportunityId || '') === normalizedOpportunityId;
+    const legacyMatch = !entry.opportunityId
+      && String(entry.sevaType || '').trim().toLowerCase() === String(selectedOpportunity.sevaType || '').trim().toLowerCase()
+      && String(entry.sevaDate || '').trim() === String(selectedOpportunity.date || '').trim();
+    return linked || legacyMatch;
+  });
+
+  let processed = 0;
+  let sent = 0;
+  let skipped = 0;
+
+  for (const registration of matching) {
+    processed += 1;
+
+    if (!registration.email || registration.status === 'rejected' || registration.status === 'cancelled') {
+      skipped += 1;
+      continue;
+    }
+
+    const result = await sendVolunteerReminderEmail(registration, { manual: true });
+    if (!result.sent) {
+      skipped += 1;
+      continue;
+    }
+
+    sent += 1;
+  }
+
+  return {
+    opportunityId: normalizedOpportunityId,
+    sevaType: String(selectedOpportunity.sevaType || ''),
+    sevaDate: String(selectedOpportunity.date || ''),
+    processed,
+    sent,
+    skipped,
+    webhookConfigured: Boolean(volunteerReminderWebhookUrl)
+  };
+};
+
+const runVolunteerReminderSweep = async (options = {}) => {
+  if (volunteerReminderSweepRunning) {
+    return { processed: 0, sent: 0, skipped: 0, reason: 'already_running' };
+  }
+
+  volunteerReminderSweepRunning = true;
+  const force = options.force === true;
+
+  try {
+    const registrations = await getVolunteerRegistrationsForReminder();
+    const logStore = readVolunteerReminderLog();
+    let processed = 0;
+    let sent = 0;
+    let skipped = 0;
+
+    for (const registration of registrations) {
+      processed += 1;
+
+      if (!registration.id || !registration.email || !registration.sevaDate) {
+        skipped += 1;
+        continue;
+      }
+
+      if (registration.status === 'rejected' || registration.status === 'cancelled') {
+        skipped += 1;
+        continue;
+      }
+
+      if (!(registration.wantsEventEmails || registration.contactPreference === 'email')) {
+        skipped += 1;
+        continue;
+      }
+
+      const daysRemaining = getDaysUntilDate(registration.sevaDate);
+      if (daysRemaining == null || !volunteerReminderDays.includes(daysRemaining)) {
+        skipped += 1;
+        continue;
+      }
+
+      const reminderKey = `${registration.id}:${registration.sevaDate}:${daysRemaining}`;
+      if (!force && logStore.sent[reminderKey]) {
+        skipped += 1;
+        continue;
+      }
+
+      const result = await sendVolunteerReminderEmail(registration, { daysRemaining, manual: false });
+      if (!result.sent) {
+        skipped += 1;
+        continue;
+      }
+
+      sent += 1;
+      logStore.sent[reminderKey] = new Date().toISOString();
+    }
+
+    writeVolunteerReminderLog(logStore);
+    return { processed, sent, skipped, force, webhookConfigured: Boolean(volunteerReminderWebhookUrl) };
+  } finally {
+    volunteerReminderSweepRunning = false;
+  }
+};
+
+const mimeByExtension = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
+  '.pdf': 'application/pdf',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.mov': 'video/quicktime',
+  '.txt': 'text/plain'
+};
+
+const normalizeUploadService = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!/^[a-z0-9_-]+$/.test(normalized)) {
+    return '';
+  }
+  return normalized;
+};
+
+const sanitizeFileName = (value) => {
+  const base = path.basename(String(value || '').trim());
+  const cleaned = base.replace(/[^A-Za-z0-9._-]/g, '_').replace(/_+/g, '_');
+  if (!cleaned) {
+    return 'file';
+  }
+  return cleaned.slice(0, 120);
+};
+
+const getMimeTypeFromName = (fileName) => {
+  const extension = path.extname(String(fileName || '')).toLowerCase();
+  return mimeByExtension[extension] || 'application/octet-stream';
+};
+
+const getExtensionFromMime = (mimeType) => {
+  const normalized = String(mimeType || '').toLowerCase();
+  if (normalized.includes('image/png')) return '.png';
+  if (normalized.includes('image/jpeg')) return '.jpg';
+  if (normalized.includes('image/gif')) return '.gif';
+  if (normalized.includes('image/webp')) return '.webp';
+  if (normalized.includes('image/svg+xml')) return '.svg';
+  if (normalized.includes('application/pdf')) return '.pdf';
+  if (normalized.includes('video/mp4')) return '.mp4';
+  if (normalized.includes('video/webm')) return '.webm';
+  if (normalized.includes('video/quicktime')) return '.mov';
+  return '';
+};
+
+const extractBase64Payload = (dataUrlOrBase64 = '') => {
+  const source = String(dataUrlOrBase64 || '').trim();
+  if (!source) {
+    return '';
+  }
+
+  if (source.startsWith('data:')) {
+    const commaIndex = source.indexOf(',');
+    if (commaIndex < 0) {
+      return '';
+    }
+    return source.slice(commaIndex + 1);
+  }
+
+  return source;
+};
+
+const safeUploadPathSegments = (encodedRelativePath = '') => {
+  return String(encodedRelativePath || '')
+    .split('/')
+    .filter(Boolean)
+    .map((segment) => decodeURIComponent(segment))
+    .map((segment) => segment.replace(/[^A-Za-z0-9._-]/g, '_'))
+    .filter(Boolean);
+};
+
+const buildUploadDirectory = (service) => {
+  const now = new Date();
+  const year = String(now.getFullYear());
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const targetDir = path.join(uploadsDir, service, year, month);
+  fs.mkdirSync(targetDir, { recursive: true });
+  return { targetDir, year, month };
 };
 
 const normalizeUser = (user = {}) => {
@@ -214,7 +967,11 @@ const completeUserRegistration = (payload = {}) => {
   return index >= 0 ? next[index] : next[0];
 };
 
-const readDonations = () => {
+const readDonations = async () => {
+  if (eventsDb.hasDatabaseConnection) {
+    return eventsDb.getDonations();
+  }
+
   ensureStorage();
   try {
     const content = fs.readFileSync(donationsPath, 'utf8');
@@ -225,13 +982,12 @@ const readDonations = () => {
   }
 };
 
-const writeDonations = (records) => {
-  ensureStorage();
-  fs.writeFileSync(donationsPath, JSON.stringify(records, null, 2), 'utf8');
-};
+const upsertDonation = async (record) => {
+  if (eventsDb.hasDatabaseConnection) {
+    return eventsDb.upsertDonation(record);
+  }
 
-const upsertDonation = (record) => {
-  const allDonations = readDonations();
+  const allDonations = await readDonations();
   const matchIndex = allDonations.findIndex((entry) => (
     String(entry.stripeSessionId || '') === String(record.stripeSessionId || '') ||
     (
@@ -247,13 +1003,130 @@ const upsertDonation = (record) => {
       ...next[matchIndex],
       ...record
     };
-    writeDonations(next);
+    fs.writeFileSync(donationsPath, JSON.stringify(next, null, 2), 'utf8');
     return next[matchIndex];
   }
 
   const next = [record, ...allDonations];
-  writeDonations(next);
+  fs.writeFileSync(donationsPath, JSON.stringify(next, null, 2), 'utf8');
   return record;
+};
+
+const getDonationCampaigns = async () => {
+  if (eventsDb.hasDatabaseConnection) {
+    return eventsDb.getDonationCampaigns();
+  }
+  return donationCampaignsFallback;
+};
+
+const createDonationCampaign = async (payload) => {
+  if (eventsDb.hasDatabaseConnection) {
+    return eventsDb.createDonationCampaign(payload);
+  }
+
+  const record = {
+    id: Date.now(),
+    name: String(payload.name || '').trim(),
+    description: String(payload.description || '').trim(),
+    raised: Number(payload.raised || 0),
+    target: Number(payload.target || 0),
+    isActive: payload.isActive !== false,
+    paymentProvider: String(payload.paymentProvider || 'STRIPE').toUpperCase() === 'PAYPAL' ? 'PAYPAL' : 'STRIPE',
+    paymentLink: String(payload.paymentLink || '').trim(),
+    stripeBuyButtonId: String(payload.stripeBuyButtonId || '').trim(),
+    stripePublishableKey: String(payload.stripePublishableKey || '').trim(),
+    isClosed: Number(payload.target || 0) > 0 && Number(payload.raised || 0) >= Number(payload.target || 0)
+  };
+
+  donationCampaignsFallback = [record, ...donationCampaignsFallback];
+  return record;
+};
+
+const updateDonationCampaign = async (id, payload) => {
+  if (eventsDb.hasDatabaseConnection) {
+    return eventsDb.updateDonationCampaign(id, payload);
+  }
+
+  donationCampaignsFallback = donationCampaignsFallback.map((entry) => (
+    Number(entry.id) === Number(id)
+      ? {
+          ...entry,
+          ...payload,
+          id: entry.id,
+          isClosed: Number(payload.target ?? entry.target ?? 0) > 0 && Number(payload.raised ?? entry.raised ?? 0) >= Number(payload.target ?? entry.target ?? 0)
+        }
+      : entry
+  ));
+
+  return donationCampaignsFallback.find((entry) => Number(entry.id) === Number(id)) || null;
+};
+
+const removeDonationCampaign = async (id) => {
+  if (eventsDb.hasDatabaseConnection) {
+    return eventsDb.removeDonationCampaign(id);
+  }
+
+  donationCampaignsFallback = donationCampaignsFallback.filter((entry) => Number(entry.id) !== Number(id));
+  donationPendingFallback = donationPendingFallback.filter((entry) => Number(entry.campaignId) !== Number(id));
+  return { success: true };
+};
+
+const getDonationSummary = async () => {
+  if (eventsDb.hasDatabaseConnection) {
+    return eventsDb.summarizeDonationsByCampaign();
+  }
+
+  return summarizeByCampaign(await readDonations());
+};
+
+const clearDonations = async () => {
+  if (eventsDb.hasDatabaseConnection) {
+    return eventsDb.clearDonations();
+  }
+
+  ensureStorage();
+  fs.writeFileSync(donationsPath, JSON.stringify([], null, 2), 'utf8');
+  return { success: true };
+};
+
+const getPendingDonations = async () => {
+  if (eventsDb.hasDatabaseConnection) {
+    return eventsDb.getPendingDonations();
+  }
+  return [...donationPendingFallback].sort((left, right) => {
+    const l = new Date(left.createdAt || 0).getTime();
+    const r = new Date(right.createdAt || 0).getTime();
+    return r - l;
+  });
+};
+
+const createPendingDonation = async (payload) => {
+  if (eventsDb.hasDatabaseConnection) {
+    return eventsDb.createPendingDonation(payload);
+  }
+  const record = {
+    ...payload,
+    id: String(payload.id || `pending-${Date.now()}`),
+    createdAt: payload.createdAt || new Date().toISOString()
+  };
+  donationPendingFallback = [record, ...donationPendingFallback];
+  return record;
+};
+
+const removePendingDonation = async (id) => {
+  if (eventsDb.hasDatabaseConnection) {
+    return eventsDb.removePendingDonation(id);
+  }
+  donationPendingFallback = donationPendingFallback.filter((entry) => entry.id !== String(id));
+  return { success: true };
+};
+
+const clearPendingDonations = async () => {
+  if (eventsDb.hasDatabaseConnection) {
+    return eventsDb.clearPendingDonations();
+  }
+  donationPendingFallback = [];
+  return { success: true };
 };
 
 const requireStripeClient = () => {
@@ -378,12 +1251,6 @@ const parseYouTubeChannelSource = (value = '') => {
 };
 
 const resolveYouTubeLiveVideo = async (source) => {
-  if (!youtubeApiKey) {
-    const error = new Error('YOUTUBE_API_KEY is not configured on the server.');
-    error.status = 500;
-    throw error;
-  }
-
   const parsedSource = parseYouTubeChannelSource(source);
   if (!parsedSource) {
     const error = new Error('Enter a YouTube channel URL, handle, or channel ID.');
@@ -392,6 +1259,20 @@ const resolveYouTubeLiveVideo = async (source) => {
   }
 
   const fetchVideoDetails = async (videoId) => {
+    if (!youtubeApiKey) {
+      return {
+        isLive: true,
+        channelId: '',
+        videoId,
+        title: '',
+        channelTitle: '',
+        concurrentViewers: null,
+        totalViews: null,
+        embedUrl: `https://www.youtube.com/embed/${videoId}`,
+        watchUrl: `https://www.youtube.com/watch?v=${videoId}`
+      };
+    }
+
     const liveDetailsUrl = new URL('https://www.googleapis.com/youtube/v3/videos');
     liveDetailsUrl.searchParams.set('part', 'snippet,liveStreamingDetails,statistics,status');
     liveDetailsUrl.searchParams.set('id', videoId);
@@ -489,6 +1370,53 @@ const resolveYouTubeLiveVideo = async (source) => {
     return '';
   };
 
+  const resolveChannelIdFromSourcePage = async (sourceType, sourceValue, resolvedChannelId) => {
+    const candidates = [];
+
+    if (resolvedChannelId) {
+      candidates.push(`https://www.youtube.com/channel/${resolvedChannelId}`);
+    }
+
+    if (sourceType === 'handle' && sourceValue) {
+      candidates.push(`https://www.youtube.com/@${sourceValue}`);
+    }
+
+    for (const candidate of candidates) {
+      try {
+        const pageResponse = await fetch(candidate, {
+          redirect: 'follow',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; SinghSabhaMiltonBot/1.0)'
+          }
+        });
+
+        if (!pageResponse.ok) {
+          continue;
+        }
+
+        const resolvedFromUrl = String(pageResponse.url || '').match(/\/channel\/(UC[A-Za-z0-9_-]{20,})/i)?.[1] || '';
+        if (resolvedFromUrl) {
+          return resolvedFromUrl;
+        }
+
+        const html = await pageResponse.text();
+        const fromJson = html.match(/"channelId":"(UC[A-Za-z0-9_-]{20,})"/i)?.[1] || '';
+        if (fromJson) {
+          return fromJson;
+        }
+
+        const fromPath = html.match(/\/channel\/(UC[A-Za-z0-9_-]{20,})/i)?.[1] || '';
+        if (fromPath) {
+          return fromPath;
+        }
+      } catch {
+        // Ignore fallback lookup errors and continue to the next candidate.
+      }
+    }
+
+    return '';
+  };
+
   if (parsedSource.type === 'videoId') {
     const videoDetails = await fetchVideoDetails(parsedSource.value);
 
@@ -523,46 +1451,69 @@ const resolveYouTubeLiveVideo = async (source) => {
     };
   }
 
-  let channelId = parsedSource.value;
+  let channelId = parsedSource.type === 'channelId' ? parsedSource.value : '';
 
   if (parsedSource.type === 'handle') {
-    const channelLookupUrl = new URL('https://www.googleapis.com/youtube/v3/channels');
-    channelLookupUrl.searchParams.set('part', 'id');
-    channelLookupUrl.searchParams.set('forHandle', parsedSource.value);
-    channelLookupUrl.searchParams.set('key', youtubeApiKey);
+    if (youtubeApiKey) {
+      const channelLookupUrl = new URL('https://www.googleapis.com/youtube/v3/channels');
+      channelLookupUrl.searchParams.set('part', 'id');
+      channelLookupUrl.searchParams.set('forHandle', parsedSource.value);
+      channelLookupUrl.searchParams.set('key', youtubeApiKey);
 
-    const channelResponse = await fetch(channelLookupUrl);
-    const channelPayload = await channelResponse.json();
-    channelId = channelPayload?.items?.[0]?.id || '';
+      const channelResponse = await fetch(channelLookupUrl);
+      const channelPayload = await channelResponse.json().catch(() => ({}));
+      channelId = channelPayload?.items?.[0]?.id || '';
 
-    if (!channelResponse.ok || !channelId) {
+      if (!channelResponse.ok || !channelId) {
+        channelId = await resolveChannelIdFromSourcePage(parsedSource.type, parsedSource.value, channelId);
+      }
+    } else {
+      channelId = await resolveChannelIdFromSourcePage(parsedSource.type, parsedSource.value, channelId);
+    }
+
+    if (!channelId) {
       const error = new Error('Unable to resolve the YouTube channel handle.');
       error.status = 404;
       throw error;
     }
   }
 
-  const searchUrl = new URL('https://www.googleapis.com/youtube/v3/search');
-  searchUrl.searchParams.set('part', 'snippet');
-  searchUrl.searchParams.set('channelId', channelId);
-  searchUrl.searchParams.set('eventType', 'live');
-  searchUrl.searchParams.set('type', 'video');
-  searchUrl.searchParams.set('maxResults', '1');
-  searchUrl.searchParams.set('key', youtubeApiKey);
+  let videoId = '';
+  let searchResponseOk = false;
 
-  const searchResponse = await fetch(searchUrl);
-  const searchPayload = await searchResponse.json();
-  const liveItem = searchPayload?.items?.[0] || null;
-  let videoId = liveItem?.id?.videoId || '';
+  if (youtubeApiKey && channelId) {
+    const searchUrl = new URL('https://www.googleapis.com/youtube/v3/search');
+    searchUrl.searchParams.set('part', 'snippet');
+    searchUrl.searchParams.set('channelId', channelId);
+    searchUrl.searchParams.set('eventType', 'live');
+    searchUrl.searchParams.set('type', 'video');
+    searchUrl.searchParams.set('maxResults', '1');
+    searchUrl.searchParams.set('key', youtubeApiKey);
+
+    const searchResponse = await fetch(searchUrl);
+    searchResponseOk = searchResponse.ok;
+    const searchPayload = await searchResponse.json().catch(() => ({}));
+    const liveItem = searchPayload?.items?.[0] || null;
+    videoId = liveItem?.id?.videoId || '';
+  }
 
   if (!videoId) {
     videoId = await resolveLiveVideoIdFromChannelPage(parsedSource.type, parsedSource.value, channelId);
   }
 
   if (!videoId) {
+    const fallbackWatchUrl = parsedSource.type === 'handle'
+      ? `https://www.youtube.com/@${parsedSource.value}/live`
+      : channelId
+        ? `https://www.youtube.com/channel/${channelId}/live`
+        : '';
+    const fallbackEmbedUrl = channelId
+      ? `https://www.youtube.com/embed/live_stream?channel=${channelId}`
+      : '';
+
     return {
-      available: false,
-      reason: searchResponse.ok ? 'not_live' : 'lookup_failed',
+      available: Boolean(fallbackEmbedUrl),
+      reason: searchResponseOk ? 'not_live' : 'lookup_fallback',
       checkedAt: new Date().toISOString(),
       channelId,
       videoId: '',
@@ -570,8 +1521,8 @@ const resolveYouTubeLiveVideo = async (source) => {
       channelTitle: '',
       concurrentViewers: null,
       totalViews: null,
-      embedUrl: '',
-      watchUrl: ''
+      embedUrl: fallbackEmbedUrl,
+      watchUrl: fallbackWatchUrl
     };
   }
 
@@ -620,8 +1571,323 @@ const server = http.createServer(async (request, response) => {
     sendJson(response, 200, {
       ok: true,
       stripeConfigured: Boolean(stripeSecretKey),
-      webhookConfigured: Boolean(stripeWebhookSecret)
+      webhookConfigured: Boolean(stripeWebhookSecret),
+      eventsDatabaseConfigured: eventsDb.hasDatabaseConnection
     });
+    return;
+  }
+
+  if (requestUrl.pathname.startsWith('/api/uploads/') && request.method === 'GET') {
+    try {
+      const relative = requestUrl.pathname.slice('/api/uploads/'.length);
+      const segments = safeUploadPathSegments(relative);
+      if (segments.length < 2) {
+        sendJson(response, 400, { ok: false, message: 'Invalid upload path.' });
+        return;
+      }
+
+      const normalizedService = normalizeUploadService(segments[0]);
+      if (!normalizedService) {
+        sendJson(response, 400, { ok: false, message: 'Invalid upload service.' });
+        return;
+      }
+
+      const filePath = path.join(uploadsDir, normalizedService, ...segments.slice(1));
+      const normalizedRoot = `${path.resolve(uploadsDir)}${path.sep}`;
+      const normalizedFilePath = path.resolve(filePath);
+      if (!normalizedFilePath.startsWith(normalizedRoot) || !fs.existsSync(normalizedFilePath)) {
+        sendJson(response, 404, { ok: false, message: 'File not found.' });
+        return;
+      }
+
+      const stat = fs.statSync(normalizedFilePath);
+      if (!stat.isFile()) {
+        sendJson(response, 404, { ok: false, message: 'File not found.' });
+        return;
+      }
+
+      response.writeHead(200, {
+        'Content-Type': getMimeTypeFromName(normalizedFilePath),
+        'Content-Length': stat.size,
+        'Cache-Control': 'public, max-age=604800',
+        'Access-Control-Allow-Origin': '*'
+      });
+
+      fs.createReadStream(normalizedFilePath).pipe(response);
+    } catch (error) {
+      sendJson(response, 500, { ok: false, message: error.message || 'Unable to read uploaded file.' });
+    }
+    return;
+  }
+
+  const uploadResourceMatch = requestUrl.pathname.match(/^\/api\/uploads\/([a-z0-9_-]+)$/i);
+  if (uploadResourceMatch && request.method === 'POST') {
+    try {
+      ensureStorage();
+      const service = normalizeUploadService(uploadResourceMatch[1]);
+      if (!service) {
+        sendJson(response, 400, { ok: false, message: 'Invalid upload service.' });
+        return;
+      }
+
+      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const rawName = sanitizeFileName(body.fileName || 'upload-file');
+      const mimeType = String(body.mimeType || '').trim().toLowerCase();
+      const base64Payload = extractBase64Payload(body.dataUrl || body.base64Data || '');
+
+      if (!base64Payload) {
+        sendJson(response, 400, { ok: false, message: 'No file payload found.' });
+        return;
+      }
+
+      const fileBuffer = Buffer.from(base64Payload, 'base64');
+      if (!fileBuffer.length) {
+        sendJson(response, 400, { ok: false, message: 'Invalid file payload.' });
+        return;
+      }
+
+      if (fileBuffer.length > maxUploadBytes) {
+        sendJson(response, 413, { ok: false, message: 'File too large. Max size is 15 MB.' });
+        return;
+      }
+
+      let finalName = rawName;
+      const requestedExt = path.extname(rawName);
+      const inferredExt = getExtensionFromMime(mimeType);
+      if (!requestedExt && inferredExt) {
+        finalName = `${rawName}${inferredExt}`;
+      }
+
+      const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const storedFileName = `${uniqueSuffix}-${sanitizeFileName(finalName)}`;
+      const { targetDir, year, month } = buildUploadDirectory(service);
+      const outputPath = path.join(targetDir, storedFileName);
+      fs.writeFileSync(outputPath, fileBuffer);
+
+      const publicUrl = `/api/uploads/${service}/${year}/${month}/${encodeURIComponent(storedFileName)}`;
+      sendJson(response, 200, {
+        ok: true,
+        data: {
+          service,
+          fileName: storedFileName,
+          size: fileBuffer.length,
+          mimeType: mimeType || getMimeTypeFromName(storedFileName),
+          url: publicUrl
+        }
+      });
+    } catch (error) {
+      sendJson(response, 500, { ok: false, message: error.message || 'Unable to upload file.' });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/analytics/metrics' && request.method === 'GET') {
+    try {
+      if (!eventsDb.hasDatabaseConnection) {
+        sendJson(response, 200, { ok: true, data: defaultAnalyticsMetrics });
+        if (typeof eventsDb.syncRelationalMirrorsFromContentStore === 'function') {
+          await eventsDb.syncRelationalMirrorsFromContentStore();
+        }
+        return;
+      }
+
+      let data = await eventsDb.getSingleton('analytics_metrics', null);
+      if (!data) {
+        data = await eventsDb.setSingleton('analytics_metrics', defaultAnalyticsMetrics);
+      }
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, { ok: false, message: error.message || 'Unable to fetch analytics metrics.' });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/analytics/trend' && request.method === 'GET') {
+    try {
+      if (!eventsDb.hasDatabaseConnection) {
+        sendJson(response, 200, { ok: true, data: defaultAnalyticsTrend });
+        return;
+      }
+
+      let data = await eventsDb.getSingleton('analytics_trend', null);
+      if (!Array.isArray(data)) {
+        data = await eventsDb.setSingleton('analytics_trend', defaultAnalyticsTrend);
+      }
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, { ok: false, message: error.message || 'Unable to fetch analytics trend.' });
+    }
+    return;
+  }
+
+  const contentResourceMatch = requestUrl.pathname.match(/^\/api\/content\/([a-z0-9_-]+)$/i);
+  if (contentResourceMatch && request.method === 'GET') {
+    try {
+      const resource = String(contentResourceMatch[1]).toLowerCase();
+      const data = eventsDb.hasDatabaseConnection
+        ? await eventsDb.listItems(resource)
+        : listContentItemsFallback(resource);
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, { ok: false, message: error.message || 'Unable to fetch content list.' });
+    }
+    return;
+  }
+
+  if (contentResourceMatch && request.method === 'POST') {
+    try {
+      const resource = String(contentResourceMatch[1]).toLowerCase();
+      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const data = eventsDb.hasDatabaseConnection
+        ? await eventsDb.createItem(resource, body)
+        : createContentItemFallback(resource, body);
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, { ok: false, message: error.message || 'Unable to create content item.' });
+    }
+    return;
+  }
+
+  const contentResourceIdMatch = requestUrl.pathname.match(/^\/api\/content\/([a-z0-9_-]+)\/([^/]+)$/i);
+  if (contentResourceIdMatch && request.method === 'PATCH') {
+    try {
+      const resource = String(contentResourceIdMatch[1]).toLowerCase();
+      const id = decodeURIComponent(contentResourceIdMatch[2]);
+      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const data = eventsDb.hasDatabaseConnection
+        ? await eventsDb.updateItem(resource, id, body)
+        : updateContentItemFallback(resource, id, body);
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, { ok: false, message: error.message || 'Unable to update content item.' });
+    }
+    return;
+  }
+
+  if (contentResourceIdMatch && request.method === 'DELETE') {
+    try {
+      const resource = String(contentResourceIdMatch[1]).toLowerCase();
+      const id = decodeURIComponent(contentResourceIdMatch[2]);
+      const data = eventsDb.hasDatabaseConnection
+        ? await eventsDb.removeItem(resource, id)
+        : removeContentItemFallback(resource, id);
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, { ok: false, message: error.message || 'Unable to delete content item.' });
+    }
+    return;
+  }
+
+  const contentSingleMatch = requestUrl.pathname.match(/^\/api\/content-single\/([a-z0-9_-]+)$/i);
+  if (contentSingleMatch && request.method === 'GET') {
+    try {
+      const resource = String(contentSingleMatch[1]).toLowerCase();
+      const data = eventsDb.hasDatabaseConnection
+        ? await eventsDb.getSingleton(resource, null)
+        : getContentSingletonFallback(resource);
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, { ok: false, message: error.message || 'Unable to fetch singleton content.' });
+    }
+    return;
+  }
+
+  if (contentSingleMatch && request.method === 'PUT') {
+    try {
+      const resource = String(contentSingleMatch[1]).toLowerCase();
+      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const data = eventsDb.hasDatabaseConnection
+        ? await eventsDb.setSingleton(resource, body)
+        : setContentSingletonFallback(resource, body);
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, { ok: false, message: error.message || 'Unable to update singleton content.' });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/events' && request.method === 'GET') {
+    try {
+      const data = await eventsDb.getEvents();
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, {
+        ok: false,
+        message: error.message || 'Unable to read events from database.'
+      });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/events' && request.method === 'POST') {
+    try {
+      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const data = await eventsDb.createEvent(body);
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, {
+        ok: false,
+        message: error.message || 'Unable to create event in database.'
+      });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/events/register' && request.method === 'POST') {
+    try {
+      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const data = await eventsDb.registerForEvent(body);
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, {
+        ok: false,
+        message: error.message || 'Unable to register for event.'
+      });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/events/registrant/remove' && request.method === 'POST') {
+    try {
+      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const data = await eventsDb.removeEventRegistrant(body);
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, {
+        ok: false,
+        message: error.message || 'Unable to remove event registrant.'
+      });
+    }
+    return;
+  }
+
+  const eventPathMatch = requestUrl.pathname.match(/^\/api\/events\/([^/]+)$/);
+  if (eventPathMatch && request.method === 'PATCH') {
+    try {
+      const id = Number(decodeURIComponent(eventPathMatch[1]));
+      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const data = await eventsDb.updateEvent(id, body);
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, {
+        ok: false,
+        message: error.message || 'Unable to update event.'
+      });
+    }
+    return;
+  }
+
+  if (eventPathMatch && request.method === 'DELETE') {
+    try {
+      const id = Number(decodeURIComponent(eventPathMatch[1]));
+      const data = await eventsDb.removeEvent(id);
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, {
+        ok: false,
+        message: error.message || 'Unable to remove event.'
+      });
+    }
     return;
   }
 
@@ -771,6 +2037,79 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (requestUrl.pathname === '/api/volunteer-reminders/run' && request.method === 'POST') {
+    try {
+      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const data = await runVolunteerReminderSweep({ force: body?.force === true });
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, {
+        ok: false,
+        message: error.message || 'Unable to run volunteer reminders.'
+      });
+    }
+    return;
+  }
+
+  const manualReminderMatch = requestUrl.pathname.match(/^\/api\/volunteer-reminders\/opportunity\/([^/]+)\/send$/i);
+  if (manualReminderMatch && request.method === 'POST') {
+    try {
+      const opportunityId = decodeURIComponent(manualReminderMatch[1]);
+      const data = await sendManualOpportunityReminders(opportunityId);
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, error.status || 500, {
+        ok: false,
+        message: error.message || 'Unable to send manual volunteer reminders.'
+      });
+    }
+    return;
+  }
+
+  const reminderPreviewMatch = requestUrl.pathname.match(/^\/api\/volunteer-reminders\/opportunity\/([^/]+)\/preview$/i);
+  if (reminderPreviewMatch && request.method === 'GET') {
+    try {
+      const opportunityId = decodeURIComponent(reminderPreviewMatch[1]);
+      const template = await buildOpportunityEmailPreview(opportunityId);
+      const responseFormat = String(requestUrl.searchParams.get('format') || '').trim().toLowerCase();
+      const htmlBody = String(template?.html || '').trim();
+
+      if (responseFormat === 'json') {
+        sendJson(response, 200, {
+          ok: true,
+          data: {
+            subject: template.subject || '',
+            text: template.text || '',
+            html: htmlBody,
+            templateType: htmlBody ? 'html' : 'text'
+          }
+        });
+        return;
+      }
+
+      if (!htmlBody) {
+        response.writeHead(200, {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Access-Control-Allow-Origin': '*'
+        });
+        response.end(template.text || 'No preview available.');
+        return;
+      }
+
+      response.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Access-Control-Allow-Origin': '*'
+      });
+      response.end(htmlBody);
+    } catch (error) {
+      sendJson(response, error.status || 500, {
+        ok: false,
+        message: error.message || 'Unable to render reminder preview.'
+      });
+    }
+    return;
+  }
+
   if (requestUrl.pathname === '/api/stripe/webhook' && request.method === 'POST') {
     try {
       if (!stripeWebhookSecret) {
@@ -789,7 +2128,7 @@ const server = http.createServer(async (request, response) => {
       if (event.type === 'checkout.session.completed') {
         const session = event.data.object;
         const donationRecord = mapWebhookDonation(session, event.id);
-        upsertDonation(donationRecord);
+        await upsertDonation(donationRecord);
       }
 
       sendJson(response, 200, { received: true });
@@ -803,7 +2142,7 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (requestUrl.pathname === '/api/donations' && request.method === 'GET') {
-    const data = readDonations().sort((left, right) => {
+    const data = (await readDonations()).sort((left, right) => {
       const l = new Date(left.createdAt || 0).getTime();
       const r = new Date(right.createdAt || 0).getTime();
       return r - l;
@@ -812,9 +2151,117 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (requestUrl.pathname === '/api/donations' && request.method === 'POST') {
+    try {
+      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const data = await upsertDonation(body);
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, { ok: false, message: error.message || 'Unable to upsert donation.' });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/donations' && request.method === 'DELETE') {
+    try {
+      const data = await clearDonations();
+      await clearPendingDonations();
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, { ok: false, message: error.message || 'Unable to clear donations.' });
+    }
+    return;
+  }
+
   if (requestUrl.pathname === '/api/donations/summary' && request.method === 'GET') {
-    const summary = summarizeByCampaign(readDonations());
+    const summary = await getDonationSummary();
     sendJson(response, 200, { ok: true, data: summary });
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/donation-campaigns' && request.method === 'GET') {
+    const data = await getDonationCampaigns();
+    sendJson(response, 200, { ok: true, data });
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/donation-campaigns' && request.method === 'POST') {
+    try {
+      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const data = await createDonationCampaign(body);
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, { ok: false, message: error.message || 'Unable to create donation campaign.' });
+    }
+    return;
+  }
+
+  const campaignIdMatch = requestUrl.pathname.match(/^\/api\/donation-campaigns\/([^/]+)$/);
+  if (campaignIdMatch && request.method === 'PATCH') {
+    try {
+      const id = Number(decodeURIComponent(campaignIdMatch[1]));
+      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const data = await updateDonationCampaign(id, body);
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, { ok: false, message: error.message || 'Unable to update donation campaign.' });
+    }
+    return;
+  }
+
+  if (campaignIdMatch && request.method === 'DELETE') {
+    try {
+      const id = Number(decodeURIComponent(campaignIdMatch[1]));
+      const data = await removeDonationCampaign(id);
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, { ok: false, message: error.message || 'Unable to remove donation campaign.' });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/donation-pending' && request.method === 'GET') {
+    const data = await getPendingDonations();
+    sendJson(response, 200, { ok: true, data });
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/donation-pending/latest' && request.method === 'GET') {
+    const list = await getPendingDonations();
+    sendJson(response, 200, { ok: true, data: list[0] || null });
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/donation-pending' && request.method === 'POST') {
+    try {
+      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const data = await createPendingDonation(body);
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, { ok: false, message: error.message || 'Unable to create pending donation.' });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/donation-pending' && request.method === 'DELETE') {
+    try {
+      const data = await clearPendingDonations();
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, { ok: false, message: error.message || 'Unable to clear pending donations.' });
+    }
+    return;
+  }
+
+  const pendingIdMatch = requestUrl.pathname.match(/^\/api\/donation-pending\/([^/]+)$/);
+  if (pendingIdMatch && request.method === 'DELETE') {
+    try {
+      const id = decodeURIComponent(pendingIdMatch[1]);
+      const data = await removePendingDonation(id);
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, { ok: false, message: error.message || 'Unable to remove pending donation.' });
+    }
     return;
   }
 
@@ -938,6 +2385,36 @@ const server = http.createServer(async (request, response) => {
   sendJson(response, 404, { ok: false, message: 'Not found' });
 });
 
-server.listen(port, () => {
-  console.log(`Stripe API helper listening on http://127.0.0.1:${port}`);
-});
+const bootstrap = async () => {
+  if (eventsDb.hasDatabaseConnection) {
+    try {
+      await eventsDb.ensureEventsSchema();
+      await eventsDb.seedEventsIfEmpty(seedEvents);
+      await eventsDb.seedDonationCampaignsIfEmpty(seedDonationCampaigns);
+      console.log('Events database schema ready.');
+    } catch (error) {
+      console.error('Failed to initialize events database:', error.message || error);
+    }
+  } else {
+    console.warn('Events database is not configured. Set DATABASE_URL to enable PostgreSQL events storage.');
+  }
+
+  server.listen(port, () => {
+    console.log(`Stripe API helper listening on http://127.0.0.1:${port}`);
+  });
+
+  // Run a daily-style reminder sweep for upcoming volunteer seva dates.
+  setTimeout(() => {
+    runVolunteerReminderSweep().catch((error) => {
+      console.error('Initial volunteer reminder sweep failed:', error.message || error);
+    });
+  }, 5000);
+
+  setInterval(() => {
+    runVolunteerReminderSweep().catch((error) => {
+      console.error('Volunteer reminder sweep failed:', error.message || error);
+    });
+  }, 6 * 60 * 60 * 1000);
+};
+
+bootstrap();

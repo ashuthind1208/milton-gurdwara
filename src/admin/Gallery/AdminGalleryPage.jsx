@@ -90,7 +90,7 @@ const AdminGalleryPage = () => {
           <Card key={album.id} className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
               <p className="font-semibold text-slate-800">{album.title}</p>
-              <p className="text-sm text-slate-600">{album.eventDate || 'No date'} • {album.isActive ? 'Active' : 'Inactive'} • {album.folderUrl ? 'Folder linked' : 'No folder linked'}</p>
+              <p className="text-sm text-slate-600">{album.eventDate || 'No date'} • {album.isActive ? 'Active' : 'Inactive'} • {(album.folderSources || []).length > 0 ? `${album.folderSources.length} source link(s)` : 'No folder linked'}</p>
               {album.description ? <p className="mt-1 truncate text-xs text-slate-500">{album.description}</p> : null}
             </div>
             <div className="flex gap-2">

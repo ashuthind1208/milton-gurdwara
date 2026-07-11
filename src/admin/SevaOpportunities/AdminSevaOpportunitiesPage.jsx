@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CheckIcon,
   EyeIcon,
+  EnvelopeIcon,
   PencilSquareIcon,
   TrashIcon
 } from '@heroicons/react/24/outline';
@@ -93,6 +94,18 @@ const AdminSevaOpportunitiesPage = () => {
       queryClient.invalidateQueries({ queryKey: ['seva-opportunities'] });
       setViewOpportunity((prev) => (prev?.id === id ? null : prev));
       setEditing((prev) => (prev?.id === id ? null : prev));
+    }
+  });
+
+  const manualReminderMutation = useMutation({
+    mutationFn: (opportunity) => volunteerService.sendOpportunityReminderEmails(opportunity.id),
+    onSuccess: (result, opportunity) => {
+      const sent = Number(result?.data?.sent || result?.sent || 0);
+      const skipped = Number(result?.data?.skipped || result?.skipped || 0);
+      window.alert(`Reminder email run completed for ${opportunity?.sevaType || 'selected seva'}: ${sent} sent, ${skipped} skipped.`);
+    },
+    onError: (error) => {
+      window.alert(error?.message || 'Unable to send reminder emails right now.');
     }
   });
 
@@ -239,6 +252,17 @@ const AdminSevaOpportunitiesPage = () => {
                         aria-label="Download PDF"
                       >
                         PDF
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => manualReminderMutation.mutate(item)}
+                        disabled={getOpportunityVolunteers(item).length === 0 || manualReminderMutation.isPending}
+                        className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-amber-200 px-2 text-xs font-semibold text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        title="Send reminder emails"
+                        aria-label="Send reminder emails"
+                      >
+                        <EnvelopeIcon className="h-3.5 w-3.5" />
+                        Email
                       </button>
                       <button
                         type="button"

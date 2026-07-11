@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import AudioPillPlayer from '../../components/common/AudioPillPlayer';
 import PageHero from '../../components/common/PageHero';
@@ -6,11 +7,38 @@ import useSeoMeta from '../../hooks/useSeoMeta';
 import Seo from '../../components/common/Seo';
 import hukamnamaService from '../../services/hukamnamaService';
 
+const toDisplayDate = (value) => {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) {
+    return new Date().toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' });
+  }
+
+  return date.toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' });
+};
+
+const toSlotLabel = (slot) => {
+  const normalized = String(slot || '').toLowerCase();
+  if (normalized === 'evening') {
+    return 'Evening';
+  }
+  if (normalized === 'morning') {
+    return 'Morning';
+  }
+  return 'Morning';
+};
+
 const HukamnamaPage = () => {
   const meta = useSeoMeta('Daily Hukamnama', 'Read today\'s hukamnama with translation, meaning, and archived entries.');
+  const readAlongConfig = useMemo(() => hukamnamaService.getReadAlongConfig(), []);
   const { data: currentHukamnama } = useQuery({
     queryKey: ['current-hukamnama'],
     queryFn: () => hukamnamaService.getCurrentHukamnama().then((res) => res.data)
+  });
+  const currentAng = Math.max(1, Number(currentHukamnama?.ang || 0));
+  const { data: readAlongAudio } = useQuery({
+    queryKey: ['hukamnama-read-along-page', currentAng],
+    queryFn: () => hukamnamaService.getReadAlongAudioUrl(currentAng).then((res) => res.data),
+    enabled: currentAng > 0 && readAlongConfig.enabled
   });
 
   const { data: archive = [] } = useQuery({
@@ -18,26 +46,32 @@ const HukamnamaPage = () => {
     queryFn: () => hukamnamaService.getArchive().then((res) => res.data)
   });
 
+  const hukamnamaSlotLabel = toSlotLabel(currentHukamnama?.slot);
+  const hukamnamaDateLabel = toDisplayDate(currentHukamnama?.date || currentHukamnama?.updatedAt);
+
   return (
     <div className="space-y-8">
       <Seo {...meta} />
       <PageHero title="Daily Hukamnama" description="Today’s hukamnama, translation, interpretation, and historical archive." />
       <Card>
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Current Hukamnama</p>
-            <p className="mt-1 text-lg font-semibold text-brand-blue">Ang {currentHukamnama?.ang}</p>
-          </div>
-          <div className="w-full md:max-w-xs">
-            <AudioPillPlayer label="Daily Mukhwak" subtitle="Sri Darbar Sahib audio" src={currentHukamnama?.audioUrl} />
-          </div>
+        <div className="space-y-2">
+          {readAlongAudio?.url ? (
+            <div className="w-full">
+              <AudioPillPlayer
+                label="Singh Sabha Milton"
+                subtitle={`${hukamnamaSlotLabel} | Ang ${currentAng} | ${hukamnamaDateLabel}`}
+                src={readAlongAudio.url}
+                showProgress
+              />
+            </div>
+          ) : null}
         </div>
-        <div className="mt-5 space-y-4">
+        <div className="mt-3 space-y-3">
           {(currentHukamnama?.lines || []).map((line) => (
             <div key={line.id}>
-              <p className="font-gurmukhi text-xl text-brand-navy dark:text-brand-cream">{line.gurmukhi}</p>
-              {line.translationPunjabi ? <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">Punjabi: {line.translationPunjabi}</p> : null}
-              {line.translationEnglish ? <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">English: {line.translationEnglish}</p> : null}
+              <p className="font-gurmukhi text-lg font-bold leading-relaxed text-brand-navy">{line.gurmukhi}</p>
+              {line.translationPunjabi ? <p className="mt-1 text-sm font-normal text-brand-saffron">Punjabi: {line.translationPunjabi}</p> : null}
+              {line.translationEnglish ? <p className="mt-0.5 text-sm font-normal text-brand-blue">English: {line.translationEnglish}</p> : null}
             </div>
           ))}
         </div>

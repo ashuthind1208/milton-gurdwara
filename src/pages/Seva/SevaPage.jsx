@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ChevronRightIcon } from '@heroicons/react/24/outline';
 import VolunteerForm from '../../components/forms/VolunteerForm';
 import Card from '../../components/ui/Card';
 import volunteerService from '../../services/volunteerService';
@@ -93,8 +94,7 @@ const SevaPage = () => {
         totalVolunteersNeeded: 0,
         totalRegistered: 0,
         totalOpenSpots: 0,
-        nextSevaDate: '',
-        completionRate: 0
+        nextSevaDate: ''
       };
     }
 
@@ -102,7 +102,6 @@ const SevaPage = () => {
     const totalVolunteersNeeded = enrichedOpportunities.reduce((sum, item) => sum + item.totalRequired, 0);
     const totalRegistered = enrichedOpportunities.reduce((sum, item) => sum + item.registered, 0);
     const totalOpenSpots = Math.max(0, totalVolunteersNeeded - totalRegistered);
-    const completionRate = totalVolunteersNeeded > 0 ? Math.min(100, Math.round((totalRegistered / totalVolunteersNeeded) * 100)) : 0;
     const nextOpen = enrichedOpportunities
       .filter((item) => item.isOpen)
       .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
@@ -112,18 +111,9 @@ const SevaPage = () => {
       totalVolunteersNeeded,
       totalRegistered,
       totalOpenSpots,
-      nextSevaDate: nextOpen?.date || '',
-      completionRate
+      nextSevaDate: nextOpen?.date || ''
     };
   }, [enrichedOpportunities]);
-
-  const topNeedOpportunities = useMemo(
-    () => [...enrichedOpportunities]
-      .filter((item) => item.isOpen)
-      .sort((a, b) => (b.totalRequired - b.registered) - (a.totalRequired - a.registered))
-      .slice(0, 3),
-    [enrichedOpportunities]
-  );
 
   const volunteerRowsByOpportunity = useMemo(() => {
     const rowsById = {};
@@ -171,7 +161,6 @@ const SevaPage = () => {
       <section className="py-2">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <h1 className="font-heading text-3xl font-bold text-slate-900 md:text-5xl">Seva Opportunities</h1>
-          <button type="button" onClick={() => setIsRegisterModalOpen(true)} disabled={selectableOptions.length === 0} className="rounded-xl bg-brand-blue px-5 py-2.5 font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50">Register for Seva</button>
         </div>
         <p className="mt-2 max-w-3xl text-slate-700">Join hands in langar, cleaning, parking, teaching, and event support.</p>
       </section>
@@ -234,44 +223,21 @@ const SevaPage = () => {
         </Card>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="font-heading text-2xl font-bold text-slate-900">Seva Readiness Overview</h2>
-            <p className="text-sm text-slate-600">A quick snapshot of capacity, participation, and what needs support next.</p>
-          </div>
-          <span className="rounded-full bg-brand-blue px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">{sevaStats.completionRate}% filled</span>
-        </div>
-        <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-brand-blue via-blue-500 to-brand-saffron"
-            style={{ width: `${sevaStats.completionRate}%` }}
-            aria-label="Seva capacity fill progress"
-          />
-        </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-3">
-          {topNeedOpportunities.map((item) => {
-            const remaining = Math.max(0, item.totalRequired - item.registered);
-            return (
-              <div key={item.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                <p className="text-sm font-bold text-slate-900">{item.sevaType}</p>
-                <p className="text-xs text-slate-600">{formatDateLabel(item.date)} • {item.time || 'Time TBD'}</p>
-                <p className="mt-1 text-xs font-semibold text-amber-700">{remaining} more sevadars needed</p>
-              </div>
-            );
-          })}
-          {topNeedOpportunities.length === 0 ? (
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 sm:col-span-3">
-              <p className="text-sm text-slate-600">No open opportunities at the moment. Please check again soon.</p>
-            </div>
-          ) : null}
-        </div>
-      </section>
-
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="font-heading text-2xl font-bold text-slate-900">Opportunity Details</h2>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Live status by session</p>
+          <div>
+            <h2 className="font-heading text-2xl font-bold text-slate-900">Seva Readiness & Opportunity Details</h2>
+            <p className="text-sm text-slate-600">Live session-wise progress, availability, and volunteer visibility in one place.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsRegisterModalOpen(true)}
+            disabled={selectableOptions.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-brand-blue via-blue-600 to-brand-saffron px-4 py-2 text-xs font-bold uppercase tracking-wide text-white transition hover:from-amber-200 hover:via-amber-300 hover:to-brand-saffron hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Register for Seva
+            <ChevronRightIcon className="h-4 w-4" />
+          </button>
         </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {enrichedOpportunities.map((item) => {

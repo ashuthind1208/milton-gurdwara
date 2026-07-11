@@ -78,3 +78,102 @@
     transform: translateX(-50%);
   }
 }
+
+.events-calendar-shell .rbc-calendar {
+  border-radius: 14px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.events-calendar-shell .rbc-toolbar {
+  margin-bottom: 10px;
+  padding: 8px;
+  border-radius: 12px;
+  background: linear-gradient(90deg, #eff6ff 0%, #ffffff 55%, #fff7ed 100%);
+  border: 1px solid #dbeafe;
+}
+
+.events-calendar-shell .rbc-toolbar-label {
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: 0.01em;
+}
+
+.events-calendar-shell .rbc-btn-group button {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #1e3a8a;
+  font-weight: 600;
+}
+
+.events-calendar-shell .rbc-btn-group button:hover,
+.events-calendar-shell .rbc-btn-group button.rbc-active {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #ffffff;
+}
+
+.events-calendar-shell .rbc-header {
+  padding: 10px 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.events-calendar-shell .rbc-month-row {
+  min-height: 116px;
+}
+
+.events-calendar-shell .rbc-row-segment {
+  padding: 0 4px 4px;
+}
+
+.events-calendar-shell .rbc-event {
+  padding-bottom: 4px;
+}
+
+.events-calendar-shell .rbc-event-content {
+  line-height: 1.2;
+}
+
+.events-calendar-shell .rbc-row-content {
+  min-height: 102px;
+}
+
+.events-calendar-shell .rbc-show-more {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0a4d9f;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.events-calendar-shell .rbc-date-cell {
+  padding-top: 6px;
+  padding-right: 6px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.events-calendar-shell .rbc-off-range-bg {
+  background: #f8fafc;
+}
+
+.events-calendar-shell .rbc-today {
+  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+}
+
+.events-calendar-shell .rbc-day-bg + .rbc-day-bg {
+  border-left: 1px solid #e2e8f0;
+}
+
+.events-calendar-shell .rbc-month-view,
+.events-calendar-shell .rbc-time-view,
+.events-calendar-shell .rbc-agenda-view {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}

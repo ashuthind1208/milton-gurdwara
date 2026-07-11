@@ -1,29 +1,7 @@
 import { mockResponse } from './mockApi';
+import contentApiService from './contentApiService';
 
-const STORAGE_KEY = 'ssm-news-articles';
-
-const seedArticles = [
-  {
-    id: 'news-1',
-    heading: 'Gurpurab Seva Schedule Released',
-    content: 'Volunteer slots, kirtan timings, and langar seva registration are now open for this month.',
-    links: ['https://www.gurdwarasinghsabhamilton.org/events'],
-    imageLinks: ['https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1200&q=80'],
-    publishedAt: '2026-07-05',
-    expiryDate: '',
-    active: true
-  },
-  {
-    id: 'news-2',
-    heading: 'Youth Camp Registrations Open',
-    content: 'A 3-day Sikh leadership and Gurbani learning camp for ages 12-18 is now accepting registrations.',
-    links: [],
-    imageLinks: [],
-    publishedAt: '2026-07-01',
-    expiryDate: '',
-    active: true
-  }
-];
+const RESOURCE = 'news_articles';
 
 const parseList = (value) => {
   if (Array.isArray(value)) {
@@ -65,58 +43,38 @@ const isLiveArticle = (article, nowTs = Date.now()) => Boolean(article.active &&
 
 const sortChronological = (articles = []) => [...articles].sort((a, b) => toTimestamp(b.publishedAt) - toTimestamp(a.publishedAt));
 
-const readArticles = () => {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return sortChronological(seedArticles.map((article, index) => normalizeArticle(article, index)));
-    }
-
-    const parsed = JSON.parse(raw);
-    const normalized = Array.isArray(parsed) ? parsed.map((article, index) => normalizeArticle(article, index)) : [];
-    return sortChronological(normalized);
-  } catch {
-    return sortChronological(seedArticles.map((article, index) => normalizeArticle(article, index)));
-  }
-};
-
-const writeArticles = (records) => {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-  } catch {
-    // Ignore localStorage write failures in mock mode.
-  }
-};
-
 const newsService = {
-  getArticles: async () => mockResponse(readArticles()),
+  getArticles: async () => {
+    try {
+      const data = await contentApiService.list(RESOURCE);
+      return { data: sortChronological(data.map((article, index) => normalizeArticle(article, index))) };
+    } catch {
+      return mockResponse([]);
+    }
+  },
+
   createArticle: async (payload) => {
-    const nextRecord = normalizeArticle({
-      ...payload,
-      id: `news-${Date.now()}`
-    });
-
-    const next = sortChronological([nextRecord, ...readArticles()]);
-    writeArticles(next);
-    return mockResponse(nextRecord);
+    const nextRecord = normalizeArticle({ ...payload, id: `news-${Date.now()}` });
+    const created = await contentApiService.create(RESOURCE, nextRecord);
+    return { data: normalizeArticle(created || nextRecord) };
   },
+
   updateArticle: async (id, payload) => {
-    const next = sortChronological(readArticles().map((article) => (
-      article.id === id ? normalizeArticle({ ...article, ...payload, id }) : article
-    )));
-
-    writeArticles(next);
-    return mockResponse(next.find((article) => article.id === id) || null);
+    const updated = await contentApiService.update(RESOURCE, id, payload);
+    return { data: normalizeArticle(updated || { id, ...payload }) };
   },
+
   removeArticle: async (id) => {
-    const next = readArticles().filter((article) => article.id !== id);
-    writeArticles(next);
+    await contentApiService.remove(RESOURCE, id);
     return mockResponse({ success: true });
   },
+
   getLatestLiveArticle: async () => {
-    const latest = sortChronological(readArticles()).find((article) => isLiveArticle(article));
+    const articles = await newsService.getArticles().then((res) => res.data || []);
+    const latest = sortChronological(articles).find((article) => isLiveArticle(article));
     return mockResponse(latest || null);
   },
+
   isLiveArticle
 };
 

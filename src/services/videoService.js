@@ -1,11 +1,12 @@
 import { mockResponse } from './mockApi';
+import contentApiService from './contentApiService';
 
-const STORAGE_KEY = 'ssm-gurdwara-videos';
+const RESOURCE = 'videos';
 
 const defaultVideos = [
   {
     id: 'vid-1',
-    title: 'Sunday Samagam — July 6, 2026',
+    title: 'Sunday Samagam - July 6, 2026',
     description: 'Full recording of Sukhmani Sahib Paath, Kirtan, Katha, and Ardaas from the Sunday diwan.',
     videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
     platform: 'youtube',
@@ -18,7 +19,7 @@ const defaultVideos = [
   },
   {
     id: 'vid-2',
-    title: 'Youth Kirtan Darbar — June 2026',
+    title: 'Youth Kirtan Darbar - June 2026',
     description: 'Youth sangat performing shabad kirtan at the monthly youth program.',
     videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
     platform: 'youtube',
@@ -27,19 +28,6 @@ const defaultVideos = [
     featuredDate: '2026-06-15',
     featured: false,
     tags: 'youth, kirtan',
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: 'vid-3',
-    title: 'Akhand Paath Bhog — Gurpurab 2026',
-    description: 'Bhog of Akhand Paath Sahib held at Singh Sabha Milton on the occasion of Gurpurab.',
-    videoUrl: 'https://www.facebook.com/singhsabhamilton/videos/sample',
-    platform: 'facebook',
-    category: 'Special',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1592861956120-e524fc739696?auto=format&fit=crop&w=640&q=70',
-    featuredDate: '2026-05-20',
-    featured: false,
-    tags: 'akhand paath, gurpurab',
     updatedAt: new Date().toISOString()
   }
 ];
@@ -86,36 +74,30 @@ export function getYouTubeEmbedUrl(url) {
 
   const input = String(url).trim();
 
-  // Already an embed URL.
   if (input.includes('youtube.com/embed/')) {
     return input;
   }
 
-  // Channel source: direct channel ID or channel URL.
   const channelIdMatch = input.match(/(?:youtube\.com\/channel\/)?(UC[A-Za-z0-9_-]{20,})/i);
   if (channelIdMatch?.[1]) {
     return `https://www.youtube.com/embed/live_stream?channel=${channelIdMatch[1]}`;
   }
 
-  // Short URL: youtu.be/ID
   const shortMatch = input.match(/youtu\.be\/([A-Za-z0-9_-]{11})/);
   if (shortMatch) {
     return `https://www.youtube.com/embed/${shortMatch[1]}`;
   }
 
-  // Shorts: youtube.com/shorts/ID
   const shortsMatch = input.match(/youtube\.com\/shorts\/([A-Za-z0-9_-]{11})/);
   if (shortsMatch) {
     return `https://www.youtube.com/embed/${shortsMatch[1]}`;
   }
 
-  // Live: youtube.com/live/ID
   const liveMatch = input.match(/youtube\.com\/live\/([A-Za-z0-9_-]{11})/);
   if (liveMatch) {
     return `https://www.youtube.com/embed/${liveMatch[1]}`;
   }
 
-  // Standard watch?v=ID
   const watchMatch = input.match(/[?&]v=([A-Za-z0-9_-]{11})/);
   if (watchMatch) {
     return `https://www.youtube.com/embed/${watchMatch[1]}`;
@@ -142,67 +124,55 @@ export function getFacebookEmbedUrl(url) {
   return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=false&width=1280&height=720`;
 }
 
-const readVideos = () => {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return defaultVideos.map((v, i) => normalizeVideo(v, i));
-    }
-
-    return JSON.parse(raw).map((v, i) => normalizeVideo(v, i));
-  } catch {
-    return defaultVideos.map((v, i) => normalizeVideo(v, i));
-  }
-};
-
-const persistVideos = (videos) => {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(videos));
-  } catch {
-    // Ignore storage errors.
+const ensureSeedVideos = async () => {
+  const rows = await contentApiService.list(RESOURCE);
+  if (rows.length > 0) {
+    return rows;
   }
 
-  return videos;
+  await Promise.all(defaultVideos.map((video, index) => contentApiService.create(RESOURCE, normalizeVideo(video, index))));
+  return contentApiService.list(RESOURCE);
 };
 
 const videoService = {
-  getVideos: async () => mockResponse(readVideos()),
+  getVideos: async () => {
+    const rows = await ensureSeedVideos();
+    return mockResponse(rows.map((v, i) => normalizeVideo(v, i)));
+  },
 
   addVideo: async (payload) => {
-    const current = readVideos();
-    const next = [
-      normalizeVideo({
-        ...payload,
-        id: `vid-${Date.now()}`,
-        platform: detectPlatform(payload.videoUrl || ''),
-        updatedAt: new Date().toISOString()
-      }),
-      ...current
-    ];
+    const record = normalizeVideo({
+      ...payload,
+      id: `vid-${Date.now()}`,
+      platform: detectPlatform(payload?.videoUrl || ''),
+      updatedAt: new Date().toISOString()
+    });
 
-    return mockResponse(persistVideos(next));
+    const created = await contentApiService.create(RESOURCE, record);
+    const allRows = await contentApiService.list(RESOURCE);
+    return mockResponse([normalizeVideo(created || record), ...allRows.filter((v) => v.id !== (created || record).id).map(normalizeVideo)]);
   },
 
   updateVideo: async (id, payload) => {
-    const current = readVideos();
-    const next = current.map((v) => (
-      v.id === id
-        ? normalizeVideo({
-            ...v,
-            ...payload,
-            id,
-            platform: detectPlatform(payload.videoUrl || v.videoUrl),
-            updatedAt: new Date().toISOString()
-          })
-        : v
-    ));
+    const currentRows = await contentApiService.list(RESOURCE);
+    const existing = currentRows.find((v) => v.id === id) || { id };
+    const updatedPayload = normalizeVideo({
+      ...existing,
+      ...payload,
+      id,
+      platform: detectPlatform(payload?.videoUrl || existing.videoUrl || ''),
+      updatedAt: new Date().toISOString()
+    });
 
-    return mockResponse(persistVideos(next));
+    await contentApiService.update(RESOURCE, id, updatedPayload);
+    const rows = await contentApiService.list(RESOURCE);
+    return mockResponse(rows.map((v, i) => normalizeVideo(v, i)));
   },
 
   removeVideo: async (id) => {
-    const next = readVideos().filter((v) => v.id !== id);
-    return mockResponse(persistVideos(next));
+    await contentApiService.remove(RESOURCE, id);
+    const rows = await contentApiService.list(RESOURCE);
+    return mockResponse(rows.map((v, i) => normalizeVideo(v, i)));
   }
 };
 

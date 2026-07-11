@@ -61,8 +61,20 @@ const AdminDonationsPage = () => {
   const [page, setPage] = useState(1);
   const form = useForm({ defaultValues: campaignDefaults });
   const editForm = useForm({ defaultValues: campaignDefaults });
-  const { data: campaigns = [] } = useQuery({ queryKey: ['admin-campaigns'], queryFn: () => donationService.getAllCampaigns().then((res) => res.data) });
-  const { data: donations = [] } = useQuery({ queryKey: ['admin-donations'], queryFn: () => donationService.getDonations().then((res) => res.data) });
+  const { data: campaigns = [] } = useQuery({
+    queryKey: ['admin-campaigns'],
+    queryFn: () => donationService.getAllCampaigns().then((res) => res.data),
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    refetchInterval: 30000
+  });
+  const { data: donations = [] } = useQuery({
+    queryKey: ['admin-donations'],
+    queryFn: () => donationService.getDonations().then((res) => res.data),
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    refetchInterval: 10000
+  });
 
   const campaignMap = useMemo(() => campaigns.reduce((accumulator, campaign) => {
     accumulator[String(campaign.id)] = campaign;
@@ -419,10 +431,10 @@ const AdminDonationsPage = () => {
                 </select>
               </label>
               <label className="text-sm">Raised
-                <input type="number" min="0" {...form.register('raised')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <input type="number" min="0" step="0.01" {...form.register('raised', { valueAsNumber: true, min: 0 })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
               <label className="text-sm">Target
-                <input type="number" min="0" {...form.register('target', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <input type="number" min="0" step="0.01" {...form.register('target', { required: true, valueAsNumber: true, min: 0 })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
               <label className="text-sm md:col-span-2">Description
                 <textarea rows={2} {...form.register('description')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
@@ -527,10 +539,10 @@ const AdminDonationsPage = () => {
                 </select>
               </label>
               <label className="text-sm">Raised
-                <input type="number" min="0" {...editForm.register('raised')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <input type="number" min="0" step="0.01" {...editForm.register('raised', { valueAsNumber: true, min: 0 })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
               <label className="text-sm">Target
-                <input type="number" min="0" {...editForm.register('target', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <input type="number" min="0" step="0.01" {...editForm.register('target', { required: true, valueAsNumber: true, min: 0 })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
               <label className="text-sm md:col-span-2">Description
                 <textarea rows={2} {...editForm.register('description')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />

@@ -17,10 +17,11 @@ const AboutPage = () => {
   return (
     <div className="space-y-10">
       <Seo {...meta} />
-      <PageHero title={content?.heroTitle || 'About Our Gurdwara'} description={content?.heroDescription || 'Serving the sangat with spiritual guidance, seva, and community development.'} />
+      <PageHero title={content?.heroTitle ?? 'About Our Gurdwara'} description={content?.heroDescription ?? 'Serving the sangat with spiritual guidance, seva, and community development.'} />
+
+      {content?.mediaUrl ? <img src={content.mediaUrl} alt="About section" className="h-56 w-full object-cover" loading="lazy" /> : null}
 
       {content?.intro ? <p className="text-sm leading-relaxed text-slate-700">{content.intro}</p> : null}
-      {content?.mediaUrl ? <img src={content.mediaUrl} alt="About section" className="h-56 w-full object-cover" loading="lazy" /> : null}
 
       <section>
         <SectionTitle title="History, Vision, and Mission" />

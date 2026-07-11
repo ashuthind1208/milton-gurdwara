@@ -9,6 +9,27 @@ import videoService, { CATEGORIES, getYouTubeEmbedUrl, getYouTubeThumbnail, getF
 
 const PAGE_SIZE = 12;
 
+const sendYouTubeCommand = (iframe, func, args = []) => {
+  if (!iframe?.contentWindow) {
+    return;
+  }
+
+  iframe.contentWindow.postMessage(
+    JSON.stringify({
+      event: 'command',
+      func,
+      args
+    }),
+    '*'
+  );
+};
+
+const startPlaybackWithVolume = (iframe, volume = 50) => {
+  sendYouTubeCommand(iframe, 'setVolume', [volume]);
+  sendYouTubeCommand(iframe, 'unMute');
+  sendYouTubeCommand(iframe, 'playVideo');
+};
+
 const VideosPage = () => {
   const meta = useSeoMeta('Gurdwara Videos', 'Watch recordings of samagams, kirtan, katha, and special events at Singh Sabha Milton.');
   const [activeCategory, setActiveCategory] = useState('All');
@@ -44,7 +65,19 @@ const VideosPage = () => {
   };
 
   const getThumb = (video) => video.thumbnailUrl || (video.platform === 'youtube' ? getYouTubeThumbnail(video.videoUrl) : '');
-  const getEmbedUrl = (video) => (video.platform === 'youtube' ? getYouTubeEmbedUrl(video.videoUrl) : getFacebookEmbedUrl(video.videoUrl));
+  const getEmbedUrl = (video) => {
+    if (video.platform === 'youtube') {
+      const base = getYouTubeEmbedUrl(video.videoUrl);
+      if (!base) {
+        return '';
+      }
+
+      const separator = base.includes('?') ? '&' : '?';
+      return `${base}${separator}autoplay=1&playsinline=1&enablejsapi=1`;
+    }
+
+    return getFacebookEmbedUrl(video.videoUrl);
+  };
 
   return (
     <div className="space-y-8">
@@ -145,6 +178,16 @@ const VideosPage = () => {
                 src={getEmbedUrl(activeVideo)}
                 title={activeVideo.title}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                onLoad={(event) => {
+                  if (activeVideo?.platform !== 'youtube') {
+                    return;
+                  }
+
+                  const iframe = event.currentTarget;
+                  startPlaybackWithVolume(iframe, 50);
+                  window.setTimeout(() => startPlaybackWithVolume(iframe, 50), 250);
+                  window.setTimeout(() => startPlaybackWithVolume(iframe, 50), 1000);
+                }}
                 allowFullScreen
               />
               </div>

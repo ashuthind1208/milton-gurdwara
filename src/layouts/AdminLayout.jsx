@@ -1,4 +1,5 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { adminNav } from '../constants/navigation';
 import { useAuth } from '../context/AuthContext';
 import gurdwaraLogo from '../assets/gurdwara-logo.webp';
@@ -23,12 +24,27 @@ const getFirstName = (fullName) => {
 
 const AdminLayout = () => {
   const { user, logout } = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
+  const [accessDeniedModalOpen, setAccessDeniedModalOpen] = useState(false);
+  const [accessDeniedNotice, setAccessDeniedNotice] = useState('');
   const firstName = getFirstName(user?.name);
   const hasFullAccess = FULL_ACCESS_ROLES.has(String(user?.role || ''));
   const visibleNav = hasFullAccess
     ? adminNav
     : adminNav.filter((item) => MEMBER_VISIBLE_PATHS.includes(item.path));
+
+  useEffect(() => {
+    const state = location.state || {};
+    if (!state.accessDenied) {
+      return;
+    }
+
+    const message = 'You are not allowed to access that section. Please contact an admin or super admin for access.';
+    setAccessDeniedNotice(message);
+    setAccessDeniedModalOpen(true);
+    navigate(location.pathname, { replace: true, state: {} });
+  }, [location.pathname, location.state, navigate]);
 
   const handleLogout = async () => {
     await logout();
@@ -75,6 +91,24 @@ const AdminLayout = () => {
           </div>
         </div>
         <Outlet />
+
+        {accessDeniedModalOpen ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4" role="dialog" aria-modal="true" aria-live="assertive">
+            <div className="w-full max-w-md rounded-2xl border border-rose-300 bg-white p-5 shadow-2xl">
+              <h2 className="text-lg font-bold text-rose-800">Access Restricted</h2>
+              <p className="mt-2 text-sm leading-relaxed text-slate-700">{accessDeniedNotice || 'You are not allowed to access that section. Please contact an admin or super admin for access.'}</p>
+              <div className="mt-5 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setAccessDeniedModalOpen(false)}
+                  className="rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </main>
     </div>
   );

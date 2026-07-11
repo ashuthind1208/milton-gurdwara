@@ -1,155 +1,71 @@
 import { mockResponse } from './mockApi';
 
-const STORAGE_KEY = 'ssm-donation-campaigns';
-const DONATION_STORAGE_KEY = 'ssm-donation-records';
-const PENDING_DONATION_KEY = 'ssm-donation-pending';
 const LAST_PENDING_DONATION_KEY = 'ssm-donation-last-pending-id';
 
-const seedCampaigns = [
-  {
-    id: 1,
-    name: 'Langar Fund',
-    description: 'Monthly langar and seva support.',
-    raised: 42000,
-    target: 60000,
-    isActive: true,
-    paymentProvider: 'STRIPE',
-    paymentLink: 'https://donate.stripe.com/test_aFa28sdWJexZ11F3ZE6Ri00',
-    stripeBuyButtonId: '',
-    stripePublishableKey: ''
-  },
-  {
-    id: 2,
-    name: 'Building Fund',
-    description: 'Expansion and maintenance project support.',
-    raised: 110000,
-    target: 250000,
-    isActive: true,
-    paymentProvider: 'PAYPAL',
-    paymentLink: '',
-    stripeBuyButtonId: '',
-    stripePublishableKey: ''
-  },
-  {
-    id: 3,
-    name: 'Education Seva',
-    description: 'Punjabi and gurmat classes for youth.',
-    raised: 18000,
-    target: 30000,
-    isActive: true,
-    paymentProvider: 'STRIPE',
-    paymentLink: 'https://donate.stripe.com/test_aFa28sdWJexZ11F3ZE6Ri00',
-    stripeBuyButtonId: '',
-    stripePublishableKey: ''
-  }
-];
+let pendingCache = [];
 
-const normalizeCampaign = (campaign) => {
-  const raised = Number(campaign.raised || 0);
-  const target = Number(campaign.target || 0);
+const normalizeCampaign = (campaign = {}) => {
+  const raisedValue = Number(campaign.raised ?? 0);
+  const targetValue = Number(campaign.target ?? 0);
+  const raised = Number.isFinite(raisedValue) ? Math.max(0, raisedValue) : 0;
+  const target = Number.isFinite(targetValue) ? Math.max(0, targetValue) : 0;
   const isClosed = target > 0 && raised >= target;
-  const provider = String(campaign.paymentProvider || 'STRIPE').toUpperCase();
+  const provider = String(campaign.paymentProvider || campaign.payment_provider || 'STRIPE').toUpperCase();
 
   return {
-    id: campaign.id,
+    id: Number(campaign.id),
     name: campaign.name || '',
     description: campaign.description || '',
     raised,
     target,
-    isActive: Boolean(campaign.isActive ?? true),
+    isActive: Boolean(campaign.isActive ?? campaign.is_active ?? true),
     isClosed,
     paymentProvider: provider === 'PAYPAL' ? 'PAYPAL' : 'STRIPE',
-    paymentLink: campaign.paymentLink || '',
-    stripeBuyButtonId: campaign.stripeBuyButtonId || '',
-    stripePublishableKey: campaign.stripePublishableKey || ''
+    paymentLink: campaign.paymentLink || campaign.payment_link || '',
+    stripeBuyButtonId: campaign.stripeBuyButtonId || campaign.stripe_buy_button_id || '',
+    stripePublishableKey: campaign.stripePublishableKey || campaign.stripe_publishable_key || ''
   };
 };
 
-const readCampaigns = () => {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return seedCampaigns.map(normalizeCampaign);
-    }
-    return JSON.parse(raw).map(normalizeCampaign);
-  } catch {
-    return seedCampaigns.map(normalizeCampaign);
-  }
-};
+const normalizePending = (record = {}) => ({
+  id: String(record.id || ''),
+  campaignId: Number(record.campaignId || record.campaign_id || 0),
+  campaignName: record.campaignName || record.campaign_name || '',
+  donorName: record.donorName || record.donor_name || 'Anonymous',
+  donorEmail: record.donorEmail || record.donor_email || '',
+  amount: record.amount == null ? null : Number(record.amount),
+  frequency: record.frequency || 'one-time',
+  paymentProvider: String(record.paymentProvider || record.payment_provider || 'STRIPE').toUpperCase(),
+  checkoutUrl: record.checkoutUrl || record.checkout_url || '',
+  sessionId: record.sessionId || record.session_id || '',
+  createdAt: record.createdAt || record.created_at || new Date().toISOString()
+});
 
-const writeCampaigns = (records) => {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-  } catch {
-    // Ignore localStorage write errors in mock mode.
-  }
-};
+const normalizeDonation = (record = {}) => {
+  const amountValue = Number(record.amount ?? 0);
 
-const readDonations = () => {
-  try {
-    const raw = window.localStorage.getItem(DONATION_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-};
-
-const writeDonations = (records) => {
-  try {
-    window.localStorage.setItem(DONATION_STORAGE_KEY, JSON.stringify(records));
-  } catch {
-    // Ignore localStorage write errors in mock mode.
-  }
-};
-
-const readPendingDonations = () => {
-  try {
-    const raw = window.localStorage.getItem(PENDING_DONATION_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-};
-
-const getLatestPendingDonationRecord = () => {
-  const pending = readPendingDonations();
-  if (pending.length === 0) {
-    return null;
-  }
-
-  return [...pending].sort((left, right) => {
-    const leftTime = new Date(left.createdAt || 0).getTime();
-    const rightTime = new Date(right.createdAt || 0).getTime();
-    return rightTime - leftTime;
-  })[0] || null;
-};
-
-const writePendingDonations = (records) => {
-  try {
-    window.localStorage.setItem(PENDING_DONATION_KEY, JSON.stringify(records));
-  } catch {
-    // Ignore localStorage write errors in mock mode.
-  }
-};
-
-const readLastPendingDonationId = () => {
-  try {
-    return window.localStorage.getItem(LAST_PENDING_DONATION_KEY) || '';
-  } catch {
-    return '';
-  }
-};
-
-const writeLastPendingDonationId = (pendingId) => {
-  try {
-    if (pendingId) {
-      window.localStorage.setItem(LAST_PENDING_DONATION_KEY, pendingId);
-      return;
-    }
-    window.localStorage.removeItem(LAST_PENDING_DONATION_KEY);
-  } catch {
-    // Ignore localStorage write errors in mock mode.
-  }
+  return {
+    id: String(record.id || ''),
+    receiptId: String(record.receiptId ?? record.receipt_id ?? ''),
+    sourcePendingId: String(record.sourcePendingId ?? record.source_pending_id ?? ''),
+    campaignId: record.campaignId != null || record.campaign_id != null
+      ? Number(record.campaignId ?? record.campaign_id)
+      : null,
+    campaignName: String(record.campaignName ?? record.campaign_name ?? ''),
+    donorName: String(record.donorName ?? record.donor_name ?? 'Anonymous'),
+    donorEmail: String(record.donorEmail ?? record.donor_email ?? ''),
+    amount: Number.isFinite(amountValue) ? amountValue : 0,
+    frequency: String(record.frequency || 'one-time'),
+    paymentProvider: String(record.paymentProvider ?? record.payment_provider ?? 'STRIPE').toUpperCase(),
+    paymentStatus: String(record.paymentStatus ?? record.payment_status ?? 'PAID').toUpperCase(),
+    gatewayTransactionId: String(record.gatewayTransactionId ?? record.gateway_transaction_id ?? ''),
+    stripeSessionId: String(record.stripeSessionId ?? record.stripe_session_id ?? ''),
+    stripeEventId: String(record.stripeEventId ?? record.stripe_event_id ?? ''),
+    emailSent: Boolean(record.emailSent ?? record.email_sent),
+    source: String(record.source || ''),
+    createdAt: String(record.createdAt ?? record.created_at ?? new Date().toISOString()),
+    updatedAt: String(record.updatedAt ?? record.updated_at ?? '')
+  };
 };
 
 const isHttpUrl = (value) => /^https?:\/\//i.test(String(value || ''));
@@ -222,11 +138,131 @@ const fetchJson = async (url, options = {}) => {
   return data;
 };
 
+const readCampaignsFromServer = async () => {
+  const response = await fetchJson('/api/donation-campaigns');
+  return Array.isArray(response.data) ? response.data.map(normalizeCampaign) : [];
+};
+
+const readPendingFromServer = async () => {
+  const response = await fetchJson('/api/donation-pending');
+  const rows = Array.isArray(response.data) ? response.data.map(normalizePending) : [];
+  pendingCache = rows;
+  return rows;
+};
+
+const readLatestPendingFromServer = async () => {
+  const response = await fetchJson('/api/donation-pending/latest');
+  const row = response.data ? normalizePending(response.data) : null;
+  if (row) {
+    pendingCache = [row, ...pendingCache.filter((entry) => entry.id !== row.id)];
+  }
+  return row;
+};
+
+const writeLastPendingDonationId = (pendingId) => {
+  try {
+    if (pendingId) {
+      window.localStorage.setItem(LAST_PENDING_DONATION_KEY, pendingId);
+      return;
+    }
+    window.localStorage.removeItem(LAST_PENDING_DONATION_KEY);
+  } catch {
+    // Ignore local cache write errors.
+  }
+};
+
+const readLastPendingDonationId = () => {
+  try {
+    return window.localStorage.getItem(LAST_PENDING_DONATION_KEY) || '';
+  } catch {
+    return '';
+  }
+};
+
+const sendReceiptEmail = async ({ donorEmail, donorName, receiptId, amount, campaignName }) => {
+  if (!donorEmail) {
+    return { sent: false, reason: 'missing_email' };
+  }
+
+  return mockResponse(
+    {
+      sent: true,
+      to: donorEmail,
+      subject: `Donation receipt ${receiptId}`,
+      donorName,
+      amount,
+      campaignName
+    },
+    200
+  ).then((res) => res.data);
+};
+
+const readServerDonations = async () => {
+  const response = await fetchJson('/api/donations');
+  return Array.isArray(response.data) ? response.data.map(normalizeDonation) : [];
+};
+
+const readServerDonationSummary = async () => {
+  const response = await fetchJson('/api/donations/summary');
+  return response.data || {};
+};
+
+const mergeDonations = (serverRecords) => {
+  const map = new Map();
+
+  serverRecords.forEach((entry) => {
+    const normalized = normalizeDonation(entry);
+    const key =
+      String(normalized.gatewayTransactionId || '').trim() ||
+      String(normalized.stripeSessionId || '').trim() ||
+      String(normalized.sourcePendingId || '').trim() ||
+      String(normalized.receiptId || '').trim() ||
+      String(normalized.id || '').trim();
+    if (!key) {
+      return;
+    }
+
+    if (!map.has(key)) {
+      map.set(key, normalized);
+      return;
+    }
+
+    const existing = map.get(key);
+    const chooseCurrent = String(normalized.source || '').includes('stripe-webhook');
+    map.set(key, chooseCurrent ? { ...existing, ...normalized } : existing);
+  });
+
+  return [...map.values()].sort((left, right) => {
+    const l = new Date(left.createdAt || 0).getTime();
+    const r = new Date(right.createdAt || 0).getTime();
+    return r - l;
+  });
+};
+
+const applyServerRaisedTotals = async (campaigns) => {
+  try {
+    const summary = await readServerDonationSummary();
+    return campaigns.map((campaign) => {
+      const byId = Number(summary[`id:${campaign.id}`] || 0);
+      const byName = Number(summary[`name:${String(campaign.name).toLowerCase()}`] || 0);
+      const serverRaisedById = Number.isFinite(byId) ? byId : 0;
+      const serverRaisedByName = Number.isFinite(byName) ? byName : 0;
+      const serverRaised = Math.max(0, serverRaisedById, serverRaisedByName);
+      const campaignRaised = Number.isFinite(Number(campaign.raised)) ? Number(campaign.raised) : 0;
+
+      // Campaign.raised is persisted by backend updates; summary is a safety fallback.
+      // Use the higher value to prevent stale values, without double-counting.
+      const mergedRaised = Math.max(campaignRaised, serverRaised);
+      return normalizeCampaign({ ...campaign, raised: mergedRaised });
+    });
+  } catch {
+    return campaigns;
+  }
+};
+
 const createServerCheckoutSession = async ({ campaign, pendingId, donorName, donorEmail, frequency, amount }) => {
   const parsedAmount = Number(amount);
-  const amountCents = Number.isFinite(parsedAmount) && parsedAmount > 0
-    ? Math.round(parsedAmount * 100)
-    : undefined;
+  const amountCents = Number.isFinite(parsedAmount) && parsedAmount > 0 ? Math.round(parsedAmount * 100) : undefined;
 
   const payload = {
     pendingId,
@@ -248,61 +284,6 @@ const createServerCheckoutSession = async ({ campaign, pendingId, donorName, don
   });
 
   return response.data || null;
-};
-
-const readServerDonations = async () => {
-  const response = await fetchJson('/api/donations');
-  return Array.isArray(response.data) ? response.data : [];
-};
-
-const readServerDonationSummary = async () => {
-  const response = await fetchJson('/api/donations/summary');
-  return response.data || {};
-};
-
-const mergeDonations = (localRecords, serverRecords) => {
-  const map = new Map();
-
-  [...localRecords, ...serverRecords].forEach((entry) => {
-    const key =
-      String(entry.gatewayTransactionId || '').trim() ||
-      String(entry.stripeSessionId || '').trim() ||
-      String(entry.receiptId || '').trim() ||
-      String(entry.id || '').trim();
-    if (!key) {
-      return;
-    }
-
-    if (!map.has(key)) {
-      map.set(key, entry);
-      return;
-    }
-
-    const existing = map.get(key);
-    const chooseServer = String(entry.source || '').includes('stripe-webhook');
-    map.set(key, chooseServer ? { ...existing, ...entry } : existing);
-  });
-
-  return [...map.values()].sort((left, right) => {
-    const l = new Date(left.createdAt || 0).getTime();
-    const r = new Date(right.createdAt || 0).getTime();
-    return r - l;
-  });
-};
-
-const applyServerRaisedTotals = async (campaigns) => {
-  try {
-    const summary = await readServerDonationSummary();
-    return campaigns.map((campaign) => {
-      const byId = Number(summary[`id:${campaign.id}`] || 0);
-      const byName = Number(summary[`name:${String(campaign.name).toLowerCase()}`] || 0);
-      const serverRaised = Number.isFinite(byId) && byId > 0 ? byId : byName;
-      const mergedRaised = Number(campaign.raised || 0) + (Number.isFinite(serverRaised) ? serverRaised : 0);
-      return normalizeCampaign({ ...campaign, raised: mergedRaised });
-    });
-  } catch {
-    return campaigns;
-  }
 };
 
 const resolveStripePaymentDetails = async ({ sessionId = '', paymentIntentId = '' } = {}) => {
@@ -384,8 +365,6 @@ const resolveCheckoutUrl = async ({ campaign, amount, donorName, donorEmail, pen
     });
   }
 
-  // Stripe Payment Links are usually fixed-amount; this adds common prefill params,
-  // while dynamic amount requires a backend checkout-session endpoint.
   return withQueryParams(templated, {
     amount: hasAmount ? amount : undefined,
     amount_decimal: hasAmount ? amount : undefined,
@@ -396,104 +375,72 @@ const resolveCheckoutUrl = async ({ campaign, amount, donorName, donorEmail, pen
   });
 };
 
-const sendReceiptEmail = async ({ donorEmail, donorName, receiptId, amount, campaignName }) => {
-  if (!donorEmail) {
-    return { sent: false, reason: 'missing_email' };
-  }
-
-  return mockResponse({
-    sent: true,
-    to: donorEmail,
-    subject: `Donation receipt ${receiptId}`,
-    donorName,
-    amount,
-    campaignName
-  }, 200).then((res) => res.data);
-};
-
-const findExistingDonation = ({ pendingId = '', gatewayTransactionId = '' } = {}) => {
-  const normalizedGatewayId = String(gatewayTransactionId || '').trim();
-  const normalizedPendingId = String(pendingId || '').trim();
-  const genericGatewayIds = new Set(['stripe-return', 'latest-pending-fallback', 'manual-user-confirm']);
-
-  const donations = readDonations();
-  if (normalizedPendingId) {
-    const byPending = donations.find((entry) => String(entry.sourcePendingId || '').trim() === normalizedPendingId);
-    if (byPending) {
-      return byPending;
-    }
-  }
-
-  if (normalizedGatewayId && !genericGatewayIds.has(normalizedGatewayId)) {
-    const byGateway = donations.find((entry) => String(entry.gatewayTransactionId || '').trim() === normalizedGatewayId);
-    if (byGateway) {
-      return byGateway;
-    }
-  }
-
-  return null;
-};
-
 const donationService = {
   getCampaigns: async () => {
-    const campaigns = await applyServerRaisedTotals(readCampaigns());
+    const campaigns = await applyServerRaisedTotals(await readCampaignsFromServer());
     return mockResponse(campaigns.filter((campaign) => campaign.isActive));
   },
+
   getAllCampaigns: async () => {
-    const campaigns = await applyServerRaisedTotals(readCampaigns());
+    const campaigns = await applyServerRaisedTotals(await readCampaignsFromServer());
     return mockResponse(campaigns);
   },
+
   getDonations: async () => {
-    try {
-      const merged = mergeDonations(readDonations(), await readServerDonations());
-      return mockResponse(merged);
-    } catch {
-      return mockResponse(readDonations());
-    }
+    const merged = mergeDonations(await readServerDonations());
+    return mockResponse(merged);
   },
-  getPendingDonations: async () => mockResponse(readPendingDonations()),
+
+  getPendingDonations: async () => mockResponse(await readPendingFromServer()),
+
   getLastPendingDonationId: () => readLastPendingDonationId(),
-  getPendingDonationById: (pendingId) => readPendingDonations().find((entry) => entry.id === pendingId) || null,
-  getLatestPendingDonation: () => getLatestPendingDonationRecord(),
+
+  getPendingDonationById: (pendingId) => pendingCache.find((entry) => entry.id === pendingId) || null,
+
+  getLatestPendingDonation: () => {
+    if (pendingCache.length === 0) {
+      return null;
+    }
+
+    return [...pendingCache]
+      .sort((left, right) => new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime())[0] || null;
+  },
+
   createCampaign: async (payload) => {
-    const record = normalizeCampaign({
-      id: Date.now(),
-      name: payload.name,
-      description: payload.description,
-      raised: Number(payload.raised || 0),
-      target: Number(payload.target || 0),
-      isActive: payload.isActive ?? true,
-      paymentProvider: payload.paymentProvider,
-      paymentLink: payload.paymentLink,
-      stripeBuyButtonId: payload.stripeBuyButtonId,
-      stripePublishableKey: payload.stripePublishableKey
+    const response = await fetchJson('/api/donation-campaigns', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload || {})
     });
-    const next = [record, ...readCampaigns()];
-    writeCampaigns(next);
-    return mockResponse(record);
+    return mockResponse(normalizeCampaign(response.data || payload));
   },
+
   updateCampaign: async (id, payload) => {
-    const next = readCampaigns().map((campaign) => (
-      campaign.id === id ? normalizeCampaign({ ...campaign, ...payload }) : campaign
-    ));
-    writeCampaigns(next);
-    return mockResponse(next.find((campaign) => campaign.id === id));
+    const response = await fetchJson(`/api/donation-campaigns/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload || {})
+    });
+    return mockResponse(normalizeCampaign(response.data || { ...payload, id }));
   },
+
   removeCampaign: async (id) => {
-    const next = readCampaigns().filter((campaign) => campaign.id !== id);
-    writeCampaigns(next);
+    await fetchJson(`/api/donation-campaigns/${encodeURIComponent(id)}`, { method: 'DELETE' });
     return mockResponse({ success: true });
   },
+
   clearDonations: async () => {
-    writeDonations([]);
-    writePendingDonations([]);
+    await fetchJson('/api/donations', { method: 'DELETE' });
+    pendingCache = [];
     writeLastPendingDonationId('');
     return mockResponse({ success: true, cleared: true });
   },
+
   resolveStripePaymentDetails,
+
   initiateDonation: async (payload) => {
     const campaignId = Number(payload.campaignId);
-    const campaigns = readCampaigns();
+    const campaigns = await readCampaignsFromServer();
     const campaign = campaigns.find((entry) => Number(entry.id) === campaignId);
 
     if (!campaign) {
@@ -536,11 +483,12 @@ const donationService = {
         pendingId
       });
     }
+
     const resolvedAmount = Number.isFinite(Number(payload.amount)) && Number(payload.amount) > 0
       ? Number(payload.amount)
       : extractAmountFromUrl(checkoutUrl) || extractAmountFromUrl(campaign.paymentLink) || null;
 
-    const pendingRecord = {
+    const pendingRecord = normalizePending({
       id: pendingId,
       campaignId: campaign.id,
       campaignName: campaign.name,
@@ -552,38 +500,49 @@ const donationService = {
       checkoutUrl,
       sessionId,
       createdAt: new Date().toISOString()
-    };
+    });
 
-    writePendingDonations([pendingRecord, ...readPendingDonations()]);
-    writeLastPendingDonationId(pendingId);
+    const response = await fetchJson('/api/donation-pending', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(pendingRecord)
+    });
+
+    const createdPending = normalizePending(response.data || pendingRecord);
+    pendingCache = [createdPending, ...pendingCache.filter((entry) => entry.id !== createdPending.id)];
+    writeLastPendingDonationId(createdPending.id);
 
     return mockResponse({
       success: true,
-      pendingId,
-      checkoutUrl,
+      pendingId: createdPending.id,
+      checkoutUrl: createdPending.checkoutUrl,
       campaign,
-      sessionId,
-      amount: pendingRecord.amount,
-      donorName: pendingRecord.donorName,
-      donorEmail: pendingRecord.donorEmail,
-      frequency: pendingRecord.frequency
+      sessionId: createdPending.sessionId,
+      amount: createdPending.amount,
+      donorName: createdPending.donorName,
+      donorEmail: createdPending.donorEmail,
+      frequency: createdPending.frequency
     });
   },
 
   confirmDonationPayment: async ({ pendingId, gatewayTransactionId = '', amount: amountOverride = null }) => {
-    const existingDonation = findExistingDonation({ pendingId, gatewayTransactionId });
+    const donations = await readServerDonations();
+    const existingDonation = donations.find((entry) => (
+      String(entry.sourcePendingId || '').trim() === String(pendingId || '').trim() ||
+      (String(gatewayTransactionId || '').trim() && String(entry.gatewayTransactionId || '').trim() === String(gatewayTransactionId || '').trim())
+    ));
+
     if (existingDonation) {
-      const pendingRecords = readPendingDonations();
-      if (pendingRecords.some((entry) => entry.id === pendingId)) {
-        writePendingDonations(pendingRecords.filter((entry) => entry.id !== pendingId));
+      if (pendingId) {
+        await fetchJson(`/api/donation-pending/${encodeURIComponent(pendingId)}`, { method: 'DELETE' }).catch(() => ({}));
       }
+      pendingCache = pendingCache.filter((entry) => entry.id !== pendingId);
       if (readLastPendingDonationId() === pendingId) {
         writeLastPendingDonationId('');
       }
 
-      const campaigns = readCampaigns();
+      const campaigns = await readCampaignsFromServer();
       const campaign = campaigns.find((entry) => Number(entry.id) === Number(existingDonation.campaignId)) || null;
-
       return mockResponse({
         success: true,
         receiptId: existingDonation.receiptId,
@@ -594,14 +553,22 @@ const donationService = {
       });
     }
 
-    const pending = readPendingDonations();
-    const record = pending.find((entry) => entry.id === pendingId);
+    let record = pendingCache.find((entry) => entry.id === pendingId) || null;
+    if (!record && pendingId) {
+      const pendingRows = await readPendingFromServer();
+      record = pendingRows.find((entry) => entry.id === pendingId) || null;
+    }
+    if (!record) {
+      record = await readLatestPendingFromServer();
+    }
+
     if (!record) {
       throw new Error('Pending payment not found. Start donation again.');
     }
 
-    const campaigns = readCampaigns();
+    const campaigns = await readCampaignsFromServer();
     const campaign = campaigns.find((entry) => Number(entry.id) === Number(record.campaignId));
+
     if (!campaign) {
       throw new Error('Campaign not found for this payment.');
     }
@@ -617,12 +584,11 @@ const donationService = {
       throw new Error('Donation amount could not be determined from checkout confirmation.');
     }
 
-    const nextRaised = campaign.raised + confirmedAmount;
     const receiptId = `R-${Date.now()}`;
     const donationRecord = {
       id: `don-${Date.now()}`,
       receiptId,
-      sourcePendingId: pendingId,
+      sourcePendingId: record.id,
       campaignId: record.campaignId,
       campaignName: record.campaignName,
       donorName: record.donorName,
@@ -638,16 +604,22 @@ const donationService = {
     const emailResult = await sendReceiptEmail(donationRecord);
     donationRecord.emailSent = Boolean(emailResult.sent);
 
-    const updatedCampaigns = campaigns.map((entry) => (
-      entry.id === campaign.id
-        ? normalizeCampaign({ ...entry, raised: nextRaised })
-        : entry
-    ));
+    await fetchJson('/api/donations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(donationRecord)
+    });
 
-    writeCampaigns(updatedCampaigns);
-    writeDonations([donationRecord, ...readDonations()]);
-    writePendingDonations(pending.filter((entry) => entry.id !== pendingId));
-    if (readLastPendingDonationId() === pendingId) {
+    const nextRaised = Number(campaign.raised || 0) + confirmedAmount;
+    await fetchJson(`/api/donation-campaigns/${encodeURIComponent(campaign.id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ raised: nextRaised })
+    });
+
+    await fetchJson(`/api/donation-pending/${encodeURIComponent(record.id)}`, { method: 'DELETE' }).catch(() => ({}));
+    pendingCache = pendingCache.filter((entry) => entry.id !== record.id);
+    if (readLastPendingDonationId() === record.id) {
       writeLastPendingDonationId('');
     }
 
@@ -655,13 +627,16 @@ const donationService = {
       success: true,
       receiptId,
       emailSent: donationRecord.emailSent,
-      campaign: updatedCampaigns.find((entry) => entry.id === campaign.id),
+      campaign: normalizeCampaign({ ...campaign, raised: nextRaised }),
       donation: donationRecord
     });
   },
 
   confirmLatestPendingDonation: async ({ gatewayTransactionId = '' } = {}) => {
-    const latestPending = getLatestPendingDonationRecord();
+    let latestPending = donationService.getLatestPendingDonation();
+    if (!latestPending) {
+      latestPending = await readLatestPendingFromServer();
+    }
     if (!latestPending?.id) {
       throw new Error('No pending donation found to verify.');
     }
@@ -675,7 +650,7 @@ const donationService = {
   recordCompletedDonation: async (payload) => {
     const amount = Number(payload.amount || 0);
     const campaignId = Number(payload.campaignId);
-    const campaigns = readCampaigns();
+    const campaigns = await readCampaignsFromServer();
     const campaign = campaigns.find((entry) => Number(entry.id) === campaignId);
 
     if (!campaign) {
@@ -710,20 +685,24 @@ const donationService = {
     const emailResult = await sendReceiptEmail(donationRecord);
     donationRecord.emailSent = Boolean(emailResult.sent);
 
-    const updatedCampaigns = campaigns.map((entry) => (
-      entry.id === campaign.id
-        ? normalizeCampaign({ ...entry, raised: entry.raised + amount })
-        : entry
-    ));
+    await fetchJson('/api/donations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(donationRecord)
+    });
 
-    writeCampaigns(updatedCampaigns);
-    writeDonations([donationRecord, ...readDonations()]);
+    const nextRaised = Number(campaign.raised || 0) + amount;
+    await fetchJson(`/api/donation-campaigns/${encodeURIComponent(campaign.id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ raised: nextRaised })
+    });
 
     return mockResponse({
       success: true,
       receiptId,
       emailSent: donationRecord.emailSent,
-      campaign: updatedCampaigns.find((entry) => entry.id === campaign.id),
+      campaign: normalizeCampaign({ ...campaign, raised: nextRaised }),
       donation: donationRecord
     });
   },

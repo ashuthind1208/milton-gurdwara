@@ -16,9 +16,9 @@ const SikhismPage = () => {
   return (
     <div className="space-y-8">
       <Seo {...meta} />
-      <PageHero title={content?.heroTitle || 'Learn Sikhism'} description={content?.heroDescription || 'Structured learning resources prepared for community education.'} />
-      {content?.intro ? <p className="text-sm leading-relaxed text-slate-700">{content.intro}</p> : null}
+      <PageHero title={content?.heroTitle ?? 'Learn Sikhism'} description={content?.heroDescription ?? 'Structured learning resources prepared for community education.'} />
       {content?.mediaUrl ? <img src={content.mediaUrl} alt="Sikh education" className="h-56 w-full object-cover" loading="lazy" /> : null}
+      {content?.intro ? <p className="text-sm leading-relaxed text-slate-700">{content.intro}</p> : null}
       <div className="grid gap-4 md:grid-cols-3">
         {sections.map((section) => (
           <div key={section.id} className="rounded-xl border border-slate-200 bg-white p-4">

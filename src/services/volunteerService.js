@@ -1,8 +1,9 @@
 import { mockResponse } from './mockApi';
 import userService from './userService';
+import contentApiService from './contentApiService';
 
-const STORAGE_KEY = 'ssm-volunteer-registrations';
-const OPPORTUNITIES_STORAGE_KEY = 'ssm-seva-opportunities';
+const OPPORTUNITIES_RESOURCE = 'seva_opportunities';
+const APPLICATIONS_RESOURCE = 'volunteer_registrations';
 
 const defaultSevaOpportunities = [
   { id: 'op-1', sevaType: 'Langar', date: '2026-07-12', time: '10:00 AM - 1:00 PM', totalVolunteersRequired: 10, expiryDate: '2026-07-11', active: true },
@@ -26,14 +27,7 @@ const normalizeBoolean = (value, fallback = true) => {
   return fallback;
 };
 
-const readRegistrations = () => {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch (error) {
-    return [];
-  }
-};
+const toIsoDate = (value) => new Date(value).toISOString().slice(0, 10);
 
 const normalizeOpportunity = (item, index = 0) => ({
   id: item.id || `op-${index + 1}`,
@@ -45,50 +39,46 @@ const normalizeOpportunity = (item, index = 0) => ({
   active: normalizeBoolean(item.active, true)
 });
 
-const writeRegistrations = (records) => {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-  } catch (error) {
-    // Ignore localStorage write failures in mock mode.
+const ensureDefaultOpportunities = async () => {
+  const rows = await contentApiService.list(OPPORTUNITIES_RESOURCE);
+  if (rows.length > 0) {
+    return rows.map((entry, index) => normalizeOpportunity(entry, index));
   }
+
+  await Promise.all(defaultSevaOpportunities.map((entry, index) => contentApiService.create(OPPORTUNITIES_RESOURCE, normalizeOpportunity(entry, index))));
+  const seeded = await contentApiService.list(OPPORTUNITIES_RESOURCE);
+  return seeded.map((entry, index) => normalizeOpportunity(entry, index));
 };
 
-const readSevaOpportunities = () => {
-  try {
-    const raw = window.localStorage.getItem(OPPORTUNITIES_STORAGE_KEY);
-    const source = raw ? JSON.parse(raw) : defaultSevaOpportunities;
-    return source.map((item, index) => normalizeOpportunity(item, index));
-  } catch {
-    return defaultSevaOpportunities.map((item, index) => normalizeOpportunity(item, index));
-  }
+const readRegistrations = async () => {
+  const rows = await contentApiService.list(APPLICATIONS_RESOURCE);
+  return rows;
 };
-
-const writeSevaOpportunities = (records) => {
-  try {
-    window.localStorage.setItem(OPPORTUNITIES_STORAGE_KEY, JSON.stringify(records));
-  } catch {
-    // Ignore localStorage write failures in mock mode.
-  }
-};
-
-const toIsoDate = (value) => new Date(value).toISOString().slice(0, 10);
 
 const countRegisteredForOpportunity = (opportunity, registrations) => registrations.filter((entry) => (
   entry.opportunityId === opportunity.id ||
   (!entry.opportunityId && (entry.sevaType || entry.area) === opportunity.sevaType && entry.sevaDate === opportunity.date)
 )).length;
 
-const opportunities = [
-  'Langar',
-  'Cleaning',
-  'Parking',
-  'Teaching',
-  'Events'
-];
+const fetchJson = async (url, options = {}) => {
+  const response = await fetch(url, options);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data?.ok === false) {
+    throw new Error(data?.message || `Request failed for ${url}`);
+  }
+  return data;
+};
+
+const opportunities = ['Langar', 'Cleaning', 'Parking', 'Teaching', 'Events'];
 
 const volunteerService = {
   getOpportunities: async () => mockResponse(opportunities),
-  getSevaOpportunities: async () => mockResponse(readSevaOpportunities()),
+
+  getSevaOpportunities: async () => {
+    const rows = await ensureDefaultOpportunities();
+    return mockResponse(rows);
+  },
+
   createSevaOpportunity: async (payload) => {
     const record = normalizeOpportunity({
       id: `op-${Date.now()}`,
@@ -99,25 +89,26 @@ const volunteerService = {
       expiryDate: payload.expiryDate,
       active: normalizeBoolean(payload.active, true)
     });
-    const next = [record, ...readSevaOpportunities()];
-    writeSevaOpportunities(next);
-    return mockResponse(record);
+    const created = await contentApiService.create(OPPORTUNITIES_RESOURCE, record);
+    return mockResponse(normalizeOpportunity(created || record));
   },
+
   updateSevaOpportunity: async (id, payload) => {
-    const next = readSevaOpportunities().map((item) => (
-      item.id === id ? normalizeOpportunity({ ...item, ...payload, id }) : item
-    ));
-    writeSevaOpportunities(next);
-    return mockResponse(next.find((item) => item.id === id));
+    const current = await ensureDefaultOpportunities();
+    const existing = current.find((item) => item.id === id) || { id };
+    const next = normalizeOpportunity({ ...existing, ...payload, id });
+    await contentApiService.update(OPPORTUNITIES_RESOURCE, id, next);
+    return mockResponse(next);
   },
+
   removeSevaOpportunity: async (id) => {
-    const next = readSevaOpportunities().filter((item) => item.id !== id);
-    writeSevaOpportunities(next);
+    await contentApiService.remove(OPPORTUNITIES_RESOURCE, id);
     return mockResponse({ success: true });
   },
+
   apply: async (payload) => {
-    const allRecords = readRegistrations();
-    const allOpportunities = readSevaOpportunities();
+    const allRecords = await readRegistrations();
+    const allOpportunities = await ensureDefaultOpportunities();
     const selectedOpportunity = allOpportunities.find((item) => item.id === payload.opportunityId);
 
     if (!selectedOpportunity) {
@@ -153,8 +144,7 @@ const volunteerService = {
       createdAt: new Date().toISOString()
     };
 
-    allRecords.unshift(record);
-    writeRegistrations(allRecords);
+    await contentApiService.create(APPLICATIONS_RESOURCE, record);
 
     try {
       await userService.upsertUserByEmail({
@@ -173,21 +163,42 @@ const volunteerService = {
 
     return mockResponse({ success: true, payload: record });
   },
-  getApplications: async () => mockResponse(readRegistrations()),
-  updateApplication: async (id, payload) => {
-    const updated = readRegistrations().map((item) => (
-      item.id === id ? { ...item, ...payload } : item
-    ));
-    writeRegistrations(updated);
-    return mockResponse(updated.find((item) => item.id === id));
+
+  getApplications: async () => {
+    const rows = await readRegistrations();
+    return mockResponse(rows);
   },
+
+  updateApplication: async (id, payload) => {
+    const rows = await readRegistrations();
+    const existing = rows.find((item) => item.id === id) || { id };
+    const updated = { ...existing, ...payload, id };
+    await contentApiService.update(APPLICATIONS_RESOURCE, id, updated);
+    return mockResponse(updated);
+  },
+
+  sendOpportunityReminderEmails: async (opportunityId) => {
+    const response = await fetchJson(`/api/volunteer-reminders/opportunity/${encodeURIComponent(opportunityId)}/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    return mockResponse(response.data || {});
+  },
+
+  getOpportunityReminderPreview: async (opportunityId) => {
+    const response = await fetchJson(`/api/volunteer-reminders/opportunity/${encodeURIComponent(opportunityId)}/preview?format=json`);
+    return mockResponse(response.data || {});
+  },
+
   getTodayRegistrations: async () => {
     const today = toIsoDate(Date.now());
-    const records = readRegistrations().filter((item) => item.date === today);
+    const records = (await readRegistrations()).filter((item) => item.date === today);
     return mockResponse(records);
   },
+
   getArchive: async () => {
-    const grouped = readRegistrations().reduce((acc, item) => {
+    const grouped = (await readRegistrations()).reduce((acc, item) => {
       if (!acc[item.date]) {
         acc[item.date] = [];
       }

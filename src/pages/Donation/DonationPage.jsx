@@ -134,12 +134,14 @@ const DonationPage = () => {
 
         <section className="space-y-4">
           {campaigns.map((campaign) => {
-            const progress = campaign.target > 0 ? Math.min((campaign.raised / campaign.target) * 100, 100) : 0;
+            const raised = Number.isFinite(Number(campaign.raised)) ? Math.max(0, Number(campaign.raised)) : 0;
+            const target = Number.isFinite(Number(campaign.target)) ? Math.max(0, Number(campaign.target)) : 0;
+            const progress = target > 0 ? Math.min((raised / target) * 100, 100) : 0;
             return (
               <Card key={campaign.id} className="border border-slate-200 bg-white">
                 <h3 className="font-heading text-lg font-semibold text-slate-900">{campaign.name}</h3>
                 {campaign.description ? <p className="mt-1 text-sm text-slate-600">{campaign.description}</p> : null}
-                <p className="mt-3 text-sm text-slate-700">{formatCurrency(campaign.raised)} raised of {formatCurrency(campaign.target)}</p>
+                <p className="mt-3 text-sm text-slate-700">{formatCurrency(raised)} raised of {formatCurrency(target)}</p>
                 <div className="mt-2 h-2 rounded-full bg-slate-200">
                   <div className="h-2 rounded-full bg-brand-saffron" style={{ width: `${progress}%` }} />
                 </div>

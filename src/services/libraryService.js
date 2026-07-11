@@ -1,6 +1,7 @@
 import { mockResponse } from './mockApi';
+import contentApiService from './contentApiService';
 
-const STORAGE_KEY = 'ssm-library-content';
+const STORAGE_RESOURCE = 'library_content';
 
 const defaultLibraryData = {
   physicalBooks: [
@@ -222,26 +223,23 @@ const normalizeLibraryData = (content = {}) => ({
   mediaResources: (content.mediaResources || defaultLibraryData.mediaResources).map(normalizeMediaResource)
 });
 
-const readLibraryData = () => {
+const readLibraryData = async () => {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return normalizeLibraryData(defaultLibraryData);
+    const payload = await contentApiService.getSingleton(STORAGE_RESOURCE, null);
+    if (!payload) {
+      const seeded = normalizeLibraryData(defaultLibraryData);
+      await contentApiService.setSingleton(STORAGE_RESOURCE, seeded);
+      return seeded;
     }
-
-    return normalizeLibraryData(JSON.parse(raw));
+    return normalizeLibraryData(payload);
   } catch {
     return normalizeLibraryData(defaultLibraryData);
   }
 };
 
-const persistLibraryData = (nextData) => {
+const persistLibraryData = async (nextData) => {
   const normalized = normalizeLibraryData(nextData);
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-  } catch {
-    // Ignore localStorage write errors in mock mode.
-  }
+  await contentApiService.setSingleton(STORAGE_RESOURCE, normalized);
   return normalized;
 };
 
@@ -307,7 +305,7 @@ const fetchOpenLibraryAuthors = async (authors = []) => {
 };
 
 const libraryService = {
-  getLibraryData: async () => mockResponse(readLibraryData()),
+  getLibraryData: async () => mockResponse(await readLibraryData()),
 
   lookupBookByIsbn: async (isbn) => {
     const normalizedIsbn = String(isbn || '').replace(/[^0-9Xx]/g, '').toUpperCase();
@@ -386,7 +384,7 @@ const libraryService = {
   },
 
   addPhysicalBook: async (payload) => {
-    const current = readLibraryData();
+    const current = await readLibraryData();
     const nextData = {
       ...current,
       physicalBooks: [
@@ -400,11 +398,11 @@ const libraryService = {
       ]
     };
 
-    return mockResponse(persistLibraryData(nextData).physicalBooks);
+    return mockResponse((await persistLibraryData(nextData)).physicalBooks);
   },
 
   updatePhysicalBook: async (id, payload) => {
-    const current = readLibraryData();
+    const current = await readLibraryData();
     const nextData = {
       ...current,
       physicalBooks: current.physicalBooks.map((book) => (
@@ -414,21 +412,21 @@ const libraryService = {
       ))
     };
 
-    return mockResponse(persistLibraryData(nextData).physicalBooks);
+    return mockResponse((await persistLibraryData(nextData)).physicalBooks);
   },
 
   removePhysicalBook: async (id) => {
-    const current = readLibraryData();
+    const current = await readLibraryData();
     const nextData = {
       ...current,
       physicalBooks: current.physicalBooks.filter((book) => book.id !== id)
     };
 
-    return mockResponse(persistLibraryData(nextData).physicalBooks);
+    return mockResponse((await persistLibraryData(nextData)).physicalBooks);
   },
 
   addIssueRecord: async (bookId, payload) => {
-    const current = readLibraryData();
+    const current = await readLibraryData();
     const nextData = {
       ...current,
       physicalBooks: current.physicalBooks.map((book) => {
@@ -453,11 +451,11 @@ const libraryService = {
       })
     };
 
-    return mockResponse(persistLibraryData(nextData).physicalBooks);
+    return mockResponse((await persistLibraryData(nextData)).physicalBooks);
   },
 
   markIssueReturned: async (bookId, issueId) => {
-    const current = readLibraryData();
+    const current = await readLibraryData();
     const nextData = {
       ...current,
       physicalBooks: current.physicalBooks.map((book) => {
@@ -479,11 +477,11 @@ const libraryService = {
       })
     };
 
-    return mockResponse(persistLibraryData(nextData).physicalBooks);
+    return mockResponse((await persistLibraryData(nextData)).physicalBooks);
   },
 
   addDigitalResource: async (payload) => {
-    const current = readLibraryData();
+    const current = await readLibraryData();
     const nextData = {
       ...current,
       digitalResources: [
@@ -492,11 +490,11 @@ const libraryService = {
       ]
     };
 
-    return mockResponse(persistLibraryData(nextData).digitalResources);
+    return mockResponse((await persistLibraryData(nextData)).digitalResources);
   },
 
   updateDigitalResource: async (id, payload) => {
-    const current = readLibraryData();
+    const current = await readLibraryData();
     const nextData = {
       ...current,
       digitalResources: current.digitalResources.map((resource) => (
@@ -506,21 +504,21 @@ const libraryService = {
       ))
     };
 
-    return mockResponse(persistLibraryData(nextData).digitalResources);
+    return mockResponse((await persistLibraryData(nextData)).digitalResources);
   },
 
   removeDigitalResource: async (id) => {
-    const current = readLibraryData();
+    const current = await readLibraryData();
     const nextData = {
       ...current,
       digitalResources: current.digitalResources.filter((resource) => resource.id !== id)
     };
 
-    return mockResponse(persistLibraryData(nextData).digitalResources);
+    return mockResponse((await persistLibraryData(nextData)).digitalResources);
   },
 
   addProgramUpdate: async (payload) => {
-    const current = readLibraryData();
+    const current = await readLibraryData();
     const nextData = {
       ...current,
       programUpdates: [
@@ -533,11 +531,11 @@ const libraryService = {
       ]
     };
 
-    return mockResponse(persistLibraryData(nextData).programUpdates);
+    return mockResponse((await persistLibraryData(nextData)).programUpdates);
   },
 
   updateProgramUpdate: async (id, payload) => {
-    const current = readLibraryData();
+    const current = await readLibraryData();
     const nextData = {
       ...current,
       programUpdates: current.programUpdates.map((entry) => (
@@ -552,21 +550,21 @@ const libraryService = {
       ))
     };
 
-    return mockResponse(persistLibraryData(nextData).programUpdates);
+    return mockResponse((await persistLibraryData(nextData)).programUpdates);
   },
 
   removeProgramUpdate: async (id) => {
-    const current = readLibraryData();
+    const current = await readLibraryData();
     const nextData = {
       ...current,
       programUpdates: current.programUpdates.filter((entry) => entry.id !== id)
     };
 
-    return mockResponse(persistLibraryData(nextData).programUpdates);
+    return mockResponse((await persistLibraryData(nextData)).programUpdates);
   },
 
   addMediaResource: async (payload) => {
-    const current = readLibraryData();
+    const current = await readLibraryData();
     const nextData = {
       ...current,
       mediaResources: [
@@ -575,11 +573,11 @@ const libraryService = {
       ]
     };
 
-    return mockResponse(persistLibraryData(nextData).mediaResources);
+    return mockResponse((await persistLibraryData(nextData)).mediaResources);
   },
 
   updateMediaResource: async (id, payload) => {
-    const current = readLibraryData();
+    const current = await readLibraryData();
     const nextData = {
       ...current,
       mediaResources: current.mediaResources.map((entry) => (
@@ -589,17 +587,17 @@ const libraryService = {
       ))
     };
 
-    return mockResponse(persistLibraryData(nextData).mediaResources);
+    return mockResponse((await persistLibraryData(nextData)).mediaResources);
   },
 
   removeMediaResource: async (id) => {
-    const current = readLibraryData();
+    const current = await readLibraryData();
     const nextData = {
       ...current,
       mediaResources: current.mediaResources.filter((entry) => entry.id !== id)
     };
 
-    return mockResponse(persistLibraryData(nextData).mediaResources);
+    return mockResponse((await persistLibraryData(nextData)).mediaResources);
   }
 };
 

@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
-  ArrowTrendingUpIcon,
   BellAlertIcon,
   CalendarDaysIcon,
   CurrencyDollarIcon,
@@ -22,7 +21,6 @@ import {
 import { Bar, Doughnut } from 'react-chartjs-2';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
-import analyticsService from '../../services/analyticsService';
 import eventService from '../../services/eventService';
 import volunteerService from '../../services/volunteerService';
 import userService from '../../services/userService';
@@ -43,6 +41,24 @@ const toDateKey = (value = new Date()) => {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+};
+
+const getExactEventRegistrationCount = (event = {}) => {
+  if (Array.isArray(event.registrants)) {
+    return event.registrants.length;
+  }
+  return 0;
+};
+
+const toValidDateKey = (value) => {
+  if (!value) {
+    return '';
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return '';
+  }
+  return toDateKey(parsed);
 };
 
 const SummaryCard = ({ label, value, sublabel, tone = 'text-slate-900', icon: Icon, href }) => {
@@ -75,8 +91,6 @@ const EmptyState = ({ text }) => <p className="text-sm text-slate-500">{text}</p
 const AdminDashboardPage = () => {
   const todayDateKey = toDateKey(new Date());
 
-  const { data: metrics } = useQuery({ queryKey: ['metrics'], queryFn: () => analyticsService.getMetrics().then((res) => res.data) });
-  const { data: trend = [] } = useQuery({ queryKey: ['trend'], queryFn: () => analyticsService.getTrend().then((res) => res.data) });
   const { data: events = [] } = useQuery({ queryKey: ['events'], queryFn: () => eventService.getEvents().then((res) => res.data) });
   const { data: donations = [] } = useQuery({ queryKey: ['admin-donations'], queryFn: () => donationService.getDonations().then((res) => res.data) });
   const { data: campaigns = [] } = useQuery({ queryKey: ['admin-campaigns'], queryFn: () => donationService.getAllCampaigns().then((res) => res.data) });
@@ -118,6 +132,31 @@ const AdminDashboardPage = () => {
     [donations]
   );
 
+  const exactEventRegistrations = useMemo(
+    () => events.reduce((sum, event) => sum + getExactEventRegistrationCount(event), 0),
+    [events]
+  );
+
+  const activeEventCount = useMemo(
+    () => events.filter((event) => Boolean(event.active)).length,
+    [events]
+  );
+
+  const pendingApprovalsCount = useMemo(
+    () => pendingUsers.length + pendingVolunteers.length,
+    [pendingUsers.length, pendingVolunteers.length]
+  );
+
+  const activeCampaignCount = useMemo(
+    () => campaigns.filter((item) => item.isActive).length,
+    [campaigns]
+  );
+
+  const liveNewsCount = useMemo(
+    () => newsArticles.filter((item) => item.active).length,
+    [newsArticles]
+  );
+
   const roleBreakdown = useMemo(() => {
     const counts = { 'Super Admin': 0, Admin: 0, Member: 0, Volunteer: 0 };
     users.forEach((user) => {
@@ -140,6 +179,43 @@ const AdminDashboardPage = () => {
     return map;
   }, [donations]);
 
+  const operationsTrend = useMemo(() => {
+    const days = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date();
+      date.setDate(date.getDate() - (6 - index));
+      const key = toDateKey(date);
+      const label = date.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+      return { key, label, donationsAmount: 0, registrations: 0 };
+    });
+
+    const dayMap = days.reduce((acc, row) => {
+      acc[row.key] = row;
+      return acc;
+    }, {});
+
+    donations.forEach((donation) => {
+      const createdAt = donation.createdAt || donation.updatedAt || '';
+      const key = toValidDateKey(createdAt);
+      if (!dayMap[key]) {
+        return;
+      }
+      dayMap[key].donationsAmount += Number(donation.amount || 0);
+    });
+
+    events.forEach((event) => {
+      const registrants = Array.isArray(event.registrants) ? event.registrants : [];
+      registrants.forEach((registrant) => {
+        const key = toValidDateKey(registrant.createdAt);
+        if (!dayMap[key]) {
+          return;
+        }
+        dayMap[key].registrations += 1;
+      });
+    });
+
+    return days;
+  }, [donations, events]);
+
   const resolvedScheduleDay = useMemo(() => {
     const scheduleDays = Array.isArray(cmsData?.scheduleDays) ? cmsData.scheduleDays : [];
     return scheduleDays.find((day) => day.dateKey === todayDateKey)
@@ -153,17 +229,17 @@ const AdminDashboardPage = () => {
     : [];
 
   const chartData = {
-    labels: trend.map((item) => item.name),
+    labels: operationsTrend.map((item) => item.label),
     datasets: [
       {
-        label: 'Visitors',
-        data: trend.map((item) => item.visitors),
+        label: 'Event Registrations',
+        data: operationsTrend.map((item) => item.registrations),
         backgroundColor: '#0B4EA2',
         borderRadius: 8
       },
       {
-        label: 'Donations',
-        data: trend.map((item) => item.donations),
+        label: 'Donations Received (CAD)',
+        data: operationsTrend.map((item) => item.donationsAmount),
         backgroundColor: '#F4A300',
         borderRadius: 8
       }
@@ -210,48 +286,50 @@ const AdminDashboardPage = () => {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl border border-slate-200 bg-white/90 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Today&apos;s Schedule</p>
-              <p className="mt-3 font-heading text-3xl font-bold text-slate-900">{todayScheduleCount}</p>
-              <p className="mt-1 text-sm text-slate-500">items active for {resolvedScheduleDay?.dateKey === 'default' ? 'default day' : todayDateKey}</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white/90 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Attention Needed</p>
-              <p className="mt-3 font-heading text-3xl font-bold text-rose-600">{pendingUsers.length + pendingVolunteers.length}</p>
-              <p className="mt-1 text-sm text-slate-500">pending users and volunteer applications</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 sm:col-span-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Live Notes</p>
-              {resolvedScheduleDay?.highlightTitle || resolvedScheduleDay?.highlightNoteEn ? (
-                <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-                  <p className="text-sm font-semibold text-slate-900">{resolvedScheduleDay?.highlightTitle || 'Schedule change noted'}</p>
-                  <p className="mt-1 text-sm text-slate-600">{resolvedScheduleDay?.highlightNoteEn || 'A highlighted daily schedule note is active.'}</p>
+            <div className="sm:col-span-2 rounded-2xl border border-slate-200 bg-white/90 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Operations Snapshot</p>
+              <div className="mt-3 border-y border-slate-200">
+                <div className="grid grid-cols-[1fr_auto] gap-3 py-2 text-sm">
+                  <span className="text-slate-500">Today&apos;s Schedule Items</span>
+                  <span className="font-semibold text-slate-900">{todayScheduleCount}</span>
                 </div>
-              ) : (
-                <p className="mt-3 text-sm text-slate-500">No active special-day note right now.</p>
-              )}
+                <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 text-sm">
+                  <span className="text-slate-500">Attention Needed</span>
+                  <span className="font-semibold text-rose-600">{pendingApprovalsCount}</span>
+                </div>
+                <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 text-sm">
+                  <span className="text-slate-500">Event Registrations</span>
+                  <span className="font-semibold text-slate-900">{exactEventRegistrations}</span>
+                </div>
+                <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 text-sm">
+                  <span className="text-slate-500">Active Events</span>
+                  <span className="font-semibold text-slate-900">{activeEventCount}</span>
+                </div>
+              </div>
+              <p className="mt-3 text-sm text-slate-600">
+                {resolvedScheduleDay?.highlightTitle || resolvedScheduleDay?.highlightNoteEn
+                  ? `${resolvedScheduleDay?.highlightTitle || 'Schedule update'}: ${resolvedScheduleDay?.highlightNoteEn || 'Highlighted daily note is active.'}`
+                  : 'No active special-day note right now.'}
+              </p>
             </div>
           </div>
         </div>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard label="Donation Total" value={formatCurrency(donationTotal || metrics?.donationAmount || 0)} sublabel={`${donations.length} recorded donations`} tone="text-emerald-600" icon={CurrencyDollarIcon} href="/admin/donations" />
+        <SummaryCard label="Donation Total" value={formatCurrency(donationTotal)} sublabel={`${donations.length} recorded donations`} tone="text-emerald-600" icon={CurrencyDollarIcon} href="/admin/donations" />
         <SummaryCard label="People Access" value={users.length} sublabel={`${inactiveUsers.length} inactive accounts`} tone="text-brand-blue" icon={UsersIcon} href="/admin/users" />
         <SummaryCard label="Volunteer Demand" value={volunteerApplications.length} sublabel={`${pendingVolunteers.length} still pending review`} tone="text-amber-600" icon={UserGroupIcon} href="/admin/seva-opportunities" />
-        <SummaryCard label="Upcoming Events" value={upcomingEvents.length} sublabel={`${events.filter((event) => event.active).length} active total`} tone="text-violet-600" icon={CalendarDaysIcon} href="/admin/events" />
+        <SummaryCard label="Upcoming Events" value={upcomingEvents.length} sublabel={`${activeEventCount} active total`} tone="text-violet-600" icon={CalendarDaysIcon} href="/admin/events" />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <Card className="border border-slate-200 bg-white">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Traffic and Giving</p>
-              <h2 className="font-heading text-2xl font-semibold text-slate-900">Weekly movement</h2>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Donations and Registrations</p>
+              <h2 className="font-heading text-2xl font-semibold text-slate-900">Last 7 days (actual records)</h2>
             </div>
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-              <ArrowTrendingUpIcon className="h-3.5 w-3.5" /> Positive weekly trend
-            </span>
           </div>
           <div className="mt-5 h-[320px]">
             <Bar
@@ -292,20 +370,26 @@ const AdminDashboardPage = () => {
           <Card className="border border-slate-200 bg-white">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Quick Queue</p>
             <h2 className="mt-1 font-heading text-xl font-semibold text-slate-900">Pending review</h2>
-            <div className="mt-4 space-y-3">
+            <div className="mt-4 border-y border-slate-200">
               {pendingUsers.length === 0 && pendingVolunteers.length === 0 ? (
-                <EmptyState text="No pending approvals right now." />
+                <div className="py-3"><EmptyState text="No pending approvals right now." /></div>
               ) : null}
               {pendingUsers.slice(0, 3).map((user) => (
-                <div key={user.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                  <p className="text-sm font-semibold text-slate-900">{user.name}</p>
-                  <p className="mt-1 text-xs text-slate-500">{user.email} • {user.role}</p>
+                <div key={user.id} className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 first:border-t-0">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{user.name}</p>
+                    <p className="mt-1 text-xs text-slate-500">{user.email}</p>
+                  </div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{user.role}</p>
                 </div>
               ))}
               {pendingVolunteers.slice(0, 2).map((entry) => (
-                <div key={entry.id} className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3">
-                  <p className="text-sm font-semibold text-slate-900">{entry.name}</p>
-                  <p className="mt-1 text-xs text-slate-500">Volunteer • {entry.sevaType || entry.area}</p>
+                <div key={entry.id} className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 first:border-t-0">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{entry.name}</p>
+                    <p className="mt-1 text-xs text-slate-500">{entry.sevaType || entry.area || 'Volunteer'}</p>
+                  </div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Volunteer</p>
                 </div>
               ))}
             </div>
@@ -349,18 +433,16 @@ const AdminDashboardPage = () => {
             </div>
             <BellAlertIcon className="h-5 w-5 text-slate-400" />
           </div>
-          <div className="mt-4 space-y-3">
+          <div className="mt-4 border-y border-slate-200">
             {latestDonations.length === 0 ? (
-              <EmptyState text="No donations recorded yet." />
+              <div className="py-3"><EmptyState text="No donations recorded yet." /></div>
             ) : latestDonations.map((entry) => (
-              <div key={entry.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">{entry.donorName || 'Anonymous'}</p>
-                    <p className="mt-1 text-xs text-slate-500">{entry.campaignName || 'General Donation'}</p>
-                  </div>
-                  <p className="text-sm font-semibold text-emerald-600">{formatCurrency(entry.amount || 0)}</p>
+              <div key={entry.id} className="grid grid-cols-[1fr_auto] items-center gap-3 border-t border-slate-200 py-2 first:border-t-0">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">{entry.donorName || 'Anonymous'}</p>
+                  <p className="mt-1 text-xs text-slate-500">{entry.campaignName || 'General Donation'}</p>
                 </div>
+                <p className="text-sm font-semibold text-emerald-600">{formatCurrency(entry.amount || 0)}</p>
               </div>
             ))}
           </div>
@@ -374,21 +456,18 @@ const AdminDashboardPage = () => {
             </div>
             <SparklesIcon className="h-5 w-5 text-slate-400" />
           </div>
-          <div className="mt-4 space-y-3">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-              <p className="text-xs uppercase tracking-wide text-slate-400">News Articles</p>
-              <p className="mt-1 text-2xl font-bold text-slate-900">{newsArticles.length}</p>
-              <p className="text-sm text-slate-500">{newsArticles.filter((item) => item.active).length} live right now</p>
+          <div className="mt-4 border-y border-slate-200">
+            <div className="grid grid-cols-[1fr_auto] gap-3 py-2 text-sm">
+              <span className="text-slate-500">News Articles Live / Total</span>
+              <span className="font-semibold text-slate-900">{liveNewsCount} / {newsArticles.length}</span>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-              <p className="text-xs uppercase tracking-wide text-slate-400">Active Campaigns</p>
-              <p className="mt-1 text-2xl font-bold text-slate-900">{campaigns.filter((item) => item.isActive).length}</p>
-              <p className="text-sm text-slate-500">{campaigns.length} total campaigns configured</p>
+            <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 text-sm">
+              <span className="text-slate-500">Active Campaigns / Total</span>
+              <span className="font-semibold text-slate-900">{activeCampaignCount} / {campaigns.length}</span>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-              <p className="text-xs uppercase tracking-wide text-slate-400">Highlighted Schedule Items</p>
-              <p className="mt-1 text-2xl font-bold text-slate-900">{highlightedScheduleItems.length}</p>
-              <p className="text-sm text-slate-500">special notes or one-off changes visible on homepage</p>
+            <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 text-sm">
+              <span className="text-slate-500">Highlighted Schedule Items</span>
+              <span className="font-semibold text-slate-900">{highlightedScheduleItems.length}</span>
             </div>
           </div>
         </Card>
@@ -403,18 +482,16 @@ const AdminDashboardPage = () => {
             </div>
             <Link to="/admin/events" className="text-sm font-semibold text-brand-blue hover:underline">Manage events</Link>
           </div>
-          <div className="mt-4 space-y-3">
+          <div className="mt-4 border-y border-slate-200">
             {upcomingEvents.length === 0 ? (
-              <EmptyState text="No upcoming events available." />
+              <div className="py-3"><EmptyState text="No upcoming events available." /></div>
             ) : upcomingEvents.map((event) => (
-              <div key={event.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">{event.title}</p>
-                    <p className="mt-1 text-xs text-slate-500">{new Date(event.date).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })} • {event.location}</p>
-                  </div>
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">{event.registrations || 0} registrations</span>
+              <div key={event.id} className="grid grid-cols-[1fr_auto] items-center gap-3 border-t border-slate-200 py-2 first:border-t-0">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">{event.title}</p>
+                  <p className="mt-1 text-xs text-slate-500">{new Date(event.date).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })} • {event.location}</p>
                 </div>
+                <span className="text-xs font-semibold text-slate-600">{getExactEventRegistrationCount(event)} registrations</span>
               </div>
             ))}
           </div>
@@ -422,23 +499,39 @@ const AdminDashboardPage = () => {
 
         <Card className="border border-slate-200 bg-white">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Operational Snapshot</p>
-          <h2 className="mt-1 font-heading text-xl font-semibold text-slate-900">Today at a glance</h2>
-          <div className="mt-4 space-y-3">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs uppercase tracking-wide text-slate-400">Visitors Today</p>
-              <p className="mt-1 text-2xl font-bold text-slate-900">{metrics?.visitorsToday || 0}</p>
+          <h2 className="mt-1 font-heading text-xl font-semibold text-slate-900">Live backend values</h2>
+          <div className="mt-4 border-y border-slate-200">
+            <div className="grid grid-cols-[1fr_auto] gap-3 py-2 text-sm">
+              <span className="text-slate-500">Event Registrations</span>
+              <span className="font-semibold text-slate-900">{exactEventRegistrations}</span>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs uppercase tracking-wide text-slate-400">Event Registrations</p>
-              <p className="mt-1 text-2xl font-bold text-slate-900">{metrics?.eventRegistrations || 0}</p>
+            <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 text-sm">
+              <span className="text-slate-500">Donations Received</span>
+              <span className="font-semibold text-slate-900">{formatCurrency(donationTotal)}</span>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs uppercase tracking-wide text-slate-400">Volunteer Metric</p>
-              <p className="mt-1 text-2xl font-bold text-slate-900">{metrics?.volunteers || volunteerApplications.length}</p>
+            <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 text-sm">
+              <span className="text-slate-500">Donation Records</span>
+              <span className="font-semibold text-slate-900">{donations.length}</span>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs uppercase tracking-wide text-slate-400">Avg Session</p>
-              <p className="mt-1 text-2xl font-bold text-slate-900">{metrics?.avgSession || '-'}</p>
+            <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 text-sm">
+              <span className="text-slate-500">Volunteer Applications</span>
+              <span className="font-semibold text-slate-900">{volunteerApplications.length}</span>
+            </div>
+            <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 text-sm">
+              <span className="text-slate-500">Pending Approvals</span>
+              <span className="font-semibold text-slate-900">{pendingApprovalsCount}</span>
+            </div>
+            <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 text-sm">
+              <span className="text-slate-500">Active Events</span>
+              <span className="font-semibold text-slate-900">{activeEventCount}</span>
+            </div>
+            <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 text-sm">
+              <span className="text-slate-500">Active Campaigns</span>
+              <span className="font-semibold text-slate-900">{activeCampaignCount}</span>
+            </div>
+            <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 text-sm">
+              <span className="text-slate-500">Live News Articles</span>
+              <span className="font-semibold text-slate-900">{liveNewsCount}</span>
             </div>
           </div>
         </Card>

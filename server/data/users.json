@@ -14,7 +14,7 @@
     "approvalStatus": "approved",
     "approvalUpdatedAt": "2026-07-09T19:23:30.367Z",
     "createdAt": "2026-07-09T19:22:43.905Z",
-    "updatedAt": "2026-07-09T19:38:20.209Z"
+    "updatedAt": "2026-07-10T00:59:16.970Z"
   },
   {
     "id": "user-1783624452454",
@@ -31,7 +31,7 @@
     "approvalStatus": "approved",
     "approvalUpdatedAt": "",
     "createdAt": "2026-07-09T19:14:12.454Z",
-    "updatedAt": "2026-07-09T19:38:20.209Z"
+    "updatedAt": "2026-07-10T00:59:16.970Z"
   },
   {
     "id": "user-1783624435729",
@@ -46,9 +46,9 @@
     "registrationComplete": true,
     "isActive": true,
     "approvalStatus": "approved",
-    "approvalUpdatedAt": "2026-07-09T19:14:32.955Z",
+    "approvalUpdatedAt": "",
     "createdAt": "2026-07-09T19:13:55.729Z",
-    "updatedAt": "2026-07-09T19:38:20.209Z"
+    "updatedAt": "2026-07-10T00:59:16.970Z"
   },
   {
     "id": "user-1",
@@ -65,6 +65,6 @@
     "approvalStatus": "approved",
     "approvalUpdatedAt": "",
     "createdAt": "2026-07-09T19:07:23.202Z",
-    "updatedAt": "2026-07-09T19:38:20.209Z"
+    "updatedAt": "2026-07-10T00:59:16.970Z"
   }
 ]

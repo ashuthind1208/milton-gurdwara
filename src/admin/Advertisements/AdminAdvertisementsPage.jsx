@@ -5,6 +5,8 @@ import { EyeIcon, PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outlin
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import advertisementService, { AD_PLACEMENT_OPTIONS } from '../../services/advertisementService';
+import uploadService from '../../services/uploadService';
+import StatusAlert from '../../components/common/StatusAlert';
 
 const placementOptions = AD_PLACEMENT_OPTIONS;
 
@@ -49,6 +51,9 @@ const AdminAdvertisementsPage = () => {
   const form = useForm({
     defaultValues: emptyFormValues
   });
+  const [uploadingField, setUploadingField] = useState('');
+  const [uploadProgress, setUploadProgress] = useState({ imageUrl: 0, bannerUrl: 0 });
+  const [uploadStatus, setUploadStatus] = useState({ type: 'success', message: '' });
 
   const { data: ads = [] } = useQuery({
     queryKey: ['advertisements'],
@@ -106,6 +111,36 @@ const AdminAdvertisementsPage = () => {
 
   const closeModal = () => {
     setModalState({ open: false, mode: 'create', adId: null });
+  };
+
+  const uploadAndSetField = async (fieldName, file) => {
+    if (!file) {
+      return;
+    }
+
+    try {
+      setUploadingField(fieldName);
+      setUploadProgress((prev) => ({ ...prev, [fieldName]: 0 }));
+      const uploaded = await uploadService.uploadFile({
+        service: 'advertisements',
+        file,
+        allowedMimeTypes: ['image/*'],
+        maxSizeMB: 15,
+        onProgress: (percent) => setUploadProgress((prev) => ({ ...prev, [fieldName]: percent }))
+      });
+      const nextUrl = uploaded?.url || '';
+      if (!nextUrl) {
+        throw new Error('Upload did not return a file URL.');
+      }
+
+      form.setValue(fieldName, nextUrl, { shouldDirty: true, shouldValidate: true });
+      setUploadStatus({ type: 'success', message: 'File uploaded successfully.' });
+    } catch (error) {
+      setUploadStatus({ type: 'error', message: error.message || 'Unable to upload file.' });
+    } finally {
+      setUploadingField('');
+      setUploadProgress((prev) => ({ ...prev, [fieldName]: 0 }));
+    }
   };
 
   const onSubmit = (values) => {
@@ -183,6 +218,9 @@ const AdminAdvertisementsPage = () => {
             </div>
 
             <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={form.handleSubmit(onSubmit)}>
+              <div className="md:col-span-2">
+                <StatusAlert type={uploadStatus.type} message={uploadStatus.message} />
+              </div>
               <label className="text-sm">Advertiser Name
                 <input disabled={isViewMode} {...form.register('title', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
               </label>
@@ -206,9 +244,41 @@ const AdminAdvertisementsPage = () => {
               </label>
               <label className="text-sm">Image URL
                 <input disabled={isViewMode} {...form.register('imageUrl')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
+                {!isViewMode ? (
+                  <>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="mt-2 block w-full text-xs"
+                      onChange={(event) => uploadAndSetField('imageUrl', event.target.files?.[0])}
+                    />
+                    <p className="mt-1 text-xs text-slate-500">{uploadingField === 'imageUrl' ? `Uploading image... ${uploadProgress.imageUrl}%` : 'Paste URL or upload image file (max 15MB).'}</p>
+                    {uploadingField === 'imageUrl' ? (
+                      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                        <div className="h-full bg-brand-blue transition-all" style={{ width: `${uploadProgress.imageUrl}%` }} />
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
               </label>
               <label className="text-sm">Banner URL
                 <input disabled={isViewMode} {...form.register('bannerUrl')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
+                {!isViewMode ? (
+                  <>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="mt-2 block w-full text-xs"
+                      onChange={(event) => uploadAndSetField('bannerUrl', event.target.files?.[0])}
+                    />
+                    <p className="mt-1 text-xs text-slate-500">{uploadingField === 'bannerUrl' ? `Uploading banner... ${uploadProgress.bannerUrl}%` : 'Paste URL or upload banner file (max 15MB).'}</p>
+                    {uploadingField === 'bannerUrl' ? (
+                      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                        <div className="h-full bg-brand-blue transition-all" style={{ width: `${uploadProgress.bannerUrl}%` }} />
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
               </label>
               <label className="text-sm md:col-span-2 flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2">
                 <input type="checkbox" disabled={isViewMode} {...form.register('active')} />

@@ -25,7 +25,8 @@ const ContactPage = () => {
   return (
     <div className="space-y-8">
       <Seo {...meta} />
-      <PageHero title={content?.heroTitle || 'Contact Us'} description={content?.heroDescription || 'Reach the Gurdwara team for inquiries, directions, or support.'} />
+      <PageHero title={content?.heroTitle ?? 'Contact Us'} description={content?.heroDescription ?? 'Reach the Gurdwara team for inquiries, directions, or support.'} />
+      {content?.mediaUrl ? <img src={content.mediaUrl} alt="Contact media" className="h-56 w-full rounded-xl object-cover" loading="lazy" /> : null}
       {content?.intro ? <p className="rounded-xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-700">{content.intro}</p> : null}
       <div className="grid gap-6 lg:grid-cols-2">
         <section>
@@ -43,7 +44,6 @@ const ContactPage = () => {
             />
           </div>
           <a href={mapOpenLink} target="_blank" rel="noreferrer" className="mt-3 inline-block rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-brand-blue">Open in Google Maps</a>
-          {content?.mediaUrl ? <img src={content.mediaUrl} alt="Contact media" className="mt-4 h-52 w-full rounded-xl object-cover" loading="lazy" /> : null}
         </section>
         <section className="rounded-xl border border-slate-200 bg-white p-4">
           <ContactForm onSubmit={onSubmit} />

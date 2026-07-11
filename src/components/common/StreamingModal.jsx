@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CheckCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon, SpeakerWaveIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { getStreamingEmbedUrl, resolveStreamingLive } from '../../services/streamingService';
 import { getYouTubeEmbedUrl } from '../../services/videoService';
 import gurdwaraLogo from '../../assets/gurdwara-logo.webp';
@@ -18,6 +18,22 @@ const sendYouTubeCommand = (iframe, func, args = []) => {
     }),
     '*'
   );
+};
+
+const isLikelyMobileDevice = () => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const ua = typeof navigator !== 'undefined' ? String(navigator.userAgent || '') : '';
+  const compactViewport = window.matchMedia('(max-width: 1024px)').matches;
+  return /android|iphone|ipad|ipod|mobile/i.test(ua) || compactViewport;
+};
+
+const startPlaybackWithVolume = (iframe, volume = 50) => {
+  sendYouTubeCommand(iframe, 'setVolume', [volume]);
+  sendYouTubeCommand(iframe, 'unMute');
+  sendYouTubeCommand(iframe, 'playVideo');
 };
 
 const isYouTubeSource = (value = '') => /youtube\.com|youtu\.be|^@|\bUC[A-Za-z0-9_-]{20,}\b/i.test(String(value || '').trim());
@@ -55,6 +71,8 @@ const isDirectYouTubeVideoSource = (value = '') => {
 const StreamingModal = ({ open, streams = [], initialStreamId = '', onClose }) => {
   const [resolvedLiveEmbed, setResolvedLiveEmbed] = useState('');
   const [isResolvingLive, setIsResolvingLive] = useState(false);
+  const [mobileSoundEnabled, setMobileSoundEnabled] = useState(false);
+  const [streamFrameNode, setStreamFrameNode] = useState(null);
 
   const streamItems = useMemo(() => {
     const rawItems = Array.isArray(streams) ? streams : [];
@@ -78,6 +96,7 @@ const StreamingModal = ({ open, streams = [], initialStreamId = '', onClose }) =
     let mounted = true;
     setResolvedLiveEmbed('');
     setIsResolvingLive(false);
+    setMobileSoundEnabled(false);
 
     const source = String(selectedStream?.streamUrl || '').trim();
     if (!source) {
@@ -152,10 +171,23 @@ const StreamingModal = ({ open, streams = [], initialStreamId = '', onClose }) =
     ? parsedYouTubeEmbedUrl
     : '';
   const resolvedEmbedUrl = resolvedLiveEmbed || directEmbedUrl || channelFallbackEmbed;
+  const mobileDevice = isLikelyMobileDevice();
+  const autoplayParams = mobileDevice
+    ? 'autoplay=1&playsinline=1&mute=1&muted=1&enablejsapi=1'
+    : 'autoplay=1&playsinline=1&enablejsapi=1';
   const canPlay = Boolean(
     selectedStream?.active
     && (channelLikeSource ? (resolvedLiveEmbed || channelFallbackEmbed) : resolvedEmbedUrl)
   );
+
+  const enableMobileSound = () => {
+    if (!streamFrameNode) {
+      return;
+    }
+    startPlaybackWithVolume(streamFrameNode, 50);
+    window.setTimeout(() => startPlaybackWithVolume(streamFrameNode, 50), 150);
+    setMobileSoundEnabled(true);
+  };
 
   return createPortal(
     <div
@@ -185,37 +217,58 @@ const StreamingModal = ({ open, streams = [], initialStreamId = '', onClose }) =
                   <h3 className="mt-1 text-xl font-bold text-slate-900">{selectedStream?.title || 'Live Stream'}</h3>
                   <p className="mt-1 text-sm text-slate-600">{selectedStream?.text || 'Playing now in popup'}</p>
                 </div>
-                <div className="flex flex-wrap items-center justify-end gap-2 pr-12 text-xs">
-                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold ${selectedStream?.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
+                <div className="flex items-center justify-start gap-2 pr-12 text-xs">
+                  <span className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 font-semibold ${selectedStream?.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
                     <CheckCircleIcon className="h-4 w-4" />
                     {selectedStream?.active ? 'Active' : 'Inactive'}
                   </span>
+                  {mobileDevice && canPlay && !mobileSoundEnabled ? (
+                    <button
+                      type="button"
+                      onClick={enableMobileSound}
+                      className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 font-semibold text-amber-800 transition hover:bg-amber-100"
+                    >
+                      <SpeakerWaveIcon className="h-4 w-4" />
+                      Tap for 50% sound
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </div>
             <div className="bg-slate-950">
-              <div className="aspect-video w-full">
+              <div className="relative aspect-video w-full">
                 {canPlay ? (
-                  <iframe
-                    className="h-full w-full"
-                      src={`${resolvedEmbedUrl}${resolvedEmbedUrl.includes('?') ? '&' : '?'}autoplay=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`}
-                    title={selectedStream?.title || 'Live stream'}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowFullScreen
-                    ref={(iframe) => {
-                      if (!iframe) {
-                        return;
-                      }
+                  <>
+                    <iframe
+                      className="h-full w-full"
+                      src={`${resolvedEmbedUrl}${resolvedEmbedUrl.includes('?') ? '&' : '?'}${autoplayParams}&origin=${encodeURIComponent(window.location.origin)}`}
+                      title={selectedStream?.title || 'Live stream'}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                      ref={(iframe) => {
+                        setStreamFrameNode(iframe || null);
+                        if (!iframe) {
+                          return;
+                        }
 
-                      const onLoad = () => {
-                        sendYouTubeCommand(iframe, 'unMute');
-                        sendYouTubeCommand(iframe, 'setVolume', [50]);
-                        sendYouTubeCommand(iframe, 'playVideo');
-                      };
+                        const onLoad = () => {
+                          if (mobileDevice) {
+                            sendYouTubeCommand(iframe, 'mute');
+                            sendYouTubeCommand(iframe, 'playVideo');
+                            return;
+                          }
 
-                      iframe.addEventListener('load', onLoad, { once: true });
-                    }}
-                  />
+                          startPlaybackWithVolume(iframe, 50);
+
+                          window.setTimeout(() => startPlaybackWithVolume(iframe, 50), 250);
+                          window.setTimeout(() => startPlaybackWithVolume(iframe, 50), 1000);
+                        };
+
+                        iframe.addEventListener('load', onLoad, { once: true });
+                      }}
+                    />
+
+                  </>
                 ) : (
                   <div className="flex h-full items-center justify-center px-6 text-center text-white">
                     <div>

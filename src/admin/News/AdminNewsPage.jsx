@@ -12,6 +12,8 @@ import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import newsService from '../../services/newsService';
 import { formatDate } from '../../utils/formatters';
+import uploadService from '../../services/uploadService';
+import StatusAlert from '../../components/common/StatusAlert';
 
 const actionIconClass = 'h-4 w-4';
 
@@ -37,11 +39,24 @@ const normalizeFormValues = (values) => ({
   active: Boolean(values.active)
 });
 
+const appendUrlLine = (existingValue, nextUrl) => {
+  const current = String(existingValue || '').trim();
+  if (!current) {
+    return nextUrl;
+  }
+  return `${current}\n${nextUrl}`;
+};
+
 const AdminNewsPage = () => {
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [viewArticle, setViewArticle] = useState(null);
   const [editingArticle, setEditingArticle] = useState(null);
+  const [createUploadState, setCreateUploadState] = useState('');
+  const [editUploadState, setEditUploadState] = useState('');
+  const [createUploadProgress, setCreateUploadProgress] = useState({ links: 0, imageLinks: 0 });
+  const [editUploadProgress, setEditUploadProgress] = useState({ links: 0, imageLinks: 0 });
+  const [uploadStatus, setUploadStatus] = useState({ type: 'success', message: '' });
 
   const createForm = useForm({ defaultValues: defaultFormValues });
   const editForm = useForm({ defaultValues: defaultFormValues });
@@ -98,6 +113,62 @@ const AdminNewsPage = () => {
     setCreateOpen(false);
     setViewArticle(null);
     setEditingArticle(null);
+  };
+
+  const uploadNewsFile = async ({ file, mode, targetField }) => {
+    if (!file) {
+      return;
+    }
+
+    try {
+      if (mode === 'create') {
+        setCreateUploadState(targetField);
+        setCreateUploadProgress((prev) => ({ ...prev, [targetField]: 0 }));
+      } else {
+        setEditUploadState(targetField);
+        setEditUploadProgress((prev) => ({ ...prev, [targetField]: 0 }));
+      }
+
+      const uploaded = await uploadService.uploadFile({
+        service: 'news',
+        file,
+        allowedMimeTypes: targetField === 'imageLinks'
+          ? ['image/*']
+          : ['image/*', 'video/*', 'application/pdf', 'text/plain'],
+        maxSizeMB: 15,
+        onProgress: (percent) => {
+          if (mode === 'create') {
+            setCreateUploadProgress((prev) => ({ ...prev, [targetField]: percent }));
+            return;
+          }
+
+          setEditUploadProgress((prev) => ({ ...prev, [targetField]: percent }));
+        }
+      });
+      const nextUrl = uploaded?.url || '';
+      if (!nextUrl) {
+        throw new Error('Upload did not return a file URL.');
+      }
+
+      if (mode === 'create') {
+        const existing = createForm.getValues(targetField) || '';
+        createForm.setValue(targetField, appendUrlLine(existing, nextUrl), { shouldDirty: true, shouldValidate: true });
+      } else {
+        const existing = editForm.getValues(targetField) || '';
+        editForm.setValue(targetField, appendUrlLine(existing, nextUrl), { shouldDirty: true, shouldValidate: true });
+      }
+      setUploadStatus({ type: 'success', message: 'File uploaded successfully.' });
+    } catch (error) {
+      setUploadStatus({ type: 'error', message: error.message || 'Unable to upload file.' });
+    } finally {
+      if (mode === 'create') {
+        setCreateUploadState('');
+        setCreateUploadProgress((prev) => ({ ...prev, [targetField]: 0 }));
+      } else {
+        setEditUploadState('');
+        setEditUploadProgress((prev) => ({ ...prev, [targetField]: 0 }));
+      }
+    }
   };
 
   return (
@@ -193,6 +264,9 @@ const AdminNewsPage = () => {
               <button type="button" onClick={closeModals} className="rounded-md border border-slate-300 px-2 py-1 text-sm">Close</button>
             </div>
             <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={createForm.handleSubmit((values) => createMutation.mutate(values))}>
+              <div className="md:col-span-2">
+                <StatusAlert type={uploadStatus.type} message={uploadStatus.message} />
+              </div>
               <label className="text-sm md:col-span-2">Heading
                 <input {...createForm.register('heading', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
@@ -207,9 +281,33 @@ const AdminNewsPage = () => {
               </label>
               <label className="text-sm md:col-span-2">Links (one per line or comma-separated)
                 <textarea rows={3} {...createForm.register('links')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <input
+                  type="file"
+                  accept="image/*,video/*,application/pdf,text/plain"
+                  className="mt-2 block w-full text-xs"
+                  onChange={(event) => uploadNewsFile({ file: event.target.files?.[0], mode: 'create', targetField: 'links' })}
+                />
+                <p className="mt-1 text-xs text-slate-500">{createUploadState === 'links' ? `Uploading file... ${createUploadProgress.links}%` : 'Upload a file to append its URL here (image/video/pdf/txt, max 15MB), or paste links manually.'}</p>
+                {createUploadState === 'links' ? (
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                    <div className="h-full bg-brand-blue transition-all" style={{ width: `${createUploadProgress.links}%` }} />
+                  </div>
+                ) : null}
               </label>
               <label className="text-sm md:col-span-2">Image Links (one per line or comma-separated)
                 <textarea rows={3} {...createForm.register('imageLinks')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="mt-2 block w-full text-xs"
+                  onChange={(event) => uploadNewsFile({ file: event.target.files?.[0], mode: 'create', targetField: 'imageLinks' })}
+                />
+                <p className="mt-1 text-xs text-slate-500">{createUploadState === 'imageLinks' ? `Uploading image... ${createUploadProgress.imageLinks}%` : 'Upload an image to append its URL here (max 15MB), or paste image URLs manually.'}</p>
+                {createUploadState === 'imageLinks' ? (
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                    <div className="h-full bg-brand-blue transition-all" style={{ width: `${createUploadProgress.imageLinks}%` }} />
+                  </div>
+                ) : null}
               </label>
               <label className="text-sm md:col-span-2 flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2">
                 <input type="checkbox" {...createForm.register('active')} />
@@ -258,6 +356,9 @@ const AdminNewsPage = () => {
               <button type="button" onClick={closeModals} className="rounded-md border border-slate-300 px-2 py-1 text-sm">Close</button>
             </div>
             <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={editForm.handleSubmit((values) => updateMutation.mutate({ id: editingArticle.id, values }))}>
+              <div className="md:col-span-2">
+                <StatusAlert type={uploadStatus.type} message={uploadStatus.message} />
+              </div>
               <label className="text-sm md:col-span-2">Heading
                 <input {...editForm.register('heading', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
@@ -272,9 +373,33 @@ const AdminNewsPage = () => {
               </label>
               <label className="text-sm md:col-span-2">Links (one per line or comma-separated)
                 <textarea rows={3} {...editForm.register('links')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <input
+                  type="file"
+                  accept="image/*,video/*,application/pdf,text/plain"
+                  className="mt-2 block w-full text-xs"
+                  onChange={(event) => uploadNewsFile({ file: event.target.files?.[0], mode: 'edit', targetField: 'links' })}
+                />
+                <p className="mt-1 text-xs text-slate-500">{editUploadState === 'links' ? `Uploading file... ${editUploadProgress.links}%` : 'Upload a file to append its URL here (image/video/pdf/txt, max 15MB), or paste links manually.'}</p>
+                {editUploadState === 'links' ? (
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                    <div className="h-full bg-brand-blue transition-all" style={{ width: `${editUploadProgress.links}%` }} />
+                  </div>
+                ) : null}
               </label>
               <label className="text-sm md:col-span-2">Image Links (one per line or comma-separated)
                 <textarea rows={3} {...editForm.register('imageLinks')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="mt-2 block w-full text-xs"
+                  onChange={(event) => uploadNewsFile({ file: event.target.files?.[0], mode: 'edit', targetField: 'imageLinks' })}
+                />
+                <p className="mt-1 text-xs text-slate-500">{editUploadState === 'imageLinks' ? `Uploading image... ${editUploadProgress.imageLinks}%` : 'Upload an image to append its URL here (max 15MB), or paste image URLs manually.'}</p>
+                {editUploadState === 'imageLinks' ? (
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                    <div className="h-full bg-brand-blue transition-all" style={{ width: `${editUploadProgress.imageLinks}%` }} />
+                  </div>
+                ) : null}
               </label>
               <label className="text-sm md:col-span-2 flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2">
                 <input type="checkbox" {...editForm.register('active')} />

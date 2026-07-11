@@ -84,7 +84,6 @@ const resolveScheduleStartMinutes = (timeEn) => {
 };
 
 const HomePage = () => {
-  const DAILY_MUKHWAK_AUDIO = 'https://hs.sgpc.net/uploadhukamnama/hukamnama.mp3';
   const navigate = useNavigate();
   const meta = useSeoMeta('Home', 'Daily hukamnama, events, seva, donations, and Sikh education for the sangat.');
   const { data: events = [] } = useQuery({ queryKey: ['events'], queryFn: () => eventService.getEvents().then((res) => res.data) });
@@ -157,6 +156,13 @@ const HomePage = () => {
   const hukamnamaLines = activeHukamnama?.lines || [];
   const hukamnamaMeta = activeHukamnama?.metadata || {};
   const volunteerOptions = ['Langar', 'Cleaning', 'Parking', 'Teaching', 'Events'];
+  const readAlongConfig = useMemo(() => hukamnamaService.getReadAlongConfig(), []);
+  const homeHukamnamaAng = Math.max(1, Number(activeHukamnama?.ang || 0));
+  const { data: homeReadAlongAudio, isFetching: homeReadAlongLoading } = useQuery({
+    queryKey: ['home-hukamnama-read-along', homeHukamnamaAng],
+    queryFn: () => hukamnamaService.getReadAlongAudioUrl(homeHukamnamaAng).then((res) => res.data),
+    enabled: homeHukamnamaAng > 0 && readAlongConfig.enabled
+  });
 
   const featuredAlbum = albums[0];
   const globalBannerAds = ads.filter((ad) => ad.active && ad.placement === 'Global Banner').slice(0, 2);
@@ -235,19 +241,14 @@ const HomePage = () => {
     setSelectedContentLink(previewMap[path] || null);
   };
 
-  const hukamnamaMetaItems = selectedContentLink?.type === 'hukamnama'
-    ? [
-        activeHukamnama?.ang ? `Ang ${activeHukamnama.ang}` : '',
-        activeHukamnama?.updatedAt ? `Date: ${new Date(activeHukamnama.updatedAt).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' })}` : '',
-        activeHukamnama?.slot ? `Slot: ${activeHukamnama.slot}` : '',
-        selectedContentLink.metadata?.source ? `Source: ${selectedContentLink.metadata.source}` : '',
-        selectedContentLink.metadata?.sourcePunjabi ? `${selectedContentLink.metadata.sourcePunjabi}` : '',
-        selectedContentLink.metadata?.raag ? `Raag: ${selectedContentLink.metadata.raag}` : '',
-        selectedContentLink.metadata?.writer ? `Writer: ${selectedContentLink.metadata.writer}` : '',
-        selectedContentLink.metadata?.totalLines ? `Lines: ${selectedContentLink.metadata.totalLines}` : '',
-        selectedContentLink.items?.length ? `Displayed: ${selectedContentLink.items.length} lines` : ''
-      ].filter(Boolean)
-    : [];
+  const modalHukamnamaAng = selectedContentLink?.type === 'hukamnama'
+    ? Math.max(1, Number(activeHukamnama?.ang || 1))
+    : 0;
+  const { data: hukamnamaReadAlong, isFetching: readAlongLoading } = useQuery({
+    queryKey: ['hukamnama-read-along', modalHukamnamaAng],
+    queryFn: () => hukamnamaService.getReadAlongAudioUrl(modalHukamnamaAng).then((res) => res.data),
+    enabled: modalHukamnamaAng > 0 && readAlongConfig.enabled
+  });
 
   return (
     <div className="space-y-3">
@@ -320,25 +321,22 @@ const HomePage = () => {
                   </div>
                 </div>
                 <div className="w-full sm:w-[260px] sm:flex-shrink-0">
-                  <AudioPillPlayer
-                    label="Daily Mukhwak"
-                    subtitle="Sri Darbar Sahib audio"
-                    src={activeHukamnama?.audioUrl || DAILY_MUKHWAK_AUDIO}
-                  />
+                  {homeReadAlongAudio?.url ? (
+                    <AudioPillPlayer
+                      label="Singh Sabha Milton"
+                      subtitle={`${hukamnamaSlot} | Ang ${homeHukamnamaAng}`}
+                      src={homeReadAlongAudio.url}
+                    />
+                  ) : (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                      {!readAlongConfig.enabled
+                        ? 'Read along audio is currently disabled.'
+                        : (homeReadAlongLoading ? 'Loading read along audio...' : `Read along audio is unavailable for Ang ${homeHukamnamaAng}.`)}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="mt-3 h-px w-full bg-slate-200" />
-              {hukamnamaMetaItems.length > 0 ? (
-                <section className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-2 py-2">
-                  <div className="flex flex-wrap gap-2">
-                    {hukamnamaMetaItems.map((meta, metaIndex) => (
-                      <p key={`home-meta-${metaIndex}`} className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">
-                        {meta}
-                      </p>
-                    ))}
-                  </div>
-                </section>
-              ) : null}
               <div className="space-y-3 pt-4">
                 {(hukamnamaLines.slice(0, 4)).map((line) => (
                   <div key={line.id}>
@@ -436,7 +434,7 @@ const HomePage = () => {
                   onClick={() => navigate('/gallery', { state: { openAlbumId: featuredAlbum.id } })}
                   className="mt-2 w-full overflow-hidden rounded-lg"
                 >
-                  <img src={featuredAlbum.cover} alt={featuredAlbum.title} className="h-36 w-full object-cover" loading="lazy" />
+                  <img src={featuredAlbum.frontImage || featuredAlbum.coverUrl || featuredAlbum.coverImage || featuredAlbum.cover || ''} alt={featuredAlbum.title} className="h-36 w-full object-cover" loading="lazy" />
                 </button>
                 <h3 className="mt-2 font-heading text-lg font-semibold">{featuredAlbum.title}</h3>
                 <div className="mt-1 flex justify-end">
@@ -495,31 +493,59 @@ const HomePage = () => {
 
       {selectedContentLink ? (
         <div className="fixed inset-0 z-[75] flex items-center justify-center bg-slate-900/45 px-3 py-4 sm:px-4">
-          <div className="w-full max-w-2xl rounded-xl bg-white p-4 shadow-xl sm:p-5">
-            <h3 className="font-heading text-xl font-semibold text-slate-900 sm:text-2xl">{selectedContentLink.title}</h3>
-            <p className="mt-2 text-sm text-slate-600">{selectedContentLink.description}</p>
+          <div className="w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                {selectedContentLink.type === 'hukamnama' ? (
+                  <div className="flex flex-wrap gap-2">
+                    {activeHukamnama?.ang ? <p className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">Ang {activeHukamnama.ang}</p> : null}
+                    {activeHukamnama?.updatedAt ? <p className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{new Date(activeHukamnama.updatedAt).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' })}</p> : null}
+                    {activeHukamnama?.slot ? <p className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 capitalize">{activeHukamnama.slot}</p> : null}
+                  </div>
+                ) : (
+                  <>
+                    <h3 className="font-heading text-xl font-semibold text-slate-900 sm:text-2xl">{selectedContentLink.title}</h3>
+                    <p className="mt-2 text-sm text-slate-600">{selectedContentLink.description}</p>
+                  </>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedContentLink(null)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 text-lg leading-none text-slate-700"
+                aria-label="Close modal"
+              >
+                ×
+              </button>
+            </div>
+
+            {selectedContentLink.type === 'hukamnama' ? (
+              <div className="mt-3 w-full sm:w-[260px] sm:flex-shrink-0">
+                {hukamnamaReadAlong?.url ? (
+                  <AudioPillPlayer
+                    label="Read Along Audio"
+                    subtitle={`Ang ${modalHukamnamaAng}`}
+                    src={hukamnamaReadAlong.url}
+                  />
+                ) : (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                    {!readAlongConfig.enabled
+                      ? 'Read along audio is currently disabled.'
+                      : (readAlongLoading ? 'Loading read along audio...' : `Read along audio is unavailable for Ang ${modalHukamnamaAng}.`)}
+                  </div>
+                )}
+              </div>
+            ) : null}
 
             {selectedContentLink.type === 'hukamnama' ? (
               <>
                 <div className="mt-3 h-px bg-slate-200" />
-                {hukamnamaMetaItems.length > 0 ? (
-                  <section className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-2 py-2">
-                    <div className="flex flex-wrap gap-2">
-                      {hukamnamaMetaItems.map((meta, metaIndex) => (
-                        <p key={`modal-meta-${metaIndex}`} className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">
-                          {meta}
-                        </p>
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
-
-                <div className="mt-4 max-h-[55vh] space-y-4 overflow-y-auto pr-1">
+                <div className="mt-4 max-h-[72vh] space-y-4 overflow-y-auto pr-1">
                   {(selectedContentLink.items || []).map((line) => (
                     <article key={line.id}>
                       <p className="mt-1 font-gurmukhi text-lg text-brand-navy">{line.gurmukhi}</p>
-                      {line.translationPunjabi ? <p className="mt-2 text-sm text-slate-700">Punjabi: {line.translationPunjabi}</p> : null}
-                      {line.translationEnglish ? <p className="mt-1 text-sm text-slate-700">English: {line.translationEnglish}</p> : null}
+                      {line.translationPunjabi ? <p className="mt-1 text-sm font-normal text-brand-saffron">Punjabi: {line.translationPunjabi}</p> : null}
+                      {line.translationEnglish ? <p className="mt-0.5 text-sm font-normal text-brand-blue">English: {line.translationEnglish}</p> : null}
                     </article>
                   ))}
                 </div>

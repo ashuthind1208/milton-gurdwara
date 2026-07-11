@@ -1,3 +1,12 @@
+const sanitizeStreamUrl = (value = '') => {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  return trimmed.replace(/[;\s]+$/, '');
+};
+
 export const siteConfig = {
   name: 'Singh Sabha Milton Gurdwara',
   shortName: 'Singh Sabha Milton',
@@ -14,9 +23,10 @@ export const siteConfig = {
     facebook: 'https://facebook.com/singhsabhamilton',
     instagram: 'https://www.instagram.com/miltongurdwara/'
   },
-  liveKirtanStreamUrl:
+  liveKirtanStreamUrl: sanitizeStreamUrl(
     process.env.REACT_APP_DARBAR_SAHIB_STREAM_URL ||
-    'https://live.sgpc.net:8442/;'
+    'https://live.sgpc.net:8442/'
+  )
 };
 
 export const userRoles = {

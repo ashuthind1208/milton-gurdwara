@@ -118,6 +118,10 @@ const Navbar = () => {
     () => [...leftMenuBalanced, ...rightMenuBalanced].filter((item) => item.path !== '/'),
     [leftMenuBalanced, rightMenuBalanced]
   );
+  const mobileMenuItems = useMemo(
+    () => publicNav.filter((item) => item.path !== '/gurbani-library' && item.path !== '/faq'),
+    []
+  );
 
   useEffect(() => {
     const onScroll = () => {
@@ -178,7 +182,7 @@ const Navbar = () => {
     return liveStreams.find((stream) => {
       const haystack = `${stream?.title || ''} ${stream?.text || ''} ${stream?.streamUrl || ''}`.toLowerCase();
       return haystack.includes('milton') || haystack.includes('singh sabha');
-    }) || liveStreams[0];
+    }) || null;
   }, [liveStreams]);
   const secondaryLiveStreams = useMemo(
     () => liveStreams.filter((stream) => stream.id !== miltonPrimaryStream?.id),
@@ -277,7 +281,7 @@ const Navbar = () => {
   };
 
   const statusDotClass = isKirtanPlaying ? 'bg-emerald-400' : (isKirtanLoading ? 'bg-amber-300' : 'bg-red-400');
-  const featuredStream = streamingItems.find((entry) => entry.active) || streamingItems[0] || null;
+  const featuredStream = miltonPrimaryStream || liveStreams[0] || null;
 
   const openStreamModal = (id) => {
     setStreamModalState({ open: true, id });
@@ -434,31 +438,51 @@ const Navbar = () => {
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={() => setOpen((prev) => !prev)}
-          className="absolute right-4 top-[70px] rounded-lg p-2 text-slate-700 lg:hidden"
-          aria-label="Open mobile menu"
-          aria-expanded={open}
-        >
-          {open ? <XMarkIcon className="h-6 w-6" /> : <Bars3Icon className="h-6 w-6" />}
-        </button>
       </div>
 
-      <div className="lg:hidden px-4 pb-2">
-        <AudioPillPlayer
-          label="Live Kirtan"
-          subtitle="Sri Darbar Sahib audio"
-          src={siteConfig.liveKirtanStreamUrl}
-          className="w-full"
-        />
+      <div className="lg:hidden px-4 pb-4 pt-1">
+        <div className="flex items-center">
+          <div className="flex w-1/3 justify-start">
+            <Link to="/" className="inline-flex items-center" aria-label="Go to homepage">
+              <img
+                src={gurdwaraLogo}
+                alt="Gurdwara Singh Sabha Milton logo"
+                className="h-[4.5rem] w-[4.5rem] rounded-full border border-brand-saffron object-cover"
+              />
+            </Link>
+          </div>
+
+          <div className="flex w-1/3 justify-center">
+            {liveStreams.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setCompactStreamsOpen(true)}
+                className="rounded-full bg-brand-blue px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white shadow-[0_8px_18px_rgba(10,77,159,0.35)] [animation:pulse_2.1s_ease-in-out_infinite]"
+              >
+                Watch Live
+              </button>
+            ) : null}
+          </div>
+
+          <div className="flex w-1/3 justify-end">
+            <button
+              type="button"
+              onClick={() => setOpen((prev) => !prev)}
+              className="z-[240] rounded-lg p-2 text-slate-700"
+              aria-label="Open mobile menu"
+              aria-expanded={open}
+            >
+              {open ? <XMarkIcon className="h-6 w-6" /> : <Bars3Icon className="h-6 w-6" />}
+            </button>
+          </div>
+        </div>
       </div>
 
       {!isCompact ? (
-        <div className="hidden border-b-2 border-brand-blue/45 bg-gradient-to-r from-blue-50/60 via-white to-amber-50/55 pb-5 pt-2 md:block">
+        <div className="hidden border-b-2 border-brand-blue/45 bg-gradient-to-r from-blue-50/60 via-white to-amber-50/55 pb-5 pt-1 md:block">
         <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 md:px-6">
               {miltonPrimaryStream ? (
-                <div className="flex justify-center pt-0.5 pb-1">
+                <div className="flex justify-center pt-0.5 pb-3">
                   <button
                     type="button"
                     onClick={() => openStreamModal(miltonPrimaryStream.id)}
@@ -470,7 +494,7 @@ const Navbar = () => {
                 </div>
               ) : null}
 
-              <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+              <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
               {secondaryLiveStreams.length > 0
             ? secondaryLiveStreams.map((stream) => {
                 const title = stream.title || 'Live Stream';
@@ -515,6 +539,14 @@ const Navbar = () => {
                 >
                   <XMarkIcon className="h-4 w-4" />
                 </button>
+              </div>
+              <div className="px-3 pt-3">
+                <AudioPillPlayer
+                  label="Live Kirtan"
+                  subtitle="Sri Darbar Sahib audio"
+                  src={siteConfig.liveKirtanStreamUrl}
+                  className="w-full"
+                />
               </div>
               <ul className="max-h-[60vh] overflow-y-auto px-2 py-2">
                 {miltonPrimaryStream ? (
@@ -615,32 +647,14 @@ const Navbar = () => {
       {streamModalState.open ? (
         <StreamingModal
           open={streamModalState.open}
-          streams={streamingItems}
+          streams={liveStreams}
           initialStreamId={streamModalState.id || featuredStream?.id || ''}
           onClose={() => setStreamModalState({ open: false, id: '' })}
         />
       ) : null}
 
-      {miltonPrimaryStream ? (
-        <div className="lg:hidden px-4 pb-2">
-          <div className="flex items-center justify-between rounded-xl border border-brand-blue/15 bg-white/90 px-3 py-2 shadow-sm">
-            <div className="inline-flex items-center gap-2">
-              <img src={gurdwaraLogo} alt="Gurdwara Singh Sabha Milton logo" className="h-9 w-9 rounded-full border border-brand-saffron object-cover" />
-              <span className="text-xs font-bold uppercase tracking-wide text-brand-blue">Milton Live</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => openStreamModal(miltonPrimaryStream.id)}
-              className="rounded-full bg-brand-blue px-3 py-1 text-xs font-bold uppercase tracking-wide text-white shadow-[0_8px_18px_rgba(10,77,159,0.35)] [animation:pulse_2.1s_ease-in-out_infinite]"
-            >
-              Watch
-            </button>
-          </div>
-        </div>
-      ) : null}
-
       {open ? (
-        <div className="border-t border-slate-100 bg-gradient-to-b from-white to-slate-50 px-4 py-3 lg:hidden">
+        <div className="max-h-[calc(100vh-6.5rem)] overflow-y-auto border-t border-slate-100 bg-gradient-to-b from-white to-slate-50 px-4 py-3 lg:hidden">
           <div className="mb-3 grid gap-2 sm:grid-cols-2">
             <Link
               to="/login?mode=admin&next=/admin"
@@ -658,7 +672,7 @@ const Navbar = () => {
             </Link>
           </div>
           <div className="grid gap-2">
-            {publicNav.map((item) => (
+            {mobileMenuItems.map((item) => (
               <NavLink key={item.path} to={item.path} className={navClass} onClick={() => setOpen(false)}>
                 {item.label}
               </NavLink>

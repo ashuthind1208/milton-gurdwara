@@ -5,6 +5,8 @@ import { EyeIcon, PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outlin
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import cmsService from '../../services/cmsService';
+import uploadService from '../../services/uploadService';
+import StatusAlert from '../../components/common/StatusAlert';
 
 const emptySlide = {
   image: '',
@@ -41,6 +43,13 @@ const AdminCmsPage = () => {
   const [selectedPage, setSelectedPage] = useState('about');
   const [slideModal, setSlideModal] = useState({ open: false, mode: 'view', slideId: null });
   const [sectionModal, setSectionModal] = useState({ open: false, mode: 'view', sectionId: null });
+  const [pageUploadPending, setPageUploadPending] = useState(false);
+  const [slideUploadPending, setSlideUploadPending] = useState(false);
+  const [sectionUploadPending, setSectionUploadPending] = useState(false);
+  const [pageUploadProgress, setPageUploadProgress] = useState(0);
+  const [slideUploadProgress, setSlideUploadProgress] = useState(0);
+  const [sectionUploadProgress, setSectionUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState({ type: 'success', message: '' });
 
   const slideForm = useForm({ defaultValues: emptySlide });
   const pageForm = useForm({
@@ -200,6 +209,75 @@ const AdminCmsPage = () => {
     }
   };
 
+  const uploadCmsFile = async ({ file, target }) => {
+    if (!file) {
+      return;
+    }
+
+    try {
+      if (target === 'page') {
+        setPageUploadPending(true);
+        setPageUploadProgress(0);
+      }
+      if (target === 'slide') {
+        setSlideUploadPending(true);
+        setSlideUploadProgress(0);
+      }
+      if (target === 'section') {
+        setSectionUploadPending(true);
+        setSectionUploadProgress(0);
+      }
+
+      const uploaded = await uploadService.uploadFile({
+        service: 'cms',
+        file,
+        allowedMimeTypes: ['image/*', 'video/*', 'application/pdf'],
+        maxSizeMB: 15,
+        onProgress: (percent) => {
+          if (target === 'page') {
+            setPageUploadProgress(percent);
+            return;
+          }
+          if (target === 'slide') {
+            setSlideUploadProgress(percent);
+            return;
+          }
+          setSectionUploadProgress(percent);
+        }
+      });
+      const nextUrl = uploaded?.url || '';
+      if (!nextUrl) {
+        throw new Error('Upload did not return a file URL.');
+      }
+
+      if (target === 'page') {
+        pageForm.setValue('mediaUrl', nextUrl, { shouldDirty: true, shouldValidate: true });
+      }
+      if (target === 'slide') {
+        slideForm.setValue('image', nextUrl, { shouldDirty: true, shouldValidate: true });
+      }
+      if (target === 'section') {
+        sectionForm.setValue('mediaUrl', nextUrl, { shouldDirty: true, shouldValidate: true });
+      }
+      setUploadStatus({ type: 'success', message: 'File uploaded successfully.' });
+    } catch (error) {
+      setUploadStatus({ type: 'error', message: error.message || 'Unable to upload file.' });
+    } finally {
+      if (target === 'page') {
+        setPageUploadPending(false);
+        setPageUploadProgress(0);
+      }
+      if (target === 'slide') {
+        setSlideUploadPending(false);
+        setSlideUploadProgress(0);
+      }
+      if (target === 'section') {
+        setSectionUploadPending(false);
+        setSectionUploadProgress(0);
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="font-heading text-3xl font-bold">CMS Management</h1>
@@ -263,11 +341,26 @@ const AdminCmsPage = () => {
 
         <form className="mt-4 space-y-4" onSubmit={pageForm.handleSubmit((values) => savePageBasicsMutation.mutate(values))}>
           <div className="grid gap-3 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <StatusAlert type={uploadStatus.type} message={uploadStatus.message} />
+            </div>
             <label className="text-sm">Hero Title
               <input {...pageForm.register('heroTitle')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
             </label>
             <label className="text-sm">Media Link
               <input {...pageForm.register('mediaUrl')} placeholder="https://example.com/media.jpg" className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              <input
+                type="file"
+                accept="image/*,video/*,application/pdf"
+                className="mt-2 block w-full text-xs"
+                onChange={(event) => uploadCmsFile({ file: event.target.files?.[0], target: 'page' })}
+              />
+              <p className="mt-1 text-xs text-slate-500">{pageUploadPending ? `Uploading media... ${pageUploadProgress}%` : 'Paste URL or upload file (image/video/pdf, max 15MB).'}</p>
+              {pageUploadPending ? (
+                <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                  <div className="h-full bg-brand-blue transition-all" style={{ width: `${pageUploadProgress}%` }} />
+                </div>
+              ) : null}
             </label>
             <label className="text-sm md:col-span-2">Hero Description
               <textarea {...pageForm.register('heroDescription')} rows={2} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
@@ -347,11 +440,30 @@ const AdminCmsPage = () => {
             </div>
 
             <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={slideForm.handleSubmit(onSlideSubmit)}>
+              <div className="md:col-span-2">
+                <StatusAlert type={uploadStatus.type} message={uploadStatus.message} />
+              </div>
               <label className="text-sm">Slide Order
                 <input type="number" min="1" max={Math.max(1, slides.length + (slideModal.mode === 'add' ? 1 : 0))} disabled={slideModal.mode === 'view'} {...slideForm.register('order', { valueAsNumber: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
               </label>
               <label className="text-sm">Image URL
                 <input disabled={slideModal.mode === 'view'} {...slideForm.register('image')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
+                {slideModal.mode !== 'view' ? (
+                  <>
+                    <input
+                      type="file"
+                      accept="image/*,video/*,application/pdf"
+                      className="mt-2 block w-full text-xs"
+                      onChange={(event) => uploadCmsFile({ file: event.target.files?.[0], target: 'slide' })}
+                    />
+                    <p className="mt-1 text-xs text-slate-500">{slideUploadPending ? `Uploading slide media... ${slideUploadProgress}%` : 'Paste URL or upload file (image/video/pdf, max 15MB).'}</p>
+                    {slideUploadPending ? (
+                      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                        <div className="h-full bg-brand-blue transition-all" style={{ width: `${slideUploadProgress}%` }} />
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
               </label>
               <label className="text-sm">Eyebrow
                 <input disabled={slideModal.mode === 'view'} {...slideForm.register('eyebrow')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
@@ -406,11 +518,28 @@ const AdminCmsPage = () => {
             </div>
 
             <form className="mt-4 space-y-3" onSubmit={sectionForm.handleSubmit(onSectionSubmit)}>
+              <StatusAlert type={uploadStatus.type} message={uploadStatus.message} />
               <label className="text-sm">Section Title
                 <input disabled={sectionModal.mode === 'view'} {...sectionForm.register('title')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
               </label>
               <label className="text-sm">Section Media Link
                 <input disabled={sectionModal.mode === 'view'} {...sectionForm.register('mediaUrl')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
+                {sectionModal.mode !== 'view' ? (
+                  <>
+                    <input
+                      type="file"
+                      accept="image/*,video/*,application/pdf"
+                      className="mt-2 block w-full text-xs"
+                      onChange={(event) => uploadCmsFile({ file: event.target.files?.[0], target: 'section' })}
+                    />
+                    <p className="mt-1 text-xs text-slate-500">{sectionUploadPending ? `Uploading section media... ${sectionUploadProgress}%` : 'Paste URL or upload file (image/video/pdf, max 15MB).'}</p>
+                    {sectionUploadPending ? (
+                      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                        <div className="h-full bg-brand-blue transition-all" style={{ width: `${sectionUploadProgress}%` }} />
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
               </label>
               <label className="text-sm">Section Body
                 <textarea rows={5} disabled={sectionModal.mode === 'view'} {...sectionForm.register('body')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />

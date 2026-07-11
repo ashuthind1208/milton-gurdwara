@@ -1,7 +1,8 @@
 import { mockResponse } from './mockApi';
+import contentApiService from './contentApiService';
 
-const STORAGE_KEY = 'gurdwara_cms_home_content';
-const PAGE_CONTENT_STORAGE_KEY = 'gurdwara_cms_page_content';
+const HOME_CONTENT_RESOURCE = 'cms_home_content';
+const PAGE_CONTENT_RESOURCE = 'cms_page_content';
 
 const defaultLangarItems = [
   { id: 'langar-1', name: 'Ginger', category: 'Grocery', addedOn: '2026-07-07', expiryDate: '', needed: true },
@@ -13,16 +14,34 @@ const defaultLangarItems = [
 
 const defaultSchedule = {
   morning: [
-    { id: 'morning-1', time: '5:00 AM', label: 'Parkash Sri Guru Granth Sahib' },
-    { id: 'morning-2', time: '5:15 AM', label: '5 Baani da Paath' },
+    { id: 'morning-1', time: '5:00AM - 5:15AM', label: 'Parkash Sri Guru Granth Sahib' },
+    { id: 'morning-2', time: '5:15AM - 6:15AM', label: '5 Baani da Paath' },
     { id: 'morning-3', time: '6:15 AM - 6:40 AM', label: 'Ardaas and Hukamnama' }
   ],
   evening: [
-    { id: 'evening-1', time: '7:00 PM', label: 'Rehraas Sahib' },
+    { id: 'evening-1', time: '7:00PM - 7:30PM', label: 'Rehraas Sahib' },
     { id: 'evening-2', time: '7:30 PM - 7:45 PM', label: 'Hukamnama Katha' },
     { id: 'evening-3', time: '7:45 PM - 8:00 PM', label: 'Kirtan Sohila Sahib' },
-    { id: 'evening-4', time: '8:00 PM', label: 'Sukh Asan Sri Guru Granth Sahib' }
+    { id: 'evening-4', time: '8:00PM - 8:30PM', label: 'Sukh Asan Sri Guru Granth Sahib' }
   ]
+};
+
+const normalizeScheduleLabelKey = (value = '') => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+
+const scheduleTimeOverrides = {
+  [normalizeScheduleLabelKey('Parkash Sri Guru Granth Sahib')]: '5:00AM - 5:15AM',
+  [normalizeScheduleLabelKey('5 Baani da Paath')]: '5:15AM - 6:15AM',
+  [normalizeScheduleLabelKey('Rehraas Sahib')]: '7:00PM - 7:30PM',
+  [normalizeScheduleLabelKey('Sukh Asan Sri Guru Granth Sahib')]: '8:00PM - 8:30PM'
+};
+
+const resolveScheduleTime = (title = '', time = '') => {
+  const key = normalizeScheduleLabelKey(title);
+  if (key && scheduleTimeOverrides[key]) {
+    return scheduleTimeOverrides[key];
+  }
+
+  return time || '';
 };
 
 const buildDefaultScheduleDay = (legacySchedule = defaultSchedule) => ({
@@ -67,7 +86,7 @@ const buildDefaultScheduleDay = (legacySchedule = defaultSchedule) => ({
 const normalizeScheduleTimelineEntry = (entry = {}, index = 0) => ({
   id: entry.id || `schedule-entry-${Date.now()}-${index}`,
   segment: ['morning', 'evening', 'special'].includes(entry.segment) ? entry.segment : 'morning',
-  timeEn: entry.timeEn || entry.time || '',
+  timeEn: resolveScheduleTime(entry.titleEn || entry.label || '', entry.timeEn || entry.time || ''),
   timePa: entry.timePa || '',
   titleEn: entry.titleEn || entry.label || '',
   titlePa: entry.titlePa || '',
@@ -225,7 +244,7 @@ const normalizeScheduleEntries = (entries = [], prefix) => entries.map((entry, i
 
   return {
     id: entry.id || `${prefix}-${index + 1}`,
-    time: entry.time || '',
+    time: resolveScheduleTime(entry.label || '', entry.time || ''),
     label: entry.label || ''
   };
 });
@@ -305,26 +324,27 @@ const normalizeContent = (content) => {
   };
 };
 
-const persistContent = (nextValue) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(nextValue));
+const persistContent = async (nextValue) => {
+  await contentApiService.setSingleton(HOME_CONTENT_RESOURCE, nextValue);
   return nextValue;
 };
 
-const readAllPageContent = () => {
-  const raw = localStorage.getItem(PAGE_CONTENT_STORAGE_KEY);
-  if (!raw) {
-    return normalizeAllPageContent(defaultPageContent);
-  }
-
+const readAllPageContent = async () => {
   try {
-    return normalizeAllPageContent(JSON.parse(raw));
+    const payload = await contentApiService.getSingleton(PAGE_CONTENT_RESOURCE, null);
+    if (!payload) {
+      const seeded = normalizeAllPageContent(defaultPageContent);
+      await contentApiService.setSingleton(PAGE_CONTENT_RESOURCE, seeded);
+      return seeded;
+    }
+    return normalizeAllPageContent(payload);
   } catch {
     return normalizeAllPageContent(defaultPageContent);
   }
 };
 
-const persistPageContent = (nextValue) => {
-  localStorage.setItem(PAGE_CONTENT_STORAGE_KEY, JSON.stringify(nextValue));
+const persistPageContent = async (nextValue) => {
+  await contentApiService.setSingleton(PAGE_CONTENT_RESOURCE, nextValue);
   return nextValue;
 };
 
@@ -375,23 +395,25 @@ const defaultContent = {
   langarItems: defaultLangarItems
 };
 
-const readHomeContent = () => {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    return normalizeContent(defaultContent);
-  }
-
+const readHomeContent = async () => {
   try {
-    return normalizeContent(JSON.parse(raw));
+    const payload = await contentApiService.getSingleton(HOME_CONTENT_RESOURCE, null);
+    if (!payload) {
+      const seeded = normalizeContent(defaultContent);
+      await contentApiService.setSingleton(HOME_CONTENT_RESOURCE, seeded);
+      return seeded;
+    }
+
+    return normalizeContent(payload);
   } catch {
     return normalizeContent(defaultContent);
   }
 };
 
 const cmsService = {
-  getHomeContent: async () => mockResponse(readHomeContent()),
+  getHomeContent: async () => mockResponse(await readHomeContent()),
   updateHomeContent: async (payload) => {
-    const current = readHomeContent();
+    const current = await readHomeContent();
     const nextValue = {
       ...current,
       ...payload,
@@ -410,11 +432,11 @@ const cmsService = {
       langarItems: payload.langarItems || current.langarItems
     };
 
-    return mockResponse(normalizeContent(persistContent(nextValue)));
+    return mockResponse(normalizeContent(await persistContent(nextValue)));
   },
-  getHeroSlides: async () => mockResponse(readHomeContent().hero.slides),
+  getHeroSlides: async () => mockResponse((await readHomeContent()).hero.slides),
   addHeroSlide: async (payload) => {
-    const current = readHomeContent();
+    const current = await readHomeContent();
     const nextSlide = {
       ...payload,
       id: payload.id || `slide-${Date.now()}`
@@ -429,10 +451,10 @@ const cmsService = {
       }
     };
 
-    return mockResponse(normalizeContent(persistContent(nextValue)).hero.slides);
+    return mockResponse(normalizeContent(await persistContent(nextValue)).hero.slides);
   },
   updateHeroSlide: async (id, payload) => {
-    const current = readHomeContent();
+    const current = await readHomeContent();
     const existing = current.hero.slides.find((slide) => slide.id === id);
     if (!existing) {
       return mockResponse(current.hero.slides);
@@ -454,10 +476,10 @@ const cmsService = {
       }
     };
 
-    return mockResponse(normalizeContent(persistContent(nextValue)).hero.slides);
+    return mockResponse(normalizeContent(await persistContent(nextValue)).hero.slides);
   },
   removeHeroSlide: async (id) => {
-    const current = readHomeContent();
+    const current = await readHomeContent();
     const nextValue = {
       ...current,
       hero: {
@@ -466,10 +488,10 @@ const cmsService = {
       }
     };
 
-    return mockResponse(normalizeContent(persistContent(nextValue)).hero.slides);
+    return mockResponse(normalizeContent(await persistContent(nextValue)).hero.slides);
   },
   addLangarItem: async (payload) => {
-    const current = readHomeContent();
+    const current = await readHomeContent();
     const nextValue = {
       ...current,
       langarItems: [
@@ -485,19 +507,19 @@ const cmsService = {
       ]
     };
 
-    return mockResponse(normalizeContent(persistContent(nextValue)).langarItems);
+    return mockResponse(normalizeContent(await persistContent(nextValue)).langarItems);
   },
   removeLangarItem: async (id) => {
-    const current = readHomeContent();
+    const current = await readHomeContent();
     const nextValue = {
       ...current,
       langarItems: current.langarItems.filter((item) => item.id !== id)
     };
 
-    return mockResponse(normalizeContent(persistContent(nextValue)).langarItems);
+    return mockResponse(normalizeContent(await persistContent(nextValue)).langarItems);
   },
   updateLangarItem: async (id, payload) => {
-    const current = readHomeContent();
+    const current = await readHomeContent();
     const nextValue = {
       ...current,
       langarItems: current.langarItems.map((item) => (
@@ -505,10 +527,10 @@ const cmsService = {
       ))
     };
 
-    return mockResponse(normalizeContent(persistContent(nextValue)).langarItems);
+    return mockResponse(normalizeContent(await persistContent(nextValue)).langarItems);
   },
   updateSchedule: async (schedule) => {
-    const current = readHomeContent();
+    const current = await readHomeContent();
     const normalizedDays = normalizeScheduleDays(current.scheduleDays, current.schedule || defaultSchedule);
 
     if (Array.isArray(schedule.scheduleDays)) {
@@ -517,7 +539,7 @@ const cmsService = {
         scheduleDays: normalizeScheduleDays(schedule.scheduleDays, current.schedule || defaultSchedule)
       };
 
-      return mockResponse(normalizeContent(persistContent(nextValue)).scheduleDays);
+      return mockResponse(normalizeContent(await persistContent(nextValue)).scheduleDays);
     }
 
     if (schedule.day) {
@@ -528,7 +550,7 @@ const cmsService = {
         scheduleDays: [...remaining, nextDay].sort((left, right) => left.dateKey.localeCompare(right.dateKey))
       };
 
-      return mockResponse(normalizeContent(persistContent(nextValue)).scheduleDays);
+      return mockResponse(normalizeContent(await persistContent(nextValue)).scheduleDays);
     }
 
     const nextValue = {
@@ -543,14 +565,14 @@ const cmsService = {
       })
     };
 
-    return mockResponse(normalizeContent(persistContent(nextValue)).schedule);
+    return mockResponse(normalizeContent(await persistContent(nextValue)).schedule);
   },
   getScheduleForDate: async (dateKey) => {
-    const current = readHomeContent();
+    const current = await readHomeContent();
     return mockResponse(resolveScheduleForDate(current.scheduleDays, dateKey || 'default'));
   },
   copyScheduleDay: async ({ sourceDateKey, targetDateKey }) => {
-    const current = readHomeContent();
+    const current = await readHomeContent();
     const normalizedDays = normalizeScheduleDays(current.scheduleDays, current.schedule || defaultSchedule);
     const sourceDay = resolveScheduleForDate(normalizedDays, sourceDateKey || 'default');
     const copiedDay = normalizeScheduleDay({
@@ -569,10 +591,10 @@ const cmsService = {
       scheduleDays: [...remaining, copiedDay].sort((left, right) => left.dateKey.localeCompare(right.dateKey))
     };
 
-    return mockResponse(normalizeContent(persistContent(nextValue)).scheduleDays);
+    return mockResponse(normalizeContent(await persistContent(nextValue)).scheduleDays);
   },
   removeScheduleDay: async (dateKey) => {
-    const current = readHomeContent();
+    const current = await readHomeContent();
     if (!dateKey || dateKey === 'default') {
       return mockResponse(normalizeContent(current).scheduleDays);
     }
@@ -582,15 +604,15 @@ const cmsService = {
       scheduleDays: normalizeScheduleDays(current.scheduleDays, current.schedule || defaultSchedule).filter((day) => day.dateKey !== dateKey)
     };
 
-    return mockResponse(normalizeContent(persistContent(nextValue)).scheduleDays);
+    return mockResponse(normalizeContent(await persistContent(nextValue)).scheduleDays);
   },
-  getAllPageContent: async () => mockResponse(readAllPageContent()),
+  getAllPageContent: async () => mockResponse(await readAllPageContent()),
   getPageContent: async (pageKey) => {
-    const allContent = readAllPageContent();
+    const allContent = await readAllPageContent();
     return mockResponse(allContent[pageKey] || allContent.about);
   },
   updatePageContent: async (pageKey, payload) => {
-    const allContent = readAllPageContent();
+    const allContent = await readAllPageContent();
     const fallback = defaultPageContent[pageKey] || defaultPageContent.about;
     const nextValue = {
       ...allContent,
@@ -601,7 +623,7 @@ const cmsService = {
       }, fallback)
     };
 
-    const saved = normalizeAllPageContent(persistPageContent(nextValue));
+    const saved = normalizeAllPageContent(await persistPageContent(nextValue));
     return mockResponse(saved[pageKey]);
   }
 };

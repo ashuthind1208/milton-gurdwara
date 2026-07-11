@@ -1,39 +1,47 @@
 import { mockResponse } from './mockApi';
+import contentApiService from './contentApiService';
 
-const STORAGE_KEY = 'ssm-notification-subscribers';
+const RESOURCE = 'subscribers';
 
-const readSubscribers = () => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-};
-
-const writeSubscribers = (records) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-};
+const normalizeSubscriber = (item = {}, index = 0) => ({
+  id: item.id || `sub-${Date.now()}-${index}`,
+  name: item.name || '',
+  email: String(item.email || '').trim().toLowerCase(),
+  interests: item.interests || 'Events and updates',
+  source: item.source || 'Website',
+  createdAt: item.createdAt || new Date().toISOString(),
+  active: item.active !== false
+});
 
 const notificationService = {
   subscribe: async (payload) => {
-    const record = {
+    const existing = await contentApiService.list(RESOURCE);
+    const normalizedEmail = String(payload?.email || '').trim().toLowerCase();
+
+    const duplicate = existing.find((entry) => String(entry?.email || '').trim().toLowerCase() === normalizedEmail);
+    if (duplicate?.id) {
+      await contentApiService.remove(RESOURCE, duplicate.id);
+    }
+
+    const record = normalizeSubscriber({
       id: `sub-${Date.now()}`,
-      name: payload.name,
-      email: payload.email,
-      interests: payload.interests || 'Events and updates',
-      source: payload.source || 'Website',
+      name: payload?.name,
+      email: normalizedEmail,
+      interests: payload?.interests,
+      source: payload?.source,
       createdAt: new Date().toISOString(),
       active: true
-    };
+    });
 
-    const existing = readSubscribers();
-    const deduped = existing.filter((entry) => entry.email !== record.email);
-    const next = [record, ...deduped];
-    writeSubscribers(next);
-    return mockResponse(record);
+    const created = await contentApiService.create(RESOURCE, record);
+    return mockResponse(normalizeSubscriber(created || record));
   },
-  getSubscribers: async () => mockResponse(readSubscribers()),
+
+  getSubscribers: async () => {
+    const rows = await contentApiService.list(RESOURCE);
+    return mockResponse(rows.map((item, index) => normalizeSubscriber(item, index)));
+  },
+
   sendApprovalEmail: async (user) => {
     const targetEmail = String(user?.email || '').trim().toLowerCase();
     if (!targetEmail) {
@@ -69,10 +77,11 @@ const notificationService = {
       return mockResponse({ sent: false, reason: 'network_error' });
     }
   },
+
   removeSubscriber: async (id) => {
-    const next = readSubscribers().filter((entry) => entry.id !== id);
-    writeSubscribers(next);
-    return mockResponse(next);
+    await contentApiService.remove(RESOURCE, id);
+    const rows = await contentApiService.list(RESOURCE);
+    return mockResponse(rows.map((item, index) => normalizeSubscriber(item, index)));
   }
 };
 

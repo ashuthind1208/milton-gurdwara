@@ -1,6 +1,7 @@
 import { mockResponse } from './mockApi';
+import contentApiService from './contentApiService';
 
-const STORAGE_KEY = 'ssm-advertisements';
+const RESOURCE = 'advertisements';
 
 export const AD_PLACEMENT_OPTIONS = [
   'Global Banner',
@@ -17,20 +18,6 @@ export const AD_PLACEMENT_OPTIONS = [
   'Events Footer Banner'
 ];
 
-const seedAds = [
-  {
-    id: 'ad-1',
-    title: 'Local Business Support',
-    content: 'Support local advertisers who support the sangat.',
-    website: '',
-    imageUrl: '',
-    bannerUrl: '',
-    targetLink: '',
-    placement: 'Homepage Sidebar',
-    active: true
-  }
-];
-
 const normalizeAd = (ad, index = 0) => ({
   id: ad.id || `ad-${Date.now()}-${index}`,
   title: ad.title || '',
@@ -43,47 +30,29 @@ const normalizeAd = (ad, index = 0) => ({
   active: typeof ad.active === 'boolean' ? ad.active : true
 });
 
-const readAds = () => {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return seedAds.map(normalizeAd);
-    }
-
-    const parsed = JSON.parse(raw);
-    return parsed.map((ad, index) => normalizeAd(ad, index));
-  } catch {
-    return seedAds.map(normalizeAd);
-  }
-};
-
-const writeAds = (records) => {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-  } catch {
-    // Ignore localStorage write failures in mock mode.
-  }
-};
-
 const advertisementService = {
-  getAds: async () => mockResponse(readAds()),
+  getAds: async () => {
+    try {
+      const data = await contentApiService.list(RESOURCE);
+      return { data: data.map((ad, index) => normalizeAd(ad, index)) };
+    } catch {
+      return mockResponse([]);
+    }
+  },
+
   createAd: async (payload) => {
-    const record = normalizeAd({
-      ...payload,
-      id: `ad-${Date.now()}`
-    });
-    const next = [record, ...readAds()];
-    writeAds(next);
-    return mockResponse(record);
+    const record = normalizeAd({ ...payload, id: `ad-${Date.now()}` });
+    const created = await contentApiService.create(RESOURCE, record);
+    return { data: normalizeAd(created || record) };
   },
+
   updateAd: async (id, payload) => {
-    const next = readAds().map((ad) => (ad.id === id ? normalizeAd({ ...ad, ...payload, id }) : ad));
-    writeAds(next);
-    return mockResponse(next.find((ad) => ad.id === id));
+    const updated = await contentApiService.update(RESOURCE, id, payload);
+    return { data: normalizeAd(updated || { id, ...payload }) };
   },
+
   removeAd: async (id) => {
-    const next = readAds().filter((ad) => ad.id !== id);
-    writeAds(next);
+    await contentApiService.remove(RESOURCE, id);
     return mockResponse({ success: true });
   }
 };
