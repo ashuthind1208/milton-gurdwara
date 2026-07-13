@@ -180,8 +180,9 @@ const AdminLangarPage = () => {
       </Card>
 
       {createOpen ? (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-900/45 px-4">
-          <div className="w-full max-w-xl rounded-xl bg-white p-5 shadow-xl">
+        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6">
+          <div className="mx-auto flex min-h-full items-center justify-center">
+          <div className="w-full max-w-xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-heading text-xl font-semibold">Add Seva Item</h3>
               <button type="button" className="rounded-md border border-slate-300 px-2 py-1 text-sm" onClick={closeModals}>Close</button>
@@ -211,12 +212,14 @@ const AdminLangarPage = () => {
               </div>
             </form>
           </div>
+          </div>
         </div>
       ) : null}
 
       {viewItem ? (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-900/45 px-4">
-          <div className="w-full max-w-xl rounded-xl bg-white p-5 shadow-xl">
+        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6">
+          <div className="mx-auto flex min-h-full items-center justify-center">
+          <div className="w-full max-w-xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-heading text-xl font-semibold">Seva Item Details</h3>
               <button type="button" className="rounded-md border border-slate-300 px-2 py-1 text-sm" onClick={closeModals}>Close</button>
@@ -229,12 +232,14 @@ const AdminLangarPage = () => {
               <p><span className="font-semibold">Status:</span> {viewItem.needed ? 'Active' : 'Inactive'}</p>
             </div>
           </div>
+          </div>
         </div>
       ) : null}
 
       {editingItem ? (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-900/45 px-4">
-          <div className="w-full max-w-xl rounded-xl bg-white p-5 shadow-xl">
+        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6">
+          <div className="mx-auto flex min-h-full items-center justify-center">
+          <div className="w-full max-w-xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-heading text-xl font-semibold">Edit Seva Item</h3>
               <button type="button" className="rounded-md border border-slate-300 px-2 py-1 text-sm" onClick={closeModals}>Close</button>
@@ -263,6 +268,7 @@ const AdminLangarPage = () => {
                 <Button type="button" variant="ghost" onClick={closeModals}>Cancel</Button>
               </div>
             </form>
+          </div>
           </div>
         </div>
       ) : null}

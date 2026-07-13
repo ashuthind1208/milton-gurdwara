@@ -103,8 +103,9 @@ const AdminGalleryPage = () => {
       </div>
 
       {isCreateOpen ? (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-900/45 px-4 py-6">
-          <div className="w-full max-w-3xl rounded-xl bg-white p-5 shadow-xl">
+        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6">
+          <div className="mx-auto flex min-h-full items-center justify-center">
+          <div className="w-full max-w-3xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-heading text-xl font-semibold">Add Gallery Item</h3>
               <button type="button" onClick={() => setIsCreateOpen(false)} className="rounded-md border border-slate-300 px-2 py-1 text-sm">Close</button>
@@ -138,12 +139,14 @@ const AdminGalleryPage = () => {
               </div>
             </form>
           </div>
+          </div>
         </div>
       ) : null}
 
       {editingAlbum ? (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-900/45 px-4 py-6">
-          <div className="w-full max-w-3xl rounded-xl bg-white p-5 shadow-xl">
+        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6">
+          <div className="mx-auto flex min-h-full items-center justify-center">
+          <div className="w-full max-w-3xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-heading text-xl font-semibold">Edit Folder</h3>
               <button type="button" onClick={() => setEditingAlbum(null)} className="rounded-md border border-slate-300 px-2 py-1 text-sm">Close</button>
@@ -177,6 +180,7 @@ const AdminGalleryPage = () => {
                 <button type="button" onClick={() => setEditingAlbum(null)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Cancel</button>
               </div>
             </form>
+          </div>
           </div>
         </div>
       ) : null}

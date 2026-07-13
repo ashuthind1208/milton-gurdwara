@@ -1,14 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { useForm } from 'react-hook-form';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  CalendarDaysIcon,
+  PlusCircleIcon,
+  PlayIcon,
+  QueueListIcon,
+  TicketIcon,
+  XMarkIcon
+} from '@heroicons/react/24/outline';
 import { BookOpenIcon, DocumentTextIcon } from '@heroicons/react/24/solid';
 import PageHero from '../../components/common/PageHero';
 import useSeoMeta from '../../hooks/useSeoMeta';
 import Seo from '../../components/common/Seo';
 import Card from '../../components/ui/Card';
 import libraryService from '../../services/libraryService';
+import eventService from '../../services/eventService';
 import advertisementService from '../../services/advertisementService';
 import { getYouTubeEmbedUrl, getYouTubeThumbnail } from '../../services/videoService';
+import Button from '../../components/ui/Button';
 
 const PAGE_SIZE = 10;
 
@@ -138,11 +148,13 @@ const YouTubeAutoPlayPlayer = ({ url, title, className = '' }) => {
 
 const LibraryPage = () => {
   const meta = useSeoMeta('Library', 'Books, PDFs, and downloadable resources for Sikh learning.');
+  const queryClient = useQueryClient();
   const [physicalPage, setPhysicalPage] = useState(1);
   const [digitalPage, setDigitalPage] = useState(1);
   const [issueModalBookId, setIssueModalBookId] = useState('');
   const [sessionModalId, setSessionModalId] = useState('');
   const [mediaModalId, setMediaModalId] = useState('');
+  const registrationForm = useForm({ defaultValues: { name: '', contact: '' } });
 
   const { data: libraryData } = useQuery({
     queryKey: ['library-content'],
@@ -152,6 +164,11 @@ const LibraryPage = () => {
   const { data: ads = [] } = useQuery({
     queryKey: ['advertisements'],
     queryFn: () => advertisementService.getAds().then((res) => res.data)
+  });
+
+  const { data: events = [] } = useQuery({
+    queryKey: ['events'],
+    queryFn: () => eventService.getEvents().then((res) => res.data)
   });
 
   const physicalBooks = useMemo(() => libraryData?.physicalBooks || [], [libraryData]);
@@ -190,15 +207,70 @@ const LibraryPage = () => {
   );
 
   const libraryTickerItems = useMemo(() => {
-    if (programUpdates.length === 0) {
-      return [];
-    }
-    return programUpdates.slice(0, 12);
+    const items = [
+      ...programUpdates.slice(0, 4).map((entry) => ({
+        id: `event-${entry.id}`,
+        icon: CalendarDaysIcon,
+        primary: `New library event: ${entry.title || 'Library Session'}`,
+        secondary: `${entry.scheduleDate || 'Date TBA'}${entry.scheduleTime ? ` at ${entry.scheduleTime}` : ''}`
+      })),
+      ...physicalBooks.slice(0, 4).map((entry) => ({
+        id: `book-${entry.id}`,
+        icon: PlusCircleIcon,
+        primary: `New book added: ${entry.title || 'Untitled Book'}`,
+        secondary: entry.author ? `Author: ${entry.author}` : 'Now available in library'
+      })),
+      ...mediaResources.slice(0, 4).map((entry) => ({
+        id: `media-${entry.id}`,
+        icon: PlayIcon,
+        primary: `New media resource: ${entry.title || 'Learning Resource'}`,
+        secondary: entry.mediaType ? `Type: ${entry.mediaType}` : 'Available in Media section'
+      }))
+    ];
+
+    return items.slice(0, 12);
+  }, [programUpdates, physicalBooks, mediaResources]);
+
+  const sortedProgramUpdates = useMemo(() => {
+    return [...programUpdates].sort((left, right) => {
+      const leftStamp = `${left.scheduleDate || '1970-01-01'}T${left.scheduleTime || '00:00'}`;
+      const rightStamp = `${right.scheduleDate || '1970-01-01'}T${right.scheduleTime || '00:00'}`;
+      return new Date(leftStamp).getTime() - new Date(rightStamp).getTime();
+    });
   }, [programUpdates]);
+
+  const eventRegistrationsById = useMemo(() => {
+    const map = new Map();
+    events.forEach((event) => {
+      map.set(Number(event.id), Number(event.registrations || 0));
+    });
+    return map;
+  }, [events]);
 
   const activeIssueRecords = useMemo(() => (
     (issueModalBook?.issueRecords || []).filter((record) => !record.returnedAt)
   ), [issueModalBook]);
+
+  useEffect(() => {
+    if (!sessionModalEntry) {
+      registrationForm.reset({ name: '', contact: '' });
+    }
+  }, [sessionModalEntry, registrationForm]);
+
+  const registrationMutation = useMutation({
+    mutationFn: (values) => eventService.registerForEvent({
+      eventId: sessionModalEntry?.eventId,
+      name: values.name,
+      contact: values.contact
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-events'] });
+      registrationForm.reset({ name: '', contact: '' });
+      setSessionModalId('');
+      window.alert('Registration saved successfully.');
+    }
+  });
 
   return (
     <div className="space-y-8">
@@ -224,26 +296,79 @@ const LibraryPage = () => {
         <div className="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden border-y border-brand-blue/70 bg-brand-blue px-3 py-2 text-white">
           <div className="ticker-mask px-2">
             <div className="ticker-track ticker-speed-medium">
-              {[...libraryTickerItems, ...libraryTickerItems].map((entry, index) => (
-                <button
-                  key={`${entry.id}-${index}`}
-                  type="button"
-                  className="inline-flex shrink-0 items-center gap-2.5 pr-8 text-left"
-                  onClick={() => setSessionModalId(entry.id)}
-                >
-                  <span className="text-sm font-black text-white">{entry.scheduleDate || 'TBA'}</span>
-                  <span className="text-base font-black text-white">{entry.title}</span>
-                  <span className="text-base font-black text-brand-saffron">{entry.speaker ? `by ${entry.speaker}` : 'Guest Speaker'}</span>
-                  <span className="text-sm font-extrabold text-white/95">{entry.scheduleTime || 'Time TBA'}</span>
-                  <span className="text-sm font-extrabold text-white/95">{entry.audience || 'Open'}</span>
+              {libraryTickerItems.length > 0 ? [...libraryTickerItems, ...libraryTickerItems].map((entry, index) => (
+                <span key={`${entry.id}-${index}`} className="inline-flex shrink-0 items-center gap-2.5 pr-8 text-left">
+                  <entry.icon className="h-4 w-4 text-brand-saffron" />
+                  <span className="text-sm font-black text-white">{entry.primary}</span>
+                  <span className="text-xs font-semibold text-white/95">{entry.secondary}</span>
                   <span className="text-white/80">|</span>
-                </button>
-              ))}
+                </span>
+              )) : (
+                <span className="inline-flex shrink-0 items-center gap-2.5 pr-8 text-left text-sm font-black text-white">
+                  Library updates will appear here as new books, events, and media resources are added.
+                </span>
+              )}
             </div>
           </div>
         </div>
-        <p className="text-xs text-slate-500">Click any update item to view full details.</p>
+        <p className="text-xs text-slate-500">Live feed from latest library additions and session updates.</p>
       </section>
+
+      {sortedProgramUpdates.length > 0 ? (
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="font-heading text-2xl font-semibold text-brand-blue md:text-3xl">Library Events Tracker</h3>
+              <p className="mt-1 text-xs text-slate-600">Library sessions are automatically tracked in the Events page as soon as they are created.</p>
+            </div>
+            <QueueListIcon className="h-7 w-7 text-brand-blue" />
+          </div>
+
+          <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200">
+            <table className="min-w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                  <th className="px-3 py-2">Session</th>
+                  <th className="px-3 py-2">Date</th>
+                  <th className="px-3 py-2">Time</th>
+                  <th className="px-3 py-2">Location</th>
+                  <th className="px-3 py-2 text-center">Registered</th>
+                  <th className="px-3 py-2 text-center">Registration</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedProgramUpdates.map((entry) => (
+                  <tr key={`program-row-${entry.id}`} className="border-b border-slate-100 last:border-b-0">
+                    <td className="px-3 py-2">
+                      <p className="font-semibold text-slate-800">{entry.title || 'Library Session'}</p>
+                      <p className="text-xs text-slate-500">{entry.speaker || 'Guest Speaker'} • {entry.audience || 'Open to all'}</p>
+                    </td>
+                    <td className="px-3 py-2">{entry.scheduleDate || 'TBA'}</td>
+                    <td className="px-3 py-2">{entry.scheduleTime || 'TBA'}</td>
+                    <td className="px-3 py-2">{entry.location || 'Library Hall'}</td>
+                    <td className="px-3 py-2 text-center">
+                      <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+                        {entry.eventId ? (eventRegistrationsById.get(Number(entry.eventId)) ?? 0) : 0}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <button
+                        type="button"
+                        onClick={() => setSessionModalId(entry.id)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-brand-blue/30 bg-blue-50 text-brand-blue transition hover:bg-blue-100"
+                        title="Open registration modal"
+                        aria-label={`Open registration modal for ${entry.title || 'library session'}`}
+                      >
+                        <TicketIcon className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
 
       <div className="grid gap-5 xl:grid-cols-2">
         <Card className="border border-amber-200/70 bg-gradient-to-br from-amber-50 via-white to-orange-50">
@@ -417,28 +542,50 @@ const LibraryPage = () => {
       {sessionModalEntry ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60" aria-hidden="true" onClick={() => setSessionModalId('')} />
-          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-brand-blue/20 bg-gradient-to-br from-blue-50 via-white to-amber-50 shadow-2xl">
             {sessionModalEntry.imageUrl ? (
               <img src={sessionModalEntry.imageUrl} alt={sessionModalEntry.title || 'Library session'} className="h-56 w-full object-cover" />
             ) : null}
             <div className="p-5">
               <div className="flex items-start justify-between gap-3">
-                <h3 className="font-heading text-xl font-semibold text-slate-800">{sessionModalEntry.title}</h3>
-                <button type="button" className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700" onClick={() => setSessionModalId('')}>
+                <div>
+                  <p className="inline-flex rounded-full bg-brand-blue/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-brand-blue">Library Session</p>
+                  <h3 className="mt-2 font-heading text-xl font-semibold text-brand-blue">{sessionModalEntry.title}</h3>
+                </div>
+                <button type="button" className="rounded-md border border-brand-blue/20 bg-white/80 p-1 text-brand-blue hover:bg-brand-blue/10 hover:text-brand-blue" onClick={() => setSessionModalId('')}>
                   <XMarkIcon className="h-5 w-5" />
                 </button>
               </div>
-              <div className="mt-3 grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
-                <p><span className="font-semibold">Speaker:</span> {sessionModalEntry.speaker || 'Guest Speaker'}</p>
-                <p><span className="font-semibold">Audience:</span> {sessionModalEntry.audience || 'Open to all'}</p>
-                <p><span className="font-semibold">Date:</span> {sessionModalEntry.scheduleDate || 'TBA'}</p>
-                <p><span className="font-semibold">Time:</span> {sessionModalEntry.scheduleTime || 'TBA'}</p>
-                <p className="sm:col-span-2"><span className="font-semibold">Location:</span> {sessionModalEntry.location || 'Library Hall'}</p>
+              <div className="mt-3 grid gap-2 rounded-xl border border-brand-blue/15 bg-white/85 p-3 text-sm text-slate-700 sm:grid-cols-2">
+                <p><span className="font-semibold text-brand-blue">Speaker:</span> {sessionModalEntry.speaker || 'Guest Speaker'}</p>
+                <p><span className="font-semibold text-brand-blue">Audience:</span> {sessionModalEntry.audience || 'Open to all'}</p>
+                <p><span className="font-semibold text-brand-blue">Date:</span> {sessionModalEntry.scheduleDate || 'TBA'}</p>
+                <p><span className="font-semibold text-brand-blue">Time:</span> {sessionModalEntry.scheduleTime || 'TBA'}</p>
+                <p className="sm:col-span-2"><span className="font-semibold text-brand-blue">Location:</span> {sessionModalEntry.location || 'Library Hall'}</p>
               </div>
-              <p className="mt-3 text-sm text-slate-700">{sessionModalEntry.summary || 'Session details will be shared soon.'}</p>
-              {sessionModalEntry.registrationUrl ? (
-                <a href={sessionModalEntry.registrationUrl} className="mt-4 inline-flex rounded-lg bg-brand-blue px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">Open Registration Link</a>
-              ) : null}
+              <p className="mt-3 rounded-lg border border-brand-saffron/30 bg-amber-50/70 px-3 py-2 text-sm text-slate-700">{sessionModalEntry.summary || 'Session details will be shared soon.'}</p>
+
+              {sessionModalEntry.eventId ? (
+                <section className="mt-4 rounded-xl border border-brand-blue/25 bg-gradient-to-r from-blue-50 to-sky-50 p-3">
+                  <h4 className="font-heading text-base font-semibold text-brand-blue">Register for This Session</h4>
+                  <form className="mt-2 space-y-2.5" onSubmit={registrationForm.handleSubmit((values) => registrationMutation.mutate(values))}>
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-brand-blue">Name
+                      <input {...registrationForm.register('name', { required: true })} className="mt-1 w-full rounded-lg border border-brand-blue/25 bg-white px-2.5 py-1.5 text-sm focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/20" />
+                    </label>
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-brand-blue">Contact
+                      <input {...registrationForm.register('contact', { required: true })} className="mt-1 w-full rounded-lg border border-brand-blue/25 bg-white px-2.5 py-1.5 text-sm focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/20" />
+                    </label>
+                    <Button type="submit" className="w-full" disabled={registrationMutation.isPending}>
+                      {registrationMutation.isPending ? 'Saving...' : 'Save Registration'}
+                    </Button>
+                  </form>
+                </section>
+              ) : (
+                <p className="mt-4 rounded-lg border border-brand-saffron/40 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
+                  Event link is still syncing. Please open the Events page to register.
+                </p>
+              )}
+
             </div>
           </div>
         </div>

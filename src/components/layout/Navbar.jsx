@@ -35,6 +35,7 @@ const compactNavClass = ({ isActive }) =>
 const iconClass = 'h-4.5 w-4.5';
 const socialGlyphClass = 'h-3.5 w-3.5';
 const streamGlyphClass = 'h-6 w-6';
+const darbarSahibDirectFallbackUrl = 'https://live.sgpc.net:8442/';
 
 const WebsiteGlyph = () => (
   <svg viewBox="0 0 24 24" className={socialGlyphClass} aria-hidden="true">
@@ -97,6 +98,11 @@ const Navbar = () => {
   const [isKirtanLoading, setIsKirtanLoading] = useState(false);
   const [streamModalState, setStreamModalState] = useState({ open: false, id: '' });
   const liveAudioRef = useRef(null);
+  const kirtanRetryTimeoutRef = useRef(null);
+  const kirtanPlaybackRequestedRef = useRef(false);
+  const kirtanPausedByUserRef = useRef(false);
+  const kirtanUseDirectFallbackRef = useRef(false);
+  const kirtanReconnectInFlightRef = useRef(false);
   const compactScrollRestoreRef = useRef(null);
   const compactRestoreFramesRef = useRef({ first: 0, second: 0 });
   const preserveCompactUntilRef = useRef(0);
@@ -257,19 +263,89 @@ const Navbar = () => {
     };
   }, [nanakshahiDate.month]);
 
+  const clearKirtanRetryTimer = () => {
+    if (kirtanRetryTimeoutRef.current) {
+      window.clearTimeout(kirtanRetryTimeoutRef.current);
+      kirtanRetryTimeoutRef.current = null;
+    }
+  };
+
+  const resolveKirtanStreamUrl = () => {
+    const configured = String(siteConfig.liveKirtanStreamUrl || '').trim();
+    if (kirtanUseDirectFallbackRef.current && /^\/api\/streaming\/darbar-sahib\/live\/?$/i.test(configured)) {
+      return darbarSahibDirectFallbackUrl;
+    }
+    return configured;
+  };
+
+  const scheduleKirtanReconnect = () => {
+    if (!kirtanPlaybackRequestedRef.current) {
+      return;
+    }
+
+    if (kirtanRetryTimeoutRef.current || kirtanReconnectInFlightRef.current) {
+      return;
+    }
+
+    kirtanRetryTimeoutRef.current = window.setTimeout(async () => {
+      kirtanRetryTimeoutRef.current = null;
+      if (!kirtanPlaybackRequestedRef.current || !liveAudioRef.current) {
+        return;
+      }
+
+      const baseStreamUrl = resolveKirtanStreamUrl();
+      if (!baseStreamUrl) {
+        setIsKirtanPlaying(false);
+        setIsKirtanLoading(false);
+        return;
+      }
+
+      try {
+        kirtanReconnectInFlightRef.current = true;
+        const separator = baseStreamUrl.includes('?') ? '&' : '?';
+        const refreshedUrl = `${baseStreamUrl}${separator}t=${Date.now()}`;
+        setIsKirtanLoading(true);
+        liveAudioRef.current.src = refreshedUrl;
+        liveAudioRef.current.load();
+        await liveAudioRef.current.play();
+      } catch {
+        if (!kirtanUseDirectFallbackRef.current && /^\/api\/streaming\/darbar-sahib\/live\/?$/i.test(String(siteConfig.liveKirtanStreamUrl || '').trim())) {
+          kirtanUseDirectFallbackRef.current = true;
+        }
+        setIsKirtanPlaying(false);
+        setIsKirtanLoading(false);
+        kirtanReconnectInFlightRef.current = false;
+        scheduleKirtanReconnect();
+        return;
+      }
+
+      kirtanReconnectInFlightRef.current = false;
+    }, 2200);
+  };
+
+  useEffect(() => () => {
+    clearKirtanRetryTimer();
+    kirtanReconnectInFlightRef.current = false;
+  }, []);
+
   const toggleLiveKirtan = async () => {
     if (!liveAudioRef.current) {
       return;
     }
 
-    const baseStreamUrl = String(siteConfig.liveKirtanStreamUrl || '').trim();
+    const baseStreamUrl = resolveKirtanStreamUrl();
     if (!baseStreamUrl) {
+      kirtanPlaybackRequestedRef.current = false;
       setIsKirtanPlaying(false);
       setIsKirtanLoading(false);
       return;
     }
 
     if (isKirtanPlaying) {
+      kirtanPlaybackRequestedRef.current = false;
+      kirtanPausedByUserRef.current = true;
+      clearKirtanRetryTimer();
+      kirtanReconnectInFlightRef.current = false;
       liveAudioRef.current.pause();
       setIsKirtanPlaying(false);
       setIsKirtanLoading(false);
@@ -277,6 +353,11 @@ const Navbar = () => {
     }
 
     try {
+      kirtanPlaybackRequestedRef.current = true;
+      kirtanPausedByUserRef.current = false;
+      kirtanUseDirectFallbackRef.current = false;
+      clearKirtanRetryTimer();
+      kirtanReconnectInFlightRef.current = false;
       const separator = baseStreamUrl.includes('?') ? '&' : '?';
       const refreshedUrl = `${baseStreamUrl}${separator}t=${Date.now()}`;
       setIsKirtanLoading(true);
@@ -286,8 +367,12 @@ const Navbar = () => {
       setIsKirtanPlaying(true);
       setIsKirtanLoading(false);
     } catch {
+      if (!kirtanUseDirectFallbackRef.current && /^\/api\/streaming\/darbar-sahib\/live\/?$/i.test(String(siteConfig.liveKirtanStreamUrl || '').trim())) {
+        kirtanUseDirectFallbackRef.current = true;
+      }
       setIsKirtanPlaying(false);
       setIsKirtanLoading(false);
+      scheduleKirtanReconnect();
     }
   };
 
@@ -326,21 +411,34 @@ const Navbar = () => {
                 src={siteConfig.liveKirtanStreamUrl}
                 preload="none"
                 onPlaying={() => {
+                  clearKirtanRetryTimer();
+                  kirtanReconnectInFlightRef.current = false;
+                  kirtanPausedByUserRef.current = false;
                   setIsKirtanPlaying(true);
                   setIsKirtanLoading(false);
                 }}
                 onPause={() => {
                   setIsKirtanPlaying(false);
-                  setIsKirtanLoading(false);
+                  setIsKirtanLoading(kirtanPlaybackRequestedRef.current && !kirtanPausedByUserRef.current);
                 }}
                 onEnded={() => {
                   setIsKirtanPlaying(false);
-                  setIsKirtanLoading(false);
+                  setIsKirtanLoading(kirtanPlaybackRequestedRef.current);
+                  if (kirtanPlaybackRequestedRef.current && !kirtanPausedByUserRef.current) {
+                    scheduleKirtanReconnect();
+                  }
                 }}
                 onWaiting={() => setIsKirtanLoading(true)}
+                onStalled={() => {
+                  setIsKirtanLoading(true);
+                  if (kirtanPlaybackRequestedRef.current && !kirtanPausedByUserRef.current) {
+                    scheduleKirtanReconnect();
+                  }
+                }}
                 onError={() => {
                   setIsKirtanPlaying(false);
                   setIsKirtanLoading(false);
+                  scheduleKirtanReconnect();
                 }}
               />
             </div>

@@ -381,6 +381,8 @@ const normalizeScheduledEntry = (entry, fallbackDate, fallbackSlot) => {
   };
 };
 
+const resolveDailyEntry = (slots) => slots?.morning || slots?.evening || null;
+
 const readScheduledEntries = async () => {
   const raw = await readJson(ENTRIES_KEY, {});
   return Object.entries(raw || {}).reduce((acc, [date, slots]) => {
@@ -462,6 +464,12 @@ const writeHistory = async (entry) => {
   await writeJson(HISTORY_KEY, nextHistory);
 };
 
+const removeHistoryEntry = async (date, slot = 'morning') => {
+  const history = await readJson(HISTORY_KEY, []);
+  const nextHistory = history.filter((item) => !(item.date === date && item.slot === slot));
+  await writeJson(HISTORY_KEY, nextHistory);
+};
+
 const hukamnamaService = {
   getReadAlongConfig: () => ({
     enabled: READ_ALONG_ENABLED,
@@ -485,8 +493,10 @@ const hukamnamaService = {
   getDailyHukamnama: async (dateValue) => {
     const date = toDateKey(dateValue || new Date());
     const entries = await readScheduledEntries();
+    const entry = resolveDailyEntry(entries[date]);
     return mockResponse({
       date,
+      entry,
       morning: entries[date]?.morning || null,
       evening: entries[date]?.evening || null
     });
@@ -526,8 +536,8 @@ const hukamnamaService = {
     const normalizedSlot = normalizeSlot(slot);
     const entries = await readScheduledEntries();
 
-    if (entries[dateKey]?.[normalizedSlot]) {
-      throw new Error(`Hukamnama for ${dateKey} (${normalizedSlot}) is already set.`);
+    if (resolveDailyEntry(entries[dateKey])) {
+      throw new Error(`Hukamnama for ${dateKey} is already set.`);
     }
 
     const angData = await fetchAngData(safeAng);
@@ -575,11 +585,79 @@ const hukamnamaService = {
   setCurrentAng: async (ang) => {
     return hukamnamaService.setScheduledHukamnama({ ang, date: toDateKey(new Date()), slot: 'morning' });
   },
+  updateScheduledHukamnama: async ({ ang, date }) => {
+    const safeAng = Math.max(1, Number(ang) || 1);
+    const dateKey = toDateKey(date || new Date());
+    const entries = await readScheduledEntries();
+    const existingEntry = resolveDailyEntry(entries[dateKey]);
+
+    if (!existingEntry) {
+      throw new Error(`No hukamnama found for ${dateKey}.`);
+    }
+
+    const angData = await fetchAngData(safeAng);
+    if (angData.isFallback || !angData.lines?.length) {
+      throw new Error('Unable to fetch hukamnama lines for this ang at the moment. Please try again.');
+    }
+
+    const updatedEntry = normalizeScheduledEntry({
+      ...angData,
+      ang: safeAng,
+      date: dateKey,
+      slot: existingEntry.slot || 'morning',
+      updatedAt: new Date().toISOString(),
+      audioUrl: DAILY_MUKHWAK_AUDIO
+    }, dateKey, existingEntry.slot || 'morning');
+
+    const nextEntries = {
+      ...entries,
+      [dateKey]: {
+        morning: updatedEntry.slot === 'evening' ? null : updatedEntry,
+        evening: updatedEntry.slot === 'evening' ? updatedEntry : null
+      }
+    };
+
+    await writeScheduledEntries(nextEntries);
+
+    if (dateKey === toDateKey(new Date())) {
+      await writeJson(SETTINGS_KEY, normalizeEntry(updatedEntry));
+    }
+
+    await writeHistory({
+      ang: safeAng,
+      date: dateKey,
+      slot: updatedEntry.slot || 'morning',
+      updatedAt: updatedEntry.updatedAt,
+      preview: updatedEntry.lines[0]?.gurmukhi || '',
+      translation: updatedEntry.lines[0]?.translationEnglish || '',
+      raag: updatedEntry.metadata?.raag || '',
+      writer: updatedEntry.metadata?.writer || ''
+    });
+
+    return mockResponse(updatedEntry);
+  },
+  deleteScheduledHukamnama: async (dateValue) => {
+    const dateKey = toDateKey(dateValue || new Date());
+    const entries = await readScheduledEntries();
+    const existingEntry = resolveDailyEntry(entries[dateKey]);
+
+    if (!existingEntry) {
+      throw new Error(`No hukamnama found for ${dateKey}.`);
+    }
+
+    const nextEntries = { ...entries };
+    delete nextEntries[dateKey];
+    await writeScheduledEntries(nextEntries);
+    await removeHistoryEntry(dateKey, existingEntry.slot || 'morning');
+
+    return mockResponse({ success: true, date: dateKey });
+  },
   getArchiveByDate: async (dateValue) => {
     const date = toDateKey(dateValue || new Date());
     const entries = await readScheduledEntries();
     return mockResponse({
       date,
+      entry: resolveDailyEntry(entries[date]),
       morning: entries[date]?.morning || null,
       evening: entries[date]?.evening || null
     });
@@ -588,16 +666,18 @@ const hukamnamaService = {
     const entries = await readScheduledEntries();
     const payload = Object.entries(entries).map(([date, slots]) => ({
       date,
+      hasEntry: Boolean(resolveDailyEntry(slots)),
       hasMorning: Boolean(slots?.morning),
       hasEvening: Boolean(slots?.evening),
-      angs: [slots?.morning?.ang, slots?.evening?.ang].filter(Boolean)
+      angs: [slots?.morning?.ang, slots?.evening?.ang].filter(Boolean),
+      ang: resolveDailyEntry(slots)?.ang || null
     }));
     return mockResponse(payload);
   },
   getArchive: async () => {
     const entries = await readScheduledEntries();
     const flattened = Object.values(entries)
-      .flatMap((day) => [day?.morning, day?.evening])
+      .map((day) => resolveDailyEntry(day))
       .filter(Boolean)
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
       .map((entry) => ({

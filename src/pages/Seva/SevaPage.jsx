@@ -74,7 +74,7 @@ const SevaPage = () => {
     return sevaOpportunities.map((item) => {
       const registered = registrationsByOpportunity[item.id] || 0;
       const totalRequired = Math.max(1, Number(item.totalVolunteersRequired) || 10);
-      const isExpired = Boolean(item.expiryDate) && item.expiryDate < today;
+      const isExpired = Boolean(item.isClosed) || (Boolean(item.expiryDate) && item.expiryDate < today);
       const isOpen = !isExpired && registered < totalRequired;
 
       return {

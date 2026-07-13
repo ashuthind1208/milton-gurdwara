@@ -39,6 +39,19 @@ const normalizeOpportunity = (item, index = 0) => ({
   active: normalizeBoolean(item.active, true)
 });
 
+const enrichOpportunityStatus = (item) => {
+  const today = toIsoDate(Date.now());
+  const isPastDate = Boolean(item?.date) && item.date < today;
+  const isExpired = Boolean(item?.expiryDate) && item.expiryDate < today;
+  const isClosed = isPastDate || isExpired;
+
+  return {
+    ...item,
+    isClosed,
+    status: isClosed ? 'closed' : (item.active ? 'active' : 'inactive')
+  };
+};
+
 const ensureDefaultOpportunities = async () => {
   const rows = await contentApiService.list(OPPORTUNITIES_RESOURCE);
   if (rows.length > 0) {
@@ -74,9 +87,13 @@ const opportunities = ['Langar', 'Cleaning', 'Parking', 'Teaching', 'Events'];
 const volunteerService = {
   getOpportunities: async () => mockResponse(opportunities),
 
-  getSevaOpportunities: async () => {
+  getSevaOpportunities: async (options = {}) => {
     const rows = await ensureDefaultOpportunities();
-    return mockResponse(rows);
+    const enriched = rows.map((item) => enrichOpportunityStatus(item));
+    if (options.includeClosed) {
+      return mockResponse(enriched);
+    }
+    return mockResponse(enriched.filter((item) => !item.isClosed));
   },
 
   createSevaOpportunity: async (payload) => {

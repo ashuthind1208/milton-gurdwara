@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  CheckIcon,
   EyeIcon,
   PencilSquareIcon,
   TrashIcon
@@ -18,6 +17,7 @@ import StatusAlert from '../../components/common/StatusAlert';
 
 const actionIconClass = 'h-4 w-4';
 const quarterMinuteOptions = ['00', '15', '30', '45'];
+const VIEW_REGISTRANTS_PAGE_SIZE = 10;
 
 const toInputDateTime = (value) => {
   if (!value) {
@@ -183,6 +183,7 @@ const AdminEventsPage = () => {
   const [createUploadProgress, setCreateUploadProgress] = useState(0);
   const [editUploadProgress, setEditUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState({ type: 'success', message: '' });
+  const [viewRegistrantsPage, setViewRegistrantsPage] = useState(1);
 
   const createForm = useForm({ defaultValues: defaultForm });
   const editForm = useForm({ defaultValues: defaultForm });
@@ -380,6 +381,23 @@ const AdminEventsPage = () => {
     });
   };
 
+  const registrants = useMemo(() => viewEvent?.registrants || [], [viewEvent]);
+  const registrantsTotalPages = Math.max(1, Math.ceil(registrants.length / VIEW_REGISTRANTS_PAGE_SIZE));
+  const visibleRegistrants = useMemo(() => {
+    const start = (viewRegistrantsPage - 1) * VIEW_REGISTRANTS_PAGE_SIZE;
+    return registrants.slice(start, start + VIEW_REGISTRANTS_PAGE_SIZE);
+  }, [registrants, viewRegistrantsPage]);
+
+  useEffect(() => {
+    setViewRegistrantsPage(1);
+  }, [viewEvent?.id]);
+
+  useEffect(() => {
+    if (viewRegistrantsPage > registrantsTotalPages) {
+      setViewRegistrantsPage(registrantsTotalPages);
+    }
+  }, [viewRegistrantsPage, registrantsTotalPages]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
@@ -414,21 +432,23 @@ const AdminEventsPage = () => {
                   <td className="py-2 pr-3">{event.category || '-'}</td>
                   <td className="py-2 pr-3">{event.registrations || (event.registrants || []).length || 0}</td>
                   <td className="py-2 pr-3">
-                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${event.active === false ? 'bg-slate-200 text-slate-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                      {event.active === false ? 'Inactive' : 'Active'}
-                    </span>
-                  </td>
-                  <td className="py-2 pr-3">
-                    <div className="flex items-center gap-2">
+                    <div className="inline-flex items-center gap-2">
                       <button
                         type="button"
                         onClick={() => toggleActiveMutation.mutate({ id: event.id, active: event.active === false })}
-                        className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border ${event.active === false ? 'border-slate-300 text-slate-700 hover:bg-slate-100' : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}
-                        title={event.active === false ? 'Mark active' : 'Mark inactive'}
-                        aria-label={event.active === false ? 'Mark active' : 'Mark inactive'}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${event.active === false ? 'bg-slate-300' : 'bg-emerald-500'}`}
+                        title={event.active === false ? 'Set active' : 'Set inactive'}
+                        aria-label={event.active === false ? 'Set active' : 'Set inactive'}
                       >
-                        <CheckIcon className={actionIconClass} />
+                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${event.active === false ? 'translate-x-0.5' : 'translate-x-5'}`} />
                       </button>
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${event.active === false ? 'bg-slate-200 text-slate-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                        {event.active === false ? 'Inactive' : 'Active'}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="py-2 pr-3">
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
                         onClick={() => setViewEvent(event)}
@@ -492,7 +512,7 @@ const AdminEventsPage = () => {
 
       {createOpen ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/45 px-4">
-          <div className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl">
+          <div className="w-full max-w-2xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-heading text-xl font-semibold">Add Event</h3>
               <button type="button" className="rounded-md border border-slate-300 px-2 py-1 text-sm" onClick={closeModals}>Close</button>
@@ -583,7 +603,7 @@ const AdminEventsPage = () => {
 
       {editingEvent ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/45 px-4">
-          <div className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl">
+          <div className="w-full max-w-2xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-heading text-xl font-semibold">Edit Event</h3>
               <button type="button" className="rounded-md border border-slate-300 px-2 py-1 text-sm" onClick={closeModals}>Close</button>
@@ -674,41 +694,76 @@ const AdminEventsPage = () => {
 
       {viewEvent ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/45 px-4">
-          <div className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl">
+          <div className="w-full max-w-3xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-2xl border border-brand-blue/20 bg-gradient-to-br from-blue-50 via-white to-amber-50 p-5 shadow-xl">
             <div className="flex items-center justify-between gap-3">
-              <h3 className="font-heading text-xl font-semibold">Event Details</h3>
+              <h3 className="font-heading text-3xl font-extrabold text-brand-blue">Event Details</h3>
               <button type="button" className="rounded-md border border-slate-300 px-2 py-1 text-sm" onClick={closeModals}>Close</button>
             </div>
-            <div className="mt-4 grid gap-2 text-sm text-slate-700 md:grid-cols-2">
-              <p><span className="font-semibold">Title:</span> {viewEvent.title || '-'}</p>
-              <p><span className="font-semibold">Date:</span> {formatDate(viewEvent.date)}</p>
-              <p><span className="font-semibold">End Date:</span> {formatDate(viewEvent.endDate || plusOneHour(viewEvent.date))}</p>
-              <p><span className="font-semibold">Category:</span> {viewEvent.category || '-'}</p>
-              <p><span className="font-semibold">Location:</span> {viewEvent.location || '-'}</p>
-              <p><span className="font-semibold">Media:</span> {viewEvent.mediaUrl ? <a href={viewEvent.mediaUrl} target="_blank" rel="noreferrer" className="text-brand-blue hover:underline">Open media</a> : '-'}</p>
-              <p><span className="font-semibold">Status:</span> {viewEvent.active === false ? 'Inactive' : 'Active'}</p>
-              <p><span className="font-semibold">Total Registrations:</span> {viewEvent.registrations || (viewEvent.registrants || []).length || 0}</p>
+            <div className="mt-4 grid gap-2 rounded-xl border border-brand-blue/15 bg-white/80 p-4 text-sm text-slate-700 md:grid-cols-2">
+              <p><span className="font-semibold text-brand-blue">Title:</span> {viewEvent.title || '-'}</p>
+              <p><span className="font-semibold text-brand-blue">Date:</span> {formatDate(viewEvent.date)}</p>
+              <p><span className="font-semibold text-brand-blue">End Date:</span> {formatDate(viewEvent.endDate || plusOneHour(viewEvent.date))}</p>
+              <p><span className="font-semibold text-brand-blue">Category:</span> {viewEvent.category || '-'}</p>
+              <p><span className="font-semibold text-brand-blue">Location:</span> {viewEvent.location || '-'}</p>
+              <p><span className="font-semibold text-brand-blue">Media:</span> {viewEvent.mediaUrl ? <a href={viewEvent.mediaUrl} target="_blank" rel="noreferrer" className="text-brand-blue hover:underline">Open media</a> : '-'}</p>
+              <p><span className="font-semibold text-brand-blue">Status:</span> {viewEvent.active === false ? 'Inactive' : 'Active'}</p>
+              <p><span className="font-semibold text-brand-blue">Total Registrations:</span> {viewEvent.registrations || (viewEvent.registrants || []).length || 0}</p>
             </div>
-            <div className="mt-4 max-h-[45vh] space-y-2 overflow-y-auto pr-1">
+            <div className="mt-4 rounded-xl border border-slate-200 bg-white/90 p-3">
+              <h4 className="text-sm font-semibold uppercase tracking-wide text-brand-blue">Registrants</h4>
               {(viewEvent.registrants || []).length === 0 ? (
-                <p className="text-sm text-slate-500">No registrations captured yet.</p>
-              ) : (viewEvent.registrants || []).map((entry) => (
-                <div key={entry.id} className="rounded-lg border border-slate-200 px-3 py-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-800">{entry.name || 'Anonymous'}</p>
-                      <p className="text-xs text-slate-600">{entry.contact || 'No contact provided'}</p>
-                    </div>
+                <p className="mt-2 text-sm text-slate-500">No registrations captured yet.</p>
+              ) : (
+                <>
+                  <div className="mt-2 overflow-x-auto">
+                    <table className="min-w-full text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                          <th className="px-3 py-2">Name</th>
+                          <th className="px-3 py-2">Contact</th>
+                          <th className="px-3 py-2 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {visibleRegistrants.map((entry) => (
+                          <tr key={entry.id} className="border-b border-slate-100 last:border-b-0">
+                            <td className="px-3 py-2 font-medium text-slate-800">{entry.name || 'Anonymous'}</td>
+                            <td className="px-3 py-2 text-slate-700">{entry.contact || 'No contact provided'}</td>
+                            <td className="px-3 py-2 text-right">
+                              <button
+                                type="button"
+                                onClick={() => removeRegistrantMutation.mutate({ eventId: viewEvent.id, registrantId: entry.id })}
+                                className="rounded-md border border-red-200 px-2 py-0.5 text-xs font-semibold text-red-700"
+                              >
+                                Remove
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="mt-3 flex items-center justify-end gap-2">
                     <button
                       type="button"
-                      onClick={() => removeRegistrantMutation.mutate({ eventId: viewEvent.id, registrantId: entry.id })}
-                      className="rounded-md border border-red-200 px-2 py-0.5 text-xs font-semibold text-red-700"
+                      className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-40"
+                      disabled={viewRegistrantsPage <= 1}
+                      onClick={() => setViewRegistrantsPage((prev) => prev - 1)}
                     >
-                      Remove
+                      Prev
+                    </button>
+                    <span className="text-xs font-semibold text-slate-600">Page {viewRegistrantsPage} of {registrantsTotalPages}</span>
+                    <button
+                      type="button"
+                      className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-40"
+                      disabled={viewRegistrantsPage >= registrantsTotalPages}
+                      onClick={() => setViewRegistrantsPage((prev) => prev + 1)}
+                    >
+                      Next
                     </button>
                   </div>
-                </div>
-              ))}
+                </>
+              )}
             </div>
           </div>
         </div>

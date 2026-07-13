@@ -797,6 +797,16 @@ const AdminLibraryPage = () => {
                   <td className="px-3 py-1.5">
                     <p className="font-semibold text-slate-800">{entry.title}</p>
                     <p className="text-xs text-slate-500">{entry.speaker || 'Guest Speaker TBD'}</p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${entry.eventId ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                        {entry.eventId ? 'Linked to Events' : 'Not Linked'}
+                      </span>
+                      {entry.eventId ? (
+                        <a href={`/events?eventId=${entry.eventId}`} target="_blank" rel="noreferrer" className="text-[11px] font-semibold text-brand-blue hover:underline">
+                          Open Event
+                        </a>
+                      ) : null}
+                    </div>
                   </td>
                   <td className="px-3 py-1.5">{entry.scheduleDate || '-'} {entry.scheduleTime ? `| ${entry.scheduleTime}` : ''}</td>
                   <td className="px-3 py-1.5">{entry.audience || '-'}</td>

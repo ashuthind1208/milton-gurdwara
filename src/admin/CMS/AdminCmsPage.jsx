@@ -432,8 +432,9 @@ const AdminCmsPage = () => {
       </Card>
 
       {slideModal.open ? (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-900/45 px-4 py-6">
-          <div className="w-full max-w-3xl rounded-xl bg-white p-5 shadow-xl">
+        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6">
+          <div className="mx-auto flex min-h-full items-center justify-center">
+          <div className="w-full max-w-3xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-heading text-xl font-semibold">{slideModal.mode === 'add' ? 'Add New Slide' : slideModal.mode === 'edit' ? 'Edit Slide' : 'View Slide'}</h3>
               <button type="button" onClick={() => setSlideModal({ open: false, mode: 'view', slideId: null })} className="rounded-md border border-slate-300 px-2 py-1 text-sm">Close</button>
@@ -506,12 +507,14 @@ const AdminCmsPage = () => {
               ) : null}
             </form>
           </div>
+          </div>
         </div>
       ) : null}
 
       {sectionModal.open ? (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-900/45 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl">
+        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6">
+          <div className="mx-auto flex min-h-full items-center justify-center">
+          <div className="w-full max-w-2xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-heading text-xl font-semibold">{sectionModal.mode === 'add' ? 'Add Section' : sectionModal.mode === 'edit' ? 'Edit Section' : 'View Section'}</h3>
               <button type="button" onClick={() => setSectionModal({ open: false, mode: 'view', sectionId: null })} className="rounded-md border border-slate-300 px-2 py-1 text-sm">Close</button>
@@ -552,6 +555,7 @@ const AdminCmsPage = () => {
                 </div>
               ) : null}
             </form>
+          </div>
           </div>
         </div>
       ) : null}

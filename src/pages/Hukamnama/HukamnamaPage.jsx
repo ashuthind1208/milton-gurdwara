@@ -16,24 +16,15 @@ const toDisplayDate = (value) => {
   return date.toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' });
 };
 
-const toSlotLabel = (slot) => {
-  const normalized = String(slot || '').toLowerCase();
-  if (normalized === 'evening') {
-    return 'Evening';
-  }
-  if (normalized === 'morning') {
-    return 'Morning';
-  }
-  return 'Morning';
-};
-
 const HukamnamaPage = () => {
   const meta = useSeoMeta('Daily Hukamnama', 'Read today\'s hukamnama with translation, meaning, and archived entries.');
   const readAlongConfig = useMemo(() => hukamnamaService.getReadAlongConfig(), []);
-  const { data: currentHukamnama } = useQuery({
-    queryKey: ['current-hukamnama'],
-    queryFn: () => hukamnamaService.getCurrentHukamnama().then((res) => res.data)
+  const todayDateKey = new Date().toISOString().slice(0, 10);
+  const { data: dailyHukamnama } = useQuery({
+    queryKey: ['daily-hukamnama', todayDateKey],
+    queryFn: () => hukamnamaService.getDailyHukamnama(todayDateKey).then((res) => res.data)
   });
+  const currentHukamnama = dailyHukamnama?.entry || null;
   const currentAng = Math.max(1, Number(currentHukamnama?.ang || 0));
 
   const { data: readAlongAudio } = useQuery({
@@ -47,7 +38,6 @@ const HukamnamaPage = () => {
     queryFn: () => hukamnamaService.getArchive().then((res) => res.data)
   });
 
-  const hukamnamaSlotLabel = toSlotLabel(currentHukamnama?.slot);
   const hukamnamaDateLabel = toDisplayDate(currentHukamnama?.date || currentHukamnama?.updatedAt);
 
   return (
@@ -60,7 +50,7 @@ const HukamnamaPage = () => {
             <div className="w-full">
               <AudioPillPlayer
                 label="Singh Sabha Milton"
-                subtitle={`${hukamnamaSlotLabel} | Ang ${currentAng} | ${hukamnamaDateLabel}`}
+                subtitle={`Ang ${currentAng} | ${hukamnamaDateLabel}`}
                 src={readAlongAudio.url}
                 showProgress
               />
@@ -68,7 +58,9 @@ const HukamnamaPage = () => {
           ) : null}
         </div>
         <div className="mt-3 space-y-3">
-          {(currentHukamnama?.lines || []).map((line) => (
+          {!currentHukamnama ? (
+            <p className="text-sm text-slate-500">Today\'s hukamnama is not available yet.</p>
+          ) : (currentHukamnama.lines || []).map((line) => (
             <div key={line.id}>
               <p className="font-gurmukhi text-lg font-bold leading-relaxed text-brand-navy">{line.gurmukhi}</p>
               {line.translationPunjabi ? <p className="mt-1 text-sm font-normal text-brand-saffron">Punjabi: {line.translationPunjabi}</p> : null}

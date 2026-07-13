@@ -35,8 +35,8 @@ const AdminSevaOpportunitiesPage = () => {
   const editForm = useForm({ defaultValues: defaultForm });
 
   const { data: opportunities = [] } = useQuery({
-    queryKey: ['seva-opportunities'],
-    queryFn: () => volunteerService.getSevaOpportunities().then((res) => res.data)
+    queryKey: ['seva-opportunities', 'admin'],
+    queryFn: () => volunteerService.getSevaOpportunities({ includeClosed: true }).then((res) => res.data)
   });
 
   const { data: registrations = [] } = useQuery({
@@ -200,8 +200,8 @@ const AdminSevaOpportunitiesPage = () => {
                   <td className="py-2 pr-3">{item.time || '-'}</td>
                   <td className="py-2 pr-3">{(volunteersByOpportunity[item.id] || []).length}/{item.totalVolunteersRequired || 10}</td>
                   <td className="py-2 pr-3">
-                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${item.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'}`}>
-                      {item.active ? 'Active' : 'Inactive'}
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${item.status === 'closed' ? 'bg-rose-100 text-rose-700' : item.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'}`}>
+                      {item.status === 'closed' ? 'Closed' : item.active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
                   <td className="py-2 pr-3">
@@ -288,8 +288,9 @@ const AdminSevaOpportunitiesPage = () => {
       </Card>
 
       {createOpen ? (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-900/45 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl">
+        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6">
+          <div className="mx-auto flex min-h-full items-center justify-center">
+          <div className="w-full max-w-2xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-heading text-xl font-semibold">Add Seva Opportunity</h3>
               <button type="button" onClick={closeModals} className="rounded-md border border-slate-300 px-2 py-1 text-sm">Close</button>
@@ -320,12 +321,14 @@ const AdminSevaOpportunitiesPage = () => {
               </div>
             </form>
           </div>
+          </div>
         </div>
       ) : null}
 
       {viewOpportunity ? (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-900/45 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl">
+        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6">
+          <div className="mx-auto flex min-h-full items-center justify-center">
+          <div className="w-full max-w-2xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-heading text-xl font-semibold">Opportunity Details</h3>
               <button type="button" onClick={closeModals} className="rounded-md border border-slate-300 px-2 py-1 text-sm">Close</button>
@@ -335,7 +338,7 @@ const AdminSevaOpportunitiesPage = () => {
               <p><span className="font-semibold">Date:</span> {viewOpportunity.date || '-'}</p>
               <p><span className="font-semibold">Time:</span> {viewOpportunity.time || '-'}</p>
               <p><span className="font-semibold">Expiry:</span> {viewOpportunity.expiryDate || '-'}</p>
-              <p><span className="font-semibold">Status:</span> {viewOpportunity.active ? 'Active' : 'Inactive'}</p>
+              <p><span className="font-semibold">Status:</span> {viewOpportunity.status === 'closed' ? 'Closed' : viewOpportunity.active ? 'Active' : 'Inactive'}</p>
               <p><span className="font-semibold">Volunteers:</span> {selectedVolunteers.length}/{viewOpportunity.totalVolunteersRequired || 10}</p>
             </div>
             <div className="mt-4 max-h-64 space-y-2 overflow-y-auto pr-1">
@@ -349,12 +352,14 @@ const AdminSevaOpportunitiesPage = () => {
               ))}
             </div>
           </div>
+          </div>
         </div>
       ) : null}
 
       {editing ? (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-900/45 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl">
+        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6">
+          <div className="mx-auto flex min-h-full items-center justify-center">
+          <div className="w-full max-w-2xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-heading text-xl font-semibold">Edit Seva Opportunity</h3>
               <button type="button" onClick={closeModals} className="rounded-md border border-slate-300 px-2 py-1 text-sm">Close</button>
@@ -384,6 +389,7 @@ const AdminSevaOpportunitiesPage = () => {
                 <Button type="button" variant="ghost" onClick={closeModals}>Cancel</Button>
               </div>
             </form>
+          </div>
           </div>
         </div>
       ) : null}

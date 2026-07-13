@@ -409,8 +409,9 @@ const AdminDonationsPage = () => {
       </Card>
 
       {createCampaignOpen ? (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-900/45 px-4 py-6" onClick={() => setCreateCampaignOpen(false)}>
-          <div className="w-full max-w-3xl rounded-xl bg-white p-5 shadow-xl" onClick={(event) => event.stopPropagation()}>
+        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6" onClick={() => setCreateCampaignOpen(false)}>
+          <div className="mx-auto flex min-h-full items-center justify-center">
+          <div className="w-full max-w-3xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-xl" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="font-heading text-xl font-semibold">Create Donation Campaign</h3>
@@ -458,12 +459,14 @@ const AdminDonationsPage = () => {
               </div>
             </form>
           </div>
+          </div>
         </div>
       ) : null}
 
       {viewingCampaign ? (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-900/45 px-4 py-6" onClick={() => setViewingCampaign(null)}>
-          <div className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl" onClick={(event) => event.stopPropagation()}>
+        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6" onClick={() => setViewingCampaign(null)}>
+          <div className="mx-auto flex min-h-full items-center justify-center">
+          <div className="w-full max-w-2xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-xl" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-heading text-xl font-semibold">Campaign Details</h3>
               <button type="button" onClick={() => setViewingCampaign(null)} className="rounded-full border border-slate-300 p-2 text-slate-600" aria-label="Close campaign details modal">
@@ -516,12 +519,14 @@ const AdminDonationsPage = () => {
               ) : null}
             </div>
           </div>
+          </div>
         </div>
       ) : null}
 
       {editingCampaign ? (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-900/45 px-4 py-6" onClick={() => setEditingCampaign(null)}>
-          <div className="w-full max-w-3xl rounded-xl bg-white p-5 shadow-xl" onClick={(event) => event.stopPropagation()}>
+        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6" onClick={() => setEditingCampaign(null)}>
+          <div className="mx-auto flex min-h-full items-center justify-center">
+          <div className="w-full max-w-3xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-xl" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-heading text-xl font-semibold">Edit Campaign</h3>
               <button type="button" onClick={() => setEditingCampaign(null)} className="rounded-full border border-slate-300 p-2 text-slate-600" aria-label="Close edit campaign modal">
@@ -565,6 +570,7 @@ const AdminDonationsPage = () => {
                 <button type="button" onClick={() => setEditingCampaign(null)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Cancel</button>
               </div>
             </form>
+          </div>
           </div>
         </div>
       ) : null}

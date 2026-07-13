@@ -1,5 +1,6 @@
 import { mockResponse } from './mockApi';
 import contentApiService from './contentApiService';
+import eventService from './eventService';
 
 const STORAGE_RESOURCE = 'library_content';
 
@@ -169,8 +170,79 @@ const normalizeProgramUpdate = (entry = {}, index = 0) => ({
   summary: entry.summary || '',
   imageUrl: entry.imageUrl || '',
   registrationUrl: entry.registrationUrl || '',
+  eventId: entry.eventId ? Number(entry.eventId) : null,
   updatedAt: entry.updatedAt || new Date().toISOString()
 });
+
+const parseScheduleDateTime = (scheduleDate = '', scheduleTime = '') => {
+  const safeDate = String(scheduleDate || '').trim();
+  const fallback = new Date();
+
+  if (!safeDate || !/^\d{4}-\d{2}-\d{2}$/.test(safeDate)) {
+    const nextHour = new Date(fallback.getTime() + 60 * 60 * 1000);
+    return {
+      startIso: fallback.toISOString(),
+      endIso: nextHour.toISOString()
+    };
+  }
+
+  const timeLabel = String(scheduleTime || '').trim().toUpperCase();
+  const timeMatch = timeLabel.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$/);
+  let hour = 18;
+  let minute = 0;
+
+  if (timeMatch) {
+    hour = Number(timeMatch[1]) || 18;
+    minute = Number(timeMatch[2] || '0') || 0;
+    const meridiem = timeMatch[3] || '';
+    if (meridiem === 'PM' && hour < 12) {
+      hour += 12;
+    }
+    if (meridiem === 'AM' && hour === 12) {
+      hour = 0;
+    }
+    if (!meridiem) {
+      hour = Math.max(0, Math.min(23, hour));
+    }
+  }
+
+  const startIso = new Date(`${safeDate}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`).toISOString();
+  const endIso = new Date(new Date(startIso).getTime() + 60 * 60 * 1000).toISOString();
+  return { startIso, endIso };
+};
+
+const toLinkedEventPayload = (entry) => {
+  const { startIso, endIso } = parseScheduleDateTime(entry.scheduleDate, entry.scheduleTime);
+  return {
+    title: String(entry.title || 'Library Session').trim(),
+    date: startIso,
+    endDate: endIso,
+    location: String(entry.location || 'Library Hall, Singh Sabha Milton').trim(),
+    category: 'Workshop',
+    mediaUrl: String(entry.imageUrl || '').trim(),
+    registrations: 0,
+    active: true
+  };
+};
+
+const resolveEventRegistrationUrl = ({ providedUrl = '', existingUrl = '', eventId = null }) => {
+  const provided = String(providedUrl || '').trim();
+  const existing = String(existingUrl || '').trim();
+
+  if (provided && provided !== '/events') {
+    return provided;
+  }
+
+  if (existing && existing !== '/events') {
+    return existing;
+  }
+
+  if (eventId) {
+    return `/events?eventId=${eventId}`;
+  }
+
+  return '/events';
+};
 
 const normalizePhysicalBook = (book = {}) => {
   const totalCopies = normalizeCount(book.totalCopies);
@@ -518,6 +590,12 @@ const libraryService = {
   },
 
   addProgramUpdate: async (payload) => {
+    const createdEvent = await eventService.createEvent(toLinkedEventPayload(payload));
+    const linkedEventId = Number(createdEvent?.data?.id || 0) || null;
+    const registrationUrl = resolveEventRegistrationUrl({
+      providedUrl: payload?.registrationUrl,
+      eventId: linkedEventId
+    });
     const current = await readLibraryData();
     const nextData = {
       ...current,
@@ -525,6 +603,8 @@ const libraryService = {
         normalizeProgramUpdate({
           ...payload,
           id: `session-${Date.now()}`,
+          eventId: linkedEventId,
+          registrationUrl,
           updatedAt: new Date().toISOString()
         }),
         ...current.programUpdates
@@ -536,16 +616,37 @@ const libraryService = {
 
   updateProgramUpdate: async (id, payload) => {
     const current = await readLibraryData();
+    const existing = current.programUpdates.find((entry) => entry.id === id);
+    if (!existing) {
+      return mockResponse(current.programUpdates);
+    }
+
+    const merged = normalizeProgramUpdate({
+      ...existing,
+      ...payload,
+      id,
+      updatedAt: new Date().toISOString()
+    });
+
+    const eventPayload = toLinkedEventPayload(merged);
+    if (merged.eventId) {
+      await eventService.updateEvent(merged.eventId, eventPayload);
+    } else {
+      const createdEvent = await eventService.createEvent(eventPayload);
+      merged.eventId = Number(createdEvent?.data?.id || 0) || null;
+    }
+
+    merged.registrationUrl = resolveEventRegistrationUrl({
+      providedUrl: payload?.registrationUrl,
+      existingUrl: existing.registrationUrl,
+      eventId: merged.eventId
+    });
+
     const nextData = {
       ...current,
       programUpdates: current.programUpdates.map((entry) => (
         entry.id === id
-          ? normalizeProgramUpdate({
-              ...entry,
-              ...payload,
-              id,
-              updatedAt: new Date().toISOString()
-            })
+          ? merged
           : entry
       ))
     };
@@ -555,6 +656,10 @@ const libraryService = {
 
   removeProgramUpdate: async (id) => {
     const current = await readLibraryData();
+    const existing = current.programUpdates.find((entry) => entry.id === id);
+    if (existing?.eventId) {
+      await eventService.removeEvent(existing.eventId);
+    }
     const nextData = {
       ...current,
       programUpdates: current.programUpdates.filter((entry) => entry.id !== id)

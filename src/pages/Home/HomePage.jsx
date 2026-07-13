@@ -89,14 +89,12 @@ const HomePage = () => {
   const { data: events = [] } = useQuery({ queryKey: ['events'], queryFn: () => eventService.getEvents().then((res) => res.data) });
   const { data: albums = [] } = useQuery({ queryKey: ['albums'], queryFn: () => galleryService.getPublicAlbums().then((res) => res.data) });
   const { data: cmsData } = useQuery({ queryKey: ['cms-home'], queryFn: () => cmsService.getHomeContent().then((res) => res.data) });
-  const { data: currentHukamnama } = useQuery({ queryKey: ['current-hukamnama'], queryFn: () => hukamnamaService.getCurrentHukamnama().then((res) => res.data) });
   const todayDateKey = toDateKey(new Date());
-  const { data: dailyHukamnamaBySlot } = useQuery({ queryKey: ['daily-hukamnama', todayDateKey], queryFn: () => hukamnamaService.getDailyHukamnama(todayDateKey).then((res) => res.data) });
+  const { data: dailyHukamnama } = useQuery({ queryKey: ['daily-hukamnama', todayDateKey], queryFn: () => hukamnamaService.getDailyHukamnama(todayDateKey).then((res) => res.data) });
   const { data: ads = [] } = useQuery({ queryKey: ['advertisements'], queryFn: () => advertisementService.getAds().then((res) => res.data) });
   const { data: newsArticles = [] } = useQuery({ queryKey: ['news-articles'], queryFn: () => newsService.getArticles().then((res) => res.data) });
   const [selectedTickerEvent, setSelectedTickerEvent] = useState(null);
   const [selectedContentLink, setSelectedContentLink] = useState(null);
-  const [hukamnamaSlot, setHukamnamaSlot] = useState('morning');
   const [selectedSevaCategory, setSelectedSevaCategory] = useState('All');
   const [selectedSevaPage, setSelectedSevaPage] = useState(1);
   const [homeReadAlongStopToken, setHomeReadAlongStopToken] = useState(0);
@@ -109,10 +107,7 @@ const HomePage = () => {
   );
 
   const langarItems = cmsData?.langarItems || [];
-  const activeHukamnama = (hukamnamaSlot === 'evening' ? dailyHukamnamaBySlot?.evening : dailyHukamnamaBySlot?.morning)
-    || dailyHukamnamaBySlot?.morning
-    || dailyHukamnamaBySlot?.evening
-    || currentHukamnama;
+  const activeHukamnama = dailyHukamnama?.entry || null;
   const resolvedScheduleDay = useMemo(() => {
     const scheduleDays = Array.isArray(cmsData?.scheduleDays) ? cmsData.scheduleDays : [];
     const fallbackEntries = [
@@ -157,19 +152,19 @@ const HomePage = () => {
   const isTodaySpecial = resolvedScheduleDay?.dateKey === todayDateKey && resolvedScheduleDay?.isSpecial !== false;
   const hukamnamaLines = activeHukamnama?.lines || [];
   const hukamnamaMeta = activeHukamnama?.metadata || {};
+  const hasDailyHukamnama = Boolean(activeHukamnama?.ang && hukamnamaLines.length > 0);
   const volunteerOptions = ['Langar', 'Cleaning', 'Parking', 'Teaching', 'Events'];
   const readAlongConfig = useMemo(() => hukamnamaService.getReadAlongConfig(), []);
-  const homeHukamnamaAng = Math.max(1, Number(activeHukamnama?.ang || 0));
+  const homeHukamnamaAng = Math.max(0, Number(activeHukamnama?.ang || 0));
   const hukamnamaMetaPills = [
     activeHukamnama?.updatedAt ? { key: 'date', label: new Date(activeHukamnama.updatedAt).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' }) } : null,
-    activeHukamnama?.slot ? { key: 'slot', label: `Slot: ${activeHukamnama.slot}` } : null,
     activeHukamnama?.metadata?.raag ? { key: 'raag', label: `Raag: ${activeHukamnama.metadata.raag}` } : null,
     activeHukamnama?.metadata?.writer ? { key: 'writer', label: `Written by: ${activeHukamnama.metadata.writer}` } : null
   ].filter(Boolean);
   const { data: homeReadAlongAudio, isFetching: homeReadAlongLoading } = useQuery({
     queryKey: ['home-hukamnama-read-along', homeHukamnamaAng],
     queryFn: () => hukamnamaService.getReadAlongAudioUrl(homeHukamnamaAng).then((res) => res.data),
-    enabled: homeHukamnamaAng > 0 && readAlongConfig.enabled
+    enabled: homeHukamnamaAng > 0 && readAlongConfig.enabled && hasDailyHukamnama
   });
 
   useEffect(() => {
@@ -204,7 +199,7 @@ const HomePage = () => {
         type: 'hukamnama',
         title: 'Daily Hukamnama',
         path: '/hukamnama',
-        description: `Ang ${activeHukamnama?.ang || '-'} with full lines and translations.`,
+        description: hasDailyHukamnama ? `Ang ${activeHukamnama?.ang || '-'} with full lines and translations.` : 'Today\'s hukamnama is not available yet.',
         metadata: hukamnamaMeta,
         items: hukamnamaLines
       },
@@ -313,34 +308,21 @@ const HomePage = () => {
             <div className="rounded-xl border border-brand-blue/20 bg-white px-5 py-4">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex-1">
-                  <SectionTitle title="Daily Hukamnama" subtitle="Today\'s Gurbani with translation." />
-                  <div className="mt-2 flex gap-2">
-                    {['morning', 'evening'].map((slot) => {
-                      const hasData = slot === 'morning' ? Boolean(dailyHukamnamaBySlot?.morning) : Boolean(dailyHukamnamaBySlot?.evening);
-                      return (
-                        <button
-                          key={slot}
-                          type="button"
-                          onClick={() => setHukamnamaSlot(slot)}
-                          className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${hukamnamaSlot === slot ? 'bg-brand-blue text-white' : 'bg-slate-100 text-slate-600'}`}
-                        >
-                          {slot}{hasData ? '' : ' (n/a)'}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <SectionTitle title="Daily Hukamnama" subtitle="Today's Gurbani with translation." />
                 </div>
                 <div className="w-full sm:w-[260px] sm:flex-shrink-0">
-                  {homeReadAlongAudio?.url ? (
+                  {hasDailyHukamnama && homeReadAlongAudio?.url ? (
                     <AudioPillPlayer
                       label="Singh Sabha Milton"
-                      subtitle={`${hukamnamaSlot} | Ang ${homeHukamnamaAng}`}
+                      subtitle={`Ang ${homeHukamnamaAng}`}
                       src={homeReadAlongAudio.url}
                       stopSignal={homeReadAlongStopToken}
                     />
                   ) : (
                     <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                      {!readAlongConfig.enabled
+                      {!hasDailyHukamnama
+                        ? "Read along audio will appear after today's hukamnama is added."
+                        : !readAlongConfig.enabled
                         ? 'Read along audio is currently disabled.'
                         : (homeReadAlongLoading ? 'Loading read along audio...' : `Read along audio is unavailable for Ang ${homeHukamnamaAng}.`)}
                     </div>
@@ -349,7 +331,9 @@ const HomePage = () => {
               </div>
               <div className="mt-3 h-px w-full bg-slate-200" />
               <div className="space-y-3 pt-4">
-                {(hukamnamaLines.slice(0, 4)).map((line) => (
+                {!hasDailyHukamnama ? (
+                  <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">Today's hukamnama is not available yet.</p>
+                ) : (hukamnamaLines.slice(0, 4)).map((line) => (
                   <div key={line.id}>
                     <p className="font-gurmukhi text-lg font-bold leading-relaxed text-brand-navy">{line.gurmukhi}</p>
                     {line.translationPunjabi ? <p className="mt-1 text-sm font-normal text-brand-saffron">Punjabi: {line.translationPunjabi}</p> : null}
@@ -357,9 +341,11 @@ const HomePage = () => {
                   </div>
                 ))}
               </div>
-              <div className="mt-4 flex justify-end">
-                <button type="button" onClick={() => openContentModal('/hukamnama')} className="inline-flex items-center gap-1 text-sm font-semibold text-brand-blue hover:underline"><span>&gt;</span> Read all hukamnama</button>
-              </div>
+              {hasDailyHukamnama ? (
+                <div className="mt-4 flex justify-end">
+                  <button type="button" onClick={() => openContentModal('/hukamnama')} className="inline-flex items-center gap-1 text-sm font-semibold text-brand-blue hover:underline"><span>&gt;</span> Read all hukamnama</button>
+                </div>
+              ) : null}
             </div>
 
             <section className={`relative rounded-xl border px-5 py-4 ${isTodaySpecial ? 'border-amber-300 bg-amber-50/40' : 'border-slate-200 bg-white'}`}>
@@ -371,10 +357,7 @@ const HomePage = () => {
               ) : null}
 
               <div className={`flex flex-wrap items-start justify-between gap-3 ${isTodaySpecial ? 'pt-8' : ''}`}>
-                <SectionTitle title="Daily Schedule" subtitle={isTodaySpecial ? 'Today is a special event schedule.' : 'Morning and evening maryada, with event-day overrides when needed.'} />
-                <div className="px-1 py-1 text-xs font-semibold text-slate-500">
-                  {resolvedScheduleDay?.dateKey === 'default' ? 'Default day' : `For ${resolvedScheduleDay?.dateKey}`}
-                </div>
+                <SectionTitle title="Daily Schedule" subtitle={isTodaySpecial ? 'Today is a special event schedule.' : ''} />
               </div>
 
               <div className="mt-3 overflow-x-auto">

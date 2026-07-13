@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import PageHero from '../../components/common/PageHero';
 import DonationForm from '../../components/forms/DonationForm';
 import Card from '../../components/ui/Card';
@@ -18,6 +18,7 @@ const DonationPage = () => {
   const [pendingCheckout, setPendingCheckout] = useState(null);
   const [popupBlocked, setPopupBlocked] = useState(false);
   const [formResetKey, setFormResetKey] = useState(0);
+  const checkoutWindowRef = useRef(null);
 
   const { data: campaigns = [] } = useQuery({
     queryKey: ['campaigns'],
@@ -40,7 +41,37 @@ const DonationPage = () => {
     }
 
     const popup = window.open(checkoutUrl, 'donation_checkout', 'popup=yes,width=560,height=780');
+    if (popup) {
+      checkoutWindowRef.current = popup;
+    }
     return Boolean(popup);
+  };
+
+  const openPlaceholderPopup = () => {
+    if (checkoutWindowRef.current && !checkoutWindowRef.current.closed) {
+      return true;
+    }
+
+    const popup = window.open('', 'donation_checkout', 'popup=yes,width=560,height=780');
+    if (!popup) {
+      return false;
+    }
+
+    popup.document.title = 'Preparing Secure Payment';
+    popup.document.body.innerHTML = '<div style="font-family:sans-serif;padding:24px;text-align:center">Preparing secure Stripe checkout...</div>';
+    checkoutWindowRef.current = popup;
+    return true;
+  };
+
+  const navigateCheckoutWindow = (checkoutUrl) => {
+    const popup = checkoutWindowRef.current;
+    if (popup && !popup.closed) {
+      popup.location.href = checkoutUrl;
+      popup.focus();
+      return true;
+    }
+
+    return openStripePopup(checkoutUrl);
   };
 
   const resetForm = () => {
@@ -56,16 +87,24 @@ const DonationPage = () => {
       const pending = response.data;
       setPendingCheckout(pending);
 
-      const opened = openStripePopup(pending.checkoutUrl);
+      const opened = navigateCheckoutWindow(pending.checkoutUrl);
       setPopupBlocked(!opened);
 
       if (opened) {
-        setStatusMessage('Stripe checkout opened in popup. Complete payment there.');
+        setStatusMessage('Stripe checkout opened. Complete payment there.');
       } else {
+        if (pending.checkoutUrl) {
+          window.location.href = pending.checkoutUrl;
+          return;
+        }
         setStatusMessage('Popup was blocked. Click "Open Stripe Payment" below.');
       }
     },
     onError: (error) => {
+      if (checkoutWindowRef.current && !checkoutWindowRef.current.closed) {
+        checkoutWindowRef.current.close();
+        checkoutWindowRef.current = null;
+      }
       setStatusMessage(error?.message || 'Unable to start donation.');
     }
   });
@@ -108,12 +147,14 @@ const DonationPage = () => {
                   key={formResetKey}
                   onSubmit={(values) => {
                     setStatusMessage('');
+                    const opened = openPlaceholderPopup();
+                    setPopupBlocked(!opened);
                     initiateDonationMutation.mutate(values);
                   }}
                   loading={initiateDonationMutation.isPending}
                   campaigns={openCampaigns}
                   user={user}
-                  submitLabel="Prepare Secure Payment"
+                  submitLabel="Secure Payment"
                 />
               </div>
             )}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
@@ -7,6 +7,7 @@ import 'react-calendar/dist/Calendar.css';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
 import enUS from 'date-fns/locale/en-US';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 import PageHero from '../../components/common/PageHero';
 import eventService from '../../services/eventService';
 import useSeoMeta from '../../hooks/useSeoMeta';
@@ -32,10 +33,12 @@ const categoryDotClass = {
 
 const EventsPage = () => {
   const meta = useSeoMeta('Events', 'Event calendar, list view, filters, and RSVP registration for all programs.');
+  const location = useLocation();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [category, setCategory] = useState('All');
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [overflowEventsModal, setOverflowEventsModal] = useState({ open: false, date: null, events: [] });
+  const deepLinkOpenedRef = useRef('');
   const queryClient = useQueryClient();
   const registrationForm = useForm({ defaultValues: { name: '', contact: '' } });
   const { data: events = [] } = useQuery({ queryKey: ['events'], queryFn: () => eventService.getEvents().then((res) => res.data) });
@@ -151,6 +154,31 @@ const EventsPage = () => {
       <p className="truncate font-bold tracking-tight">{truncateEventTitle(event.title)}</p>
     </div>
   );
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search || '');
+    const requestedEventId = params.get('eventId');
+
+    if (!requestedEventId || events.length === 0) {
+      deepLinkOpenedRef.current = '';
+      return;
+    }
+
+    if (deepLinkOpenedRef.current === requestedEventId) {
+      return;
+    }
+
+    const requestedAsNumber = Number(requestedEventId);
+    const linkedEvent = events.find((entry) => (
+      String(entry.id) === requestedEventId || (!Number.isNaN(requestedAsNumber) && Number(entry.id) === requestedAsNumber)
+    ));
+
+    if (linkedEvent) {
+      setSelectedDate(new Date(linkedEvent.date));
+      setSelectedEvent(linkedEvent);
+      deepLinkOpenedRef.current = requestedEventId;
+    }
+  }, [events, location.search]);
 
   return (
     <div className="space-y-8">

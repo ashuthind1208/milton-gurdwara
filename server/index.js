@@ -42,7 +42,17 @@ loadEnvFile(path.join(workspaceRoot, '.env.local'));
 
 const eventsDb = require('./db/postgres');
 
-const port = Number(process.env.PORT || 4242);
+const resolveServerPort = () => {
+  const preferred = Number(process.env.STRIPE_API_PORT || process.env.SERVER_PORT || 4242);
+  if (Number.isFinite(preferred) && preferred > 0) {
+    return preferred;
+  }
+
+  const fallback = Number(process.env.PORT || 4242);
+  return Number.isFinite(fallback) && fallback > 0 ? fallback : 4242;
+};
+
+const port = resolveServerPort();
 const stripeSecretKey = String(process.env.STRIPE_SECRET_KEY || '').trim();
 const stripeWebhookSecret = String(process.env.STRIPE_WEBHOOK_SECRET || '').trim();
 const stripeCurrency = String(process.env.STRIPE_CURRENCY || 'cad').toLowerCase();
@@ -61,9 +71,89 @@ const volunteerReminderLogoUrl = String(process.env.VOLUNTEER_REMINDER_LOGO_URL 
 const volunteerReminderSiteName = String(process.env.VOLUNTEER_REMINDER_ORG_NAME || 'Singh Sabha Milton Gurdwara').trim();
 const volunteerReminderBaseUrl = String(process.env.VOLUNTEER_REMINDER_BASE_URL || 'http://localhost:3001').trim().replace(/\/$/, '');
 const volunteerReminderHtmlTemplateEnabled = String(process.env.VOLUNTEER_REMINDER_HTML_TEMPLATE_ENABLED || 'true').trim().toLowerCase() !== 'false';
+const volunteerReminderSendTimeRaw = String(process.env.VOLUNTEER_REMINDER_SEND_TIME || '09:00').trim();
+const volunteerReminderTimeZone = String(process.env.VOLUNTEER_REMINDER_TIME_ZONE || 'America/Toronto').trim() || 'America/Toronto';
 const volunteerReminderDays = [10, 5, 2, 1];
 let volunteerReminderSweepRunning = false;
+let volunteerReminderLastRunDateKey = '';
 const darbarSahibStreamSource = String(process.env.DARBAR_SAHIB_STREAM_PROXY_TARGET || 'http://live.sgpc.net:4835/;').trim();
+
+const parseReminderSendTime = (value) => {
+  const match = String(value || '').trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) {
+    return { hour: 9, minute: 0 };
+  }
+
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    return { hour: 9, minute: 0 };
+  }
+
+  return { hour, minute };
+};
+
+const volunteerReminderSendTime = parseReminderSendTime(volunteerReminderSendTimeRaw);
+
+const getDatePartsInTimeZone = (date = new Date(), timeZone = 'UTC') => {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+
+    const parts = formatter.formatToParts(date);
+    const lookup = (type) => parts.find((part) => part.type === type)?.value || '';
+    return {
+      year: Number(lookup('year')) || date.getUTCFullYear(),
+      month: Number(lookup('month')) || (date.getUTCMonth() + 1),
+      day: Number(lookup('day')) || date.getUTCDate(),
+      hour: Number(lookup('hour')) || 0,
+      minute: Number(lookup('minute')) || 0
+    };
+  } catch {
+    return {
+      year: date.getUTCFullYear(),
+      month: date.getUTCMonth() + 1,
+      day: date.getUTCDate(),
+      hour: date.getUTCHours(),
+      minute: date.getUTCMinutes()
+    };
+  }
+};
+
+const toDateKeyFromParts = ({ year, month, day }) => {
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+};
+
+const shouldRunVolunteerReminderSweep = (date = new Date()) => {
+  const nowParts = getDatePartsInTimeZone(date, volunteerReminderTimeZone);
+  const todayDateKey = toDateKeyFromParts(nowParts);
+  const nowMinutes = (nowParts.hour * 60) + nowParts.minute;
+  const scheduledMinutes = (volunteerReminderSendTime.hour * 60) + volunteerReminderSendTime.minute;
+
+  if (volunteerReminderLastRunDateKey === todayDateKey) {
+    return false;
+  }
+
+  return nowMinutes >= scheduledMinutes;
+};
+
+const runScheduledVolunteerReminderSweep = async () => {
+  if (!shouldRunVolunteerReminderSweep()) {
+    return null;
+  }
+
+  const result = await runVolunteerReminderSweep();
+  const nowParts = getDatePartsInTimeZone(new Date(), volunteerReminderTimeZone);
+  volunteerReminderLastRunDateKey = toDateKeyFromParts(nowParts);
+  return result;
+};
 
 const buildLogoDataUri = () => {
   const candidates = [
@@ -232,7 +322,6 @@ const proxyAudioStream = (request, response, targetUrlString) => {
     method: upstreamMethod,
     headers: {
       'User-Agent': request.headers['user-agent'] || 'Mozilla/5.0',
-      'Icy-MetaData': '1',
       Accept: '*/*'
     }
   }, (proxyResponse) => {
@@ -1636,7 +1725,7 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  if (requestUrl.pathname === '/api/streaming/darbar-sahib/live' && (request.method === 'GET' || request.method === 'HEAD')) {
+  if (/^\/api\/streaming\/darbar-sahib\/live\/?$/i.test(requestUrl.pathname) && (request.method === 'GET' || request.method === 'HEAD')) {
     try {
       proxyAudioStream(request, response, darbarSahibStreamSource);
     } catch (error) {
@@ -2474,18 +2563,20 @@ const bootstrap = async () => {
     console.log(`Stripe API helper listening on http://127.0.0.1:${port}`);
   });
 
-  // Run a daily-style reminder sweep for upcoming volunteer seva dates.
-  setTimeout(() => {
-    runVolunteerReminderSweep().catch((error) => {
-      console.error('Initial volunteer reminder sweep failed:', error.message || error);
-    });
-  }, 5000);
+  const configuredTime = `${String(volunteerReminderSendTime.hour).padStart(2, '0')}:${String(volunteerReminderSendTime.minute).padStart(2, '0')}`;
+  console.log(`Volunteer reminder scheduler set for ${configuredTime} (${volunteerReminderTimeZone}) daily.`);
 
+  // Check every minute, but only send once per day after the configured local send time.
   setInterval(() => {
-    runVolunteerReminderSweep().catch((error) => {
+    runScheduledVolunteerReminderSweep().catch((error) => {
       console.error('Volunteer reminder sweep failed:', error.message || error);
     });
-  }, 6 * 60 * 60 * 1000);
+  }, 60 * 1000);
+
+  // Run one immediate scheduler check on startup in case the server starts after today's send time.
+  runScheduledVolunteerReminderSweep().catch((error) => {
+    console.error('Initial volunteer reminder scheduler check failed:', error.message || error);
+  });
 };
 
 bootstrap();

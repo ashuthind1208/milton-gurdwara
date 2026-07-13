@@ -25,7 +25,7 @@ const toDateKey = (value = new Date()) => {
 
 const HukamnamaText = ({ entry }) => {
   if (!entry) {
-    return <p className="mt-2 text-sm text-slate-500">No hukamnama added for this slot.</p>;
+    return <p className="mt-2 text-sm text-slate-500">No hukamnama added for this date yet.</p>;
   }
 
   return (
@@ -47,11 +47,11 @@ const AdminHukamnamaPage = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [previewData, setPreviewData] = useState(null);
+  const [editingDateKey, setEditingDateKey] = useState('');
 
   const form = useForm({
     defaultValues: {
       date: toDateKey(new Date()),
-      slot: 'morning',
       ang: ''
     }
   });
@@ -88,7 +88,9 @@ const AdminHukamnamaPage = () => {
   });
 
   const addMutation = useMutation({
-    mutationFn: (values) => hukamnamaService.setScheduledHukamnama(values),
+    mutationFn: (values) => (editingDateKey
+      ? hukamnamaService.updateScheduledHukamnama(values)
+      : hukamnamaService.setScheduledHukamnama(values)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['current-hukamnama'] });
       queryClient.invalidateQueries({ queryKey: ['daily-hukamnama'] });
@@ -96,19 +98,61 @@ const AdminHukamnamaPage = () => {
       queryClient.invalidateQueries({ queryKey: ['hukamnama-archive-by-date'] });
       queryClient.invalidateQueries({ queryKey: ['hukamnama-archive'] });
       setAddModalOpen(false);
+      setEditingDateKey('');
       setPreviewData(null);
-      form.reset({ date: toDateKey(new Date()), slot: 'morning', ang: '' });
-      window.alert('Hukamnama added successfully.');
+      form.reset({ date: toDateKey(new Date()), ang: '' });
+      window.alert(editingDateKey ? 'Hukamnama updated successfully.' : 'Hukamnama added successfully.');
     },
     onError: (error) => {
-      window.alert(error?.message || 'Could not save hukamnama for selected date and slot.');
+      window.alert(error?.message || 'Could not save hukamnama for selected date.');
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (dateKey) => hukamnamaService.deleteScheduledHukamnama(dateKey),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['current-hukamnama'] });
+      queryClient.invalidateQueries({ queryKey: ['daily-hukamnama'] });
+      queryClient.invalidateQueries({ queryKey: ['hukamnama-calendar'] });
+      queryClient.invalidateQueries({ queryKey: ['hukamnama-archive-by-date'] });
+      queryClient.invalidateQueries({ queryKey: ['hukamnama-archive'] });
+      setEditingDateKey('');
+      setPreviewData(null);
+      window.alert('Hukamnama deleted successfully.');
+    },
+    onError: (error) => {
+      window.alert(error?.message || 'Could not delete hukamnama for selected date.');
     }
   });
 
   const openAddModal = () => {
     setPreviewData(null);
-    form.reset({ date: toDateKey(new Date()), slot: 'morning', ang: '' });
+    setEditingDateKey('');
+    form.reset({ date: selectedDateKey, ang: '' });
     setAddModalOpen(true);
+  };
+
+  const openEditModal = () => {
+    if (!selectedDateArchive?.entry) {
+      return;
+    }
+
+    setEditingDateKey(selectedDateKey);
+    setPreviewData(selectedDateArchive.entry);
+    form.reset({ date: selectedDateKey, ang: String(selectedDateArchive.entry.ang || '') });
+    setAddModalOpen(true);
+  };
+
+  const handleDelete = () => {
+    if (!selectedDateArchive?.entry) {
+      return;
+    }
+
+    if (!window.confirm(`Delete hukamnama for ${selectedDateKey}?`)) {
+      return;
+    }
+
+    deleteMutation.mutate(selectedDateKey);
   };
 
   const onCalendarSelect = (value) => {
@@ -128,8 +172,7 @@ const AdminHukamnamaPage = () => {
 
     return (
       <div className="mt-1 flex items-center justify-center gap-1">
-        {marker.hasMorning ? <span className="h-1.5 w-1.5 rounded-full bg-brand-blue" /> : null}
-        {marker.hasEvening ? <span className="h-1.5 w-1.5 rounded-full bg-brand-saffron" /> : null}
+        {marker.hasEntry ? <span className="h-1.5 w-1.5 rounded-full bg-brand-blue" /> : null}
       </div>
     );
   };
@@ -141,51 +184,49 @@ const AdminHukamnamaPage = () => {
         <Button type="button" onClick={openAddModal}>Add Hukamnama</Button>
       </div>
 
-      <Card>
-        <h2 className="font-heading text-lg font-semibold">Archive Calendar</h2>
-        <p className="mt-1 text-xs text-slate-500">Click any date to open morning/evening hukamnama popup. Blue dot: morning, orange dot: evening.</p>
-        <div className="mt-3">
-          <ReactCalendar value={selectedDate} onChange={onCalendarSelect} tileContent={tileContent} className="w-full" style={{ width: '100%' }} />
-        </div>
-      </Card>
+      <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
+        <Card>
+          <h2 className="font-heading text-lg font-semibold">Archive Calendar</h2>
+          <p className="mt-1 text-xs text-slate-500">Click any date to view its single hukamnama entry.</p>
+          <div className="mt-3">
+            <ReactCalendar value={selectedDate} onChange={onCalendarSelect} tileContent={tileContent} className="w-full" style={{ width: '100%' }} />
+          </div>
+        </Card>
 
-      <Card>
-        <h3 className="font-heading text-xl font-semibold">Hukamnama • {selectedDateKey}</h3>
-        <p className="mt-1 text-xs text-slate-500">Morning and evening entries for the selected calendar date.</p>
-        <div className="mt-4 grid gap-5 md:grid-cols-2">
-          <section>
-            <p className="text-xs font-semibold uppercase tracking-wider text-brand-blue">Morning</p>
-            <HukamnamaText entry={selectedDateArchive?.morning} />
-          </section>
-          <section>
-            <p className="text-xs font-semibold uppercase tracking-wider text-brand-blue">Evening</p>
-            <HukamnamaText entry={selectedDateArchive?.evening} />
-          </section>
-        </div>
-      </Card>
+        <Card>
+          <h3 className="font-heading text-xl font-semibold">Hukamnama • {selectedDateKey}</h3>
+          <p className="mt-1 text-xs text-slate-500">Single daily hukamnama preview for the selected calendar date.</p>
+          {selectedDateArchive?.entry ? (
+            <div className="mt-3 flex gap-2">
+              <Button type="button" onClick={openEditModal}>Edit Hukamnama</Button>
+              <Button type="button" variant="ghost" onClick={handleDelete} disabled={deleteMutation.isPending} className="text-red-700 ring-red-200 hover:bg-red-50">
+                {deleteMutation.isPending ? 'Deleting...' : 'Delete Hukamnama'}
+              </Button>
+            </div>
+          ) : null}
+          <div className="mt-4">
+            <HukamnamaText entry={selectedDateArchive?.entry} />
+          </div>
+        </Card>
+      </div>
 
       {addModalOpen ? (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-900/45 px-4 py-6">
-          <div className="w-full max-w-5xl rounded-xl bg-white p-5 shadow-xl">
+        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6">
+          <div className="mx-auto flex min-h-full items-center justify-center">
+          <div className="w-full max-w-5xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
             <div className="flex items-center justify-between gap-3">
-              <h3 className="font-heading text-xl font-semibold">Add Hukamnama</h3>
+              <h3 className="font-heading text-xl font-semibold">{editingDateKey ? 'Edit Hukamnama' : 'Add Hukamnama'}</h3>
               <button type="button" onClick={() => setAddModalOpen(false)} className="rounded-md border border-slate-300 px-2 py-1 text-sm">Close</button>
             </div>
 
-            <form className="mt-4 grid gap-3 md:grid-cols-4" onSubmit={form.handleSubmit((values) => addMutation.mutate(values))}>
-              <label className="text-sm">Date
-                <input type="date" {...form.register('date', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-              </label>
-              <label className="text-sm">Slot
-                <select {...form.register('slot')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
-                  <option value="morning">Morning</option>
-                  <option value="evening">Evening</option>
-                </select>
-              </label>
-              <label className="text-sm">Ang
-                <input type="number" min="1" max="1430" {...form.register('ang', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-              </label>
-              <div className="flex items-end">
+            <form className="mt-4 grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]" onSubmit={form.handleSubmit((values) => addMutation.mutate(values))}>
+              <div className="space-y-3">
+                <label className="text-sm">Date
+                  <input type="date" {...form.register('date', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                </label>
+                <label className="text-sm">Ang
+                  <input type="number" min="1" max="1430" {...form.register('ang', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                </label>
                 <button
                   type="button"
                   onClick={() => previewMutation.mutate(form.getValues('ang'))}
@@ -193,9 +234,13 @@ const AdminHukamnamaPage = () => {
                 >
                   {previewMutation.isPending ? 'Loading...' : 'Load Preview'}
                 </button>
+                <div className="flex gap-2">
+                  <Button type="submit" className="whitespace-nowrap" disabled={addMutation.isPending}>{addMutation.isPending ? 'Saving...' : 'Submit'}</Button>
+                  <button type="button" onClick={() => setAddModalOpen(false)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Cancel</button>
+                </div>
               </div>
 
-              <div className="md:col-span-4 rounded-lg bg-slate-50 p-4">
+              <div className="rounded-lg bg-slate-50 p-4">
                 <p className="text-sm font-semibold text-slate-700">Preview</p>
                 {!previewData ? (
                   <p className="mt-2 text-sm text-slate-500">Load preview to verify the selected ang before submitting.</p>
@@ -213,12 +258,8 @@ const AdminHukamnamaPage = () => {
                   </div>
                 )}
               </div>
-
-              <div className="md:col-span-4 flex gap-2">
-                <Button type="submit" className="whitespace-nowrap" disabled={addMutation.isPending}>{addMutation.isPending ? 'Saving...' : 'Submit'}</Button>
-                <button type="button" onClick={() => setAddModalOpen(false)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Cancel</button>
-              </div>
             </form>
+          </div>
           </div>
         </div>
       ) : null}
