@@ -7,7 +7,7 @@ import Card from '../../components/ui/Card';
 import useSeoMeta from '../../hooks/useSeoMeta';
 import videoService, { CATEGORIES, getYouTubeEmbedUrl, getYouTubeThumbnail, getFacebookEmbedUrl } from '../../services/videoService';
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 9;
 
 const sendYouTubeCommand = (iframe, func, args = []) => {
   if (!iframe?.contentWindow) {

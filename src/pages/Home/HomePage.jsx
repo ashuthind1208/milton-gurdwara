@@ -60,9 +60,10 @@ const resolveScheduleRowState = (timeEn, now = new Date()) => {
 
   const nowMinutes = (now.getHours() * 60) + now.getMinutes();
   if (endMinutes != null) {
+    const effectiveEndMinutes = endMinutes > startMinutes ? endMinutes - 1 : endMinutes;
     return {
-      isCurrent: nowMinutes >= startMinutes && nowMinutes <= endMinutes,
-      isPast: nowMinutes > endMinutes
+      isCurrent: nowMinutes >= startMinutes && nowMinutes <= effectiveEndMinutes,
+      isPast: nowMinutes > effectiveEndMinutes
     };
   }
 
@@ -149,6 +150,14 @@ const HomePage = () => {
       ...resolveScheduleRowState(item.timeEn, new Date())
     }));
   }, [resolvedScheduleDay]);
+  const morningScheduleRows = useMemo(
+    () => scheduleRows.filter((item) => (item.segment || 'morning') === 'morning'),
+    [scheduleRows]
+  );
+  const eveningScheduleRows = useMemo(
+    () => scheduleRows.filter((item) => (item.segment || 'morning') !== 'morning'),
+    [scheduleRows]
+  );
   const isTodaySpecial = resolvedScheduleDay?.dateKey === todayDateKey && resolvedScheduleDay?.isSpecial !== false;
   const hukamnamaLines = activeHukamnama?.lines || [];
   const hukamnamaMeta = activeHukamnama?.metadata || {};
@@ -294,7 +303,18 @@ const HomePage = () => {
         <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
           <div className="grid gap-2 md:grid-cols-2">
             {globalBannerAds.map((ad) => (
-              <a key={ad.id} href={ad.targetLink || ad.website || '#'} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30">
+              <a
+                key={ad.id}
+                href={ad.website || '#'}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => {
+                  if (ad.website) {
+                    void advertisementService.recordAdClick(ad.id);
+                  }
+                }}
+                className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30"
+              >
                 {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full bg-slate-50 p-1 object-contain md:h-28" loading="lazy" /> : null}
               </a>
             ))}
@@ -360,34 +380,68 @@ const HomePage = () => {
                 <SectionTitle title="Daily Schedule" subtitle={isTodaySpecial ? 'Today is a special event schedule.' : ''} />
               </div>
 
-              <div className="mt-3 overflow-x-auto">
-                <table className="min-w-full border-collapse text-left">
-                  <tbody>
-                    {scheduleRows.length === 0 ? (
-                      <tr>
-                        <td className="py-4 text-sm text-slate-500">No schedule items available for this day.</td>
-                      </tr>
-                    ) : scheduleRows.map((item) => (
-                      <tr key={item.id} className={`border-t border-slate-200 ${item.isCurrent ? 'animate-pulse bg-brand-blue/15' : item.isHighlighted ? 'bg-sky-50/40' : 'bg-transparent'} ${item.isActive === false ? 'opacity-45' : ''}`}>
-                        <td className="w-[145px] py-3 pr-4 pl-2 align-top">
-                          <div className="flex items-start gap-3">
-                            <span className={`mt-1 inline-flex h-3 w-3 rounded-full ${item.isCurrent ? 'bg-green-500 shadow-[0_0_0_6px_rgba(34,197,94,0.18)]' : item.isHighlighted ? 'bg-brand-blue/80' : 'bg-slate-300'}`} />
-                            <div>
-                              <p className="whitespace-nowrap text-sm font-bold leading-none text-slate-900">{item.timeEn || 'Time TBD'}</p>
-                              {item.timePa ? <p className="mt-1 text-xs font-medium text-slate-500">{item.timePa}</p> : null}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3 align-top">
-                          <p className="text-sm font-semibold text-slate-900">{item.titleEn || 'Untitled schedule item'}</p>
-                          {item.titlePa ? <p className="mt-1 text-sm text-brand-saffron">{item.titlePa}</p> : null}
-                          {item.noteEn ? <p className="mt-1 text-xs text-slate-600">{item.noteEn}</p> : null}
-                          {item.notePa ? <p className="mt-1 text-xs text-slate-500">{item.notePa}</p> : null}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="mt-3 space-y-4">
+                {scheduleRows.length === 0 ? (
+                  <p className="py-4 text-sm text-slate-500">No schedule items available for this day.</p>
+                ) : null}
+
+                {morningScheduleRows.length > 0 ? (
+                  <div className="overflow-x-auto rounded-lg border border-sky-200">
+                    <div className="border-b border-sky-200 bg-sky-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-sky-800">Morning</div>
+                    <table className="min-w-full border-collapse text-left">
+                      <tbody>
+                        {morningScheduleRows.map((item) => (
+                          <tr key={item.id} className={`border-t border-sky-100 ${item.isCurrent ? 'animate-pulse bg-brand-blue/15' : item.isHighlighted ? 'bg-sky-50/40' : 'bg-sky-50/25'} ${item.isActive === false ? 'opacity-45' : ''}`}>
+                            <td className="w-[145px] py-3 pr-4 pl-2 align-top">
+                              <div className="flex items-start gap-3">
+                                <span className={`mt-1 inline-flex h-3 w-3 rounded-full ${item.isCurrent ? 'bg-green-500 shadow-[0_0_0_6px_rgba(34,197,94,0.18)]' : item.isHighlighted ? 'bg-brand-blue/80' : 'bg-slate-300'}`} />
+                                <div>
+                                  <p className="whitespace-nowrap text-sm font-bold leading-none text-slate-900">{item.timeEn || 'Time TBD'}</p>
+                                  {item.timePa ? <p className="mt-1 text-xs font-medium text-slate-500">{item.timePa}</p> : null}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 align-top">
+                              <p className="text-sm font-semibold text-slate-900">{item.titleEn || 'Untitled schedule item'}</p>
+                              {item.titlePa ? <p className="mt-1 text-sm text-brand-saffron">{item.titlePa}</p> : null}
+                              {item.noteEn ? <p className="mt-1 text-xs text-slate-600">{item.noteEn}</p> : null}
+                              {item.notePa ? <p className="mt-1 text-xs text-slate-500">{item.notePa}</p> : null}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
+
+                {eveningScheduleRows.length > 0 ? (
+                  <div className="overflow-x-auto rounded-lg border border-amber-200">
+                    <div className="border-b border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-amber-800">Evening</div>
+                    <table className="min-w-full border-collapse text-left">
+                      <tbody>
+                        {eveningScheduleRows.map((item) => (
+                          <tr key={item.id} className={`border-t border-amber-100 ${item.isCurrent ? 'animate-pulse bg-brand-blue/15' : item.isHighlighted ? 'bg-sky-50/40' : item.segment === 'special' ? 'bg-violet-50/35' : 'bg-amber-50/35'} ${item.isActive === false ? 'opacity-45' : ''}`}>
+                            <td className="w-[145px] py-3 pr-4 pl-2 align-top">
+                              <div className="flex items-start gap-3">
+                                <span className={`mt-1 inline-flex h-3 w-3 rounded-full ${item.isCurrent ? 'bg-green-500 shadow-[0_0_0_6px_rgba(34,197,94,0.18)]' : item.isHighlighted ? 'bg-brand-blue/80' : 'bg-slate-300'}`} />
+                                <div>
+                                  <p className="whitespace-nowrap text-sm font-bold leading-none text-slate-900">{item.timeEn || 'Time TBD'}</p>
+                                  {item.timePa ? <p className="mt-1 text-xs font-medium text-slate-500">{item.timePa}</p> : null}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 align-top">
+                              <p className="text-sm font-semibold text-slate-900">{item.titleEn || 'Untitled schedule item'}</p>
+                              {item.titlePa ? <p className="mt-1 text-sm text-brand-saffron">{item.titlePa}</p> : null}
+                              {item.noteEn ? <p className="mt-1 text-xs text-slate-600">{item.noteEn}</p> : null}
+                              {item.notePa ? <p className="mt-1 text-xs text-slate-500">{item.notePa}</p> : null}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
               </div>
             </section>
           </div>
@@ -438,7 +492,18 @@ const HomePage = () => {
             ) : null}
 
             {homeSidebarAds.map((ad) => (
-              <a key={ad.id} href={ad.targetLink || ad.website || '#'} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl border border-slate-200 bg-white hover:border-brand-blue/30">
+              <a
+                key={ad.id}
+                href={ad.website || '#'}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => {
+                  if (ad.website) {
+                    void advertisementService.recordAdClick(ad.id);
+                  }
+                }}
+                className="block overflow-hidden rounded-xl border border-slate-200 bg-white hover:border-brand-blue/30"
+              >
                 {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-28 w-full bg-slate-50 p-2 object-contain md:h-32" loading="lazy" /> : null}
               </a>
             ))}
@@ -450,7 +515,18 @@ const HomePage = () => {
         <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
           <div className="grid gap-2 md:grid-cols-2">
             {homeFooterAds.map((ad) => (
-              <a key={ad.id} href={ad.targetLink || ad.website || '#'} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30">
+              <a
+                key={ad.id}
+                href={ad.website || '#'}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => {
+                  if (ad.website) {
+                    void advertisementService.recordAdClick(ad.id);
+                  }
+                }}
+                className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30"
+              >
                 {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full bg-slate-50 p-1 object-contain md:h-28" loading="lazy" /> : null}
               </a>
             ))}

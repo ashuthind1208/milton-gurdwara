@@ -13,6 +13,7 @@ const HukamnamaPage = lazy(() => import('../pages/Hukamnama/HukamnamaPage'));
 const EventsPage = lazy(() => import('../pages/Events/EventsPage'));
 const SevaPage = lazy(() => import('../pages/Seva/SevaPage'));
 const DonationPage = lazy(() => import('../pages/Donation/DonationPage'));
+const DonationDisplayBoardPage = lazy(() => import('../pages/Donation/DonationDisplayBoardPage'));
 const DonationSuccessPage = lazy(() => import('../pages/Donation/DonationSuccessPage'));
 const GalleryPage = lazy(() => import('../pages/Gallery/GalleryPage'));
 const NewsPage = lazy(() => import('../pages/News/NewsPage'));
@@ -67,6 +68,8 @@ const AppRoutes = () => {
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/login" element={<LoginPage />} />
         </Route>
+
+        <Route path="/donation-board" element={<DonationDisplayBoardPage />} />
 
         <Route element={<ProtectedRoute allowedRoles={FULL_ADMIN_ROLES} />}>
           <Route element={<AdminLayout />}>

@@ -132,8 +132,7 @@ export const downloadRegistrationPdf = async ({
   doc.save(fileName || 'registrations.pdf');
 };
 
-export const downloadDonationInvoicePdf = async ({
-  fileName,
+export const createDonationInvoicePdfBlob = async ({
   organizationName,
   address,
   phone,
@@ -215,7 +214,13 @@ export const downloadDonationInvoicePdf = async ({
   doc.setFontSize(9);
   doc.text('This invoice confirms the donation received for the specified campaign.', 40, Math.min(finalY + 160, pageHeight - 34));
 
-  doc.save(fileName || `invoice-${donation?.receiptId || donation?.id || 'donation'}.pdf`);
+  return doc.output('blob');
+};
+
+export const downloadDonationInvoicePdf = async (payload) => {
+  const blob = await createDonationInvoicePdfBlob(payload);
+  const fileName = payload?.fileName || `invoice-${payload?.donation?.receiptId || payload?.donation?.id || 'donation'}.pdf`;
+  triggerFileDownload(blob, fileName);
 };
 
 export const downloadCampaignDonationsCsv = ({

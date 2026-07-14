@@ -192,7 +192,18 @@ const SevaPage = () => {
         <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
           <div className="grid gap-2 md:grid-cols-2">
             {sevaTopAds.map((ad) => (
-              <a key={ad.id} href={ad.targetLink || ad.website || '#'} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30">
+              <a
+                key={ad.id}
+                href={ad.website || '#'}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => {
+                  if (ad.website) {
+                    void advertisementService.recordAdClick(ad.id);
+                  }
+                }}
+                className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30"
+              >
                 {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
               </a>
             ))}
@@ -278,7 +289,18 @@ const SevaPage = () => {
         <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
           <div className="grid gap-2 md:grid-cols-2">
             {sevaFooterAds.map((ad) => (
-              <a key={ad.id} href={ad.targetLink || ad.website || '#'} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30">
+              <a
+                key={ad.id}
+                href={ad.website || '#'}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => {
+                  if (ad.website) {
+                    void advertisementService.recordAdClick(ad.id);
+                  }
+                }}
+                className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30"
+              >
                 {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
               </a>
             ))}

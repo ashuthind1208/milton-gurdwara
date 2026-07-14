@@ -151,6 +151,7 @@ const LibraryPage = () => {
   const queryClient = useQueryClient();
   const [physicalPage, setPhysicalPage] = useState(1);
   const [digitalPage, setDigitalPage] = useState(1);
+  const [programEventsPage, setProgramEventsPage] = useState(1);
   const [issueModalBookId, setIssueModalBookId] = useState('');
   const [sessionModalId, setSessionModalId] = useState('');
   const [mediaModalId, setMediaModalId] = useState('');
@@ -239,6 +240,12 @@ const LibraryPage = () => {
     });
   }, [programUpdates]);
 
+  const programEventsTotalPages = Math.max(1, Math.ceil(sortedProgramUpdates.length / PAGE_SIZE));
+  const visibleProgramEvents = useMemo(() => {
+    const start = (programEventsPage - 1) * PAGE_SIZE;
+    return sortedProgramUpdates.slice(start, start + PAGE_SIZE);
+  }, [programEventsPage, sortedProgramUpdates]);
+
   const eventRegistrationsById = useMemo(() => {
     const map = new Map();
     events.forEach((event) => {
@@ -256,6 +263,12 @@ const LibraryPage = () => {
       registrationForm.reset({ name: '', contact: '' });
     }
   }, [sessionModalEntry, registrationForm]);
+
+  useEffect(() => {
+    if (programEventsPage > programEventsTotalPages) {
+      setProgramEventsPage(programEventsTotalPages);
+    }
+  }, [programEventsPage, programEventsTotalPages]);
 
   const registrationMutation = useMutation({
     mutationFn: (values) => eventService.registerForEvent({
@@ -284,7 +297,18 @@ const LibraryPage = () => {
         <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
           <div className="grid gap-2 md:grid-cols-2">
             {libraryTopAds.map((ad) => (
-              <a key={ad.id} href={ad.targetLink || ad.website || '#'} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30">
+              <a
+                key={ad.id}
+                href={ad.website || '#'}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => {
+                  if (ad.website) {
+                    void advertisementService.recordAdClick(ad.id);
+                  }
+                }}
+                className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30"
+              >
                 {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
               </a>
             ))}
@@ -337,7 +361,7 @@ const LibraryPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {sortedProgramUpdates.map((entry) => (
+                {visibleProgramEvents.map((entry) => (
                   <tr key={`program-row-${entry.id}`} className="border-b border-slate-100 last:border-b-0">
                     <td className="px-3 py-2">
                       <p className="font-semibold text-slate-800">{entry.title || 'Library Session'}</p>
@@ -367,6 +391,7 @@ const LibraryPage = () => {
               </tbody>
             </table>
           </div>
+          <Pagination page={programEventsPage} total={programEventsTotalPages} onChange={setProgramEventsPage} />
         </section>
       ) : null}
 
@@ -669,7 +694,18 @@ const LibraryPage = () => {
         <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
           <div className="grid gap-2 md:grid-cols-2">
             {libraryFooterAds.map((ad) => (
-              <a key={ad.id} href={ad.targetLink || ad.website || '#'} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30">
+              <a
+                key={ad.id}
+                href={ad.website || '#'}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => {
+                  if (ad.website) {
+                    void advertisementService.recordAdClick(ad.id);
+                  }
+                }}
+                className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30"
+              >
                 {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
               </a>
             ))}

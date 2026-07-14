@@ -3,6 +3,8 @@ import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   DocumentArrowDownIcon,
+  ArrowsPointingOutIcon,
+  EnvelopeIcon,
   FunnelIcon,
   MagnifyingGlassIcon,
   ArrowDownIcon,
@@ -22,6 +24,7 @@ import donationService from '../../services/donationService';
 import { formatCurrency } from '../../utils/formatters';
 import Button from '../../components/ui/Button';
 import {
+  createDonationInvoicePdfBlob,
   downloadCampaignDonationsCsv,
   downloadCampaignDonationsPdf,
   downloadDonationInvoicePdf
@@ -80,6 +83,8 @@ const AdminDonationsPage = () => {
     accumulator[String(campaign.id)] = campaign;
     return accumulator;
   }, {}), [campaigns]);
+
+  const fullscreenBoardUrl = '/donation-board?fullscreen=1';
 
   const campaignDonations = useMemo(() => {
     if (!viewingCampaign) {
@@ -199,6 +204,57 @@ const AdminDonationsPage = () => {
     }).catch(() => null);
   };
 
+  const handleEmailInvoice = async (entry) => {
+    const donorEmail = String(entry.donorEmail || '').trim();
+    if (!donorEmail) {
+      return;
+    }
+
+    const fileName = `invoice-${entry.receiptId || entry.id}.pdf`;
+    const payload = {
+      fileName,
+      organizationName: siteConfig.name,
+      address: siteConfig.contact.address,
+      phone: siteConfig.contact.phone,
+      donation: entry,
+      campaignDescription: campaignMap[String(entry.campaignId)]?.description || ''
+    };
+
+    try {
+      const blob = await createDonationInvoicePdfBlob(payload);
+      const file = new File([blob], fileName, { type: 'application/pdf' });
+      const canShareWithFile = typeof navigator !== 'undefined'
+        && typeof navigator.share === 'function'
+        && typeof navigator.canShare === 'function'
+        && navigator.canShare({ files: [file] });
+
+      if (canShareWithFile) {
+        await navigator.share({
+          files: [file],
+          title: `Donation Invoice ${entry.receiptId || entry.id}`,
+          text: `Please find your donation invoice attached.\nCampaign: ${entry.campaignName || '-'}`
+        });
+        return;
+      }
+
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+
+      const subject = encodeURIComponent(`Donation Invoice ${entry.receiptId || entry.id}`);
+      const body = encodeURIComponent(`Sat Sri Akal ${entry.donorName || ''},\n\nPlease find your donation invoice attached for ${entry.campaignName || 'your donation'}.\n\nThank you for your support.\n${siteConfig.name}`);
+      window.location.href = `mailto:${encodeURIComponent(donorEmail)}?subject=${subject}&body=${body}`;
+    } catch {
+      // Fallback to plain invoice download if mail/share preparation fails.
+      handleDownloadInvoice(entry);
+    }
+  };
+
   const handleDownloadCampaignCsv = () => {
     if (!viewingCampaign) {
       return;
@@ -232,9 +288,19 @@ const AdminDonationsPage = () => {
       <Card>
         <div className="flex items-center justify-between gap-3">
           <h2 className="font-heading text-xl font-semibold">Campaigns</h2>
-          <Button type="button" onClick={openCreate} className="inline-flex items-center gap-1.5">
-            <PlusIcon className="h-4 w-4" /> Add Campaign
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href={fullscreenBoardUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100"
+            >
+              <ArrowsPointingOutIcon className="h-4 w-4" /> Launch Fullscreen Board
+            </a>
+            <Button type="button" onClick={openCreate} className="inline-flex items-center gap-1.5">
+              <PlusIcon className="h-4 w-4" /> Add Campaign
+            </Button>
+          </div>
         </div>
         <div className="mt-4 overflow-x-auto">
           <table className="min-w-full text-left text-sm">
@@ -363,14 +429,25 @@ const AdminDonationsPage = () => {
                   </td>
                   <td className="py-2 pr-3 font-semibold text-slate-800">{formatCurrency(entry.amount)}</td>
                   <td className="py-2 pr-3">
-                    <button
-                      type="button"
-                      onClick={() => handleDownloadInvoice(entry)}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-brand-blue/20 px-3 py-1.5 text-xs font-semibold text-brand-blue transition hover:border-brand-blue hover:bg-brand-blue hover:text-white"
-                      title="Download invoice PDF"
-                    >
-                      <DocumentArrowDownIcon className="h-4 w-4" /> Invoice
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadInvoice(entry)}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-brand-blue/20 px-3 py-1.5 text-xs font-semibold text-brand-blue transition hover:border-brand-blue hover:bg-brand-blue hover:text-white"
+                        title="Download invoice PDF"
+                      >
+                        <DocumentArrowDownIcon className="h-4 w-4" /> Invoice
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleEmailInvoice(entry)}
+                        disabled={!entry.donorEmail}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:border-emerald-400 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        title={entry.donorEmail ? 'Email invoice to donor' : 'Donor email not available'}
+                      >
+                        <EnvelopeIcon className="h-4 w-4" /> Email Invoice
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

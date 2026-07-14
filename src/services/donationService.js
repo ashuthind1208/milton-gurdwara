@@ -210,14 +210,33 @@ const readServerDonationSummary = async () => {
 const mergeDonations = (serverRecords) => {
   const map = new Map();
 
+  const normalizeKey = (value) => String(value || '').trim();
+
+  const getStableKey = (normalized) => {
+    // Prefer canonical identifiers first; these should be unique per donation.
+    const id = normalizeKey(normalized.id);
+    if (id) return `id:${id}`;
+
+    const receiptId = normalizeKey(normalized.receiptId);
+    if (receiptId) return `receipt:${receiptId}`;
+
+    const sourcePendingId = normalizeKey(normalized.sourcePendingId);
+    if (sourcePendingId) return `pending:${sourcePendingId}`;
+
+    const stripeSessionId = normalizeKey(normalized.stripeSessionId);
+    if (stripeSessionId) return `stripe:${stripeSessionId}`;
+
+    // Keep gateway transaction as a last fallback to avoid collapsing unrelated
+    // records that happen to reuse a generic/manual gateway reference.
+    const gatewayTransactionId = normalizeKey(normalized.gatewayTransactionId);
+    if (gatewayTransactionId) return `gateway:${gatewayTransactionId}`;
+
+    return `fallback:${normalizeKey(normalized.campaignId)}:${normalizeKey(normalized.donorEmail)}:${normalizeKey(normalized.amount)}:${normalizeKey(normalized.createdAt)}`;
+  };
+
   serverRecords.forEach((entry) => {
     const normalized = normalizeDonation(entry);
-    const key =
-      String(normalized.gatewayTransactionId || '').trim() ||
-      String(normalized.stripeSessionId || '').trim() ||
-      String(normalized.sourcePendingId || '').trim() ||
-      String(normalized.receiptId || '').trim() ||
-      String(normalized.id || '').trim();
+    const key = getStableKey(normalized);
     if (!key) {
       return;
     }

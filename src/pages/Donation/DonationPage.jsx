@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useMemo, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import PageHero from '../../components/common/PageHero';
 import DonationForm from '../../components/forms/DonationForm';
 import Card from '../../components/ui/Card';
@@ -12,6 +13,7 @@ import Seo from '../../components/common/Seo';
 import { useAuth } from '../../context/AuthContext';
 
 const DonationPage = () => {
+  const location = useLocation();
   const meta = useSeoMeta('Donation', 'Daswand contribution page with Stripe popup checkout.');
   const { user } = useAuth();
   const [statusMessage, setStatusMessage] = useState('');
@@ -34,6 +36,10 @@ const DonationPage = () => {
   const donationFooterAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Donation Footer Banner').slice(0, 2), [ads]);
 
   const openCampaigns = useMemo(() => campaigns.filter((campaign) => !campaign.isClosed), [campaigns]);
+  const preferredCampaignId = useMemo(() => {
+    const params = new URLSearchParams(location.search || '');
+    return String(params.get('campaignId') || '').trim();
+  }, [location.search]);
 
   const openStripePopup = (checkoutUrl) => {
     if (!checkoutUrl) {
@@ -121,7 +127,18 @@ const DonationPage = () => {
         <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
           <div className="grid gap-2 md:grid-cols-2">
             {donationTopAds.map((ad) => (
-              <a key={ad.id} href={ad.targetLink || ad.website || '#'} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30">
+              <a
+                key={ad.id}
+                href={ad.website || '#'}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => {
+                  if (ad.website) {
+                    void advertisementService.recordAdClick(ad.id);
+                  }
+                }}
+                className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30"
+              >
                 {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
               </a>
             ))}
@@ -154,6 +171,7 @@ const DonationPage = () => {
                   loading={initiateDonationMutation.isPending}
                   campaigns={openCampaigns}
                   user={user}
+                  preferredCampaignId={preferredCampaignId}
                   submitLabel="Secure Payment"
                 />
               </div>
@@ -198,7 +216,18 @@ const DonationPage = () => {
         <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
           <div className="grid gap-2 md:grid-cols-2">
             {donationFooterAds.map((ad) => (
-              <a key={ad.id} href={ad.targetLink || ad.website || '#'} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30">
+              <a
+                key={ad.id}
+                href={ad.website || '#'}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => {
+                  if (ad.website) {
+                    void advertisementService.recordAdClick(ad.id);
+                  }
+                }}
+                className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30"
+              >
                 {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
               </a>
             ))}

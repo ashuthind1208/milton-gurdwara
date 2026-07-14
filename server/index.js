@@ -4,6 +4,7 @@ const http = require('http');
 const https = require('https');
 const { URL } = require('url');
 const Stripe = require('stripe');
+const crypto = require('crypto');
 
 const loadEnvFile = (filePath) => {
   if (!fs.existsSync(filePath)) {
@@ -77,6 +78,27 @@ const volunteerReminderDays = [10, 5, 2, 1];
 let volunteerReminderSweepRunning = false;
 let volunteerReminderLastRunDateKey = '';
 const darbarSahibStreamSource = String(process.env.DARBAR_SAHIB_STREAM_PROXY_TARGET || 'http://live.sgpc.net:4835/;').trim();
+const adOrganicViewCooldownMs = Number(process.env.AD_ORGANIC_VIEW_COOLDOWN_MS || (24 * 60 * 60 * 1000));
+
+const resolveClientIp = (request) => {
+  const forwarded = String(request.headers['x-forwarded-for'] || '').trim();
+  if (forwarded) {
+    const parts = forwarded.split(',').map((part) => part.trim()).filter(Boolean);
+    if (parts.length > 0) {
+      return parts[0];
+    }
+  }
+
+  const remote = request.socket?.remoteAddress || request.connection?.remoteAddress || '';
+  return String(remote || '').trim();
+};
+
+const buildAdViewerHash = (request) => {
+  const ip = resolveClientIp(request);
+  const ua = String(request.headers['user-agent'] || '').trim();
+  const fingerprint = `${ip}|${ua}`;
+  return crypto.createHash('sha256').update(fingerprint).digest('hex');
+};
 
 const parseReminderSendTime = (value) => {
   const match = String(value || '').trim().match(/^(\d{1,2}):(\d{2})$/);

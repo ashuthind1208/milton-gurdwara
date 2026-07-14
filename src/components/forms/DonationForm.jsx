@@ -1,17 +1,35 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import Button from '../ui/Button';
 
-const DonationForm = ({ onSubmit, loading, campaigns = [], user, submitLabel = 'Generate Payment Options' }) => {
+const DonationForm = ({ onSubmit, loading, campaigns = [], user, submitLabel = 'Generate Payment Options', preferredCampaignId = '' }) => {
   const defaultCampaign = campaigns[0];
-  const { register, handleSubmit } = useForm({
+  const { register, handleSubmit, setValue } = useForm({
     defaultValues: {
       donorName: user?.name || '',
       donorEmail: user?.email || '',
       frequency: 'one-time',
-      campaignId: defaultCampaign?.id || '',
+      campaignId: preferredCampaignId || defaultCampaign?.id || '',
       amount: ''
     }
   });
+
+  useEffect(() => {
+    if (!campaigns.length) {
+      return;
+    }
+
+    const normalizedPreferred = String(preferredCampaignId || '');
+    if (normalizedPreferred) {
+      const exists = campaigns.some((campaign) => String(campaign.id) === normalizedPreferred);
+      if (exists) {
+        setValue('campaignId', normalizedPreferred, { shouldDirty: false, shouldValidate: true });
+        return;
+      }
+    }
+
+    setValue('campaignId', String(defaultCampaign?.id || ''), { shouldDirty: false, shouldValidate: true });
+  }, [campaigns, defaultCampaign?.id, preferredCampaignId, setValue]);
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" aria-label="Donation form">
