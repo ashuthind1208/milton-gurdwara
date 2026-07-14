@@ -3,7 +3,6 @@ import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   DocumentArrowDownIcon,
-  ArrowsPointingOutIcon,
   EnvelopeIcon,
   FunnelIcon,
   MagnifyingGlassIcon,
@@ -84,7 +83,7 @@ const AdminDonationsPage = () => {
     return accumulator;
   }, {}), [campaigns]);
 
-  const fullscreenBoardUrl = '/donation-board?fullscreen=1';
+  const donationBoardUrl = '/donation-board';
 
   const campaignDonations = useMemo(() => {
     if (!viewingCampaign) {
@@ -290,12 +289,12 @@ const AdminDonationsPage = () => {
           <h2 className="font-heading text-xl font-semibold">Campaigns</h2>
           <div className="flex flex-wrap items-center gap-2">
             <a
-              href={fullscreenBoardUrl}
+              href={donationBoardUrl}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100"
             >
-              <ArrowsPointingOutIcon className="h-4 w-4" /> Launch Fullscreen Board
+              <EyeIcon className="h-4 w-4" /> Go To Donation Board
             </a>
             <Button type="button" onClick={openCreate} className="inline-flex items-center gap-1.5">
               <PlusIcon className="h-4 w-4" /> Add Campaign

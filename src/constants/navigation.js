@@ -28,6 +28,7 @@ export const adminNav = [
   { label: 'Videos', path: '/admin/videos' },
   { label: 'Streaming', path: '/admin/streaming' },
   { label: 'Advertisements', path: '/admin/advertisements' },
+  { label: 'Sponsors', path: '/admin/sponsors' },
   { label: 'Events', path: '/admin/events' },
   { label: 'Donations', path: '/admin/donations' },
   { label: 'Users', path: '/admin/users' },

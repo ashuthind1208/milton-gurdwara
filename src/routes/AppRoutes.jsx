@@ -35,6 +35,7 @@ const AdminLibraryPage = lazy(() => import('../admin/Library/AdminLibraryPage'))
 const AdminVideosPage = lazy(() => import('../admin/Videos/AdminVideosPage'));
 const AdminStreamingPage = lazy(() => import('../admin/Streaming/AdminStreamingPage'));
 const AdminAdvertisementsPage = lazy(() => import('../admin/Advertisements/AdminAdvertisementsPage'));
+const AdminSponsorsPage = lazy(() => import('../admin/Sponsors/AdminSponsorsPage'));
 const AdminEventsPage = lazy(() => import('../admin/Events/AdminEventsPage'));
 const AdminDonationsPage = lazy(() => import('../admin/Donations/AdminDonationsPage'));
 const AdminUsersPage = lazy(() => import('../admin/Users/AdminUsersPage'));
@@ -78,6 +79,7 @@ const AppRoutes = () => {
             <Route path="/admin/schedule" element={<AdminSchedulePage />} />
             <Route path="/admin/langar" element={<AdminLangarPage />} />
             <Route path="/admin/advertisements" element={<AdminAdvertisementsPage />} />
+            <Route path="/admin/sponsors" element={<AdminSponsorsPage />} />
             <Route path="/admin/donations" element={<AdminDonationsPage />} />
             <Route path="/admin/users" element={<AdminUsersPage />} />
             <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
