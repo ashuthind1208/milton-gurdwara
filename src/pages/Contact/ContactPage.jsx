@@ -56,7 +56,7 @@ const ContactPage = () => {
             <article key={section.id} className="rounded-xl border border-slate-200 bg-white p-4">
               <h3 className="font-heading text-lg font-semibold text-brand-blue">{section.title}</h3>
               <p className="mt-1 text-sm leading-relaxed text-slate-700">{section.body}</p>
-              {section.mediaUrl ? <img src={section.mediaUrl} alt={section.title} className="mt-3 h-48 w-full rounded-lg object-cover" loading="lazy" /> : null}
+              {section.mediaUrl ? <img src={section.mediaUrl} alt={section.title} className="mt-3 h-48 w-full rounded-lg object-contain bg-slate-50" loading="lazy" /> : null}
             </article>
           ))}
         </section>

@@ -159,6 +159,9 @@ const HomePage = () => {
     [scheduleRows]
   );
   const isTodaySpecial = resolvedScheduleDay?.dateKey === todayDateKey && resolvedScheduleDay?.isSpecial !== false;
+  const specialDayReason = (resolvedScheduleDay?.specialReason || resolvedScheduleDay?.highlightNoteEn || '').trim();
+  const specialDayReasonPa = (resolvedScheduleDay?.specialReasonPa || resolvedScheduleDay?.highlightNotePa || '').trim();
+  const specialDayTickerText = [specialDayReason, specialDayReasonPa].filter(Boolean).join(' • ');
   const hukamnamaLines = activeHukamnama?.lines || [];
   const hukamnamaMeta = activeHukamnama?.metadata || {};
   const hasDailyHukamnama = Boolean(activeHukamnama?.ang && hukamnamaLines.length > 0);
@@ -222,7 +225,7 @@ const HomePage = () => {
           primary: entry.name,
           category: entry.category || 'General',
           needed: Boolean(entry.needed),
-          secondary: `${entry.addedOn} • ${entry.needed ? 'Needed' : 'Not Needed'}`
+          secondary: `${entry.addedOn} • ${entry.displayStatusLabel || (entry.needed ? 'Required Soon' : 'Stock Available')}`
         }))
       },
       '/donation': {
@@ -265,7 +268,7 @@ const HomePage = () => {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="min-w-0 space-y-3">
       <Seo {...meta} />
 
       <HomeHeroBanner
@@ -323,8 +326,8 @@ const HomePage = () => {
       ) : null}
 
       <section className="pb-8">
-        <div className="grid gap-3 lg:grid-cols-[1.5fr_0.85fr]">
-          <div className="space-y-3">
+        <div className="min-w-0 grid gap-3 lg:grid-cols-[1.5fr_0.85fr]">
+          <div className="min-w-0 space-y-3">
             <div className="rounded-xl border border-brand-blue/20 bg-white px-5 py-4">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex-1">
@@ -368,7 +371,7 @@ const HomePage = () => {
               ) : null}
             </div>
 
-            <section className={`relative rounded-xl border px-5 py-4 ${isTodaySpecial ? 'border-amber-300 bg-amber-50/40' : 'border-slate-200 bg-white'}`}>
+            <section className={`relative min-w-0 max-w-full overflow-hidden rounded-xl border px-5 py-4 ${isTodaySpecial ? 'border-amber-300 bg-amber-50/40' : 'border-slate-200 bg-white'}`}>
               {isTodaySpecial ? (
                 <div className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full border border-amber-300 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-800">
                   <span aria-hidden="true">✦</span>
@@ -377,8 +380,24 @@ const HomePage = () => {
               ) : null}
 
               <div className={`flex flex-wrap items-start justify-between gap-3 ${isTodaySpecial ? 'pt-8' : ''}`}>
-                <SectionTitle title="Daily Schedule" subtitle={isTodaySpecial ? 'Today is a special event schedule.' : ''} />
+                <SectionTitle title="Daily Schedule" subtitle="" />
               </div>
+
+              {isTodaySpecial && specialDayTickerText ? (
+                <div className="daily-schedule-special-ticker mt-2 w-full min-w-0 max-w-full overflow-hidden bg-brand-saffron">
+                  <div className="ticker-mask px-3 py-1.5">
+                    <div className="ticker-track daily-schedule-special-track ticker-speed-fast ticker-no-pause">
+                      {[0, 1, 2, 3, 4, 5].map((groupIndex) => (
+                        <div key={`special-day-note-${groupIndex}`} className="ticker-group">
+                          <p className="daily-schedule-special-item inline-flex shrink-0 items-center text-sm font-extrabold text-amber-50">
+                            <span>{specialDayTickerText}</span>
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="mt-3 space-y-4">
                 {scheduleRows.length === 0 ? (
@@ -386,26 +405,26 @@ const HomePage = () => {
                 ) : null}
 
                 {morningScheduleRows.length > 0 ? (
-                  <div className="overflow-x-auto rounded-lg border border-sky-200">
+                  <div className="min-w-0 max-w-full overflow-hidden rounded-lg border border-sky-200">
                     <div className="border-b border-sky-200 bg-sky-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-sky-800">Morning</div>
-                    <table className="min-w-full border-collapse text-left">
+                    <table className="w-full table-fixed border-collapse text-left">
                       <tbody>
                         {morningScheduleRows.map((item) => (
                           <tr key={item.id} className={`border-t border-sky-100 ${item.isCurrent ? 'animate-pulse bg-brand-blue/15' : item.isHighlighted ? 'bg-sky-50/40' : 'bg-sky-50/25'} ${item.isActive === false ? 'opacity-45' : ''}`}>
-                            <td className="w-[145px] py-3 pr-4 pl-2 align-top">
+                            <td className="w-[132px] py-3 pr-3 pl-2 align-top md:w-[170px] md:pr-4">
                               <div className="flex items-start gap-3">
                                 <span className={`mt-1 inline-flex h-3 w-3 rounded-full ${item.isCurrent ? 'bg-green-500 shadow-[0_0_0_6px_rgba(34,197,94,0.18)]' : item.isHighlighted ? 'bg-brand-blue/80' : 'bg-slate-300'}`} />
-                                <div>
-                                  <p className="whitespace-nowrap text-sm font-bold leading-none text-slate-900">{item.timeEn || 'Time TBD'}</p>
-                                  {item.timePa ? <p className="mt-1 text-xs font-medium text-slate-500">{item.timePa}</p> : null}
+                                <div className="min-w-0">
+                                  <p className="whitespace-nowrap text-sm font-bold leading-snug text-slate-900">{item.timeEn || 'Time TBD'}</p>
+                                  {item.timePa ? <p className="mt-1 whitespace-nowrap text-xs font-medium leading-snug text-slate-500">{item.timePa}</p> : null}
                                 </div>
                               </div>
                             </td>
-                            <td className="py-3 align-top">
-                              <p className="text-sm font-semibold text-slate-900">{item.titleEn || 'Untitled schedule item'}</p>
-                              {item.titlePa ? <p className="mt-1 text-sm text-brand-saffron">{item.titlePa}</p> : null}
-                              {item.noteEn ? <p className="mt-1 text-xs text-slate-600">{item.noteEn}</p> : null}
-                              {item.notePa ? <p className="mt-1 text-xs text-slate-500">{item.notePa}</p> : null}
+                            <td className="min-w-0 py-3 align-top">
+                              <p className="schedule-cell-clip text-sm font-semibold text-slate-900">{item.titleEn || 'Untitled schedule item'}</p>
+                              {item.titlePa ? <p className="schedule-cell-clip mt-1 text-sm text-brand-saffron">{item.titlePa}</p> : null}
+                              {item.noteEn ? <p className="schedule-cell-clip mt-1 text-xs text-slate-600">{item.noteEn}</p> : null}
+                              {item.notePa ? <p className="schedule-cell-clip mt-1 text-xs text-slate-500">{item.notePa}</p> : null}
                             </td>
                           </tr>
                         ))}
@@ -415,26 +434,26 @@ const HomePage = () => {
                 ) : null}
 
                 {eveningScheduleRows.length > 0 ? (
-                  <div className="overflow-x-auto rounded-lg border border-amber-200">
+                  <div className="min-w-0 max-w-full overflow-hidden rounded-lg border border-amber-200">
                     <div className="border-b border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-amber-800">Evening</div>
-                    <table className="min-w-full border-collapse text-left">
+                    <table className="w-full table-fixed border-collapse text-left">
                       <tbody>
                         {eveningScheduleRows.map((item) => (
                           <tr key={item.id} className={`border-t border-amber-100 ${item.isCurrent ? 'animate-pulse bg-brand-blue/15' : item.isHighlighted ? 'bg-sky-50/40' : item.segment === 'special' ? 'bg-violet-50/35' : 'bg-amber-50/35'} ${item.isActive === false ? 'opacity-45' : ''}`}>
-                            <td className="w-[145px] py-3 pr-4 pl-2 align-top">
+                            <td className="w-[132px] py-3 pr-3 pl-2 align-top md:w-[170px] md:pr-4">
                               <div className="flex items-start gap-3">
                                 <span className={`mt-1 inline-flex h-3 w-3 rounded-full ${item.isCurrent ? 'bg-green-500 shadow-[0_0_0_6px_rgba(34,197,94,0.18)]' : item.isHighlighted ? 'bg-brand-blue/80' : 'bg-slate-300'}`} />
-                                <div>
-                                  <p className="whitespace-nowrap text-sm font-bold leading-none text-slate-900">{item.timeEn || 'Time TBD'}</p>
-                                  {item.timePa ? <p className="mt-1 text-xs font-medium text-slate-500">{item.timePa}</p> : null}
+                                <div className="min-w-0">
+                                  <p className="whitespace-nowrap text-sm font-bold leading-snug text-slate-900">{item.timeEn || 'Time TBD'}</p>
+                                  {item.timePa ? <p className="mt-1 whitespace-nowrap text-xs font-medium leading-snug text-slate-500">{item.timePa}</p> : null}
                                 </div>
                               </div>
                             </td>
-                            <td className="py-3 align-top">
-                              <p className="text-sm font-semibold text-slate-900">{item.titleEn || 'Untitled schedule item'}</p>
-                              {item.titlePa ? <p className="mt-1 text-sm text-brand-saffron">{item.titlePa}</p> : null}
-                              {item.noteEn ? <p className="mt-1 text-xs text-slate-600">{item.noteEn}</p> : null}
-                              {item.notePa ? <p className="mt-1 text-xs text-slate-500">{item.notePa}</p> : null}
+                            <td className="min-w-0 py-3 align-top">
+                              <p className="schedule-cell-clip text-sm font-semibold text-slate-900">{item.titleEn || 'Untitled schedule item'}</p>
+                              {item.titlePa ? <p className="schedule-cell-clip mt-1 text-sm text-brand-saffron">{item.titlePa}</p> : null}
+                              {item.noteEn ? <p className="schedule-cell-clip mt-1 text-xs text-slate-600">{item.noteEn}</p> : null}
+                              {item.notePa ? <p className="schedule-cell-clip mt-1 text-xs text-slate-500">{item.notePa}</p> : null}
                             </td>
                           </tr>
                         ))}
@@ -446,7 +465,7 @@ const HomePage = () => {
             </section>
           </div>
 
-          <div className="space-y-3 self-start">
+          <div className="min-w-0 space-y-3 self-start">
             <aside className="rounded-xl border border-brand-blue/15 bg-white px-4 py-4">
               <h3 className="font-heading text-2xl font-bold text-brand-blue">Langar Seva Items</h3>
               <ul className="mt-3 divide-y divide-slate-100 text-sm">
@@ -456,7 +475,7 @@ const HomePage = () => {
                       <p className="font-medium text-slate-700">{entry.name}</p>
                       <p className="text-xs text-slate-500">{entry.addedOn}</p>
                     </div>
-                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase ${entry.needed ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'}`}>{entry.needed ? 'Needed' : 'Not Needed'}</span>
+                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase ${entry.needed ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'}`}>{entry.displayStatusLabel || (entry.needed ? 'Required Soon' : 'Stock Available')}</span>
                   </li>
                 ))}
               </ul>

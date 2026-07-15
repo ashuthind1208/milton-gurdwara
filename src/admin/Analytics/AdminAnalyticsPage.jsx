@@ -133,10 +133,43 @@ const AdminAnalyticsPage = () => {
 
   const averageDonation = donations.length > 0 ? totalDonationAmount / donations.length : 0;
 
+  const thisMonthDonationAmount = useMemo(() => {
+    const now = new Date();
+    const month = now.getMonth();
+    const year = now.getFullYear();
+    return donations.reduce((sum, donation) => {
+      const date = new Date(donation.createdAt || donation.updatedAt || Date.now());
+      if (Number.isNaN(date.getTime()) || date.getMonth() !== month || date.getFullYear() !== year) {
+        return sum;
+      }
+      return sum + Number(donation.amount || 0);
+    }, 0);
+  }, [donations]);
+
+  const totalEventRegistrations = useMemo(
+    () => events.reduce((sum, event) => sum + (Array.isArray(event.registrants) ? event.registrants.length : 0), 0),
+    [events]
+  );
+
+  const averageRegistrationsPerEvent = useMemo(
+    () => (events.length > 0 ? totalEventRegistrations / events.length : 0),
+    [events.length, totalEventRegistrations]
+  );
+
+  const approvedVolunteerApplications = useMemo(
+    () => volunteerApplications.filter((entry) => String(entry.status || '').toLowerCase() === 'approved').length,
+    [volunteerApplications]
+  );
+
+  const volunteerApprovalRate = useMemo(
+    () => (volunteerApplications.length > 0 ? (approvedVolunteerApplications / volunteerApplications.length) * 100 : 0),
+    [approvedVolunteerApplications, volunteerApplications.length]
+  );
+
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="font-heading text-3xl font-bold">Analytics and KPIs</h1>
+        <h1 className="sr-only">Analytics and KPIs</h1>
         <p className="text-sm text-slate-600">Live operational numbers from users, donations, events, and volunteer applications.</p>
       </div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -159,6 +192,26 @@ const AdminAnalyticsPage = () => {
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Upcoming Events</p>
           <p className="mt-3 font-heading text-3xl font-bold text-violet-600">{upcomingEvents.length}</p>
           <p className="mt-2 text-sm text-slate-500">{events.length} total event records</p>
+        </Card>
+        <Card>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">This Month Donations</p>
+          <p className="mt-3 font-heading text-3xl font-bold text-brand-blue">{formatCurrency(thisMonthDonationAmount)}</p>
+          <p className="mt-2 text-sm text-slate-500">Current month collection total</p>
+        </Card>
+        <Card>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Event Registrations</p>
+          <p className="mt-3 font-heading text-3xl font-bold text-brand-saffron">{totalEventRegistrations}</p>
+          <p className="mt-2 text-sm text-slate-500">Avg {averageRegistrationsPerEvent.toFixed(1)} per event</p>
+        </Card>
+        <Card>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Volunteer Applications</p>
+          <p className="mt-3 font-heading text-3xl font-bold text-emerald-600">{volunteerApplications.length}</p>
+          <p className="mt-2 text-sm text-slate-500">{approvedVolunteerApplications} approved so far</p>
+        </Card>
+        <Card>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Volunteer Approval Rate</p>
+          <p className="mt-3 font-heading text-3xl font-bold text-violet-600">{volunteerApprovalRate.toFixed(0)}%</p>
+          <p className="mt-2 text-sm text-slate-500">Approval ratio across all applications</p>
         </Card>
       </div>
       <Card>

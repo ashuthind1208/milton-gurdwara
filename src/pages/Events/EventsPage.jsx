@@ -35,6 +35,7 @@ const EventsPage = () => {
   const meta = useSeoMeta('Events', 'Event calendar, list view, filters, and RSVP registration for all programs.');
   const location = useLocation();
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [calendarView, setCalendarView] = useState('month');
   const [category, setCategory] = useState('All');
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [overflowEventsModal, setOverflowEventsModal] = useState({ open: false, date: null, events: [] });
@@ -305,6 +306,9 @@ const EventsPage = () => {
               localizer={localizer}
               events={calendarEvents}
               date={selectedDate}
+              view={calendarView}
+              onView={setCalendarView}
+              views={['month', 'week', 'day', 'agenda']}
               startAccessor="start"
               endAccessor="end"
               onNavigate={setSelectedDate}
@@ -312,6 +316,10 @@ const EventsPage = () => {
               selectable
               popup={false}
               messages={{
+                month: 'Month',
+                week: 'Week',
+                day: 'Day',
+                agenda: 'Agenda',
                 showMore: (total) => `+${total}`
               }}
               doShowMoreDrillDown={false}

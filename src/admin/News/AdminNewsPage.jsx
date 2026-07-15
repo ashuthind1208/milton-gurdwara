@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -48,6 +49,7 @@ const appendUrlLine = (existingValue, nextUrl) => {
 };
 
 const AdminNewsPage = () => {
+  const { setHeaderAction } = useOutletContext();
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [viewArticle, setViewArticle] = useState(null);
@@ -171,12 +173,19 @@ const AdminNewsPage = () => {
     }
   };
 
+  useEffect(() => {
+    setHeaderAction(
+      <Button type="button" onClick={() => setCreateOpen(true)} className="h-8 px-2.5 py-1 text-xs font-semibold">
+        Add News
+      </Button>
+    );
+
+    return () => setHeaderAction(null);
+  }, [setHeaderAction]);
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="font-heading text-3xl font-bold">News and Updates</h1>
-        <Button type="button" onClick={() => setCreateOpen(true)}>Add New News</Button>
-      </div>
+      <h1 className="sr-only">News and Updates</h1>
 
       <Card>
         <div className="overflow-x-auto">

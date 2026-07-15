@@ -139,6 +139,24 @@ const AdminDashboardPage = () => {
     [donations]
   );
 
+  const averageDonation = useMemo(
+    () => (donations.length > 0 ? donationTotal / donations.length : 0),
+    [donationTotal, donations.length]
+  );
+
+  const thisMonthDonationAmount = useMemo(() => {
+    const now = new Date();
+    const month = now.getMonth();
+    const year = now.getFullYear();
+    return donations.reduce((sum, donation) => {
+      const date = new Date(donation.createdAt || donation.updatedAt || Date.now());
+      if (Number.isNaN(date.getTime()) || date.getMonth() !== month || date.getFullYear() !== year) {
+        return sum;
+      }
+      return sum + Number(donation.amount || 0);
+    }, 0);
+  }, [donations]);
+
   const exactEventRegistrations = useMemo(
     () => events.reduce((sum, event) => sum + getExactEventRegistrationCount(event), 0),
     [events]
@@ -147,6 +165,21 @@ const AdminDashboardPage = () => {
   const activeEventCount = useMemo(
     () => events.filter((event) => Boolean(event.active)).length,
     [events]
+  );
+
+  const approvedUsersCount = useMemo(
+    () => users.filter((user) => String(user.approvalStatus || '').toLowerCase() === 'approved').length,
+    [users]
+  );
+
+  const approvedVolunteerApplications = useMemo(
+    () => volunteerApplications.filter((entry) => String(entry.status || '').toLowerCase() === 'approved').length,
+    [volunteerApplications]
+  );
+
+  const volunteerApprovalRate = useMemo(
+    () => (volunteerApplications.length > 0 ? (approvedVolunteerApplications / volunteerApplications.length) * 100 : 0),
+    [approvedVolunteerApplications, volunteerApplications.length]
   );
 
   const pendingApprovalsCount = useMemo(
@@ -334,6 +367,10 @@ const AdminDashboardPage = () => {
         <SummaryCard label="People Access" value={users.length} sublabel={`${inactiveUsers.length} inactive accounts`} tone="text-brand-blue" icon={UsersIcon} href="/admin/users" />
         <SummaryCard label="Volunteer Demand" value={volunteerApplications.length} sublabel={`${pendingVolunteers.length} still pending review`} tone="text-amber-600" icon={UserGroupIcon} href="/admin/seva-opportunities" />
         <SummaryCard label="Upcoming Events" value={upcomingEvents.length} sublabel={`${activeEventCount} active total`} tone="text-violet-600" icon={CalendarDaysIcon} href="/admin/events" />
+        <SummaryCard label="This Month Donations" value={formatCurrency(thisMonthDonationAmount)} sublabel={`Average ${formatCurrency(averageDonation)} per donation`} tone="text-brand-blue" icon={CurrencyDollarIcon} href="/admin/donations" />
+        <SummaryCard label="Event Registrations" value={exactEventRegistrations} sublabel={`${events.length} total events`} tone="text-brand-blue" icon={CalendarDaysIcon} href="/admin/events" />
+        <SummaryCard label="Approved Users" value={approvedUsersCount} sublabel={`${pendingUsers.length} users pending`} tone="text-emerald-600" icon={UsersIcon} href="/admin/users" />
+        <SummaryCard label="Volunteer Approval" value={`${volunteerApprovalRate.toFixed(0)}%`} sublabel={`${approvedVolunteerApplications} approved applications`} tone="text-violet-600" icon={UserGroupIcon} href="/admin/seva-opportunities" />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">

@@ -38,6 +38,8 @@ const pageOptions = [
   { value: 'contact', label: 'Contact' }
 ];
 
+const isImageUrl = (value = '') => /\.(png|jpe?g|gif|webp|svg|avif)(\?.*)?$/i.test(String(value || ''));
+
 const AdminCmsPage = () => {
   const queryClient = useQueryClient();
   const [selectedPage, setSelectedPage] = useState('about');
@@ -280,7 +282,7 @@ const AdminCmsPage = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-3xl font-bold">CMS Management</h1>
+      <h1 className="sr-only">CMS Management</h1>
 
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -361,6 +363,11 @@ const AdminCmsPage = () => {
                   <div className="h-full bg-brand-blue transition-all" style={{ width: `${pageUploadProgress}%` }} />
                 </div>
               ) : null}
+              {isImageUrl(pageForm.watch('mediaUrl')) ? (
+                <div className="mt-2 overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                  <img src={pageForm.watch('mediaUrl')} alt="Page media preview" className="h-36 w-full object-contain" loading="lazy" />
+                </div>
+              ) : null}
             </label>
             <label className="text-sm md:col-span-2">Hero Description
               <textarea {...pageForm.register('heroDescription')} rows={2} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
@@ -409,7 +416,17 @@ const AdminCmsPage = () => {
                   <tr key={section.id}>
                     <td className="px-3 py-2">{section.title || 'Untitled section'}</td>
                     <td className="px-3 py-2">{(section.body || '').slice(0, 90)}{(section.body || '').length > 90 ? '...' : ''}</td>
-                    <td className="px-3 py-2">{section.mediaUrl ? 'Linked' : '-'}</td>
+                    <td className="px-3 py-2">
+                      {section.mediaUrl ? (
+                        isImageUrl(section.mediaUrl) ? (
+                          <div className="h-16 w-24 overflow-hidden rounded border border-slate-200 bg-slate-50">
+                            <img src={section.mediaUrl} alt={section.title || 'Section media'} className="h-full w-full object-contain" loading="lazy" />
+                          </div>
+                        ) : (
+                          <a className="text-xs font-semibold text-brand-blue hover:underline" href={section.mediaUrl} target="_blank" rel="noreferrer">Open file</a>
+                        )
+                      ) : '-'}
+                    </td>
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-1">
                         <button type="button" className="rounded-md border border-slate-300 p-1.5 text-slate-700" onClick={() => setSectionModal({ open: true, mode: 'view', sectionId: section.id })} title="View">
@@ -542,6 +559,11 @@ const AdminCmsPage = () => {
                       </div>
                     ) : null}
                   </>
+                ) : null}
+                {isImageUrl(sectionForm.watch('mediaUrl')) ? (
+                  <div className="mt-2 overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                    <img src={sectionForm.watch('mediaUrl')} alt="Section media preview" className="h-40 w-full object-contain" loading="lazy" />
+                  </div>
                 ) : null}
               </label>
               <label className="text-sm">Section Body

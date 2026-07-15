@@ -335,7 +335,6 @@ const LibraryPage = () => {
             </div>
           </div>
         </div>
-        <p className="text-xs text-slate-500">Live feed from latest library additions and session updates.</p>
       </section>
 
       {sortedProgramUpdates.length > 0 ? (

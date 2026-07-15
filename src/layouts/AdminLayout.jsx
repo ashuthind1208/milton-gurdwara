@@ -1,5 +1,26 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import {
+  Bars3Icon,
+  ChartBarSquareIcon,
+  CalendarDaysIcon,
+  CameraIcon,
+  CurrencyDollarIcon,
+  MegaphoneIcon,
+  NewspaperIcon,
+  PhotoIcon,
+  QueueListIcon,
+  RectangleGroupIcon,
+  SignalIcon,
+  Squares2X2Icon,
+  UserGroupIcon,
+  UsersIcon,
+  VideoCameraIcon,
+  BookOpenIcon,
+  HeartIcon,
+  SparklesIcon
+} from '@heroicons/react/24/outline';
+import { XMarkIcon } from '@heroicons/react/24/outline';
 import { adminNav } from '../constants/navigation';
 import { useAuth } from '../context/AuthContext';
 import gurdwaraLogo from '../assets/gurdwara-logo.webp';
@@ -22,17 +43,43 @@ const getFirstName = (fullName) => {
   return tokens[0] || 'Member';
 };
 
+const iconByPath = {
+  '/admin': Squares2X2Icon,
+  '/admin/cms': RectangleGroupIcon,
+  '/admin/news': NewspaperIcon,
+  '/admin/schedule': CalendarDaysIcon,
+  '/admin/hukamnama': SparklesIcon,
+  '/admin/langar': HeartIcon,
+  '/admin/seva-opportunities': UserGroupIcon,
+  '/admin/gallery': PhotoIcon,
+  '/admin/library': BookOpenIcon,
+  '/admin/videos': VideoCameraIcon,
+  '/admin/streaming': SignalIcon,
+  '/admin/advertisements': MegaphoneIcon,
+  '/admin/sponsors': CameraIcon,
+  '/admin/events': QueueListIcon,
+  '/admin/donations': CurrencyDollarIcon,
+  '/admin/users': UsersIcon,
+  '/admin/analytics': ChartBarSquareIcon
+};
+
 const AdminLayout = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [accessDeniedModalOpen, setAccessDeniedModalOpen] = useState(false);
   const [accessDeniedNotice, setAccessDeniedNotice] = useState('');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [headerAction, setHeaderAction] = useState(null);
   const firstName = getFirstName(user?.name);
   const hasFullAccess = FULL_ACCESS_ROLES.has(String(user?.role || ''));
   const visibleNav = hasFullAccess
     ? adminNav
     : adminNav.filter((item) => MEMBER_VISIBLE_PATHS.includes(item.path));
+  const currentNavItem = [...adminNav]
+    .sort((a, b) => b.path.length - a.path.length)
+    .find((item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`));
+  const pageTitle = currentNavItem?.label || (location.pathname.startsWith('/admin/analytics') ? 'Analytics and KPIs' : 'Admin');
 
   useEffect(() => {
     const state = location.state || {};
@@ -46,14 +93,19 @@ const AdminLayout = () => {
     navigate(location.pathname, { replace: true, state: {} });
   }, [location.pathname, location.state, navigate]);
 
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
+
   const handleLogout = async () => {
     await logout();
     navigate('/', { replace: true });
   };
 
   return (
-    <div className="grid min-h-screen grid-cols-1 bg-slate-100 dark:bg-slate-950 lg:grid-cols-[270px_1fr]">
-      <aside className="border-r border-slate-800 bg-slate-950 p-4 text-slate-100">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-950">
+      <div className="grid grid-cols-1 lg:grid-cols-[270px_1fr]">
+      <aside className="hidden border-r border-slate-800 bg-slate-950 p-4 text-slate-100 lg:block">
         <p className="flex items-center gap-2 font-heading text-xl font-bold text-white">
           <img src={gurdwaraLogo} alt="Singh Sabha logo" className="h-8 w-8 rounded-full border border-brand-saffron/70 object-cover" />
           Admin Portal
@@ -68,29 +120,60 @@ const AdminLayout = () => {
                 `rounded-lg px-3 py-2 text-sm ${isActive ? 'bg-brand-blue text-white' : 'text-slate-300 hover:bg-slate-800'}`
               }
             >
-              {item.label}
+              {(() => {
+                const Icon = iconByPath[item.path] || Squares2X2Icon;
+                return (
+                  <span className="inline-flex items-center gap-2">
+                    <Icon className="h-4 w-4" />
+                    <span>{item.label}</span>
+                  </span>
+                );
+              })()}
             </NavLink>
           ))}
         </nav>
       </aside>
-      <main className="p-4 md:p-8">
-        <div className="mb-6 flex justify-end">
-          <div className="flex w-full max-w-sm items-center gap-2.5 rounded-xl border border-slate-200/80 bg-white/85 px-3 py-2 shadow-[0_4px_14px_-10px_rgba(15,23,42,0.45)] backdrop-blur">
-            <img src={user?.avatarUrl || gurdwaraLogo} alt={user?.name || 'Profile'} className="h-9 w-9 rounded-full border border-slate-200 object-cover" />
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Signed in</p>
-              <p className="truncate text-sm font-semibold text-slate-700">{firstName}</p>
+      <main className="admin-main-content p-4 md:p-8">
+        <div className="mb-6 border-b border-slate-200 pb-3">
+          <div className="flex items-center gap-3">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setMobileNavOpen(true)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-300 text-slate-700 lg:hidden"
+                aria-label="Open admin menu"
+              >
+                <Bars3Icon className="h-5 w-5" />
+              </button>
+              <h1 className="truncate font-heading text-2xl font-bold text-slate-900 sm:text-3xl">{pageTitle}</h1>
+              {headerAction ? <div className="flex-shrink-0">{headerAction}</div> : null}
             </div>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
-            >
-              Logout
-            </button>
+
+            <div className="flex items-center gap-2 lg:hidden">
+              <img src={user?.avatarUrl || gurdwaraLogo} alt={user?.name || 'Profile'} className="h-9 w-9 rounded-full border border-slate-200 object-cover" />
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="text-sm font-semibold text-slate-700 underline underline-offset-4"
+              >
+                Logout
+              </button>
+            </div>
+
+            <div className="hidden items-center gap-3 lg:flex">
+              <img src={user?.avatarUrl || gurdwaraLogo} alt={user?.name || 'Profile'} className="h-9 w-9 rounded-full border border-slate-200 object-cover" />
+              <p className="text-base font-extrabold text-slate-800">{firstName}</p>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="text-sm font-semibold text-slate-700 underline underline-offset-4"
+              >
+                Logout
+              </button>
+            </div>
           </div>
         </div>
-        <Outlet />
+        <Outlet context={{ setHeaderAction }} />
 
         {accessDeniedModalOpen ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4" role="dialog" aria-modal="true" aria-live="assertive">
@@ -110,6 +193,57 @@ const AdminLayout = () => {
           </div>
         ) : null}
       </main>
+      </div>
+
+      {mobileNavOpen ? (
+        <div className="fixed inset-0 z-[140] lg:hidden" role="dialog" aria-modal="true" aria-label="Admin navigation">
+          <button
+            type="button"
+            className="absolute inset-0 bg-slate-950/60"
+            aria-label="Close admin menu"
+            onClick={() => setMobileNavOpen(false)}
+          />
+          <aside className="relative h-full w-[86%] max-w-[320px] overflow-y-auto border-r border-slate-800 bg-slate-950 p-4 text-slate-100 shadow-2xl">
+            <div className="flex items-center justify-between gap-2">
+              <p className="flex items-center gap-2 font-heading text-xl font-bold text-white">
+                <img src={gurdwaraLogo} alt="Singh Sabha logo" className="h-8 w-8 rounded-full border border-brand-saffron/70 object-cover" />
+                Admin Portal
+              </p>
+              <button
+                type="button"
+                onClick={() => setMobileNavOpen(false)}
+                className="rounded-md border border-slate-700 p-1 text-slate-300"
+                aria-label="Close admin menu"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+
+            <nav className="mt-6 grid gap-2" aria-label="Admin navigation mobile">
+              {visibleNav.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  end={item.path === '/admin'}
+                  className={({ isActive }) =>
+                    `rounded-lg px-3 py-2 text-sm ${isActive ? 'bg-brand-blue text-white' : 'text-slate-300 hover:bg-slate-800'}`
+                  }
+                >
+                  {(() => {
+                    const Icon = iconByPath[item.path] || Squares2X2Icon;
+                    return (
+                      <span className="inline-flex items-center gap-2">
+                        <Icon className="h-4 w-4" />
+                        <span>{item.label}</span>
+                      </span>
+                    );
+                  })()}
+                </NavLink>
+              ))}
+            </nav>
+          </aside>
+        </div>
+      ) : null}
     </div>
   );
 };

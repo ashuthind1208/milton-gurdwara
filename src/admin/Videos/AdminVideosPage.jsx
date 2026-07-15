@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EyeIcon, PencilSquareIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
@@ -35,6 +36,7 @@ const Pagination = ({ page, total, onChange }) => {
 const platformBadge = { youtube: 'bg-red-50 text-red-700 border-red-200', facebook: 'bg-blue-50 text-blue-700 border-blue-200', other: 'bg-slate-50 text-slate-600 border-slate-200' };
 
 const AdminVideosPage = () => {
+  const { setHeaderAction } = useOutletContext();
   const queryClient = useQueryClient();
   const [videoModal, setVideoModal] = useState({ open: false, mode: 'add', id: '' });
   const [page, setPage] = useState(1);
@@ -94,12 +96,19 @@ const AdminVideosPage = () => {
 
   const isSaving = addMutation.isPending || updateMutation.isPending;
 
+  useEffect(() => {
+    setHeaderAction(
+      <Button type="button" onClick={() => setVideoModal({ open: true, mode: 'add', id: '' })} className="h-8 px-2.5 py-1 text-xs font-semibold">
+        Add Video
+      </Button>
+    );
+
+    return () => setHeaderAction(null);
+  }, [setHeaderAction]);
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="font-heading text-3xl font-bold">Gurdwara Videos</h1>
-        <Button type="button" onClick={() => setVideoModal({ open: true, mode: 'add', id: '' })}>Add Video</Button>
-      </div>
+      <h1 className="sr-only">Gurdwara Videos</h1>
       <p className="text-sm text-slate-600">Add YouTube and Facebook video links from the Gurdwara channel and Facebook page. YouTube videos embed directly; Facebook links open in a new tab.</p>
 
       <Card>

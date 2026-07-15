@@ -1,8 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CheckIcon,
+  EllipsisVerticalIcon,
   EyeIcon,
   EnvelopeIcon,
   PencilSquareIcon,
@@ -26,10 +28,12 @@ const defaultForm = {
 };
 
 const AdminSevaOpportunitiesPage = () => {
+  const { setHeaderAction } = useOutletContext();
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [viewOpportunity, setViewOpportunity] = useState(null);
   const [editing, setEditing] = useState(null);
+  const [openActionMenuId, setOpenActionMenuId] = useState('');
 
   const createForm = useForm({ defaultValues: defaultForm });
   const editForm = useForm({ defaultValues: defaultForm });
@@ -172,12 +176,19 @@ const AdminSevaOpportunitiesPage = () => {
     });
   };
 
+  useEffect(() => {
+    setHeaderAction(
+      <Button type="button" onClick={() => setCreateOpen(true)} className="h-8 px-2.5 py-1 text-xs font-semibold">
+        Add New Seva Opportunity
+      </Button>
+    );
+
+    return () => setHeaderAction(null);
+  }, [setHeaderAction]);
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="font-heading text-3xl font-bold">Seva Opportunities</h1>
-        <Button type="button" onClick={() => setCreateOpen(true)}>Add New Seva Opportunity</Button>
-      </div>
+      <h1 className="sr-only">Seva Opportunities</h1>
 
       <Card>
         <div className="overflow-x-auto">
@@ -205,7 +216,96 @@ const AdminSevaOpportunitiesPage = () => {
                     </span>
                   </td>
                   <td className="py-2 pr-3">
-                    <div className="flex items-center gap-2">
+                    <div className="relative lg:hidden">
+                      <button
+                        type="button"
+                        onClick={() => setOpenActionMenuId((prev) => (prev === item.id ? '' : item.id))}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100"
+                        aria-label="More actions"
+                        title="More actions"
+                      >
+                        <EllipsisVerticalIcon className={actionIconClass} />
+                      </button>
+                      {openActionMenuId === item.id ? (
+                        <div className="absolute right-0 top-9 z-20 min-w-[160px] rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              toggleActiveMutation.mutate({ id: item.id, active: !item.active });
+                              setOpenActionMenuId('');
+                            }}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                          >
+                            {item.active ? 'Mark inactive' : 'Mark active'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setViewOpportunity(item);
+                              setOpenActionMenuId('');
+                            }}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                          >
+                            View
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              openEdit(item);
+                              setOpenActionMenuId('');
+                            }}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              exportOpportunityVolunteers(item, 'csv');
+                              setOpenActionMenuId('');
+                            }}
+                            disabled={getOpportunityVolunteers(item).length === 0}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            Download CSV
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              exportOpportunityVolunteers(item, 'pdf');
+                              setOpenActionMenuId('');
+                            }}
+                            disabled={getOpportunityVolunteers(item).length === 0}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            Download PDF
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              manualReminderMutation.mutate(item);
+                              setOpenActionMenuId('');
+                            }}
+                            disabled={getOpportunityVolunteers(item).length === 0 || manualReminderMutation.isPending}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            Send Email
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              deleteMutation.mutate(item.id);
+                              setOpenActionMenuId('');
+                            }}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-red-700 hover:bg-red-50"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="hidden items-center gap-2 lg:flex">
                       <button
                         type="button"
                         onClick={() => toggleActiveMutation.mutate({ id: item.id, active: !item.active })}

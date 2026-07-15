@@ -39,7 +39,6 @@ const AdminSponsorsPage = lazy(() => import('../admin/Sponsors/AdminSponsorsPage
 const AdminEventsPage = lazy(() => import('../admin/Events/AdminEventsPage'));
 const AdminDonationsPage = lazy(() => import('../admin/Donations/AdminDonationsPage'));
 const AdminUsersPage = lazy(() => import('../admin/Users/AdminUsersPage'));
-const AdminAnalyticsPage = lazy(() => import('../admin/Analytics/AdminAnalyticsPage'));
 
 const LoadingFallback = () => <div className="py-20 text-center text-slate-600">Loading page...</div>;
 
@@ -82,7 +81,6 @@ const AppRoutes = () => {
             <Route path="/admin/sponsors" element={<AdminSponsorsPage />} />
             <Route path="/admin/donations" element={<AdminDonationsPage />} />
             <Route path="/admin/users" element={<AdminUsersPage />} />
-            <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
           </Route>
         </Route>
 

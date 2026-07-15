@@ -64,6 +64,51 @@
   .ticker-speed-medium {
     animation-duration: 34s;
   }
+
+  .ticker-speed-fast {
+    animation-duration: 18s;
+  }
+
+  .daily-schedule-special-ticker {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    contain: layout paint;
+    isolation: isolate;
+  }
+
+  .daily-schedule-special-ticker .ticker-mask {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .daily-schedule-special-ticker .ticker-track {
+    max-width: none;
+    min-width: max-content;
+  }
+
+  .daily-schedule-special-track {
+    display: inline-flex;
+    width: max-content;
+    max-width: none;
+    min-width: max-content;
+  }
+
+  .daily-schedule-special-item {
+    margin: 2px 8px;
+    padding: 3px 8px;
+  }
+
+  .schedule-cell-clip {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
 @keyframes ticker-scroll-left {
@@ -78,6 +123,10 @@
 @media (hover: hover) and (pointer: fine) {
   .ticker-track:hover {
     animation-play-state: paused;
+  }
+
+  .ticker-track.ticker-no-pause:hover {
+    animation-play-state: running;
   }
 }
 
@@ -108,11 +157,21 @@
   font-weight: 600;
 }
 
+.events-calendar-shell .rbc-toolbar button {
+  border-radius: 999px;
+  padding: 6px 12px;
+}
+
 .events-calendar-shell .rbc-btn-group button:hover,
 .events-calendar-shell .rbc-btn-group button.rbc-active {
   background: #1d4ed8;
   border-color: #1d4ed8;
   color: #ffffff;
+}
+
+.events-calendar-shell .rbc-toolbar button:focus-visible {
+  outline: 2px solid #f5a623;
+  outline-offset: 2px;
 }
 
 .events-calendar-shell .rbc-header {
@@ -178,4 +237,97 @@
 .events-calendar-shell .rbc-agenda-view {
   border: 1px solid #e2e8f0;
   border-radius: 12px;
+}
+
+.events-calendar-shell .rbc-agenda-view table {
+  color: #0f172a;
+}
+
+.events-calendar-shell .rbc-agenda-view .rbc-agenda-date-cell,
+.events-calendar-shell .rbc-agenda-view .rbc-agenda-time-cell {
+  color: #f59e0b;
+  font-weight: 700;
+}
+
+.events-calendar-shell .rbc-agenda-view .rbc-agenda-event-cell,
+.events-calendar-shell .rbc-agenda-view .rbc-agenda-event-cell a {
+  color: #f59e0b;
+  font-weight: 700;
+}
+
+@media (max-width: 1023px) {
+  .admin-main-content table th,
+  .admin-main-content table td {
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+
+  .admin-main-content table td:last-child > div {
+    display: inline-grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    max-width: 100%;
+    width: fit-content;
+    min-width: 0;
+    max-width: 100%;
+    justify-items: start;
+    align-content: start;
+  }
+
+  @media (max-width: 420px) {
+    .admin-main-content table td:last-child > div {
+      grid-template-columns: minmax(0, 1fr);
+      max-width: 110px;
+    }
+  }
+
+  .admin-main-content table td:last-child > div > button,
+  .admin-main-content table td:last-child > div > a {
+    margin: 0;
+    width: auto;
+    flex: 0 1 auto;
+    min-width: 0 !important;
+    max-width: 100px;
+    height: 28px;
+    padding: 0 5px;
+    font-size: 10px;
+    line-height: 1;
+    justify-content: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .admin-main-content table td:last-child > div > button.h-8.w-8,
+  .admin-main-content table td:last-child > div > a.h-8.w-8,
+  .admin-main-content table td:last-child > div > button.h-7.w-7,
+  .admin-main-content table td:last-child > div > a.h-7.w-7 {
+    height: 28px;
+    width: 28px;
+    padding: 0;
+  }
+
+  .admin-main-content table td:last-child > div > button span,
+  .admin-main-content table td:last-child > div > a span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+    max-width: 100%;
+  }
+
+  .admin-main-content table td:last-child {
+    width: 1%;
+    max-width: 170px;
+    white-space: normal;
+    vertical-align: top;
+  }
+
+  .admin-main-content table td:last-child > div > button svg,
+  .admin-main-content table td:last-child > div > a svg {
+    height: 13px;
+    width: 13px;
+  }
 }

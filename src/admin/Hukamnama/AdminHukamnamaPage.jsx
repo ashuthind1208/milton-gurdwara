@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import ReactCalendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { useForm } from 'react-hook-form';
@@ -43,6 +44,7 @@ const HukamnamaText = ({ entry }) => {
 };
 
 const AdminHukamnamaPage = () => {
+  const { setHeaderAction } = useOutletContext();
   const queryClient = useQueryClient();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -177,12 +179,20 @@ const AdminHukamnamaPage = () => {
     );
   };
 
+  useEffect(() => {
+    setHeaderAction(
+      <Button type="button" onClick={openAddModal} className="h-8 px-2.5 py-1 text-xs font-semibold">
+        Add Hukamnama
+      </Button>
+    );
+
+    return () => setHeaderAction(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setHeaderAction]);
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-heading text-3xl font-bold">Daily Hukamnama</h1>
-        <Button type="button" onClick={openAddModal}>Add Hukamnama</Button>
-      </div>
+      <h1 className="sr-only">Daily Hukamnama</h1>
 
       <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
         <Card>

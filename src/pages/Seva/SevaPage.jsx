@@ -171,16 +171,20 @@ const SevaPage = () => {
         ) : (
           <section className="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden border-y border-brand-blue/70 bg-brand-blue py-2.5">
             <div className="ticker-mask px-4 md:px-8">
-              <div className="ticker-track ticker-speed-slow">
-                {[...sevaTickerItems, ...sevaTickerItems].map((item, index) => (
-                  <p key={`${item.id}-${index}`} className="inline-flex shrink-0 items-center gap-2.5 pr-8">
-                    <span className="text-sm font-black text-white">{formatDateLabel(item.date)}</span>
-                    <span className="text-base font-black text-white">{item.sevaType}</span>
-                    <span className="text-base font-black text-brand-saffron">{item.time || 'Time TBD'}</span>
-                    <span className="text-sm font-extrabold text-white/95">{item.registered}/{item.totalRequired} registered</span>
-                    <span className={`text-sm font-extrabold ${item.isOpen ? 'text-emerald-300' : 'text-red-300'}`}>{item.isOpen ? 'Open' : 'Closed'}</span>
-                    <span className="text-white/80">|</span>
-                  </p>
+              <div className="ticker-track ticker-speed-medium ticker-no-pause">
+                {[0, 1].map((groupIndex) => (
+                  <div key={`seva-group-${groupIndex}`} className="ticker-group">
+                    {sevaTickerItems.map((item) => (
+                      <p key={`${groupIndex}-${item.id}`} className="inline-flex shrink-0 items-center gap-2.5 pr-8">
+                        <span className="text-sm font-black text-white">{formatDateLabel(item.date)}</span>
+                        <span className="text-base font-black text-white">{item.sevaType}</span>
+                        <span className="text-base font-black text-brand-saffron">{item.time || 'Time TBD'}</span>
+                        <span className="text-sm font-extrabold text-white/95">{item.registered}/{item.totalRequired} registered</span>
+                        <span className={`text-sm font-extrabold ${item.isOpen ? 'text-emerald-300' : 'text-red-300'}`}>{item.isOpen ? 'Open' : 'Closed'}</span>
+                        <span className="text-white/80">|</span>
+                      </p>
+                    ))}
+                  </div>
                 ))}
               </div>
             </div>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -53,6 +54,7 @@ const sortOptions = [
 ];
 
 const AdminDonationsPage = () => {
+  const { setHeaderAction } = useOutletContext();
   const queryClient = useQueryClient();
   const [createCampaignOpen, setCreateCampaignOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState(null);
@@ -280,26 +282,32 @@ const AdminDonationsPage = () => {
     });
   };
 
+  useEffect(() => {
+    setHeaderAction(
+      <Button type="button" onClick={openCreate} className="inline-flex h-8 items-center gap-1.5 px-2.5 py-1 text-xs font-semibold">
+        <PlusIcon className="h-3.5 w-3.5" /> Add Campaign
+      </Button>
+    );
+
+    return () => setHeaderAction(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setHeaderAction]);
+
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-3xl font-bold">Donation Management</h1>
+      <h1 className="sr-only">Donation Management</h1>
 
       <Card>
         <div className="flex items-center justify-between gap-3">
           <h2 className="font-heading text-xl font-semibold">Campaigns</h2>
-          <div className="flex flex-wrap items-center gap-2">
-            <a
-              href={donationBoardUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100"
-            >
-              <EyeIcon className="h-4 w-4" /> Go To Donation Board
-            </a>
-            <Button type="button" onClick={openCreate} className="inline-flex items-center gap-1.5">
-              <PlusIcon className="h-4 w-4" /> Add Campaign
-            </Button>
-          </div>
+          <a
+            href={donationBoardUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100"
+          >
+            <EyeIcon className="h-4 w-4" /> Go To Donation Board
+          </a>
         </div>
         <div className="mt-4 overflow-x-auto">
           <table className="min-w-full text-left text-sm">

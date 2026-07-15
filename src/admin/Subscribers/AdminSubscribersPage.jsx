@@ -16,7 +16,7 @@ const AdminSubscribersPage = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-3xl font-bold">Email Subscribers</h1>
+      <h1 className="sr-only">Email Subscribers</h1>
       <div className="space-y-3">
         {subscribers.length === 0 ? (
           <Card><p className="text-sm text-slate-500">No subscribers yet.</p></Card>

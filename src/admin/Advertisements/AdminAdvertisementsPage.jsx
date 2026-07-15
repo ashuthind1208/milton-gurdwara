@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EyeIcon, PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline';
@@ -51,6 +52,7 @@ const TREND_RANGE_OPTIONS = [
 ];
 
 const AdminAdvertisementsPage = () => {
+  const { setHeaderAction } = useOutletContext();
   const queryClient = useQueryClient();
   const [modalState, setModalState] = useState({ open: false, mode: 'create', adId: null });
   const [trendAdId, setTrendAdId] = useState(null);
@@ -261,17 +263,25 @@ const AdminAdvertisementsPage = () => {
 
   const isViewMode = modalState.mode === 'view';
 
+  useEffect(() => {
+    setHeaderAction(
+      <Button type="button" onClick={() => openModal('create')} className="h-8 px-2.5 py-1 text-xs font-semibold">
+        Create Advertisement
+      </Button>
+    );
+
+    return () => setHeaderAction(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setHeaderAction]);
+
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-3xl font-bold">Advertisements</h1>
+      <h1 className="sr-only">Advertisements</h1>
 
       <Card>
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="font-heading text-xl font-semibold">Advertisements Table</h2>
-            <p className="mt-1 text-sm text-slate-600">View, edit, delete, and toggle active status directly from this table.</p>
-          </div>
-          <Button type="button" onClick={() => openModal('create')}>Create Advertisement</Button>
+        <div>
+          <h2 className="font-heading text-xl font-semibold">Advertisements Table</h2>
+          <p className="mt-1 text-sm text-slate-600">View, edit, delete, and toggle active status directly from this table.</p>
         </div>
 
         <div className="mt-4 overflow-x-auto">

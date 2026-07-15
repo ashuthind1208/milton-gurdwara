@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EyeIcon, PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline';
@@ -35,6 +36,7 @@ const toInputDate = (value) => {
 };
 
 const AdminSponsorsPage = () => {
+  const { setHeaderAction } = useOutletContext();
   const queryClient = useQueryClient();
   const [modalState, setModalState] = useState({ open: false, mode: 'create', sponsorId: null });
   const form = useForm({ defaultValues: emptyFormValues });
@@ -163,17 +165,25 @@ const AdminSponsorsPage = () => {
 
   const isViewMode = modalState.mode === 'view';
 
+  useEffect(() => {
+    setHeaderAction(
+      <Button type="button" onClick={() => openModal('create')} className="h-8 px-2.5 py-1 text-xs font-semibold">
+        Add Sponsor
+      </Button>
+    );
+
+    return () => setHeaderAction(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setHeaderAction]);
+
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-3xl font-bold">Sponsors</h1>
+      <h1 className="sr-only">Sponsors</h1>
 
       <Card>
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="font-heading text-xl font-semibold">Sponsors Table</h2>
-            <p className="mt-1 text-sm text-slate-600">Manage event sponsor names shown on the donation board footer ticker.</p>
-          </div>
-          <Button type="button" onClick={() => openModal('create')}>Add Sponsor</Button>
+        <div>
+          <h2 className="font-heading text-xl font-semibold">Sponsors Table</h2>
+          <p className="mt-1 text-sm text-slate-600">Manage event sponsor names shown on the donation board footer ticker.</p>
         </div>
 
         <div className="mt-4 overflow-x-auto">

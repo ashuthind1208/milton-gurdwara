@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Card from '../../components/ui/Card';
@@ -6,6 +7,7 @@ import Button from '../../components/ui/Button';
 import galleryService from '../../services/galleryService';
 
 const AdminGalleryPage = () => {
+  const { setHeaderAction } = useOutletContext();
   const queryClient = useQueryClient();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingAlbum, setEditingAlbum] = useState(null);
@@ -78,12 +80,19 @@ const AdminGalleryPage = () => {
     });
   };
 
+  useEffect(() => {
+    setHeaderAction(
+      <Button type="button" onClick={() => setIsCreateOpen(true)} className="h-8 px-2.5 py-1 text-xs font-semibold">
+        Add Gallery Item
+      </Button>
+    );
+
+    return () => setHeaderAction(null);
+  }, [setHeaderAction]);
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="font-heading text-3xl font-bold">Gallery Folders</h1>
-        <Button type="button" onClick={() => setIsCreateOpen(true)}>Add Gallery Item</Button>
-      </div>
+      <h1 className="sr-only">Gallery Folders</h1>
 
       <div className="space-y-3">
         {orderedAlbums.map((album) => (

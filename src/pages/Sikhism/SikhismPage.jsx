@@ -4,6 +4,8 @@ import useSeoMeta from '../../hooks/useSeoMeta';
 import Seo from '../../components/common/Seo';
 import cmsService from '../../services/cmsService';
 
+const isImageUrl = (value = '') => /\.(png|jpe?g|gif|webp|svg|avif)(\?.*)?$/i.test(String(value || ''));
+
 const SikhismPage = () => {
   const meta = useSeoMeta('Sikhism', 'Structured Sikh educational content for beginners, families, and youth.');
   const { data: content } = useQuery({
@@ -24,7 +26,15 @@ const SikhismPage = () => {
           <div key={section.id} className="rounded-xl border border-slate-200 bg-white p-4">
             <h3 className="font-heading text-lg font-semibold text-brand-blue">{section.title}</h3>
             <p className="mt-1 text-sm text-slate-700">{section.body}</p>
-            {section.mediaUrl ? <a href={section.mediaUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs font-semibold text-brand-blue hover:underline">Open reference media</a> : null}
+            {section.mediaUrl ? (
+              isImageUrl(section.mediaUrl) ? (
+                <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                  <img src={section.mediaUrl} alt={section.title || 'Reference media'} className="h-44 w-full object-contain" loading="lazy" />
+                </div>
+              ) : (
+                <a href={section.mediaUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs font-semibold text-brand-blue hover:underline">Open reference media</a>
+              )
+            ) : null}
           </div>
         ))}
       </div>

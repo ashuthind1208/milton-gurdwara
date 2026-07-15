@@ -30,7 +30,7 @@ const AdminVolunteersPage = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-3xl font-bold">Volunteer Management</h1>
+      <h1 className="sr-only">Volunteer Management</h1>
       {applications.length > 0 ? (
         <Card className="flex items-center justify-between">
           <p className="text-sm text-slate-600">Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, applications.length)} of {applications.length}</p>

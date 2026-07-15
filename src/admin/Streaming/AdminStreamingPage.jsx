@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { EyeIcon, PencilSquareIcon, PowerIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, PencilSquareIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import streamingService, { verifyStreamingAvailability } from '../../services/streamingService';
@@ -17,6 +18,7 @@ const emptyForm = {
 const PAGE_SIZE = 10;
 
 const AdminStreamingPage = () => {
+  const { setHeaderAction } = useOutletContext();
   const queryClient = useQueryClient();
   const form = useForm({ defaultValues: emptyForm });
   const [modalState, setModalState] = useState({ open: false, mode: 'view', id: '' });
@@ -117,14 +119,22 @@ const AdminStreamingPage = () => {
   const openModal = (mode, id = '') => setModalState({ open: true, mode, id });
   const closeModal = () => setModalState({ open: false, mode: 'view', id: '' });
 
+  useEffect(() => {
+    setHeaderAction(
+      <Button type="button" onClick={() => openModal('add', '')} className="h-8 px-2.5 py-1 text-xs font-semibold">
+        Add Stream
+      </Button>
+    );
+
+    return () => setHeaderAction(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setHeaderAction]);
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-heading text-3xl font-bold text-slate-900">Streaming</h1>
-          <p className="mt-1 text-sm text-slate-600">Manage the single live source used by the header preview and the sangat stream page. Enter a YouTube channel URL, handle, or channel ID so the app can resolve the current live video only.</p>
-        </div>
-        <Button type="button" onClick={() => openModal('add', '')}>Add Stream</Button>
+      <div>
+        <h1 className="sr-only">Streaming</h1>
+        <p className="mt-1 text-sm text-slate-600">Manage the single live source used by the header preview and the sangat stream page. Enter a YouTube channel URL, handle, or channel ID so the app can resolve the current live video only.</p>
       </div>
 
       <Card>
@@ -144,9 +154,13 @@ const AdminStreamingPage = () => {
                   <td className="px-3 py-3 text-slate-700">{row.text || '-'}</td>
                   <td className="px-3 py-3 break-all text-xs text-slate-600">{row.streamUrl || 'Not configured'}</td>
                   <td className="px-3 py-3">
-                    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${row.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
+                    <button
+                      type="button"
+                      onClick={() => toggleMutation.mutate({ id: row.id, active: !row.active })}
+                      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold transition ${row.active ? 'border-emerald-200 bg-emerald-100 text-emerald-700 hover:border-emerald-300' : 'border-slate-300 bg-slate-100 text-slate-700 hover:border-slate-400'}`}
+                    >
                       {row.active ? 'Active' : 'Inactive'}
-                    </span>
+                    </button>
                   </td>
                   <td className="px-3 py-3">
                     <div className="flex flex-wrap gap-2">
@@ -155,9 +169,6 @@ const AdminStreamingPage = () => {
                       </button>
                       <button type="button" onClick={() => openModal('edit', row.id)} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:border-brand-blue hover:text-brand-blue" aria-label="Edit stream">
                         <PencilSquareIcon className="h-4 w-4" />
-                      </button>
-                      <button type="button" onClick={() => toggleMutation.mutate({ id: row.id, active: !row.active })} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:border-brand-blue hover:text-brand-blue" aria-label={row.active ? 'Deactivate stream' : 'Activate stream'}>
-                        <PowerIcon className="h-4 w-4" />
                       </button>
                       <button
                         type="button"

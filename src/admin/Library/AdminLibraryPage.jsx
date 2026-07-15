@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { EyeIcon, MagnifyingGlassIcon, PencilSquareIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { EllipsisVerticalIcon, EyeIcon, MagnifyingGlassIcon, PencilSquareIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import libraryService from '../../services/libraryService';
@@ -91,6 +91,8 @@ const AdminLibraryPage = () => {
   const queryClient = useQueryClient();
   const [editingPhysicalId, setEditingPhysicalId] = useState('');
   const [editingDigitalId, setEditingDigitalId] = useState('');
+  const [physicalModalOpen, setPhysicalModalOpen] = useState(false);
+  const [digitalModalOpen, setDigitalModalOpen] = useState(false);
   const [issueBookId, setIssueBookId] = useState('');
   const [isbnStatus, setIsbnStatus] = useState('');
   const [physicalPage, setPhysicalPage] = useState(1);
@@ -99,6 +101,7 @@ const AdminLibraryPage = () => {
   const [programModal, setProgramModal] = useState({ open: false, mode: 'add', id: '' });
   const [mediaPage, setMediaPage] = useState(1);
   const [mediaModal, setMediaModal] = useState({ open: false, mode: 'add', id: '' });
+  const [openPhysicalActionMenuId, setOpenPhysicalActionMenuId] = useState('');
 
   const physicalForm = useForm({ defaultValues: emptyPhysicalForm });
   const digitalForm = useForm({ defaultValues: emptyDigitalForm });
@@ -287,6 +290,7 @@ const AdminLibraryPage = () => {
     onSuccess: () => {
       invalidateLibrary();
       setEditingPhysicalId('');
+      setPhysicalModalOpen(false);
       physicalForm.reset(emptyPhysicalForm);
     }
   });
@@ -296,6 +300,7 @@ const AdminLibraryPage = () => {
     onSuccess: () => {
       invalidateLibrary();
       setEditingPhysicalId('');
+      setPhysicalModalOpen(false);
       physicalForm.reset(emptyPhysicalForm);
     }
   });
@@ -343,6 +348,7 @@ const AdminLibraryPage = () => {
     onSuccess: () => {
       invalidateLibrary();
       setEditingDigitalId('');
+      setDigitalModalOpen(false);
       digitalForm.reset(emptyDigitalForm);
     }
   });
@@ -352,6 +358,7 @@ const AdminLibraryPage = () => {
     onSuccess: () => {
       invalidateLibrary();
       setEditingDigitalId('');
+      setDigitalModalOpen(false);
       digitalForm.reset(emptyDigitalForm);
     }
   });
@@ -499,12 +506,24 @@ const AdminLibraryPage = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-3xl font-bold">Library Management</h1>
+      <h1 className="sr-only">Library Management</h1>
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="space-y-6">
         <Card>
           <div className="flex items-center justify-between gap-3">
             <h2 className="font-heading text-xl font-semibold">Physical Books</h2>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                onClick={() => {
+                  setEditingPhysicalId('');
+                  physicalForm.reset(emptyPhysicalForm);
+                  setPhysicalModalOpen(true);
+                }}
+              >
+                Add Physical Resource
+              </Button>
+            </div>
             {editingPhysicalId ? (
               <button
                 type="button"
@@ -512,60 +531,13 @@ const AdminLibraryPage = () => {
                 onClick={() => {
                   setEditingPhysicalId('');
                   physicalForm.reset(emptyPhysicalForm);
+                  setPhysicalModalOpen(false);
                 }}
               >
                 Cancel Edit
               </button>
             ) : null}
           </div>
-
-          <form className="mt-4 grid gap-2.5 md:grid-cols-2" onSubmit={physicalForm.handleSubmit(onSubmitPhysical)}>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">ISBN
-              <div className="mt-1 flex items-center gap-2">
-                <input {...physicalForm.register('isbn')} className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
-                <button
-                  type="button"
-                  className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-lg border border-brand-blue text-brand-blue hover:bg-blue-50"
-                  onClick={() => {
-                    const isbnValue = physicalForm.getValues('isbn');
-                    if (!isbnValue) {
-                      setIsbnStatus('Enter ISBN first.');
-                      return;
-                    }
-                    lookupIsbnMutation.mutate(isbnValue);
-                  }}
-                  aria-label="Fetch details using ISBN"
-                  title="Fetch details using ISBN"
-                >
-                  {lookupIsbnMutation.isPending
-                    ? <span className="text-[10px] font-semibold">...</span>
-                    : <MagnifyingGlassIcon className="h-4 w-4" />}
-                </button>
-              </div>
-              {isbnStatus ? <p className="mt-1 text-[11px] text-slate-500">{isbnStatus}</p> : null}
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Book Title
-              <input {...physicalForm.register('title', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Author
-              <input {...physicalForm.register('author')} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Category
-              <input {...physicalForm.register('category')} placeholder="History, Gurbani..." className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Total Copies
-              <input type="number" min="0" {...physicalForm.register('totalCopies', { valueAsNumber: true })} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 md:col-span-2">Notes
-              <textarea rows={2} {...physicalForm.register('notes')} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
-            </label>
-
-            <div className="md:col-span-2">
-              <Button type="submit" disabled={isSavingPhysical}>
-                {isSavingPhysical ? 'Saving...' : (editingPhysicalId ? 'Update Physical Book' : 'Add Physical Book')}
-              </Button>
-            </div>
-          </form>
 
           <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200">
             <table className="min-w-full text-left text-sm">
@@ -593,13 +565,85 @@ const AdminLibraryPage = () => {
                         <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">{available}</span>
                       </td>
                       <td className="px-3 py-1.5">
-                        <div className="flex items-center gap-1.5">
+                        <div className="relative lg:hidden">
+                          <button
+                            type="button"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded border border-slate-300 text-slate-700 hover:bg-slate-100"
+                            title="More actions"
+                            aria-label="More actions"
+                            onClick={() => setOpenPhysicalActionMenuId((prev) => (prev === book.id ? '' : book.id))}
+                          >
+                            <EllipsisVerticalIcon className={actionIconClass} />
+                          </button>
+                          {openPhysicalActionMenuId === book.id ? (
+                            <div className="absolute right-0 top-8 z-20 min-w-[150px] rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingPhysicalId(book.id);
+                                  setPhysicalModalOpen(true);
+                                  setOpenPhysicalActionMenuId('');
+                                }}
+                                className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIssueBookId(book.id);
+                                  setOpenPhysicalActionMenuId('');
+                                }}
+                                className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                              >
+                                Issues
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  exportLibraryRegistrations(book, 'csv');
+                                  setOpenPhysicalActionMenuId('');
+                                }}
+                                disabled={(book.issueRecords || []).filter((record) => !record.returnedAt).length === 0}
+                                className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                Download CSV
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  exportLibraryRegistrations(book, 'pdf');
+                                  setOpenPhysicalActionMenuId('');
+                                }}
+                                disabled={(book.issueRecords || []).filter((record) => !record.returnedAt).length === 0}
+                                className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                Download PDF
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  deletePhysicalMutation.mutate(book.id);
+                                  setOpenPhysicalActionMenuId('');
+                                }}
+                                className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-red-700 hover:bg-red-50"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+
+                        <div className="hidden items-center gap-1.5 lg:flex">
                           <button
                             type="button"
                             className="inline-flex h-7 w-7 items-center justify-center rounded border border-blue-200 text-blue-700 hover:bg-blue-50"
                             title="Edit"
                             aria-label="Edit"
-                            onClick={() => setEditingPhysicalId(book.id)}
+                            onClick={() => {
+                              setEditingPhysicalId(book.id);
+                              setPhysicalModalOpen(true);
+                            }}
                           >
                             <PencilSquareIcon className={actionIconClass} />
                           </button>
@@ -659,6 +703,18 @@ const AdminLibraryPage = () => {
         <Card>
           <div className="flex items-center justify-between gap-3">
             <h2 className="font-heading text-xl font-semibold">Digital Resources</h2>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                onClick={() => {
+                  setEditingDigitalId('');
+                  digitalForm.reset(emptyDigitalForm);
+                  setDigitalModalOpen(true);
+                }}
+              >
+                Add Digital Resource
+              </Button>
+            </div>
             {editingDigitalId ? (
               <button
                 type="button"
@@ -666,45 +722,13 @@ const AdminLibraryPage = () => {
                 onClick={() => {
                   setEditingDigitalId('');
                   digitalForm.reset(emptyDigitalForm);
+                  setDigitalModalOpen(false);
                 }}
               >
                 Cancel Edit
               </button>
             ) : null}
           </div>
-
-          <form className="mt-4 grid gap-2.5 md:grid-cols-2" onSubmit={digitalForm.handleSubmit(onSubmitDigital)}>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Resource Title
-              <input {...digitalForm.register('title', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Type
-              <select {...digitalForm.register('fileType')} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm">
-                <option>PDF</option>
-                <option>DOC</option>
-                <option>DOCX</option>
-                <option>PPT</option>
-                <option>LINK</option>
-              </select>
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 md:col-span-2">Description
-              <textarea rows={2} {...digitalForm.register('description')} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 md:col-span-2">Download Link
-              <input {...digitalForm.register('downloadUrl', { required: true })} placeholder="https://example.com/file.pdf" className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 md:col-span-2">Cover Image Link
-              <input {...digitalForm.register('coverImageUrl')} placeholder="https://example.com/cover.jpg" className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
-            </label>
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 md:col-span-2">Tags
-              <input {...digitalForm.register('tags')} placeholder="history, katha, youth" className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
-            </label>
-
-            <div className="md:col-span-2">
-              <Button type="submit" disabled={isSavingDigital}>
-                {isSavingDigital ? 'Saving...' : (editingDigitalId ? 'Update Digital Resource' : 'Add Digital Resource')}
-              </Button>
-            </div>
-          </form>
 
           <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200">
             <table className="min-w-full text-left text-sm">
@@ -743,7 +767,10 @@ const AdminLibraryPage = () => {
                           className="inline-flex h-7 w-7 items-center justify-center rounded border border-blue-200 text-blue-700 hover:bg-blue-50"
                           title="Edit"
                           aria-label="Edit"
-                          onClick={() => setEditingDigitalId(resource.id)}
+                            onClick={() => {
+                              setEditingDigitalId(resource.id);
+                              setDigitalModalOpen(true);
+                            }}
                         >
                           <PencilSquareIcon className={actionIconClass} />
                         </button>
@@ -853,6 +880,123 @@ const AdminLibraryPage = () => {
         </div>
         <Pagination page={programPage} total={programTotalPages} onChange={setProgramPage} />
       </Card>
+
+      {physicalModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60" aria-hidden="true" onClick={() => setPhysicalModalOpen(false)} />
+          <div className="relative z-10 w-full max-w-3xl rounded-2xl bg-white p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="font-heading text-lg font-semibold">{editingPhysicalId ? 'Edit Physical Resource' : 'Add Physical Resource'}</h3>
+              <button
+                type="button"
+                onClick={() => setPhysicalModalOpen(false)}
+                className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Close physical resource modal"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <form className="mt-4 grid gap-2.5 md:grid-cols-2" onSubmit={physicalForm.handleSubmit(onSubmitPhysical)}>
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">ISBN
+                <div className="mt-1 flex items-center gap-2">
+                  <input {...physicalForm.register('isbn')} className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
+                  <button
+                    type="button"
+                    className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-lg border border-brand-blue text-brand-blue hover:bg-blue-50"
+                    onClick={() => {
+                      const isbnValue = physicalForm.getValues('isbn');
+                      if (!isbnValue) {
+                        setIsbnStatus('Enter ISBN first.');
+                        return;
+                      }
+                      lookupIsbnMutation.mutate(isbnValue);
+                    }}
+                    aria-label="Fetch details using ISBN"
+                    title="Fetch details using ISBN"
+                  >
+                    {lookupIsbnMutation.isPending
+                      ? <span className="text-[10px] font-semibold">...</span>
+                      : <MagnifyingGlassIcon className="h-4 w-4" />}
+                  </button>
+                </div>
+                {isbnStatus ? <p className="mt-1 text-[11px] text-slate-500">{isbnStatus}</p> : null}
+              </label>
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Book Title
+                <input {...physicalForm.register('title', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
+              </label>
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Author
+                <input {...physicalForm.register('author')} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
+              </label>
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Category
+                <input {...physicalForm.register('category')} placeholder="History, Gurbani..." className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
+              </label>
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Total Copies
+                <input type="number" min="0" {...physicalForm.register('totalCopies', { valueAsNumber: true })} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
+              </label>
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 md:col-span-2">Notes
+                <textarea rows={2} {...physicalForm.register('notes')} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
+              </label>
+              <div className="md:col-span-2 flex gap-2">
+                <Button type="submit" disabled={isSavingPhysical}>
+                  {isSavingPhysical ? 'Saving...' : (editingPhysicalId ? 'Update Physical Resource' : 'Add Physical Resource')}
+                </Button>
+                <Button type="button" variant="ghost" onClick={() => setPhysicalModalOpen(false)}>Cancel</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {digitalModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60" aria-hidden="true" onClick={() => setDigitalModalOpen(false)} />
+          <div className="relative z-10 w-full max-w-3xl rounded-2xl bg-white p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="font-heading text-lg font-semibold">{editingDigitalId ? 'Edit Digital Resource' : 'Add Digital Resource'}</h3>
+              <button
+                type="button"
+                onClick={() => setDigitalModalOpen(false)}
+                className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Close digital resource modal"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <form className="mt-4 grid gap-2.5 md:grid-cols-2" onSubmit={digitalForm.handleSubmit(onSubmitDigital)}>
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Resource Title
+                <input {...digitalForm.register('title', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
+              </label>
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Type
+                <select {...digitalForm.register('fileType')} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm">
+                  <option>PDF</option>
+                  <option>DOC</option>
+                  <option>DOCX</option>
+                  <option>PPT</option>
+                  <option>LINK</option>
+                </select>
+              </label>
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 md:col-span-2">Description
+                <textarea rows={2} {...digitalForm.register('description')} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
+              </label>
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 md:col-span-2">Download Link
+                <input {...digitalForm.register('downloadUrl', { required: true })} placeholder="https://example.com/file.pdf" className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
+              </label>
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 md:col-span-2">Cover Image Link
+                <input {...digitalForm.register('coverImageUrl')} placeholder="https://example.com/cover.jpg" className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
+              </label>
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 md:col-span-2">Tags
+                <input {...digitalForm.register('tags')} placeholder="history, katha, youth" className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
+              </label>
+              <div className="md:col-span-2 flex gap-2">
+                <Button type="submit" disabled={isSavingDigital}>
+                  {isSavingDigital ? 'Saving...' : (editingDigitalId ? 'Update Digital Resource' : 'Add Digital Resource')}
+                </Button>
+                <Button type="button" variant="ghost" onClick={() => setDigitalModalOpen(false)}>Cancel</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
       {programModal.open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

@@ -18,6 +18,18 @@ import cmsService from '../../services/cmsService';
 const HOURS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
 const MINUTES = ['00', '15', '30', '45'];
 const MERIDIEM = ['AM', 'PM'];
+const GURMUKHI_DIGITS = {
+  '0': '੦',
+  '1': '੧',
+  '2': '੨',
+  '3': '੩',
+  '4': '੪',
+  '5': '੫',
+  '6': '੬',
+  '7': '੭',
+  '8': '੮',
+  '9': '੯'
+};
 
 const toDateKey = (value = new Date()) => {
   const date = value instanceof Date ? value : new Date(value);
@@ -65,6 +77,36 @@ const getYearDateKeys = (year) => {
 
 const formatSlotTime = (hour, minute, meridiem) => `${hour}:${minute} ${meridiem}`;
 
+const toGurmukhiDigits = (value = '') => String(value || '').replace(/[0-9]/g, (digit) => GURMUKHI_DIGITS[digit] || digit);
+
+const toPunjabiMeridiem = (meridiem = 'AM') => (String(meridiem).toUpperCase() === 'AM' ? 'ਸਵੇਰੇ' : 'ਸ਼ਾਮ');
+
+const addFifteenMinutes = (hour = '5', minute = '00', meridiem = 'AM') => {
+  const safeHour = Number(hour);
+  const safeMinute = Number(minute);
+  const safeMeridiem = String(meridiem || 'AM').toUpperCase();
+
+  let hour24 = safeHour % 12;
+  if (safeMeridiem === 'PM') {
+    hour24 += 12;
+  }
+
+  const source = new Date();
+  source.setHours(hour24, safeMinute, 0, 0);
+  source.setMinutes(source.getMinutes() + 15);
+
+  const nextHour24 = source.getHours();
+  const nextMinute = String(source.getMinutes()).padStart(2, '0');
+  const nextMeridiem = nextHour24 >= 12 ? 'PM' : 'AM';
+  const nextHour12 = String(((nextHour24 + 11) % 12) + 1);
+
+  return {
+    endHour: nextHour12,
+    endMinute: nextMinute,
+    endMeridiem: nextMeridiem
+  };
+};
+
 const parseTimeRange = (value = '') => {
   const match = String(value || '')
     .trim()
@@ -75,30 +117,33 @@ const parseTimeRange = (value = '') => {
       startHour: '5',
       startMinute: '00',
       startMeridiem: 'AM',
-      hasEnd: false,
       endHour: '5',
       endMinute: '15',
       endMeridiem: 'AM'
     };
   }
 
+  const autoEnd = addFifteenMinutes(match[1], match[2], match[3]);
+
   return {
     startHour: match[1],
     startMinute: match[2],
     startMeridiem: match[3].toUpperCase(),
-    hasEnd: Boolean(match[4]),
-    endHour: match[4] || '5',
-    endMinute: match[5] || '15',
-    endMeridiem: (match[6] || 'AM').toUpperCase()
+    endHour: match[4] || autoEnd.endHour,
+    endMinute: match[5] || autoEnd.endMinute,
+    endMeridiem: (match[6] || autoEnd.endMeridiem).toUpperCase()
   };
 };
 
 const buildTimeRange = (values) => {
   const start = formatSlotTime(values.startHour, values.startMinute, values.startMeridiem);
-  if (!values.hasEnd) {
-    return start;
-  }
   const end = formatSlotTime(values.endHour, values.endMinute, values.endMeridiem);
+  return `${start} - ${end}`;
+};
+
+const buildPunjabiTimeRange = (values) => {
+  const start = `${toGurmukhiDigits(values.startHour)}:${toGurmukhiDigits(values.startMinute)} ${toPunjabiMeridiem(values.startMeridiem)}`;
+  const end = `${toGurmukhiDigits(values.endHour)}:${toGurmukhiDigits(values.endMinute)} ${toPunjabiMeridiem(values.endMeridiem)}`;
   return `${start} - ${end}`;
 };
 
@@ -139,23 +184,16 @@ const entryFormDefaults = {
   startHour: '5',
   startMinute: '00',
   startMeridiem: 'AM',
-  hasEnd: false,
   endHour: '5',
   endMinute: '15',
   endMeridiem: 'AM',
-  timePa: '',
   titleEn: '',
-  titlePa: '',
-  noteEn: '',
-  notePa: '',
-  isHighlighted: false,
-  isActive: true
+  titlePa: ''
 };
 
 const segmentOptions = [
   { value: 'morning', label: 'Morning' },
-  { value: 'evening', label: 'Evening' },
-  { value: 'special', label: 'Special' }
+  { value: 'evening', label: 'Evening' }
 ];
 
 const segmentClassMap = {
@@ -180,11 +218,13 @@ const AdminSchedulePage = () => {
   const todayDateKey = toDateKey(new Date());
   const currentYear = new Date().getFullYear();
   const [selectedDateKey, setSelectedDateKey] = useState(toDateKey(new Date()));
+  const [quickDateKey, setQuickDateKey] = useState(toDateKey(new Date()));
   const [yearFilter, setYearFilter] = useState(currentYear);
   const [dayFilter, setDayFilter] = useState('');
   const [page, setPage] = useState(1);
   const [dayModal, setDayModal] = useState({ open: false, mode: 'view' });
   const [entryModal, setEntryModal] = useState({ open: false, mode: 'create', entryId: null });
+  const [dayMeta, setDayMeta] = useState({ isSpecial: false, specialReason: '', specialReasonPa: '' });
   const form = useForm({ defaultValues: entryFormDefaults });
 
   const isPastDateKey = useCallback(
@@ -239,13 +279,18 @@ const AdminSchedulePage = () => {
   }, [defaultDay, scheduleMap, selectedDateKey]);
 
   const saveDayMutation = useMutation({
-    mutationFn: (nextEntries) => cmsService.updateSchedule({
+    mutationFn: ({ nextEntries, meta }) => cmsService.updateSchedule({
       day: {
         ...selectedDay,
         dateKey: selectedDateKey,
         dateLabel: selectedDateKey === 'default' ? 'Daily Default' : formatDateLabel(selectedDateKey),
-        title: selectedDateKey === 'default' ? 'Standard Daily Maryada' : 'Special Day Schedule',
-        isSpecial: selectedDateKey !== 'default',
+        title: selectedDateKey === 'default' ? 'Standard Daily Maryada' : (meta?.isSpecial ? 'Special Day Schedule' : 'Daily Schedule'),
+        isSpecial: selectedDateKey === 'default' ? false : Boolean(meta?.isSpecial),
+        highlightTitle: meta?.isSpecial ? 'Special Day Notice' : '',
+        highlightNoteEn: meta?.specialReason || '',
+        highlightNotePa: meta?.specialReasonPa || '',
+        specialReason: meta?.specialReason || '',
+        specialReasonPa: meta?.specialReasonPa || '',
         entries: sortEntries(nextEntries)
       }
     }),
@@ -273,6 +318,15 @@ const AdminSchedulePage = () => {
   };
 
   const openDayModal = (dateKey, mode = 'view') => {
+    const existing = scheduleMap.get(dateKey);
+    const defaultSpecial = dateKey !== 'default' && Boolean(existing?.isSpecial);
+    const defaultReason = existing?.specialReason || existing?.highlightNoteEn || '';
+    const defaultReasonPa = existing?.specialReasonPa || existing?.highlightNotePa || '';
+    setDayMeta({
+      isSpecial: dateKey === 'default' ? false : defaultSpecial,
+      specialReason: dateKey === 'default' ? '' : defaultReason,
+      specialReasonPa: dateKey === 'default' ? '' : defaultReasonPa
+    });
     setSelectedDateKey(dateKey);
     setDayModal({ open: true, mode });
   };
@@ -287,12 +341,8 @@ const AdminSchedulePage = () => {
     form.reset({
       segment: entry.segment || 'morning',
       ...parsed,
-      timePa: entry.timePa || '',
       titleEn: entry.titleEn || '',
       titlePa: entry.titlePa || '',
-      noteEn: entry.noteEn || '',
-      notePa: entry.notePa || '',
-      isHighlighted: Boolean(entry.isHighlighted),
       isActive: entry.isActive !== false
     });
     setEntryModal({ open: true, mode: 'edit', entryId: entry.id });
@@ -303,28 +353,32 @@ const AdminSchedulePage = () => {
   const isDayModalReadOnly = dayModal.mode === 'view' || isSelectedDayPast;
 
   const handleSaveEntry = (values) => {
+    const existingEntry = entryModal.mode === 'edit' && entryModal.entryId
+      ? rows.find((entry) => entry.id === entryModal.entryId)
+      : null;
+
     const nextPayload = {
       segment: values.segment,
       timeEn: buildTimeRange(values),
-      timePa: values.timePa,
+      timePa: buildPunjabiTimeRange(values),
       titleEn: values.titleEn,
       titlePa: values.titlePa,
-      noteEn: values.noteEn,
-      notePa: values.notePa,
-      isHighlighted: Boolean(values.isHighlighted),
-      isActive: values.isActive !== false
+      noteEn: '',
+      notePa: '',
+      isHighlighted: false,
+      isActive: existingEntry ? existingEntry.isActive !== false : true
     };
 
     if (entryModal.mode === 'edit' && entryModal.entryId) {
       const nextEntries = sortEntries(rows.map((entry) => (
         entry.id === entryModal.entryId ? { ...entry, ...nextPayload } : entry
       )));
-      saveDayMutation.mutate(nextEntries, { onSuccess: closeEntryModal });
+      saveDayMutation.mutate({ nextEntries, meta: dayMeta }, { onSuccess: closeEntryModal });
       return;
     }
 
     const nextEntries = sortEntries([...rows, normalizeEntry(nextPayload, rows.length)]);
-    saveDayMutation.mutate(nextEntries, { onSuccess: closeEntryModal });
+    saveDayMutation.mutate({ nextEntries, meta: dayMeta }, { onSuccess: closeEntryModal });
   };
 
   const handleDeleteEntry = (entryId) => {
@@ -332,7 +386,7 @@ const AdminSchedulePage = () => {
       return;
     }
     const nextEntries = sortEntries(rows.filter((entry) => entry.id !== entryId));
-    saveDayMutation.mutate(nextEntries);
+    saveDayMutation.mutate({ nextEntries, meta: dayMeta });
   };
 
   const handleToggleActive = (entry) => {
@@ -342,7 +396,7 @@ const AdminSchedulePage = () => {
     const nextEntries = sortEntries(rows.map((item) => (
       item.id === entry.id ? { ...item, isActive: item.isActive === false } : item
     )));
-    saveDayMutation.mutate(nextEntries);
+    saveDayMutation.mutate({ nextEntries, meta: dayMeta });
   };
 
   const yearRows = useMemo(() => {
@@ -383,7 +437,7 @@ const AdminSchedulePage = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-3xl font-bold">Daily Schedule</h1>
+        <h1 className="sr-only">Daily Schedule</h1>
         <p className="mt-1 text-sm text-slate-600">Schedule editing opens in a popup. Use the year table actions to view or edit a day.</p>
       </div>
 
@@ -391,7 +445,33 @@ const AdminSchedulePage = () => {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 className="font-heading text-xl font-semibold text-slate-900">365-Day Schedule Table</h2>
-            <p className="text-xs text-slate-500">Each day starts from default schedule. Any edited date is marked as Special.</p>
+            <p className="text-xs text-slate-500">Each day starts from default schedule. Mark a day as special only when needed.</p>
+          </div>
+          <div className="grid w-full gap-2 sm:w-auto sm:grid-cols-[180px_auto_auto] sm:items-end">
+            <label className="text-sm font-medium text-slate-700">
+              <span className="mb-1 block">Pick Date</span>
+              <input
+                type="date"
+                value={quickDateKey}
+                onChange={(event) => setQuickDateKey(event.target.value)}
+                className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm shadow-sm outline-none transition focus:border-brand-blue/60 focus:ring-2 focus:ring-brand-blue/20"
+              />
+            </label>
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-11 rounded-xl px-4"
+              onClick={() => openDayModal(quickDateKey, 'view')}
+            >
+              View Day
+            </Button>
+            <Button
+              type="button"
+              className="h-11 rounded-xl px-4"
+              onClick={() => openDayModal(quickDateKey, 'edit')}
+            >
+              Edit Day
+            </Button>
           </div>
           <div className="grid w-full gap-2 sm:w-auto sm:grid-cols-[130px_1fr_auto] sm:items-end">
             <label className="text-sm font-medium text-slate-700">
@@ -512,13 +592,13 @@ const AdminSchedulePage = () => {
       {dayModal.open ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/50" onClick={closeDayModal} aria-hidden="true" />
-          <div className="relative z-10 w-full max-w-5xl rounded-2xl bg-white p-5 shadow-2xl">
+          <div className="relative z-10 max-h-[calc(100vh-2rem)] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h3 className="font-heading text-lg font-semibold">{formatDateLabel(selectedDateKey)}</h3>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
-                  <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${selectedDay.isSpecial ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'}`}>
-                    {selectedDay.isSpecial ? 'Special' : 'Default'}
+                  <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${dayMeta.isSpecial ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'}`}>
+                    {dayMeta.isSpecial ? 'Special' : 'Default'}
                   </span>
                   {isSelectedDayPast ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
@@ -528,19 +608,65 @@ const AdminSchedulePage = () => {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {!isDayModalReadOnly ? (
-                  <Button type="button" onClick={openCreateModal} className="inline-flex items-center gap-1.5">
-                    <PlusIcon className="h-4 w-4" /> Add Event
-                  </Button>
-                ) : null}
-                {!isDayModalReadOnly && selectedDateKey !== 'default' ? (
-                  <Button type="button" variant="ghost" onClick={() => removeDayMutation.mutate()} disabled={removeDayMutation.isPending}>Reset To Default</Button>
-                ) : null}
                 <button type="button" onClick={closeDayModal} className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700" aria-label="Close day modal">
                   <XMarkIcon className="h-5 w-5" />
                 </button>
               </div>
             </div>
+
+            {!isDayModalReadOnly && selectedDateKey !== 'default' ? (
+              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+                <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-800">
+                  <input
+                    type="checkbox"
+                    checked={dayMeta.isSpecial}
+                    onChange={(event) => setDayMeta((prev) => ({ ...prev, isSpecial: event.target.checked }))}
+                  />
+                  Mark this day as special
+                </label>
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <label className="block text-sm font-medium text-slate-700">
+                    Special Day Message (English)
+                    <textarea
+                      rows={2}
+                      value={dayMeta.specialReason}
+                      onChange={(event) => setDayMeta((prev) => ({ ...prev, specialReason: event.target.value }))}
+                      placeholder="Example: Gurpurab today, special kirtan and langar schedule."
+                      className="mt-1 w-full rounded-lg border border-slate-300 p-2.5"
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-slate-700">
+                    Special Day Message (Punjabi)
+                    <textarea
+                      rows={2}
+                      value={dayMeta.specialReasonPa}
+                      onChange={(event) => setDayMeta((prev) => ({ ...prev, specialReasonPa: event.target.value }))}
+                      placeholder="ਉਦਾਹਰਨ: ਅੱਜ ਗੁਰਪੁਰਬ ਹੈ, ਵਿਸ਼ੇਸ਼ ਕੀਰਤਨ ਅਤੇ ਲੰਗਰ ਸਮਾਂ।"
+                      className="mt-1 w-full rounded-lg border border-slate-300 p-2.5"
+                    />
+                  </label>
+                </div>
+              </div>
+            ) : null}
+
+            {!isDayModalReadOnly ? (
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <Button type="button" onClick={openCreateModal} className="inline-flex h-8 items-center gap-1.5 px-3 text-xs">
+                  <PlusIcon className="h-3.5 w-3.5" /> Add Event
+                </Button>
+                {selectedDateKey !== 'default' ? (
+                  <Button type="button" variant="ghost" onClick={() => removeDayMutation.mutate()} disabled={removeDayMutation.isPending} className="h-8 px-3 text-xs">Reset To Default</Button>
+                ) : null}
+                <Button
+                  type="button"
+                  onClick={() => saveDayMutation.mutate({ nextEntries: rows, meta: dayMeta })}
+                  disabled={saveDayMutation.isPending}
+                  className="h-8 bg-brand-blue px-3 text-xs text-white hover:bg-blue-800"
+                >
+                  {saveDayMutation.isPending ? 'Saving...' : 'Save Day Details'}
+                </Button>
+              </div>
+            ) : null}
 
             <div className="mt-4 overflow-x-auto">
               <table className="min-w-full text-left text-sm">
@@ -611,10 +737,10 @@ const AdminSchedulePage = () => {
       {entryModal.open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/50" onClick={closeEntryModal} aria-hidden="true" />
-          <div className="relative z-10 w-full max-w-3xl rounded-2xl bg-white p-5 shadow-2xl">
+          <div className="relative z-10 max-h-[calc(100vh-2rem)] w-full max-w-3xl overflow-y-auto rounded-2xl border border-brand-blue/20 bg-gradient-to-br from-blue-50 via-white to-amber-50 p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
-              <h3 className="font-heading text-lg font-semibold">{entryModal.mode === 'edit' ? 'Edit Event' : 'Add Event'}</h3>
-              <button type="button" onClick={closeEntryModal} className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700" aria-label="Close add row modal">
+              <h3 className="font-heading text-xl font-extrabold text-brand-blue">{entryModal.mode === 'edit' ? 'Edit Event' : 'Add Event'}</h3>
+              <button type="button" onClick={closeEntryModal} className="rounded-md border border-amber-200 bg-white p-1 text-amber-700 hover:bg-amber-50 hover:text-amber-800" aria-label="Close add row modal">
                 <XMarkIcon className="h-5 w-5" />
               </button>
             </div>
@@ -624,40 +750,36 @@ const AdminSchedulePage = () => {
                   {segmentOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
               </label>
-              <label className="flex items-center gap-2 text-sm md:self-end">
-                <input type="checkbox" {...form.register('isActive')} /> Active row
-              </label>
 
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 md:col-span-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Time Slot (15-minute steps)</p>
-                <div className="mt-2 grid gap-2 md:grid-cols-[1fr_1fr_1fr_auto_1fr_1fr_1fr]">
-                  <select {...form.register('startHour')} className="rounded-lg border border-slate-300 p-2.5">
-                    {HOURS.map((hour) => <option key={`start-hour-${hour}`} value={hour}>{hour}</option>)}
-                  </select>
-                  <select {...form.register('startMinute')} className="rounded-lg border border-slate-300 p-2.5">
-                    {MINUTES.map((minute) => <option key={`start-minute-${minute}`} value={minute}>{minute}</option>)}
-                  </select>
-                  <select {...form.register('startMeridiem')} className="rounded-lg border border-slate-300 p-2.5">
-                    {MERIDIEM.map((value) => <option key={`start-meridiem-${value}`} value={value}>{value}</option>)}
-                  </select>
-                  <label className="inline-flex items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white px-2 text-xs font-medium text-slate-600">
-                    <input type="checkbox" {...form.register('hasEnd')} /> End
-                  </label>
-                  <select {...form.register('endHour')} className="rounded-lg border border-slate-300 p-2.5">
-                    {HOURS.map((hour) => <option key={`end-hour-${hour}`} value={hour}>{hour}</option>)}
-                  </select>
-                  <select {...form.register('endMinute')} className="rounded-lg border border-slate-300 p-2.5">
-                    {MINUTES.map((minute) => <option key={`end-minute-${minute}`} value={minute}>{minute}</option>)}
-                  </select>
-                  <select {...form.register('endMeridiem')} className="rounded-lg border border-slate-300 p-2.5">
-                    {MERIDIEM.map((value) => <option key={`end-meridiem-${value}`} value={value}>{value}</option>)}
-                  </select>
+              <div className="rounded-xl border border-brand-blue/20 bg-white/80 p-3 md:col-span-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Time Slot</p>
+                <div className="mt-2 space-y-2">
+                  <div className="grid gap-2 md:grid-cols-[auto_1fr_1fr_1fr] md:items-center">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Start</p>
+                    <select {...form.register('startHour')} className="rounded-lg border border-slate-300 p-2.5">
+                      {HOURS.map((hour) => <option key={`start-hour-${hour}`} value={hour}>{hour}</option>)}
+                    </select>
+                    <select {...form.register('startMinute')} className="rounded-lg border border-slate-300 p-2.5">
+                      {MINUTES.map((minute) => <option key={`start-minute-${minute}`} value={minute}>{minute}</option>)}
+                    </select>
+                    <select {...form.register('startMeridiem')} className="rounded-lg border border-slate-300 p-2.5">
+                      {MERIDIEM.map((value) => <option key={`start-meridiem-${value}`} value={value}>{value}</option>)}
+                    </select>
+                  </div>
+                  <div className="grid gap-2 md:grid-cols-[auto_1fr_1fr_1fr] md:items-center">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">End</p>
+                    <select {...form.register('endHour')} className="rounded-lg border border-slate-300 p-2.5">
+                      {HOURS.map((hour) => <option key={`end-hour-${hour}`} value={hour}>{hour}</option>)}
+                    </select>
+                    <select {...form.register('endMinute')} className="rounded-lg border border-slate-300 p-2.5">
+                      {MINUTES.map((minute) => <option key={`end-minute-${minute}`} value={minute}>{minute}</option>)}
+                    </select>
+                    <select {...form.register('endMeridiem')} className="rounded-lg border border-slate-300 p-2.5">
+                      {MERIDIEM.map((value) => <option key={`end-meridiem-${value}`} value={value}>{value}</option>)}
+                    </select>
+                  </div>
                 </div>
               </div>
-
-              <label className="text-sm">Time (Punjabi)
-                <input {...form.register('timePa')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-              </label>
 
               <label className="text-sm">Content (English)
                 <input {...form.register('titleEn', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
@@ -665,17 +787,8 @@ const AdminSchedulePage = () => {
               <label className="text-sm">Content (Punjabi)
                 <input {...form.register('titlePa')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
-              <label className="text-sm md:col-span-2">Notes (English)
-                <textarea rows={2} {...form.register('noteEn')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-              </label>
-              <label className="text-sm md:col-span-2">Notes (Punjabi)
-                <textarea rows={2} {...form.register('notePa')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-              </label>
-              <label className="flex items-center gap-2 text-sm md:col-span-2">
-                <input type="checkbox" {...form.register('isHighlighted')} /> Highlight this row for the homepage
-              </label>
               <div className="md:col-span-2 flex gap-2">
-                <Button type="submit" disabled={saveDayMutation.isPending}>{saveDayMutation.isPending ? 'Saving...' : 'OK'}</Button>
+                <Button type="submit" disabled={saveDayMutation.isPending} className="bg-brand-blue text-white hover:bg-blue-800">{saveDayMutation.isPending ? 'Saving...' : 'Save Event'}</Button>
                 <Button type="button" variant="ghost" onClick={closeEntryModal}>Cancel</Button>
               </div>
             </form>

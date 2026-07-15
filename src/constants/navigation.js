@@ -31,6 +31,5 @@ export const adminNav = [
   { label: 'Sponsors', path: '/admin/sponsors' },
   { label: 'Events', path: '/admin/events' },
   { label: 'Donations', path: '/admin/donations' },
-  { label: 'Users', path: '/admin/users' },
-  { label: 'Analytics', path: '/admin/analytics' }
+  { label: 'Users', path: '/admin/users' }
 ];

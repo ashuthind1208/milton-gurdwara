@@ -5,12 +5,24 @@ const HOME_CONTENT_RESOURCE = 'cms_home_content';
 const PAGE_CONTENT_RESOURCE = 'cms_page_content';
 
 const defaultLangarItems = [
-  { id: 'langar-1', name: 'Ginger', category: 'Grocery', addedOn: '2026-07-07', expiryDate: '', needed: true },
-  { id: 'langar-2', name: 'Tomato', category: 'Grocery', addedOn: '2026-07-07', expiryDate: '', needed: true },
-  { id: 'langar-3', name: 'Onions', category: 'Grocery', addedOn: '2026-07-06', expiryDate: '', needed: false },
-  { id: 'langar-4', name: 'Flour (Atta)', category: 'Grocery', addedOn: '2026-07-07', expiryDate: '', needed: true },
-  { id: 'langar-5', name: 'Lentils (Daal)', category: 'Grocery', addedOn: '2026-07-05', expiryDate: '', needed: false }
+  { id: 'langar-1', name: 'Ginger', category: 'Grocery', addedOn: '2026-07-07', expiryDate: '', needed: true, stockStatus: 'required_soon', customStatusLabel: '' },
+  { id: 'langar-2', name: 'Tomato', category: 'Grocery', addedOn: '2026-07-07', expiryDate: '', needed: true, stockStatus: 'required_soon', customStatusLabel: '' },
+  { id: 'langar-3', name: 'Onions', category: 'Grocery', addedOn: '2026-07-06', expiryDate: '', needed: false, stockStatus: 'stock_available', customStatusLabel: '' },
+  { id: 'langar-4', name: 'Flour (Atta)', category: 'Grocery', addedOn: '2026-07-07', expiryDate: '', needed: true, stockStatus: 'required_soon', customStatusLabel: '' },
+  { id: 'langar-5', name: 'Lentils (Daal)', category: 'Grocery', addedOn: '2026-07-05', expiryDate: '', needed: false, stockStatus: 'stock_available', customStatusLabel: '' }
 ];
+
+const resolveLangarStatusLabel = (item = {}) => {
+  if (item.stockStatus === 'custom' && item.customStatusLabel) {
+    return item.customStatusLabel;
+  }
+
+  if (item.stockStatus === 'stock_available') {
+    return 'Stock Available';
+  }
+
+  return 'Required Soon';
+};
 
 const defaultSchedule = {
   morning: [
@@ -319,7 +331,10 @@ const normalizeContent = (content) => {
     category: item.category || 'Grocery',
     addedOn: item.addedOn || new Date().toISOString().slice(0, 10),
     expiryDate: item.expiryDate || '',
-    needed: typeof item.needed === 'boolean' ? item.needed : true
+    needed: typeof item.needed === 'boolean' ? item.needed : true,
+    stockStatus: item.stockStatus || ((typeof item.needed === 'boolean' ? item.needed : true) ? 'required_soon' : 'stock_available'),
+    customStatusLabel: item.customStatusLabel || '',
+    displayStatusLabel: resolveLangarStatusLabel(item)
   }))
   };
 };
@@ -501,7 +516,9 @@ const cmsService = {
           category: payload.category || 'Grocery',
           addedOn: payload.addedOn || new Date().toISOString().slice(0, 10),
           expiryDate: payload.expiryDate || '',
-          needed: payload.needed
+          needed: payload.needed,
+          stockStatus: payload.stockStatus || (payload.needed ? 'required_soon' : 'stock_available'),
+          customStatusLabel: payload.customStatusLabel || ''
         },
         ...current.langarItems
       ]

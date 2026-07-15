@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  EllipsisVerticalIcon,
   EyeIcon,
   PencilSquareIcon,
   TrashIcon
@@ -174,6 +176,7 @@ const defaultForm = {
 };
 
 const AdminEventsPage = () => {
+  const { setHeaderAction } = useOutletContext();
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [viewEvent, setViewEvent] = useState(null);
@@ -184,6 +187,7 @@ const AdminEventsPage = () => {
   const [editUploadProgress, setEditUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState({ type: 'success', message: '' });
   const [viewRegistrantsPage, setViewRegistrantsPage] = useState(1);
+  const [openActionMenuId, setOpenActionMenuId] = useState('');
 
   const createForm = useForm({ defaultValues: defaultForm });
   const editForm = useForm({ defaultValues: defaultForm });
@@ -398,12 +402,24 @@ const AdminEventsPage = () => {
     }
   }, [viewRegistrantsPage, registrantsTotalPages]);
 
+  useEffect(() => {
+    setOpenActionMenuId('');
+  }, [events.length]);
+
+  useEffect(() => {
+    setHeaderAction(
+      <Button type="button" onClick={openCreateModal} className="h-8 px-2.5 py-1 text-xs font-semibold">
+        Add New Event
+      </Button>
+    );
+
+    return () => setHeaderAction(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setHeaderAction]);
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="font-heading text-3xl font-bold">Events</h1>
-        <Button type="button" onClick={openCreateModal}>Add New Event</Button>
-      </div>
+      <h1 className="sr-only">Events</h1>
 
       <Card>
         <div className="overflow-x-auto">
@@ -432,23 +448,86 @@ const AdminEventsPage = () => {
                   <td className="py-2 pr-3">{event.category || '-'}</td>
                   <td className="py-2 pr-3">{event.registrations || (event.registrants || []).length || 0}</td>
                   <td className="py-2 pr-3">
-                    <div className="inline-flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => toggleActiveMutation.mutate({ id: event.id, active: event.active === false })}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${event.active === false ? 'bg-slate-300' : 'bg-emerald-500'}`}
-                        title={event.active === false ? 'Set active' : 'Set inactive'}
-                        aria-label={event.active === false ? 'Set active' : 'Set inactive'}
-                      >
-                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${event.active === false ? 'translate-x-0.5' : 'translate-x-5'}`} />
-                      </button>
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${event.active === false ? 'bg-slate-200 text-slate-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                        {event.active === false ? 'Inactive' : 'Active'}
-                      </span>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleActiveMutation.mutate({ id: event.id, active: event.active === false })}
+                      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold transition ${event.active === false ? 'border-slate-300 bg-slate-100 text-slate-700 hover:border-slate-400' : 'border-emerald-200 bg-emerald-100 text-emerald-700 hover:border-emerald-300'}`}
+                      title={event.active === false ? 'Set active' : 'Set inactive'}
+                      aria-label={event.active === false ? 'Set active' : 'Set inactive'}
+                    >
+                      {event.active === false ? 'Inactive' : 'Active'}
+                    </button>
                   </td>
                   <td className="py-2 pr-3">
-                    <div className="flex items-center gap-2">
+                    <div className="relative lg:hidden">
+                      <button
+                        type="button"
+                        onClick={() => setOpenActionMenuId((prev) => (prev === event.id ? '' : event.id))}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100"
+                        aria-label="More actions"
+                        title="More actions"
+                      >
+                        <EllipsisVerticalIcon className={actionIconClass} />
+                      </button>
+                      {openActionMenuId === event.id ? (
+                        <div className="absolute right-0 top-9 z-20 min-w-[150px] rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setViewEvent(event);
+                              setOpenActionMenuId('');
+                            }}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                          >
+                            View
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              openEdit(event);
+                              setOpenActionMenuId('');
+                            }}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              exportEventRegistrations(event, 'csv');
+                              setOpenActionMenuId('');
+                            }}
+                            disabled={(event.registrants || []).length === 0}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            Download CSV
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              exportEventRegistrations(event, 'pdf');
+                              setOpenActionMenuId('');
+                            }}
+                            disabled={(event.registrants || []).length === 0}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            Download PDF
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              deleteMutation.mutate(event.id);
+                              setOpenActionMenuId('');
+                            }}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-red-700 hover:bg-red-50"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="hidden items-center gap-2 lg:flex">
                       <button
                         type="button"
                         onClick={() => setViewEvent(event)}

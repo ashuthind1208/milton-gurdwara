@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EyeIcon, PencilSquareIcon, PlusIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
@@ -28,6 +29,7 @@ const userFormDefaults = {
 };
 
 const AdminUsersPage = () => {
+  const { setHeaderAction } = useOutletContext();
   const queryClient = useQueryClient();
   const [activeFilter, setActiveFilter] = useState('All');
   const [viewUser, setViewUser] = useState(null);
@@ -156,14 +158,20 @@ const AdminUsersPage = () => {
     );
   };
 
+  useEffect(() => {
+    setHeaderAction(
+      <Button type="button" onClick={openCreateUser} className="inline-flex h-8 items-center gap-1.5 px-2.5 py-1 text-xs font-semibold">
+        <PlusIcon className="h-3.5 w-3.5" /> Add User
+      </Button>
+    );
+
+    return () => setHeaderAction(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setHeaderAction]);
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-heading text-3xl font-bold">Users and Roles</h1>
-        <Button type="button" onClick={openCreateUser} className="inline-flex items-center gap-1.5">
-          <PlusIcon className="h-4 w-4" /> Add User
-        </Button>
-      </div>
+      <h1 className="sr-only">Users and Roles</h1>
 
       <Card>
         {approvalNotice ? (
