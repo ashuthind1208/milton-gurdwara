@@ -407,11 +407,11 @@ const HomePage = () => {
                 {morningScheduleRows.length > 0 ? (
                   <div className="min-w-0 max-w-full overflow-hidden rounded-lg border border-sky-200">
                     <div className="border-b border-sky-200 bg-sky-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-sky-800">Morning</div>
-                    <table className="w-full table-fixed border-collapse text-left">
+                    <table className="schedule-mobile-table w-full table-fixed border-collapse text-left">
                       <tbody>
                         {morningScheduleRows.map((item) => (
-                          <tr key={item.id} className={`border-t border-sky-100 ${item.isCurrent ? 'animate-pulse bg-brand-blue/15' : item.isHighlighted ? 'bg-sky-50/40' : 'bg-sky-50/25'} ${item.isActive === false ? 'opacity-45' : ''}`}>
-                            <td className="w-[132px] py-3 pr-3 pl-2 align-top md:w-[170px] md:pr-4">
+                          <tr key={item.id} className={`schedule-mobile-row border-t border-sky-100 ${item.isCurrent ? 'animate-pulse bg-brand-blue/15' : item.isHighlighted ? 'bg-sky-50/40' : 'bg-sky-50/25'} ${item.isActive === false ? 'opacity-45' : ''}`}>
+                            <td className="schedule-mobile-time-cell w-[132px] py-3 pr-3 pl-2 align-top md:w-[170px] md:pr-4">
                               <div className="flex items-start gap-3">
                                 <span className={`mt-1 inline-flex h-3 w-3 rounded-full ${item.isCurrent ? 'bg-green-500 shadow-[0_0_0_6px_rgba(34,197,94,0.18)]' : item.isHighlighted ? 'bg-brand-blue/80' : 'bg-slate-300'}`} />
                                 <div className="min-w-0">
@@ -420,8 +420,8 @@ const HomePage = () => {
                                 </div>
                               </div>
                             </td>
-                            <td className="min-w-0 py-3 align-top">
-                              <p className="schedule-cell-clip text-sm font-semibold text-slate-900">{item.titleEn || 'Untitled schedule item'}</p>
+                            <td className="schedule-mobile-text-cell min-w-0 py-3 align-top">
+                              <p className="schedule-cell-clip schedule-mobile-title text-sm font-normal text-slate-900 sm:font-semibold">{item.titleEn || 'Untitled schedule item'}</p>
                               {item.titlePa ? <p className="schedule-cell-clip mt-1 text-sm text-brand-saffron">{item.titlePa}</p> : null}
                               {item.noteEn ? <p className="schedule-cell-clip mt-1 text-xs text-slate-600">{item.noteEn}</p> : null}
                               {item.notePa ? <p className="schedule-cell-clip mt-1 text-xs text-slate-500">{item.notePa}</p> : null}
@@ -436,11 +436,11 @@ const HomePage = () => {
                 {eveningScheduleRows.length > 0 ? (
                   <div className="min-w-0 max-w-full overflow-hidden rounded-lg border border-amber-200">
                     <div className="border-b border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-amber-800">Evening</div>
-                    <table className="w-full table-fixed border-collapse text-left">
+                    <table className="schedule-mobile-table w-full table-fixed border-collapse text-left">
                       <tbody>
                         {eveningScheduleRows.map((item) => (
-                          <tr key={item.id} className={`border-t border-amber-100 ${item.isCurrent ? 'animate-pulse bg-brand-blue/15' : item.isHighlighted ? 'bg-sky-50/40' : item.segment === 'special' ? 'bg-violet-50/35' : 'bg-amber-50/35'} ${item.isActive === false ? 'opacity-45' : ''}`}>
-                            <td className="w-[132px] py-3 pr-3 pl-2 align-top md:w-[170px] md:pr-4">
+                          <tr key={item.id} className={`schedule-mobile-row border-t border-amber-100 ${item.isCurrent ? 'animate-pulse bg-brand-blue/15' : item.isHighlighted ? 'bg-sky-50/40' : item.segment === 'special' ? 'bg-violet-50/35' : 'bg-amber-50/35'} ${item.isActive === false ? 'opacity-45' : ''}`}>
+                            <td className="schedule-mobile-time-cell w-[132px] py-3 pr-3 pl-2 align-top md:w-[170px] md:pr-4">
                               <div className="flex items-start gap-3">
                                 <span className={`mt-1 inline-flex h-3 w-3 rounded-full ${item.isCurrent ? 'bg-green-500 shadow-[0_0_0_6px_rgba(34,197,94,0.18)]' : item.isHighlighted ? 'bg-brand-blue/80' : 'bg-slate-300'}`} />
                                 <div className="min-w-0">
@@ -449,8 +449,8 @@ const HomePage = () => {
                                 </div>
                               </div>
                             </td>
-                            <td className="min-w-0 py-3 align-top">
-                              <p className="schedule-cell-clip text-sm font-semibold text-slate-900">{item.titleEn || 'Untitled schedule item'}</p>
+                            <td className="schedule-mobile-text-cell min-w-0 py-3 align-top">
+                              <p className="schedule-cell-clip schedule-mobile-title text-sm font-normal text-slate-900 sm:font-semibold">{item.titleEn || 'Untitled schedule item'}</p>
                               {item.titlePa ? <p className="schedule-cell-clip mt-1 text-sm text-brand-saffron">{item.titlePa}</p> : null}
                               {item.noteEn ? <p className="schedule-cell-clip mt-1 text-xs text-slate-600">{item.noteEn}</p> : null}
                               {item.notePa ? <p className="schedule-cell-clip mt-1 text-xs text-slate-500">{item.notePa}</p> : null}
@@ -675,10 +675,13 @@ const HomePage = () => {
                       <>
                         <ul className="divide-y divide-slate-100">
                           {pageItems.map((item) => (
-                            <li key={`${item.primary}-${item.secondary}`} className="py-2">
-                              <div>
-                                <p className="text-sm font-medium text-slate-800">{item.primary}</p>
-                                <p className="text-xs text-slate-600">{item.category} • {item.secondary}</p>
+                            <li key={`${item.primary}-${item.secondary}`} className="py-1.5">
+                              <div className="space-y-0.5">
+                                <p className="text-sm font-semibold leading-tight text-slate-800">{item.primary}</p>
+                                <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] leading-tight text-slate-600">
+                                  <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">{item.category}</span>
+                                  <span>{item.secondary}</span>
+                                </p>
                               </div>
                             </li>
                           ))}

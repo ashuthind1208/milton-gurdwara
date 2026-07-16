@@ -12,7 +12,6 @@ import {
   EyeIcon,
   PencilSquareIcon,
   TrashIcon,
-  PlusIcon,
   XMarkIcon,
   SparklesIcon,
   BuildingLibraryIcon,
@@ -23,6 +22,7 @@ import Card from '../../components/ui/Card';
 import donationService from '../../services/donationService';
 import { formatCurrency } from '../../utils/formatters';
 import Button from '../../components/ui/Button';
+import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton';
 import {
   createDonationInvoicePdfBlob,
   downloadCampaignDonationsCsv,
@@ -284,9 +284,7 @@ const AdminDonationsPage = () => {
 
   useEffect(() => {
     setHeaderAction(
-      <Button type="button" onClick={openCreate} className="inline-flex h-8 items-center gap-1.5 px-2.5 py-1 text-xs font-semibold">
-        <PlusIcon className="h-3.5 w-3.5" /> Add Campaign
-      </Button>
+      <AdminHeaderActionButton label="Add Campaign" onClick={openCreate} />
     );
 
     return () => setHeaderAction(null);
@@ -325,23 +323,34 @@ const AdminDonationsPage = () => {
               {campaigns.map((campaign, index) => (
                 <tr key={campaign.id} className={`border-b border-slate-100 transition hover:bg-blue-50/40 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
                   <td className="py-2 pr-3">
-                    <p className="inline-flex items-center gap-1.5 font-semibold text-slate-800">
-                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-amber-100 text-brand-blue">
-                        <SparklesIcon className="h-4 w-4" />
-                      </span>
-                      {campaign.name}
-                    </p>
-                    {campaign.description ? <p className="text-xs text-slate-500">{campaign.description}</p> : null}
+                    <div className="space-y-1.5 lg:hidden">
+                      <p className="inline-flex items-center gap-1.5 text-sm font-bold leading-tight text-slate-800">
+                        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-amber-100 text-brand-blue">
+                          <SparklesIcon className="h-4 w-4" />
+                        </span>
+                        {campaign.name}
+                      </p>
+                      {campaign.description ? <p className="text-[12px] leading-snug text-slate-600">{campaign.description}</p> : null}
+                      <p className="text-[12px] leading-snug text-slate-600">{campaign.paymentProvider}</p>
+                      <p className="text-[12px] leading-snug text-slate-600">Target: {formatCurrency(campaign.target)}</p>
+                      <p className="text-[12px] leading-snug text-slate-600">Raised: {formatCurrency(campaign.raised)}</p>
+                      <div className="pt-0.5">
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${campaign.isClosed ? 'bg-violet-100 text-violet-800' : campaign.isActive ? 'border border-emerald-300 bg-emerald-100 text-emerald-800' : 'border border-slate-300 bg-slate-100 text-slate-700'}`}>
+                          {campaign.isClosed ? 'Closed' : campaign.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="hidden lg:inline">{campaign.name}</span>
                   </td>
-                  <td className="py-2 pr-3">
+                  <td className="admin-compact-mobile-hidden py-2 pr-3">
                     <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${campaign.paymentProvider === 'PAYPAL' ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-800'}`}>
                       {campaign.paymentProvider === 'PAYPAL' ? <BanknotesIcon className="h-3.5 w-3.5" /> : <BuildingLibraryIcon className="h-3.5 w-3.5" />}
                       {campaign.paymentProvider}
                     </span>
                   </td>
-                  <td className="py-2 pr-3">{formatCurrency(campaign.target)}</td>
-                  <td className="py-2 pr-3">{formatCurrency(campaign.raised)}</td>
-                  <td className="py-2 pr-3">
+                  <td className="admin-compact-mobile-hidden py-2 pr-3">{formatCurrency(campaign.target)}</td>
+                  <td className="admin-compact-mobile-hidden py-2 pr-3">{formatCurrency(campaign.raised)}</td>
+                  <td className="admin-compact-mobile-hidden py-2 pr-3">
                     <div className="flex flex-wrap items-center gap-2">
                       {campaign.isClosed ? (
                         <span className="inline-flex rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-800">Closed</span>
@@ -426,15 +435,24 @@ const AdminDonationsPage = () => {
             <tbody>
               {pagedDonations.map((entry) => (
                 <tr key={entry.id} className="border-b border-slate-100">
-                  <td className="py-2 pr-3">{new Date(entry.createdAt).toLocaleDateString()}</td>
-                  <td className="py-2 pr-3 font-semibold text-slate-800">{entry.donorName}</td>
                   <td className="py-2 pr-3">
+                    <div className="space-y-1.5 lg:hidden">
+                      <p className="text-sm font-bold leading-tight text-slate-800">{entry.donorName}</p>
+                      <p className="text-[12px] leading-snug text-slate-600">{new Date(entry.createdAt).toLocaleDateString()}</p>
+                      <p className="text-[12px] leading-snug text-slate-600">{entry.campaignName}</p>
+                      {entry.campaignDescription ? <p className="text-[12px] leading-snug text-slate-600">{entry.campaignDescription}</p> : null}
+                      <p className="text-[12px] leading-snug text-slate-600">{formatCurrency(entry.amount)}</p>
+                    </div>
+                    <span className="hidden lg:inline">{new Date(entry.createdAt).toLocaleDateString()}</span>
+                  </td>
+                  <td className="admin-compact-mobile-hidden py-2 pr-3 font-semibold text-slate-800">{entry.donorName}</td>
+                  <td className="admin-compact-mobile-hidden py-2 pr-3">
                     <div>
                       <p className="font-medium text-slate-800">{entry.campaignName}</p>
                       {entry.campaignDescription ? <p className="text-xs text-slate-500">{entry.campaignDescription}</p> : null}
                     </div>
                   </td>
-                  <td className="py-2 pr-3 font-semibold text-slate-800">{formatCurrency(entry.amount)}</td>
+                  <td className="admin-compact-mobile-hidden py-2 pr-3 font-semibold text-slate-800">{formatCurrency(entry.amount)}</td>
                   <td className="py-2 pr-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <button

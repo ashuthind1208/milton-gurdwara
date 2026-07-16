@@ -109,6 +109,38 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  @media (max-width: 640px) {
+    .schedule-mobile-table,
+    .schedule-mobile-table tbody,
+    .schedule-mobile-table tr,
+    .schedule-mobile-table td {
+      display: block;
+      width: 100%;
+    }
+
+    .schedule-mobile-row {
+      padding: 10px 12px;
+    }
+
+    .schedule-mobile-time-cell {
+      padding: 0 0 6px 0 !important;
+    }
+
+    .schedule-mobile-text-cell {
+      padding: 0 0 2px 26px !important;
+    }
+
+    .schedule-mobile-title {
+      font-weight: 400;
+    }
+
+    .schedule-cell-clip {
+      white-space: normal;
+      overflow: visible;
+      text-overflow: clip;
+    }
+  }
 }
 
 @keyframes ticker-scroll-left {
@@ -255,31 +287,148 @@
   font-weight: 700;
 }
 
+.admin-dashboard-shell,
+.admin-dashboard-shell section,
+.admin-dashboard-shell .admin-dashboard-card {
+  min-width: 0;
+}
+
+.admin-dashboard-shell canvas,
+.admin-dashboard-shell svg {
+  max-width: 100% !important;
+}
+
+.admin-main-content .react-calendar {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.admin-main-content .react-calendar * {
+  box-sizing: border-box;
+}
+
+.admin-main-content .react-calendar__viewContainer,
+.admin-main-content .react-calendar__month-view,
+.admin-main-content .react-calendar__month-view > div,
+.admin-main-content .react-calendar__month-view > div > div {
+  min-width: 0;
+  max-width: 100%;
+}
+
 @media (max-width: 1023px) {
-  .admin-main-content table th,
-  .admin-main-content table td {
-    padding-top: 6px;
-    padding-bottom: 6px;
+  .admin-dashboard-shell {
+    overflow-x: clip;
   }
 
-  .admin-main-content table td:last-child > div {
-    display: inline-grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: center;
+  .admin-dashboard-shell .admin-dashboard-card {
+    overflow: hidden;
+  }
+
+  .admin-main-content .react-calendar {
+    font-size: 0.9rem;
+  }
+
+  .admin-main-content .react-calendar__navigation {
     gap: 4px;
+  }
+
+  .admin-main-content .react-calendar__navigation button {
     min-width: 0;
+    padding-inline: 6px;
+    font-size: 0.85rem;
+  }
+
+  .admin-main-content .react-calendar__tile {
     max-width: 100%;
-    width: fit-content;
+    padding: 8px 2px;
+    font-size: 0.8rem;
+  }
+
+  .admin-main-content table {
+    display: block;
+    width: 100%;
+  }
+
+  .admin-main-content table thead {
+    display: none;
+  }
+
+  .admin-main-content table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .admin-main-content table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-auto-flow: row;
+    column-gap: 6px;
+    row-gap: 3px;
+    align-items: start;
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 8px;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: 0 10px 24px -20px rgba(15, 23, 42, 0.35);
+  }
+
+  .admin-main-content table th,
+  .admin-main-content table td {
+    display: block;
+    width: auto;
+    padding: 0;
+  }
+
+  .admin-main-content table td:last-child {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+    align-self: start;
+    width: auto;
+    max-width: none;
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+    white-space: normal;
+    vertical-align: top;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .admin-main-content table td:not(:last-child) {
+    grid-column: 1;
     min-width: 0;
-    max-width: 100%;
-    justify-items: start;
-    align-content: start;
+  }
+
+  .admin-langar-mobile-hidden {
+    display: none !important;
+  }
+
+  .admin-seva-mobile-hidden {
+    display: block;
+  }
+
+  .admin-compact-mobile-hidden {
+    display: block;
   }
 
   @media (max-width: 420px) {
-    .admin-main-content table td:last-child > div {
-      grid-template-columns: minmax(0, 1fr);
-      max-width: 110px;
+    .admin-main-content table tr {
+      padding: 6px;
+    }
+  }
+
+  @media (max-width: 1023px) {
+    .admin-seva-mobile-hidden {
+      display: none !important;
+    }
+
+    .admin-compact-mobile-hidden {
+      display: none !important;
     }
   }
 
@@ -287,12 +436,12 @@
   .admin-main-content table td:last-child > div > a {
     margin: 0;
     width: auto;
-    flex: 0 1 auto;
+    flex: 0 0 auto;
     min-width: 0 !important;
-    max-width: 100px;
-    height: 28px;
-    padding: 0 5px;
-    font-size: 10px;
+    max-width: none;
+    height: 32px;
+    padding: 0 10px;
+    font-size: 11px;
     line-height: 1;
     justify-content: center;
     overflow: hidden;
@@ -300,13 +449,29 @@
     white-space: nowrap;
   }
 
+  .admin-main-content table td:last-child > div {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
+    min-width: 0;
+    width: max-content;
+    max-width: 100%;
+  }
+
   .admin-main-content table td:last-child > div > button.h-8.w-8,
   .admin-main-content table td:last-child > div > a.h-8.w-8,
   .admin-main-content table td:last-child > div > button.h-7.w-7,
   .admin-main-content table td:last-child > div > a.h-7.w-7 {
-    height: 28px;
-    width: 28px;
+    height: 32px;
+    width: 32px;
     padding: 0;
+    flex: 0 0 auto;
+  }
+
+  .admin-main-content table td:last-child > div > button:not(.h-8.w-8):not(.h-7.w-7),
+  .admin-main-content table td:last-child > div > a:not(.h-8.w-8):not(.h-7.w-7) {
+    flex: 0 0 auto;
   }
 
   .admin-main-content table td:last-child > div > button span,
@@ -320,14 +485,14 @@
 
   .admin-main-content table td:last-child {
     width: 1%;
-    max-width: 170px;
+    max-width: none;
     white-space: normal;
     vertical-align: top;
   }
 
   .admin-main-content table td:last-child > div > button svg,
   .admin-main-content table td:last-child > div > a svg {
-    height: 13px;
-    width: 13px;
+    height: 14px;
+    width: 14px;
   }
 }

@@ -556,12 +556,21 @@ const AdminLibraryPage = () => {
                   return (
                     <tr key={book.id} className="border-b border-slate-100 last:border-b-0">
                       <td className="px-3 py-1.5">
-                        <p className="font-semibold text-slate-800">{book.title || 'Untitled'}</p>
-                        <p className="text-xs text-slate-500">{book.author || 'Unknown author'}</p>
+                        <div className="space-y-1.5 lg:hidden">
+                          <p className="text-sm font-bold leading-tight text-slate-800">{book.title || 'Untitled'}</p>
+                          <p className="text-[12px] leading-snug text-slate-600">{book.author || 'Unknown author'}</p>
+                          <p className="text-[12px] leading-snug text-slate-600">Copies: {book.totalCopies || 0}</p>
+                          <p className="text-[12px] leading-snug text-slate-600">Issued: {book.issuedCopies || 0}</p>
+                          <p className="text-[12px] leading-snug text-slate-600">Available: {available}</p>
+                        </div>
+                        <div className="hidden lg:block">
+                          <p className="font-semibold text-slate-800">{book.title || 'Untitled'}</p>
+                          <p className="text-xs text-slate-500">{book.author || 'Unknown author'}</p>
+                        </div>
                       </td>
-                      <td className="px-3 py-1.5">{book.totalCopies || 0}</td>
-                      <td className="px-3 py-1.5">{book.issuedCopies || 0}</td>
-                      <td className="px-3 py-1.5">
+                      <td className="admin-compact-mobile-hidden px-3 py-1.5">{book.totalCopies || 0}</td>
+                      <td className="admin-compact-mobile-hidden px-3 py-1.5">{book.issuedCopies || 0}</td>
+                      <td className="admin-compact-mobile-hidden px-3 py-1.5">
                         <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">{available}</span>
                       </td>
                       <td className="px-3 py-1.5">
@@ -744,7 +753,20 @@ const AdminLibraryPage = () => {
                 {visibleDigitalResources.map((resource) => (
                   <tr key={resource.id} className="border-b border-slate-100 last:border-b-0">
                     <td className="px-3 py-1.5">
-                      <div className="flex items-center gap-2">
+                      <div className="space-y-1.5 lg:hidden">
+                        <div className="flex items-center gap-2">
+                          {resource.coverImageUrl ? (
+                            <img src={resource.coverImageUrl} alt={resource.title || 'Cover'} className="h-9 w-7 rounded object-cover" />
+                          ) : (
+                            <div className="h-9 w-7 rounded bg-slate-200" />
+                          )}
+                          <p className="text-sm font-bold leading-tight text-slate-800">{resource.title || 'Untitled resource'}</p>
+                        </div>
+                        <p className="text-[12px] leading-snug text-slate-600">{resource.tags || 'No tags'}</p>
+                        <p className="text-[12px] leading-snug text-slate-600">{resource.fileType || 'PDF'}</p>
+                        <p className="text-[12px] leading-snug break-all text-slate-600">{resource.downloadUrl || 'Open Link'}</p>
+                      </div>
+                      <div className="hidden lg:flex items-center gap-2">
                         {resource.coverImageUrl ? (
                           <img src={resource.coverImageUrl} alt={resource.title || 'Cover'} className="h-9 w-7 rounded object-cover" />
                         ) : (
@@ -756,8 +778,8 @@ const AdminLibraryPage = () => {
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 py-1.5">{resource.fileType || 'PDF'}</td>
-                    <td className="px-3 py-1.5">
+                    <td className="admin-compact-mobile-hidden px-3 py-1.5">{resource.fileType || 'PDF'}</td>
+                    <td className="admin-compact-mobile-hidden px-3 py-1.5">
                       <a className="text-xs font-semibold text-brand-blue hover:underline" href={resource.downloadUrl} target="_blank" rel="noreferrer">Open Link</a>
                     </td>
                     <td className="px-3 py-1.5">
@@ -822,21 +844,29 @@ const AdminLibraryPage = () => {
               {visibleProgramUpdates.map((entry) => (
                 <tr key={entry.id} className="border-b border-slate-100 last:border-b-0">
                   <td className="px-3 py-1.5">
-                    <p className="font-semibold text-slate-800">{entry.title}</p>
-                    <p className="text-xs text-slate-500">{entry.speaker || 'Guest Speaker TBD'}</p>
-                    <div className="mt-1 flex items-center gap-2">
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${entry.eventId ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                        {entry.eventId ? 'Linked to Events' : 'Not Linked'}
-                      </span>
-                      {entry.eventId ? (
-                        <a href={`/events?eventId=${entry.eventId}`} target="_blank" rel="noreferrer" className="text-[11px] font-semibold text-brand-blue hover:underline">
-                          Open Event
-                        </a>
-                      ) : null}
+                    <div className="space-y-1.5 lg:hidden">
+                      <p className="text-sm font-bold leading-tight text-slate-800">{entry.title}</p>
+                      <p className="text-[12px] leading-snug text-slate-600">{entry.speaker || 'Guest Speaker TBD'}</p>
+                      <p className="text-[12px] leading-snug text-slate-600">{entry.scheduleDate || '-'} {entry.scheduleTime ? `| ${entry.scheduleTime}` : ''}</p>
+                      <p className="text-[12px] leading-snug text-slate-600">{entry.audience || '-'}</p>
+                      <div className="pt-0.5 flex items-center gap-2">
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${entry.eventId ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                          {entry.eventId ? 'Linked to Events' : 'Not Linked'}
+                        </span>
+                        {entry.eventId ? (
+                          <a href={`/events?eventId=${entry.eventId}`} target="_blank" rel="noreferrer" className="text-[11px] font-semibold text-brand-blue hover:underline">
+                            Open Event
+                          </a>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="hidden lg:block">
+                      <p className="font-semibold text-slate-800">{entry.title}</p>
+                      <p className="text-xs text-slate-500">{entry.speaker || 'Guest Speaker TBD'}</p>
                     </div>
                   </td>
-                  <td className="px-3 py-1.5">{entry.scheduleDate || '-'} {entry.scheduleTime ? `| ${entry.scheduleTime}` : ''}</td>
-                  <td className="px-3 py-1.5">{entry.audience || '-'}</td>
+                  <td className="admin-compact-mobile-hidden px-3 py-1.5">{entry.scheduleDate || '-'} {entry.scheduleTime ? `| ${entry.scheduleTime}` : ''}</td>
+                  <td className="admin-compact-mobile-hidden px-3 py-1.5">{entry.audience || '-'}</td>
                   <td className="px-3 py-1.5">
                     <div className="flex items-center gap-1.5">
                       <button
@@ -1126,12 +1156,22 @@ const AdminLibraryPage = () => {
                 <tbody>
                   {(issueBook.issueRecords || []).map((record) => (
                     <tr key={record.id} className="border-b border-slate-100 last:border-b-0">
-                      <td className="px-3 py-1.5">Copy {record.copyNumber}</td>
-                      <td className="px-3 py-1.5">{record.issuerName || '-'}</td>
-                      <td className="px-3 py-1.5">{record.issuerPhone || '-'}</td>
-                      <td className="px-3 py-1.5">{record.issueDate || '-'}</td>
-                      <td className="px-3 py-1.5">{record.returnDate || '-'}</td>
-                      <td className="px-3 py-1.5">
+                        <td className="px-3 py-1.5">
+                          <div className="space-y-1.5 lg:hidden">
+                            <p className="text-sm font-bold leading-tight text-slate-800">Copy {record.copyNumber}</p>
+                            <p className="text-[12px] leading-snug text-slate-600">{record.issuerName || '-'}</p>
+                            <p className="text-[12px] leading-snug text-slate-600">{record.issuerPhone || '-'}</p>
+                            <p className="text-[12px] leading-snug text-slate-600">{record.issueDate || '-'}</p>
+                            <p className="text-[12px] leading-snug text-slate-600">{record.returnDate || '-'}</p>
+                            <p className="text-[12px] leading-snug text-slate-600">{record.returnedAt ? `Returned ${record.returnedAt}` : 'Issued'}</p>
+                          </div>
+                          <span className="hidden lg:inline">Copy {record.copyNumber}</span>
+                        </td>
+                        <td className="admin-compact-mobile-hidden px-3 py-1.5">{record.issuerName || '-'}</td>
+                        <td className="admin-compact-mobile-hidden px-3 py-1.5">{record.issuerPhone || '-'}</td>
+                        <td className="admin-compact-mobile-hidden px-3 py-1.5">{record.issueDate || '-'}</td>
+                        <td className="admin-compact-mobile-hidden px-3 py-1.5">{record.returnDate || '-'}</td>
+                        <td className="admin-compact-mobile-hidden px-3 py-1.5">
                         {record.returnedAt ? (
                           <span className="text-xs font-semibold text-slate-500">Returned {record.returnedAt}</span>
                         ) : (
@@ -1183,13 +1223,21 @@ const AdminLibraryPage = () => {
                 return (
                   <tr key={entry.id} className="border-b border-slate-100 last:border-b-0">
                     <td className="px-3 py-1.5">
-                      <div className="flex items-center gap-2">
+                      <div className="space-y-1.5 lg:hidden">
+                        <div className="flex items-center gap-2">
+                          {thumb ? <img src={thumb} alt={entry.title} className="h-9 w-16 rounded object-cover" /> : <div className="h-9 w-16 rounded bg-slate-200" />}
+                          <p className="text-sm font-bold leading-tight text-slate-800">{entry.title || 'Untitled'}</p>
+                        </div>
+                        <p className="text-[12px] leading-snug text-slate-600">{entry.mediaType}</p>
+                        <p className="text-[12px] leading-snug text-slate-600">{entry.tags || '-'}</p>
+                      </div>
+                      <div className="hidden lg:flex items-center gap-2">
                         {thumb ? <img src={thumb} alt={entry.title} className="h-9 w-16 rounded object-cover" /> : <div className="h-9 w-16 rounded bg-slate-200" />}
                         <p className="font-semibold text-slate-800">{entry.title || 'Untitled'}</p>
                       </div>
                     </td>
-                    <td className="px-3 py-1.5 capitalize">{entry.mediaType}</td>
-                    <td className="px-3 py-1.5">{entry.tags || '-'}</td>
+                    <td className="admin-compact-mobile-hidden px-3 py-1.5 capitalize">{entry.mediaType}</td>
+                    <td className="admin-compact-mobile-hidden px-3 py-1.5">{entry.tags || '-'}</td>
                     <td className="px-3 py-1.5">
                       <div className="flex items-center gap-1.5">
                         <button type="button" className="inline-flex h-7 w-7 items-center justify-center rounded border border-slate-300 text-slate-700 hover:bg-slate-100" title="View" onClick={() => setMediaModal({ open: true, mode: 'view', id: entry.id })}><EyeIcon className={actionIconClass} /></button>

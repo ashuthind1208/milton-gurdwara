@@ -12,6 +12,7 @@ import {
 } from '@heroicons/react/24/outline';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
+import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton';
 import volunteerService from '../../services/volunteerService';
 import { siteConfig } from '../../constants/siteConfig';
 import { downloadRegistrationCsv, downloadRegistrationPdf } from '../../utils/csvExport';
@@ -178,9 +179,7 @@ const AdminSevaOpportunitiesPage = () => {
 
   useEffect(() => {
     setHeaderAction(
-      <Button type="button" onClick={() => setCreateOpen(true)} className="h-8 px-2.5 py-1 text-xs font-semibold">
-        Add New Seva Opportunity
-      </Button>
+      <AdminHeaderActionButton label="Add New Seva Opportunity" onClick={() => setCreateOpen(true)} />
     );
 
     return () => setHeaderAction(null);
@@ -206,11 +205,24 @@ const AdminSevaOpportunitiesPage = () => {
             <tbody>
               {opportunities.map((item) => (
                 <tr key={item.id} className="border-b border-slate-100">
-                  <td className="py-2 pr-3 font-semibold text-slate-800">{item.sevaType || '-'}</td>
-                  <td className="py-2 pr-3">{item.date || '-'}</td>
-                  <td className="py-2 pr-3">{item.time || '-'}</td>
-                  <td className="py-2 pr-3">{(volunteersByOpportunity[item.id] || []).length}/{item.totalVolunteersRequired || 10}</td>
-                  <td className="py-2 pr-3">
+                  <td className="py-2 pr-3 font-semibold text-slate-800">
+                    <div className="space-y-1.5 lg:hidden">
+                      <p className="text-sm font-bold leading-tight text-slate-800">{item.sevaType || '-'}</p>
+                      <p className="text-[12px] leading-snug text-slate-600">{item.date || '-'}</p>
+                      <p className="text-[12px] leading-snug text-slate-600">{item.time || '-'}</p>
+                      <p className="text-[12px] leading-snug text-slate-600">{(volunteersByOpportunity[item.id] || []).length}/{item.totalVolunteersRequired || 10}</p>
+                      <div className="pt-0.5">
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${item.status === 'closed' ? 'bg-rose-100 text-rose-700' : item.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'}`}>
+                          {item.status === 'closed' ? 'Closed' : item.active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="hidden lg:inline">{item.sevaType || '-'}</span>
+                  </td>
+                  <td className="admin-seva-mobile-hidden py-2 pr-3">{item.date || '-'}</td>
+                  <td className="admin-seva-mobile-hidden py-2 pr-3">{item.time || '-'}</td>
+                  <td className="admin-seva-mobile-hidden py-2 pr-3">{(volunteersByOpportunity[item.id] || []).length}/{item.totalVolunteersRequired || 10}</td>
+                  <td className="admin-seva-mobile-hidden py-2 pr-3">
                     <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${item.status === 'closed' ? 'bg-rose-100 text-rose-700' : item.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'}`}>
                       {item.status === 'closed' ? 'Closed' : item.active ? 'Active' : 'Inactive'}
                     </span>

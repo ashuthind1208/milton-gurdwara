@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EyeIcon, PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
+import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton';
 import advertisementService, { AD_PLACEMENT_OPTIONS } from '../../services/advertisementService';
 import uploadService from '../../services/uploadService';
 import StatusAlert from '../../components/common/StatusAlert';
@@ -265,9 +266,7 @@ const AdminAdvertisementsPage = () => {
 
   useEffect(() => {
     setHeaderAction(
-      <Button type="button" onClick={() => openModal('create')} className="h-8 px-2.5 py-1 text-xs font-semibold">
-        Create Advertisement
-      </Button>
+      <AdminHeaderActionButton label="Create Advertisement" onClick={() => openModal('create')} />
     );
 
     return () => setHeaderAction(null);
@@ -299,10 +298,23 @@ const AdminAdvertisementsPage = () => {
             <tbody className="divide-y divide-slate-100">
               {ads.map((ad) => (
                 <tr key={ad.id}>
-                  <td className="px-3 py-2 font-semibold text-slate-800">{ad.title || 'Untitled ad'}</td>
-                  <td className="px-3 py-2">{ad.placement}</td>
-                  <td className="px-3 py-2">{ad.website || '-'}</td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-2 font-semibold text-slate-800">
+                    <div className="space-y-1.5 lg:hidden">
+                      <p className="text-sm font-bold leading-tight text-slate-800">{ad.title || 'Untitled ad'}</p>
+                      <p className="text-[12px] leading-snug text-slate-600">{ad.placement}</p>
+                      <p className="text-[12px] leading-snug text-slate-600 break-all">{ad.website || '-'}</p>
+                      <p className="text-[12px] leading-snug text-slate-600">{Number(ad.clickCount || 0)} organic</p>
+                      <div className="pt-0.5">
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${ad.active ? 'bg-green-100 text-green-800' : 'bg-slate-200 text-slate-700'}`}>
+                          {ad.active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="hidden lg:inline">{ad.title || 'Untitled ad'}</span>
+                  </td>
+                  <td className="admin-compact-mobile-hidden px-3 py-2">{ad.placement}</td>
+                  <td className="admin-compact-mobile-hidden px-3 py-2">{ad.website || '-'}</td>
+                  <td className="admin-compact-mobile-hidden px-3 py-2">
                     <button
                       type="button"
                       onClick={() => setTrendAdId(ad.id)}
@@ -311,7 +323,7 @@ const AdminAdvertisementsPage = () => {
                       {Number(ad.clickCount || 0)} organic
                     </button>
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="admin-compact-mobile-hidden px-3 py-2">
                     <button
                       type="button"
                       onClick={() => toggleActiveMutation.mutate({ id: ad.id, active: !ad.active })}

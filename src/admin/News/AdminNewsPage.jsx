@@ -11,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
+import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton';
 import newsService from '../../services/newsService';
 import { formatDate } from '../../utils/formatters';
 import uploadService from '../../services/uploadService';
@@ -174,11 +175,7 @@ const AdminNewsPage = () => {
   };
 
   useEffect(() => {
-    setHeaderAction(
-      <Button type="button" onClick={() => setCreateOpen(true)} className="h-8 px-2.5 py-1 text-xs font-semibold">
-        Add News
-      </Button>
-    );
+    setHeaderAction(<AdminHeaderActionButton label="Add News" onClick={() => setCreateOpen(true)} />);
 
     return () => setHeaderAction(null);
   }, [setHeaderAction]);

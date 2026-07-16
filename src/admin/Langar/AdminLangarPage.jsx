@@ -10,6 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
+import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton';
 import cmsService from '../../services/cmsService';
 
 const actionIconClass = 'h-4 w-4';
@@ -116,11 +117,7 @@ const AdminLangarPage = () => {
   };
 
   useEffect(() => {
-    setHeaderAction(
-      <Button type="button" onClick={() => setCreateOpen(true)} className="h-8 px-2.5 py-1 text-xs font-semibold">
-        Add New Seva Item
-      </Button>
-    );
+    setHeaderAction(<AdminHeaderActionButton label="Add New Seva Item" onClick={() => setCreateOpen(true)} />);
 
     return () => setHeaderAction(null);
   }, [setHeaderAction]);
@@ -145,11 +142,24 @@ const AdminLangarPage = () => {
             <tbody>
               {(cmsData?.langarItems || []).map((item) => (
                 <tr key={item.id} className="border-b border-slate-100">
-                  <td className="py-2 pr-3 font-semibold text-slate-800">{item.name || '-'}</td>
-                  <td className="py-2 pr-3">{item.category || 'Grocery'}</td>
-                  <td className="py-2 pr-3">{item.addedOn || '-'}</td>
-                  <td className="py-2 pr-3">{item.expiryDate || '-'}</td>
-                  <td className="py-2 pr-3">
+                  <td className="py-2 pr-3 font-semibold text-slate-800">
+                    <div className="space-y-1.5 lg:hidden">
+                      <p className="text-sm font-bold leading-tight text-slate-800">{item.name || '-'}</p>
+                      <p className="text-[12px] leading-snug text-slate-600">{item.category || 'Grocery'}</p>
+                      <p className="text-[12px] leading-snug text-slate-600">{item.addedOn || '-'}</p>
+                      <p className="text-[12px] leading-snug text-slate-600">{item.expiryDate || '-'}</p>
+                      <div className="pt-0.5">
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${item.needed ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-700'}`}>
+                          {resolveStatusPreview(item)}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="hidden lg:inline">{item.name || '-'}</span>
+                  </td>
+                  <td className="admin-langar-mobile-hidden py-2 pr-3">{item.category || 'Grocery'}</td>
+                  <td className="admin-langar-mobile-hidden py-2 pr-3">{item.addedOn || '-'}</td>
+                  <td className="admin-langar-mobile-hidden py-2 pr-3">{item.expiryDate || '-'}</td>
+                  <td className="admin-langar-mobile-hidden py-2 pr-3">
                     <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${item.needed ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-700'}`}>
                       {resolveStatusPreview(item)}
                     </span>

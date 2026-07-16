@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EyeIcon, PencilSquareIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
+import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton';
 import videoService, { CATEGORIES, getYouTubeEmbedUrl, getYouTubeThumbnail } from '../../services/videoService';
 
 const PAGE_SIZE = 10;
@@ -98,9 +99,7 @@ const AdminVideosPage = () => {
 
   useEffect(() => {
     setHeaderAction(
-      <Button type="button" onClick={() => setVideoModal({ open: true, mode: 'add', id: '' })} className="h-8 px-2.5 py-1 text-xs font-semibold">
-        Add Video
-      </Button>
+      <AdminHeaderActionButton label="Add Video" onClick={() => setVideoModal({ open: true, mode: 'add', id: '' })} />
     );
 
     return () => setHeaderAction(null);

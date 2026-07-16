@@ -6,13 +6,13 @@ import {
   EyeIcon,
   LockClosedIcon,
   PencilSquareIcon,
-  PlusIcon,
   TrashIcon,
   XCircleIcon,
   XMarkIcon
 } from '@heroicons/react/24/outline';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
+import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton';
 import cmsService from '../../services/cmsService';
 
 const HOURS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
@@ -651,9 +651,7 @@ const AdminSchedulePage = () => {
 
             {!isDayModalReadOnly ? (
               <div className="mt-4 flex flex-wrap items-center gap-2">
-                <Button type="button" onClick={openCreateModal} className="inline-flex h-8 items-center gap-1.5 px-3 text-xs">
-                  <PlusIcon className="h-3.5 w-3.5" /> Add Event
-                </Button>
+                <AdminHeaderActionButton label="Add Event" onClick={openCreateModal} className="px-3" />
                 {selectedDateKey !== 'default' ? (
                   <Button type="button" variant="ghost" onClick={() => removeDayMutation.mutate()} disabled={removeDayMutation.isPending} className="h-8 px-3 text-xs">Reset To Default</Button>
                 ) : null}

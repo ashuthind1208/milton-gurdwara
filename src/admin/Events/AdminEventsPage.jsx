@@ -12,6 +12,7 @@ import Card from '../../components/ui/Card';
 import eventService from '../../services/eventService';
 import { formatDate } from '../../utils/formatters';
 import Button from '../../components/ui/Button';
+import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton';
 import { siteConfig } from '../../constants/siteConfig';
 import { downloadRegistrationCsv, downloadRegistrationPdf } from '../../utils/csvExport';
 import uploadService from '../../services/uploadService';
@@ -407,11 +408,7 @@ const AdminEventsPage = () => {
   }, [events.length]);
 
   useEffect(() => {
-    setHeaderAction(
-      <Button type="button" onClick={openCreateModal} className="h-8 px-2.5 py-1 text-xs font-semibold">
-        Add New Event
-      </Button>
-    );
+    setHeaderAction(<AdminHeaderActionButton label="Add New Event" onClick={openCreateModal} />);
 
     return () => setHeaderAction(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -438,16 +435,31 @@ const AdminEventsPage = () => {
               {events.map((event) => (
                 <tr key={event.id} className="border-b border-slate-100">
                   <td className="py-2 pr-3">
-                    <p className="font-semibold text-slate-800">{event.title || 'Untitled'}</p>
-                    <p className="text-xs text-slate-500">{event.location || '-'}</p>
+                    <div className="space-y-1.5 lg:hidden">
+                      <p className="text-sm font-bold leading-tight text-slate-800">{event.title || 'Untitled'}</p>
+                      <p className="text-[12px] leading-snug text-slate-600">{event.location || '-'}</p>
+                      <p className="text-[12px] leading-snug text-slate-600">{formatDate(event.date)}</p>
+                      <p className="text-[12px] leading-snug text-slate-600">to {formatDate(event.endDate || plusOneHour(event.date))}</p>
+                      <p className="text-[12px] leading-snug text-slate-600">{event.category || '-'}</p>
+                      <p className="text-[12px] leading-snug text-slate-600">{event.registrations || (event.registrants || []).length || 0} registrations</p>
+                      <div className="pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => toggleActiveMutation.mutate({ id: event.id, active: event.active === false })}
+                          className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${event.active === false ? 'border-slate-300 bg-slate-100 text-slate-700 hover:border-slate-400' : 'border-emerald-200 bg-emerald-100 text-emerald-700 hover:border-emerald-300'}`}
+                          title={event.active === false ? 'Set active' : 'Set inactive'}
+                          aria-label={event.active === false ? 'Set active' : 'Set inactive'}
+                        >
+                          {event.active === false ? 'Inactive' : 'Active'}
+                        </button>
+                      </div>
+                    </div>
+                    <span className="hidden lg:inline font-semibold text-slate-800">{event.title || 'Untitled'}</span>
                   </td>
-                  <td className="py-2 pr-3">
-                    <p>{formatDate(event.date)}</p>
-                    <p className="text-xs text-slate-500">to {formatDate(event.endDate || plusOneHour(event.date))}</p>
-                  </td>
-                  <td className="py-2 pr-3">{event.category || '-'}</td>
-                  <td className="py-2 pr-3">{event.registrations || (event.registrants || []).length || 0}</td>
-                  <td className="py-2 pr-3">
+                  <td className="admin-compact-mobile-hidden py-2 pr-3">{formatDate(event.date)}</td>
+                  <td className="admin-compact-mobile-hidden py-2 pr-3">{event.category || '-'}</td>
+                  <td className="admin-compact-mobile-hidden py-2 pr-3">{event.registrations || (event.registrants || []).length || 0}</td>
+                  <td className="admin-compact-mobile-hidden py-2 pr-3">
                     <button
                       type="button"
                       onClick={() => toggleActiveMutation.mutate({ id: event.id, active: event.active === false })}

@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EyeIcon, PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
+import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton';
 import sponsorService from '../../services/sponsorService';
 import uploadService from '../../services/uploadService';
 import StatusAlert from '../../components/common/StatusAlert';
@@ -167,9 +168,7 @@ const AdminSponsorsPage = () => {
 
   useEffect(() => {
     setHeaderAction(
-      <Button type="button" onClick={() => openModal('create')} className="h-8 px-2.5 py-1 text-xs font-semibold">
-        Add Sponsor
-      </Button>
+      <AdminHeaderActionButton label="Add Sponsor" onClick={() => openModal('create')} />
     );
 
     return () => setHeaderAction(null);
@@ -200,10 +199,22 @@ const AdminSponsorsPage = () => {
             <tbody className="divide-y divide-slate-100">
               {sponsors.map((sponsor) => (
                 <tr key={sponsor.id}>
-                  <td className="px-3 py-2 font-semibold text-slate-800">{sponsor.title || 'Untitled sponsor'}</td>
-                  <td className="px-3 py-2">{formatDate(sponsor.createdAt)}</td>
-                  <td className="px-3 py-2">{formatDate(sponsor.expiryDate)}</td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-2 font-semibold text-slate-800">
+                    <div className="space-y-1.5 lg:hidden">
+                      <p className="text-sm font-bold leading-tight text-slate-800">{sponsor.title || 'Untitled sponsor'}</p>
+                      <p className="text-[12px] leading-snug text-slate-600">{formatDate(sponsor.createdAt)}</p>
+                      <p className="text-[12px] leading-snug text-slate-600">{formatDate(sponsor.expiryDate)}</p>
+                      <div className="pt-0.5">
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${sponsor.active ? 'bg-green-100 text-green-800' : 'bg-slate-200 text-slate-700'}`}>
+                          {sponsor.active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="hidden lg:inline">{sponsor.title || 'Untitled sponsor'}</span>
+                  </td>
+                  <td className="admin-compact-mobile-hidden px-3 py-2">{formatDate(sponsor.createdAt)}</td>
+                  <td className="admin-compact-mobile-hidden px-3 py-2">{formatDate(sponsor.expiryDate)}</td>
+                  <td className="admin-compact-mobile-hidden px-3 py-2">
                     <button
                       type="button"
                       onClick={() => toggleActiveMutation.mutate({ id: sponsor.id, active: !sponsor.active })}

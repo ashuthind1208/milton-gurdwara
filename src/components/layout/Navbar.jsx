@@ -2,12 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { createPortal } from 'react-dom';
+import jsPDF from 'jspdf';
 import {
   Bars3Icon,
   XMarkIcon,
   PauseIcon,
   PlayIcon,
   PlayCircleIcon,
+  ArrowDownTrayIcon,
   HomeIcon,
   InformationCircleIcon,
   BookOpenIcon,
@@ -21,7 +23,9 @@ import {
 import { publicNav } from '../../constants/navigation';
 import { siteConfig } from '../../constants/siteConfig';
 import gurdwaraLogo from '../../assets/gurdwara-logo.webp';
-import { getNanakshahiDate, getUpcomingPunjabiObservances } from '../../utils/punjabiCalendar';
+import notoSansGurmukhiRegular from '../../assets/fonts/NotoSansGurmukhi-Regular.ttf';
+import notoSansGurmukhiBold from '../../assets/fonts/NotoSansGurmukhi-Bold.ttf';
+import { getNanakshahiDate, getNanakshahiMonthCalendar, getUpcomingPunjabiObservances } from '../../utils/punjabiCalendar';
 import streamingService from '../../services/streamingService';
 import StreamingModal from '../common/StreamingModal';
 import AudioPillPlayer from '../common/AudioPillPlayer';
@@ -36,6 +40,66 @@ const iconClass = 'h-4.5 w-4.5';
 const socialGlyphClass = 'h-3.5 w-3.5';
 const streamGlyphClass = 'h-6 w-6';
 const darbarSahibDirectFallbackUrl = 'https://live.sgpc.net:8442/';
+const NANAKSHAHI_WEEKDAY_LABELS_PA = ['ਐ', 'ਸੋ', 'ਮੰ', 'ਬੁੱ', 'ਵੀ', 'ਸ਼ੁੱ', 'ਸ਼ੱ'];
+const CALENDAR_NAV_DAY_MS = 24 * 60 * 60 * 1000;
+const PDF_HEADER_BG = [0, 64, 129];
+
+const getPdfEventTone = (type = '') => {
+  const token = String(type || '').toLowerCase();
+  if (token.includes('puranmashi')) return { bg: [254, 249, 195], text: [146, 64, 14] };
+  if (token.includes('gurpurab') || token.includes('holiday')) return { bg: [254, 243, 199], text: [146, 64, 14] };
+  if (token.includes('masya')) return { bg: [237, 233, 254], text: [91, 33, 182] };
+  if (token.includes('sangrand')) return { bg: [254, 243, 199], text: [146, 64, 14] };
+  if (token.includes('shaheedi')) return { bg: [255, 232, 238], text: [159, 18, 57] };
+  return { bg: [220, 252, 231], text: [22, 101, 52] };
+};
+
+const formatGregorianLabel = (date) => new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: '2-digit',
+  year: 'numeric'
+}).format(date);
+
+const formatGregorianMiniLabel = (date) => {
+  const [month, day] = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: '2-digit'
+  }).format(date).split(' ');
+  return `${month}, ${day}`;
+};
+
+const toBase64FromArrayBuffer = (buffer) => {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+
+  return window.btoa(binary);
+};
+
+const truncatePdfText = (value = '', max = 30) => (value.length > max ? `${value.slice(0, max - 1)}...` : value);
+
+const observanceToneClass = (type = '') => {
+  const token = String(type || '').toLowerCase();
+  if (token.includes('puranmashi')) {
+    return 'ring-1 ring-yellow-300/70 bg-yellow-100 text-yellow-900';
+  }
+  if (token.includes('gurpurab')) {
+    return 'ring-1 ring-yellow-300/70 bg-yellow-100 text-yellow-900';
+  }
+  if (token.includes('masya')) {
+    return 'ring-1 ring-violet-300/70 bg-violet-100 text-violet-900';
+  }
+  if (token.includes('sangrand')) {
+    return 'ring-1 ring-amber-300/70 bg-amber-100 text-amber-900';
+  }
+  if (token.includes('shaheedi')) {
+    return 'ring-1 ring-rose-300/70 bg-rose-100 text-rose-900';
+  }
+  return 'ring-1 ring-emerald-300/70 bg-emerald-100 text-emerald-900';
+};
 
 const WebsiteGlyph = () => (
   <svg viewBox="0 0 24 24" className={socialGlyphClass} aria-hidden="true">
@@ -94,6 +158,8 @@ const Navbar = () => {
   const [isCompact, setIsCompact] = useState(false);
   const [compactStreamsOpen, setCompactStreamsOpen] = useState(false);
   const [dateInfoOpen, setDateInfoOpen] = useState(false);
+  const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
+  const [isPdfBusy, setIsPdfBusy] = useState(false);
   const [isKirtanPlaying, setIsKirtanPlaying] = useState(false);
   const [isKirtanLoading, setIsKirtanLoading] = useState(false);
   const [streamModalState, setStreamModalState] = useState({ open: false, id: '' });
@@ -103,16 +169,27 @@ const Navbar = () => {
   const kirtanPausedByUserRef = useRef(false);
   const kirtanUseDirectFallbackRef = useRef(false);
   const kirtanReconnectInFlightRef = useRef(false);
+  const datePopoverCloseTimeoutRef = useRef(null);
+  const pdfFontCacheRef = useRef(null);
   const compactScrollRestoreRef = useRef(null);
   const compactRestoreFramesRef = useRef({ first: 0, second: 0 });
   const preserveCompactUntilRef = useRef(0);
+  const [calendarViewDate, setCalendarViewDate] = useState(() => new Date());
   const nanakshahiDate = useMemo(() => getNanakshahiDate(new Date()), []);
+  const nanakshahiMonthCalendar = useMemo(() => getNanakshahiMonthCalendar(calendarViewDate), [calendarViewDate]);
   const location = useLocation();
   const { data: streamingItems = [] } = useQuery({
     queryKey: ['streaming-config'],
     queryFn: () => streamingService.getStreamingItems().then((res) => res.data)
   });
-  const todayIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const todayIso = useMemo(() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, []);
+  const todayGregorianKey = todayIso;
   const upcomingObservances = useMemo(() => getUpcomingPunjabiObservances(20, new Date()), []);
 
   const leftMenuBalanced = useMemo(() => {
@@ -127,6 +204,92 @@ const Navbar = () => {
   const mobileMenuItems = useMemo(
     () => publicNav.filter((item) => item.path !== '/gurbani-library' && item.path !== '/faq'),
     []
+  );
+
+  const renderNanakshahiCalendar = (compact = false) => (
+    <div className={`rounded-2xl border border-brand-blue/35 bg-gradient-to-br from-blue-50 via-white to-amber-50 ${compact ? 'p-3' : 'p-4'}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">ਨਾਨਕਸ਼ਾਹੀ ਮਹੀਨਾ</p>
+          <p className="mt-1 text-lg font-bold text-brand-blue">{nanakshahiMonthCalendar.labelPa}</p>
+          <p className="text-xs text-slate-600">{nanakshahiMonthCalendar.currentDayPa} {nanakshahiMonthCalendar.monthPa} {nanakshahiMonthCalendar.yearPa}</p>
+        </div>
+        <div className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-brand-blue">
+          {nanakshahiDate.labelPa}
+        </div>
+      </div>
+      <div className="mt-3 flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => setCalendarViewDate(new Date(nanakshahiMonthCalendar.monthStartGregorian.getTime() - CALENDAR_NAV_DAY_MS))}
+          className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-brand-blue/25 bg-white/90 text-sm font-bold text-brand-blue shadow-sm transition hover:border-brand-blue hover:bg-blue-50"
+          aria-label="Previous Nanakshahi month"
+          title="Previous Nanakshahi month"
+        >
+          &lt;
+        </button>
+        <button
+          type="button"
+          onClick={() => setCalendarViewDate(new Date(nanakshahiMonthCalendar.nextMonthStartGregorian.getTime()))}
+          className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-brand-blue/25 bg-white/90 text-sm font-bold text-brand-blue shadow-sm transition hover:border-brand-blue hover:bg-blue-50"
+          aria-label="Next Nanakshahi month"
+          title="Next Nanakshahi month"
+        >
+          &gt;
+        </button>
+      </div>
+      <div className="relative z-10 mt-3 grid grid-cols-7 gap-1 text-center">
+        {NANAKSHAHI_WEEKDAY_LABELS_PA.map((label) => (
+          <span key={label} className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</span>
+        ))}
+        {nanakshahiMonthCalendar.weeks.flat().map((cell, index) => {
+          if (!cell) {
+            return <span key={`blank-${index}`} className="inline-flex h-8 items-center justify-center rounded-lg text-transparent">•</span>;
+          }
+
+          const primaryObservance = cell.observances[0] || null;
+          const eventTone = primaryObservance ? observanceToneClass(primaryObservance.type) : '';
+          const cellGregorianKey = `${cell.gregorianDate.getFullYear()}-${String(cell.gregorianDate.getMonth() + 1).padStart(2, '0')}-${String(cell.gregorianDate.getDate()).padStart(2, '0')}`;
+          const isGregorianToday = cellGregorianKey === todayGregorianKey;
+          const englishDateLabel = new Intl.DateTimeFormat('en-US', {
+            month: 'short',
+            day: '2-digit',
+            year: 'numeric'
+          }).format(cell.gregorianDate);
+          const hasScrollableObservances = cell.observances.length > 2;
+
+          return (
+            <span
+              key={`${cell.day}-${cell.gregorianDate.toISOString()}`}
+              className={`group/date relative inline-flex h-8 w-8 items-center justify-center rounded-lg ${isGregorianToday ? 'ring-2 ring-brand-saffron shadow-[0_0_0_4px_rgba(245,166,35,0.22)] bg-amber-100/45' : ''}`}
+            >
+              <span
+                className={`relative z-10 inline-flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold ${cell.isToday ? 'bg-brand-blue text-white shadow-[0_8px_18px_rgba(10,77,159,0.22)]' : cell.hasObservance ? eventTone : 'text-slate-700'} ${isGregorianToday ? 'animate-pulse' : ''}`}
+              >
+                {cell.dayPa}
+              </span>
+              {cell.hasObservance ? <span className="absolute bottom-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-brand-saffron" /> : null}
+              {cell.hasObservance ? (
+                <span className={`pointer-events-none invisible absolute left-1/2 top-[calc(100%+8px)] z-[999] w-64 -translate-x-1/2 rounded-2xl border border-brand-blue/30 bg-gradient-to-br from-amber-50 via-white to-blue-50 p-3 text-left opacity-0 shadow-[0_16px_38px_rgba(15,23,42,0.2)] transition duration-150 group-hover/date:visible group-hover/date:opacity-100 ${hasScrollableObservances ? 'max-h-72 overflow-y-auto pr-2' : ''}`}>
+                  {cell.observances.map((event, eventIndex) => (
+                    <span
+                      key={`${event.type}-${event.titlePa}-${eventIndex}`}
+                      className={`block ${eventIndex > 0 ? 'mt-3 border-t border-brand-blue/15 pt-3' : ''}`}
+                    >
+                      <span className="block text-[11px] font-bold text-brand-blue">{event.titlePa}</span>
+                      <span className="block text-[10px] font-semibold text-slate-700">{event.title}</span>
+                      <span className="mt-0.5 block text-[10px] font-bold tracking-wide text-brand-blue">{englishDateLabel}</span>
+                      <span className="mt-1 block text-[10px] leading-snug text-slate-600">{event.blurbPa}</span>
+                      <span className="mt-0.5 block text-[10px] leading-snug text-slate-600">{event.blurb}</span>
+                    </span>
+                  ))}
+                </span>
+              ) : null}
+            </span>
+          );
+        })}
+      </div>
+    </div>
   );
 
   useEffect(() => {
@@ -383,10 +546,339 @@ const Navbar = () => {
     setStreamModalState({ open: true, id });
   };
 
+  const openDatePopover = () => {
+    if (datePopoverCloseTimeoutRef.current) {
+      window.clearTimeout(datePopoverCloseTimeoutRef.current);
+      datePopoverCloseTimeoutRef.current = null;
+    }
+    setIsDatePopoverOpen(true);
+  };
+
+  const closeDatePopoverWithDelay = () => {
+    if (datePopoverCloseTimeoutRef.current) {
+      window.clearTimeout(datePopoverCloseTimeoutRef.current);
+    }
+    datePopoverCloseTimeoutRef.current = window.setTimeout(() => {
+      setIsDatePopoverOpen(false);
+      datePopoverCloseTimeoutRef.current = null;
+    }, 180);
+  };
+
   const handleCompactNavClick = () => {
     compactScrollRestoreRef.current = window.scrollY;
     preserveCompactUntilRef.current = Date.now() + 800;
   };
+
+  const getLogoDataUrl = async () => new Promise((resolve) => {
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = image.width;
+      canvas.height = image.height;
+      const context = canvas.getContext('2d');
+
+      if (!context) {
+        resolve(null);
+        return;
+      }
+
+      context.drawImage(image, 0, 0);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    image.onerror = () => resolve(null);
+    image.src = gurdwaraLogo;
+  });
+
+  const getPdfGurmukhiFonts = async () => {
+    if (pdfFontCacheRef.current) {
+      return pdfFontCacheRef.current;
+    }
+
+    try {
+      const [regularRes, boldRes] = await Promise.all([
+        fetch(notoSansGurmukhiRegular),
+        fetch(notoSansGurmukhiBold)
+      ]);
+      const [regularBuffer, boldBuffer] = await Promise.all([
+        regularRes.arrayBuffer(),
+        boldRes.arrayBuffer()
+      ]);
+
+      pdfFontCacheRef.current = {
+        regular: toBase64FromArrayBuffer(regularBuffer),
+        bold: toBase64FromArrayBuffer(boldBuffer)
+      };
+      return pdfFontCacheRef.current;
+    } catch {
+      return null;
+    }
+  };
+
+  const drawPdfHeader = (doc, logoDataUrl, title, subtitle, hasGurmukhiFont = false) => {
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    doc.setFillColor(...PDF_HEADER_BG);
+    doc.rect(0, 0, pageWidth, 36, 'F');
+
+    if (logoDataUrl) {
+      doc.addImage(logoDataUrl, 'PNG', 10, 6, 20, 20);
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(14);
+    doc.text(siteConfig.name, 34, 14);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(219, 234, 254);
+    doc.setFontSize(9.5);
+    doc.text(siteConfig.contact.address, 34, 20);
+    doc.text(siteConfig.contact.phone, 34, 25);
+
+    doc.setFont(hasGurmukhiFont ? 'NotoSansGurmukhi' : 'helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(11.8);
+    doc.text(title, pageWidth - 10, 14, { align: 'right' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(219, 234, 254);
+    doc.setFontSize(9.5);
+    doc.text(subtitle, pageWidth - 10, 20, { align: 'right' });
+  };
+
+  const getNanakshahiYearMonths = () => {
+    let firstMonth = getNanakshahiMonthCalendar(nanakshahiMonthCalendar.monthStartGregorian);
+    let rewindGuard = 0;
+
+    while (firstMonth.month !== 'Chet' && rewindGuard < 14) {
+      firstMonth = getNanakshahiMonthCalendar(new Date(firstMonth.monthStartGregorian.getTime() - CALENDAR_NAV_DAY_MS));
+      rewindGuard += 1;
+    }
+
+    const yearMonths = [];
+    let cursor = firstMonth;
+
+    for (let index = 0; index < 12; index += 1) {
+      yearMonths.push(cursor);
+      cursor = getNanakshahiMonthCalendar(new Date(cursor.nextMonthStartGregorian.getTime()));
+    }
+
+    return yearMonths;
+  };
+
+  const generateCalendarPdf = async (variant = 'compact') => {
+    if (isPdfBusy) {
+      return;
+    }
+
+    setIsPdfBusy(true);
+    try {
+      const isDetailed = variant === 'detailed';
+      const doc = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4'
+      });
+      const fontPayload = await getPdfGurmukhiFonts();
+      const hasGurmukhiFont = Boolean(fontPayload?.regular && fontPayload?.bold);
+      if (hasGurmukhiFont) {
+        doc.addFileToVFS('NotoSansGurmukhi-Regular.ttf', fontPayload.regular);
+        doc.addFont('NotoSansGurmukhi-Regular.ttf', 'NotoSansGurmukhi', 'normal');
+        doc.addFileToVFS('NotoSansGurmukhi-Bold.ttf', fontPayload.bold);
+        doc.addFont('NotoSansGurmukhi-Bold.ttf', 'NotoSansGurmukhi', 'bold');
+      }
+      const logoDataUrl = await getLogoDataUrl();
+      const monthStart = nanakshahiMonthCalendar.monthStartGregorian;
+      const nextMonthStart = nanakshahiMonthCalendar.nextMonthStartGregorian;
+      const monthEnd = new Date(nextMonthStart.getTime() - CALENDAR_NAV_DAY_MS);
+
+      if (!isDetailed) {
+        const yearMonths = getNanakshahiYearMonths();
+        const yearStart = yearMonths[0].monthStartGregorian;
+        const yearEnd = new Date(yearMonths[yearMonths.length - 1].nextMonthStartGregorian.getTime() - CALENDAR_NAV_DAY_MS);
+
+        drawPdfHeader(
+          doc,
+          logoDataUrl,
+          `${yearMonths[0].yearPa} ਨਾਨਕਸ਼ਾਹੀ ਕੈਲੰਡਰ - ਸੰਖੇਪ`,
+          `${formatGregorianLabel(yearStart)} - ${formatGregorianLabel(yearEnd)}`,
+          hasGurmukhiFont
+        );
+
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const marginX = 8;
+        const marginBottom = 8;
+        const topY = 40;
+        const columns = 3;
+        const rows = 4;
+        const gapX = 3.5;
+        const gapY = 3.5;
+        const cardWidth = (pageWidth - (marginX * 2) - ((columns - 1) * gapX)) / columns;
+        const cardHeight = (pageHeight - topY - marginBottom - ((rows - 1) * gapY)) / rows;
+
+        yearMonths.forEach((monthData, monthIndex) => {
+          const col = monthIndex % columns;
+          const row = Math.floor(monthIndex / columns);
+          const x = marginX + (col * (cardWidth + gapX));
+          const y = topY + (row * (cardHeight + gapY));
+
+          doc.setDrawColor(10, 77, 159);
+          doc.setFillColor(255, 255, 255);
+          doc.roundedRect(x, y, cardWidth, cardHeight, 1.2, 1.2, 'FD');
+
+          doc.setFillColor(239, 246, 255);
+          doc.roundedRect(x + 0.6, y + 0.6, cardWidth - 1.2, 6.6, 1, 1, 'F');
+          doc.setTextColor(10, 77, 159);
+          doc.setFont(hasGurmukhiFont ? 'NotoSansGurmukhi' : 'helvetica', 'bold');
+          doc.setFontSize(8.6);
+          doc.text(`${monthData.monthPa} ${monthData.yearPa}`, x + 1.5, y + 5.3);
+
+          const miniColWidth = (cardWidth - 2.2) / 7;
+          NANAKSHAHI_WEEKDAY_LABELS_PA.forEach((label, weekdayIndex) => {
+            doc.setTextColor(100, 116, 139);
+            doc.setFont(hasGurmukhiFont ? 'NotoSansGurmukhi' : 'helvetica', 'bold');
+            doc.setFontSize(5.1);
+            doc.text(label, x + 1.1 + (weekdayIndex * miniColWidth) + (miniColWidth / 2), y + 9.7, { align: 'center' });
+          });
+
+          const monthWeeks = monthData.weeks.slice(0, 6);
+          const cellHeight = (cardHeight - 11.6) / 6;
+
+          monthWeeks.forEach((week, weekIndex) => {
+            week.forEach((cell, dayIndex) => {
+              const cellX = x + 1.1 + (dayIndex * miniColWidth);
+              const cellY = y + 10.2 + (weekIndex * cellHeight);
+
+              doc.setDrawColor(10, 77, 159);
+              doc.setLineWidth(0.14);
+              doc.rect(cellX, cellY, miniColWidth, cellHeight);
+
+              if (!cell) {
+                return;
+              }
+
+              const cellKey = `${cell.gregorianDate.getFullYear()}-${String(cell.gregorianDate.getMonth() + 1).padStart(2, '0')}-${String(cell.gregorianDate.getDate()).padStart(2, '0')}`;
+
+              if (cellKey === todayGregorianKey) {
+                doc.setFillColor(255, 236, 179);
+                doc.roundedRect(cellX + 0.1, cellY + 0.15, miniColWidth - 0.25, cellHeight - 0.3, 0.5, 0.5, 'F');
+              }
+
+              if (cell.hasObservance) {
+                doc.setFillColor(245, 166, 35);
+                doc.circle(cellX + miniColWidth - 0.6, cellY + 0.7, 0.26, 'F');
+              }
+
+              doc.setTextColor(cell.hasObservance ? 10 : 51, cell.hasObservance ? 77 : 65, cell.hasObservance ? 159 : 85);
+              doc.setFont(hasGurmukhiFont ? 'NotoSansGurmukhi' : 'helvetica', 'bold');
+              doc.setFontSize(5.8);
+              doc.text(String(cell.dayPa), cellX + (miniColWidth / 2), cellY + 2.2, { align: 'center' });
+
+              doc.setFont('helvetica', 'normal');
+              doc.setTextColor(71, 85, 105);
+              doc.setFontSize(3.9);
+              doc.text(formatGregorianMiniLabel(cell.gregorianDate), cellX + (miniColWidth / 2), cellY + (cellHeight - 0.8), { align: 'center' });
+            });
+          });
+        });
+
+        doc.save(`nanakshahi-${yearMonths[0].year}-compact-year-grid.pdf`);
+        return;
+      }
+
+      const subtitle = `${formatGregorianLabel(monthStart)} - ${formatGregorianLabel(monthEnd)}`;
+
+      drawPdfHeader(
+        doc,
+        logoDataUrl,
+        `${nanakshahiMonthCalendar.labelPa} ਨਾਨਕਸ਼ਾਹੀ ਕੈਲੰਡਰ - ਵਿਸਥਾਰ`,
+        subtitle,
+        hasGurmukhiFont
+      );
+
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const marginX = 10;
+      const colWidth = (pageWidth - marginX * 2) / 7;
+      const headerY = 42;
+      const rowHeight = isDetailed ? 23 : 26;
+
+      NANAKSHAHI_WEEKDAY_LABELS_PA.forEach((label, index) => {
+        const x = marginX + (index * colWidth);
+        doc.setFillColor(239, 246, 255);
+        doc.rect(x, headerY, colWidth, 8, 'F');
+        doc.setDrawColor(203, 213, 225);
+        doc.rect(x, headerY, colWidth, 8);
+        doc.setTextColor(71, 85, 105);
+        doc.setFont(hasGurmukhiFont ? 'NotoSansGurmukhi' : 'helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.text(label, x + (colWidth / 2), headerY + 5.2, { align: 'center' });
+      });
+
+      const weeks = nanakshahiMonthCalendar.weeks;
+      const todayKey = todayGregorianKey;
+
+      weeks.forEach((week, rowIndex) => {
+        week.forEach((cell, colIndex) => {
+          const x = marginX + (colIndex * colWidth);
+          const y = headerY + 8 + (rowIndex * rowHeight);
+
+          doc.setDrawColor(203, 213, 225);
+          doc.setFillColor(255, 255, 255);
+          doc.rect(x, y, colWidth, rowHeight, 'FD');
+
+          if (!cell) {
+            return;
+          }
+
+          const cellKey = `${cell.gregorianDate.getFullYear()}-${String(cell.gregorianDate.getMonth() + 1).padStart(2, '0')}-${String(cell.gregorianDate.getDate()).padStart(2, '0')}`;
+          if (cellKey === todayKey) {
+            doc.setDrawColor(245, 166, 35);
+            doc.setLineWidth(0.8);
+            doc.rect(x + 0.5, y + 0.5, colWidth - 1, rowHeight - 1);
+            doc.setLineWidth(0.2);
+          }
+
+          doc.setFont(hasGurmukhiFont ? 'NotoSansGurmukhi' : 'helvetica', 'bold');
+          doc.setTextColor(10, 77, 159);
+          doc.setFontSize(isDetailed ? 12 : 15);
+          doc.text(String(cell.dayPa), x + 1.2, y + 6.2);
+
+          if (isDetailed) {
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(71, 85, 105);
+            doc.setFontSize(6.7);
+            doc.text(formatGregorianLabel(cell.gregorianDate), x + 1.2, y + 10.2);
+
+            let chipY = y + 12;
+            const maxChips = 3;
+            cell.observances.slice(0, maxChips).forEach((event) => {
+              const tone = getPdfEventTone(event.type);
+              doc.setFillColor(...tone.bg);
+              doc.roundedRect(x + 1, chipY, colWidth - 2, 4.8, 1, 1, 'F');
+              doc.setTextColor(...tone.text);
+              doc.setFont(hasGurmukhiFont ? 'NotoSansGurmukhi' : 'helvetica', 'bold');
+              doc.setFontSize(6.2);
+              doc.text(truncatePdfText(event.titlePa || event.title, 28), x + 1.8, chipY + 3.2);
+              chipY += 5.4;
+            });
+          }
+        });
+      });
+
+      const suffix = isDetailed ? 'detailed' : 'compact';
+      doc.save(`nanakshahi-${nanakshahiMonthCalendar.month.toLowerCase()}-${nanakshahiMonthCalendar.year}-${suffix}.pdf`);
+    } finally {
+      setIsPdfBusy(false);
+    }
+  };
+
+  useEffect(() => () => {
+    if (datePopoverCloseTimeoutRef.current) {
+      window.clearTimeout(datePopoverCloseTimeoutRef.current);
+    }
+  }, []);
 
   return (
     <header className={`sticky top-0 z-50 bg-gradient-to-b from-blue-50/85 via-white to-amber-50/70 shadow-[0_6px_24px_-8px_rgba(10,77,159,0.18)] ring-1 ring-slate-200/70 backdrop-blur-md transition-all duration-300 ${isCompact ? 'pb-1' : ''}`}>
@@ -444,15 +936,70 @@ const Navbar = () => {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setDateInfoOpen(true)}
-              className="max-w-[340px] truncate whitespace-nowrap rounded-full border border-blue-200/30 px-2 py-0.5 text-[11px] font-extrabold leading-none tracking-tight text-blue-50 transition hover:bg-blue-800/40"
+            <div className="hidden items-center gap-1.5 lg:flex">
+              <div
+                className="group relative"
+                onMouseEnter={openDatePopover}
+                onMouseLeave={closeDatePopoverWithDelay}
+                onFocus={openDatePopover}
+                onBlur={closeDatePopoverWithDelay}
+              >
+              <div
+                className="max-w-[340px] truncate whitespace-nowrap rounded-full border border-blue-200/30 px-2 py-0.5 text-[11px] font-extrabold leading-none tracking-tight text-blue-50 transition hover:bg-blue-800/40"
+                title="View Nanakshahi date details"
+                aria-label="View Nanakshahi date details"
+                role="note"
+              >
+                {nanakshahiDate.labelPa}
+              </div>
+              <div className={`pointer-events-auto absolute right-0 top-full z-[250] w-[360px] rounded-3xl border-2 border-brand-blue/35 bg-gradient-to-br from-blue-50/95 via-white to-amber-50/95 p-4 shadow-[0_24px_60px_rgba(15,23,42,0.22)] transition duration-200 ${isDatePopoverOpen ? 'visible translate-y-0 opacity-100' : 'invisible translate-y-1 opacity-0'}`}>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">ਅੱਜ</p>
+                    <p className="mt-1 text-lg font-bold text-brand-blue">{nanakshahiDate.labelPa}</p>
+                    <p className="mt-1 text-xs font-bold text-slate-600">{nanakshahiDate.label} • {dateContext.weekdayEn}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => generateCalendarPdf('compact')}
+                      disabled={isPdfBusy}
+                      className="inline-flex h-7 items-center justify-center whitespace-nowrap rounded-full border border-brand-blue/25 bg-white px-3 text-[10px] font-bold text-brand-blue transition hover:bg-brand-saffron/40 hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <ArrowDownTrayIcon className="mr-1 h-3.5 w-3.5" />
+                      Month Snapshot
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => generateCalendarPdf('detailed')}
+                      disabled={isPdfBusy}
+                      className="inline-flex h-7 items-center justify-center whitespace-nowrap rounded-full border border-brand-blue/25 bg-white px-3 text-[10px] font-bold text-brand-blue transition hover:bg-brand-saffron/40 hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <ArrowDownTrayIcon className="mr-1 h-3.5 w-3.5" />
+                      Detailed Calendar
+                    </button>
+                  </div>
+                  {renderNanakshahiCalendar(true)}
+                  <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-3">
+                    <p className="text-sm font-semibold text-slate-800">ਅੱਜ ਦੀ ਰੂਹਾਨੀ ਸੋਚ</p>
+                    <p className="mt-1 text-sm leading-relaxed text-slate-700">{dateContext.insight.pa}</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
+                    <p className="text-sm font-semibold text-slate-800">Thought of the Day</p>
+                    <p className="mt-1 text-sm leading-relaxed text-slate-700">{dateContext.insight.en}</p>
+                  </div>
+                </div>
+              </div>
+              </div>
+            </div>
+            <div
+              className="rounded-full border border-blue-200/30 px-2 py-0.5 text-[11px] font-extrabold leading-none tracking-tight text-blue-50 transition hover:bg-blue-800/40 lg:hidden"
               title="View Nanakshahi date details"
               aria-label="View Nanakshahi date details"
+              role="note"
             >
               {nanakshahiDate.labelPa}
-            </button>
+            </div>
             <Link to="/login?mode=admin&next=/admin" className="rounded-full border border-blue-200/40 px-2 py-0.5 text-[11px] font-semibold text-blue-50 hover:bg-blue-800/40">Admin Portal</Link>
             <Link to="/login?mode=join&type=volunteer" className="rounded-full border border-blue-200/40 px-2 py-0.5 text-[11px] font-semibold text-blue-50 hover:bg-blue-800/40">Join Volunteer</Link>
             <a href={siteConfig.baseUrl} target="_blank" rel="noreferrer" className="text-blue-50/90 transition hover:text-white" aria-label="Website">
@@ -518,16 +1065,20 @@ const Navbar = () => {
           ) : (
             <div className="grid w-full grid-cols-[minmax(0,1fr)_minmax(210px,36%)] items-center gap-2 pl-[5.4rem]">
               <nav className="flex min-w-0 items-center overflow-x-auto pr-2" aria-label="Compact navigation">
-                {compactMenuItems.map((item) => (
-                  <span key={item.path} className="inline-flex items-center whitespace-nowrap">
-                    <NavLink to={item.path} preventScrollReset onClick={handleCompactNavClick} className={compactNavClass}>
-                      {item.label}
-                    </NavLink>
-                    {item.path !== compactMenuItems[compactMenuItems.length - 1]?.path ? (
-                      <span aria-hidden="true" className="mx-2 inline-flex items-center justify-center text-[18px] font-black leading-none text-brand-blue">.</span>
-                    ) : null}
-                  </span>
-                ))}
+                {compactMenuItems.map((item) => {
+                  const isLastItem = item.path === compactMenuItems[compactMenuItems.length - 1]?.path;
+
+                  return (
+                    <span key={item.path} className="inline-flex items-center whitespace-nowrap">
+                      <NavLink to={item.path} preventScrollReset onClick={handleCompactNavClick} className={compactNavClass}>
+                        {item.label}
+                      </NavLink>
+                      {!isLastItem ? (
+                        <span aria-hidden="true" className="mx-2 inline-flex items-center justify-center text-[18px] font-black leading-none text-brand-blue">·</span>
+                      ) : null}
+                    </span>
+                  );
+                })}
               </nav>
 
               <div className="flex min-w-0 items-center justify-end pr-2">
@@ -722,10 +1273,12 @@ const Navbar = () => {
               </div>
               <div className="space-y-4 p-4">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Today</p>
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Today</p>
                   <p className="mt-1 text-xl font-bold text-brand-blue">{nanakshahiDate.labelPa}</p>
-                  <p className="mt-1 text-sm text-slate-700">{nanakshahiDate.label} • {dateContext.weekdayEn}</p>
+                  <p className="mt-1 text-sm font-bold text-slate-700">{nanakshahiDate.label} • {dateContext.weekdayEn}</p>
                 </div>
+
+                {renderNanakshahiCalendar()}
 
                 <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3">
                   <p className="text-sm font-semibold text-slate-800">ਅੱਜ ਦੀ ਰੂਹਾਨੀ ਸੋਚ</p>

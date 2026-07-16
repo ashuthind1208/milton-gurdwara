@@ -316,7 +316,7 @@ const AdminDashboardPage = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="admin-dashboard-shell space-y-6">
       <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_#eff6ff,_#ffffff_40%,_#fff7ed)] p-6 shadow-[0_28px_80px_-46px_rgba(15,23,42,0.55)]">
         <div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
           <div>
@@ -374,7 +374,7 @@ const AdminDashboardPage = () => {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <Card className="border border-slate-200 bg-white">
+        <Card className="admin-dashboard-card border border-slate-200 bg-white">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Donations and Registrations</p>
@@ -397,7 +397,7 @@ const AdminDashboardPage = () => {
         </Card>
 
         <div className="grid gap-6">
-          <Card className="border border-slate-200 bg-white">
+          <Card className="admin-dashboard-card border border-slate-200 bg-white">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Role Distribution</p>
@@ -426,7 +426,7 @@ const AdminDashboardPage = () => {
             </div>
           </Card>
 
-          <Card className="border border-slate-200 bg-white">
+          <Card className="admin-dashboard-card border border-slate-200 bg-white">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Quick Queue</p>
             <h2 className="mt-1 font-heading text-xl font-semibold text-slate-900">Pending review</h2>
             <div className="mt-4 border-y border-slate-200">
@@ -457,7 +457,7 @@ const AdminDashboardPage = () => {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr_0.9fr]">
-        <Card className="border border-slate-200 bg-white">
+        <Card className="admin-dashboard-card border border-slate-200 bg-white">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Campaign Momentum</p>
@@ -484,7 +484,7 @@ const AdminDashboardPage = () => {
           </div>
         </Card>
 
-        <Card className="border border-slate-200 bg-white">
+        <Card className="admin-dashboard-card border border-slate-200 bg-white">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Recent Donations</p>
@@ -507,7 +507,7 @@ const AdminDashboardPage = () => {
           </div>
         </Card>
 
-        <Card className="border border-slate-200 bg-white">
+        <Card className="admin-dashboard-card border border-slate-200 bg-white">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Publishing Overview</p>
@@ -533,7 +533,7 @@ const AdminDashboardPage = () => {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <Card className="border border-slate-200 bg-white">
+        <Card className="admin-dashboard-card border border-slate-200 bg-white">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Upcoming Calendar</p>
@@ -556,7 +556,7 @@ const AdminDashboardPage = () => {
           </div>
         </Card>
 
-        <Card className="border border-slate-200 bg-white">
+        <Card className="admin-dashboard-card border border-slate-200 bg-white">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Operational Snapshot</p>
           <h2 className="mt-1 font-heading text-xl font-semibold text-slate-900">Live backend values</h2>
           <div className="mt-4 border-y border-slate-200">

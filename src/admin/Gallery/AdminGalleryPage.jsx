@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
+import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton';
 import galleryService from '../../services/galleryService';
 
 const AdminGalleryPage = () => {
@@ -82,9 +83,7 @@ const AdminGalleryPage = () => {
 
   useEffect(() => {
     setHeaderAction(
-      <Button type="button" onClick={() => setIsCreateOpen(true)} className="h-8 px-2.5 py-1 text-xs font-semibold">
-        Add Gallery Item
-      </Button>
+      <AdminHeaderActionButton label="Add Gallery Item" onClick={() => setIsCreateOpen(true)} />
     );
 
     return () => setHeaderAction(null);

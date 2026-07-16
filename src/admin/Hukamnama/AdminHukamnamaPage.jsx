@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
+import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton';
 import hukamnamaService from '../../services/hukamnamaService';
 
 const toDateKey = (value = new Date()) => {
@@ -180,11 +181,7 @@ const AdminHukamnamaPage = () => {
   };
 
   useEffect(() => {
-    setHeaderAction(
-      <Button type="button" onClick={openAddModal} className="h-8 px-2.5 py-1 text-xs font-semibold">
-        Add Hukamnama
-      </Button>
-    );
+    setHeaderAction(<AdminHeaderActionButton label="Add Hukamnama" onClick={openAddModal} />);
 
     return () => setHeaderAction(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps

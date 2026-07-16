@@ -145,7 +145,7 @@ const AdminLayout = () => {
               >
                 <Bars3Icon className="h-5 w-5" />
               </button>
-              <h1 className="truncate font-heading text-2xl font-bold text-slate-900 sm:text-3xl">{pageTitle}</h1>
+              <h1 className="font-heading text-2xl font-bold leading-tight text-slate-900 sm:text-3xl">{pageTitle}</h1>
               {headerAction ? <div className="flex-shrink-0">{headerAction}</div> : null}
             </div>
 

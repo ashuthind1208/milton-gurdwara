@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { EyeIcon, PencilSquareIcon, PlusIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, PencilSquareIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
+import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton';
 import userService from '../../services/userService';
 import notificationService from '../../services/notificationService';
 
@@ -159,11 +160,7 @@ const AdminUsersPage = () => {
   };
 
   useEffect(() => {
-    setHeaderAction(
-      <Button type="button" onClick={openCreateUser} className="inline-flex h-8 items-center gap-1.5 px-2.5 py-1 text-xs font-semibold">
-        <PlusIcon className="h-3.5 w-3.5" /> Add User
-      </Button>
-    );
+    setHeaderAction(<AdminHeaderActionButton label="Add User" onClick={openCreateUser} />);
 
     return () => setHeaderAction(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -210,7 +207,22 @@ const AdminUsersPage = () => {
                 return (
                   <tr key={user.id} className="border-t border-slate-100">
                     <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-2">
+                      <div className="space-y-1.5 lg:hidden">
+                        <div className="flex items-center gap-2">
+                          <img
+                            src={avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}`}
+                            alt={user.name}
+                            className="h-8 w-8 rounded-full object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                          <span className="text-sm font-bold leading-tight text-slate-800">{user.name}</span>
+                        </div>
+                        <p className="text-[12px] leading-snug text-slate-600">{user.email}</p>
+                        <p className="text-[12px] leading-snug text-slate-600">{user.role || '-'}</p>
+                        <p className="text-[12px] leading-snug text-slate-600">Approval: {approvalStatus}</p>
+                        <div>{renderActivePill(user)}</div>
+                      </div>
+                      <div className="hidden lg:flex items-center gap-2">
                         <img
                           src={avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}`}
                           alt={user.name}
@@ -220,9 +232,9 @@ const AdminUsersPage = () => {
                         <span className="font-medium text-slate-800">{user.name}</span>
                       </div>
                     </td>
-                    <td className="px-3 py-2.5 text-slate-700">{user.email}</td>
-                    <td className="px-3 py-2.5 text-slate-700">{user.role || '-'}</td>
-                    <td className="px-3 py-2.5">
+                    <td className="admin-compact-mobile-hidden px-3 py-2.5 text-slate-700">{user.email}</td>
+                    <td className="admin-compact-mobile-hidden px-3 py-2.5 text-slate-700">{user.role || '-'}</td>
+                    <td className="admin-compact-mobile-hidden px-3 py-2.5">
                       <div className="flex items-center gap-2">
                         <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${statusClassMap[approvalStatus] || statusClassMap.pending}`}>
                           {approvalStatus}
@@ -239,7 +251,7 @@ const AdminUsersPage = () => {
                         ) : null}
                       </div>
                     </td>
-                    <td className="px-3 py-2.5">{renderActivePill(user)}</td>
+                    <td className="admin-compact-mobile-hidden px-3 py-2.5">{renderActivePill(user)}</td>
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-2">
                         <button

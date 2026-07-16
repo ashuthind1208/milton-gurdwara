@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EyeIcon, PencilSquareIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
+import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton';
 import streamingService, { verifyStreamingAvailability } from '../../services/streamingService';
 import { siteConfig } from '../../constants/siteConfig';
 
@@ -121,9 +122,7 @@ const AdminStreamingPage = () => {
 
   useEffect(() => {
     setHeaderAction(
-      <Button type="button" onClick={() => openModal('add', '')} className="h-8 px-2.5 py-1 text-xs font-semibold">
-        Add Stream
-      </Button>
+      <AdminHeaderActionButton label="Add Stream" onClick={() => openModal('add', '')} />
     );
 
     return () => setHeaderAction(null);
@@ -151,9 +150,47 @@ const AdminStreamingPage = () => {
             <tbody>
               {visibleRows.map((row) => (
                 <tr key={row.id} className="border-b border-slate-100 last:border-b-0">
-                  <td className="px-3 py-3 text-slate-700">{row.text || '-'}</td>
-                  <td className="px-3 py-3 break-all text-xs text-slate-600">{row.streamUrl || 'Not configured'}</td>
-                  <td className="px-3 py-3">
+                  <td className="px-3 py-3 text-slate-700">
+                    <div className="space-y-1.5 lg:hidden">
+                      <p className="text-sm font-bold leading-tight text-slate-800">{row.text || '-'}</p>
+                      <p className="text-[12px] leading-snug break-all text-slate-600">{row.streamUrl || 'Not configured'}</p>
+                      <p className="text-[12px] leading-snug text-slate-600">{row.active ? 'Active' : 'Inactive'}</p>
+                      <button
+                        type="button"
+                        onClick={() => toggleMutation.mutate({ id: row.id, active: !row.active })}
+                        className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${row.active ? 'border-emerald-200 bg-emerald-100 text-emerald-700 hover:border-emerald-300' : 'border-slate-300 bg-slate-100 text-slate-700 hover:border-slate-400'}`}
+                      >
+                        {row.active ? 'Set Inactive' : 'Set Active'}
+                      </button>
+                      <div className="pt-0.5">
+                        <div className="flex items-center gap-2">
+                          <button type="button" onClick={() => openModal('view', row.id)} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:border-brand-blue hover:text-brand-blue" aria-label="View stream">
+                            <EyeIcon className="h-4 w-4" />
+                          </button>
+                          <button type="button" onClick={() => openModal('edit', row.id)} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:border-brand-blue hover:text-brand-blue" aria-label="Edit stream">
+                            <PencilSquareIcon className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!isMiltonPrimaryStream(row)) {
+                                deleteMutation.mutate(row.id);
+                              }
+                            }}
+                            disabled={isMiltonPrimaryStream(row) || deleteMutation.isPending}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:border-red-500 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                            aria-label={isMiltonPrimaryStream(row) ? 'Milton main stream cannot be deleted' : 'Delete stream'}
+                            title={isMiltonPrimaryStream(row) ? 'Milton main stream cannot be deleted' : 'Delete stream'}
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <span className="hidden lg:inline">{row.text || '-'}</span>
+                  </td>
+                  <td className="admin-compact-mobile-hidden px-3 py-3 break-all text-xs text-slate-600">{row.streamUrl || 'Not configured'}</td>
+                  <td className="admin-compact-mobile-hidden px-3 py-3">
                     <button
                       type="button"
                       onClick={() => toggleMutation.mutate({ id: row.id, active: !row.active })}
@@ -162,7 +199,7 @@ const AdminStreamingPage = () => {
                       {row.active ? 'Active' : 'Inactive'}
                     </button>
                   </td>
-                  <td className="px-3 py-3">
+                  <td className="admin-compact-mobile-hidden px-3 py-3">
                     <div className="flex flex-wrap gap-2">
                       <button type="button" onClick={() => openModal('view', row.id)} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:border-brand-blue hover:text-brand-blue" aria-label="View stream">
                         <EyeIcon className="h-4 w-4" />
