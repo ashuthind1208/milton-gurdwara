@@ -47,7 +47,7 @@ const PDF_HEADER_BG = [0, 64, 129];
 const getPdfEventTone = (type = '') => {
   const token = String(type || '').toLowerCase();
   if (token.includes('puranmashi')) return { bg: [254, 249, 195], text: [146, 64, 14] };
-  if (token.includes('gurpurab') || token.includes('holiday')) return { bg: [254, 243, 199], text: [146, 64, 14] };
+  if (token.includes('gurpurab') || token.includes('gurgaddi') || token.includes('joti jot') || token.includes('prakash') || token.includes('birth') || token.includes('birthday') || token.includes('holiday')) return { bg: [254, 243, 199], text: [146, 64, 14] };
   if (token.includes('masya')) return { bg: [237, 233, 254], text: [91, 33, 182] };
   if (token.includes('sangrand')) return { bg: [254, 243, 199], text: [146, 64, 14] };
   if (token.includes('shaheedi')) return { bg: [255, 232, 238], text: [159, 18, 57] };
@@ -86,7 +86,7 @@ const observanceToneClass = (type = '') => {
   if (token.includes('puranmashi')) {
     return 'ring-1 ring-yellow-300/70 bg-yellow-100 text-yellow-900';
   }
-  if (token.includes('gurpurab')) {
+  if (token.includes('gurpurab') || token.includes('gurgaddi') || token.includes('joti jot') || token.includes('prakash') || token.includes('birth') || token.includes('birthday')) {
     return 'ring-1 ring-yellow-300/70 bg-yellow-100 text-yellow-900';
   }
   if (token.includes('masya')) {
@@ -276,7 +276,11 @@ const Navbar = () => {
                       key={`${event.type}-${event.titlePa}-${eventIndex}`}
                       className={`block ${eventIndex > 0 ? 'mt-3 border-t border-brand-blue/15 pt-3' : ''}`}
                     >
-                      <span className="block text-[11px] font-bold text-brand-blue">{event.titlePa}</span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-brand-blue/10 px-2 py-0.5 text-[10px] font-bold text-brand-blue">
+                        <CalendarDaysIcon className="h-3 w-3 flex-shrink-0" />
+                        {event.occasion}
+                      </span>
+                      <span className="mt-1 block text-[11px] font-bold text-brand-blue">{event.titlePa}</span>
                       <span className="block text-[10px] font-semibold text-slate-700">{event.title}</span>
                       <span className="mt-0.5 block text-[10px] font-bold tracking-wide text-brand-blue">{englishDateLabel}</span>
                       <span className="mt-1 block text-[10px] leading-snug text-slate-600">{event.blurbPa}</span>

@@ -45,7 +45,11 @@ export const siteConfig = {
   liveKirtanStreamUrl: normalizeDarbarSahibStreamUrl(
     process.env.REACT_APP_DARBAR_SAHIB_STREAM_URL ||
     darbarSahibStreamProxyUrl
-  )
+  ),
+  calendarSourceUrl: String(
+    process.env.REACT_APP_SIKHNET_GURPURAB_CALENDAR_URL ||
+    'https://sikhnet.com/pages/sikh-gurpurab-calendar'
+  ).trim()
 };
 
 export const userRoles = {

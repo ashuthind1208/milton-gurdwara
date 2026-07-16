@@ -38,6 +38,9 @@ Set these in production (frontend and backend as applicable).
 - `REACT_APP_DONATION_PUBLIC_URL`
   - Required for donation-board QR correctness.
   - Example: `https://yourdomain.com`
+- `REACT_APP_SIKHNET_GURPURAB_CALENDAR_URL`
+  - Source page for Sikh Gurpurab / Nanakshahi calendar observances.
+  - Example: `https://sikhnet.com/pages/sikh-gurpurab-calendar`
 
 ### Backend / Server
 
