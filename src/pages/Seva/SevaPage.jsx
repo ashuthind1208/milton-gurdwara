@@ -47,6 +47,11 @@ const SevaPage = () => {
     queryFn: () => volunteerService.getApplications().then((res) => res.data)
   });
 
+  const { data: recognition = { topLeaders: [], allLeaders: [] } } = useQuery({
+    queryKey: ['volunteer-recognition'],
+    queryFn: () => volunteerService.getRecognition().then((res) => res.data)
+  });
+
   const { data: sevaOpportunities = [] } = useQuery({
     queryKey: ['seva-opportunities'],
     queryFn: () => volunteerService.getSevaOpportunities().then((res) => res.data)
@@ -184,6 +189,18 @@ const SevaPage = () => {
       };
     }), [currentUserEmail, currentUserName, currentUserPhone, enrichedOpportunities, volunteerRowsByOpportunity]);
 
+  const currentVolunteerBadge = useMemo(() => {
+    if (!isAuthenticated) {
+      return null;
+    }
+
+    return (Array.isArray(recognition?.allLeaders) ? recognition.allLeaders : []).find((entry) => {
+      const entryEmail = String(entry?.email || '').trim().toLowerCase();
+      const entryName = String(entry?.name || '').trim().toLowerCase();
+      return (currentUserEmail && entryEmail === currentUserEmail) || (currentUserName && entryName === currentUserName);
+    }) || null;
+  }, [currentUserEmail, currentUserName, isAuthenticated, recognition?.allLeaders]);
+
   const sevaTickerItems = useMemo(() => {
     if (enrichedOpportunities.length === 0) {
       return [];
@@ -273,6 +290,32 @@ const SevaPage = () => {
           <p className="mt-2 text-2xl font-black text-slate-900">{formatShortDate(sevaStats.nextSevaDate)}</p>
           <p className="mt-1 text-xs text-slate-600">Upcoming open seva opportunity.</p>
         </Card>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-heading text-xl font-bold text-slate-900">Volunteer Recognition Wall</h2>
+            <p className="text-xs text-slate-600">Celebrate regular sevadars based on active participation points.</p>
+          </div>
+          {currentVolunteerBadge ? (
+            <p className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800">
+              Your badge: {currentVolunteerBadge.badge} ({currentVolunteerBadge.points} pts)
+            </p>
+          ) : null}
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {(Array.isArray(recognition?.topLeaders) ? recognition.topLeaders : []).map((entry, index) => (
+            <div key={`${entry.key || entry.email || entry.name}-${index}`} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <p className="text-sm font-bold text-slate-900">{entry.name || 'Volunteer'}</p>
+              <p className="text-xs font-semibold text-brand-blue">{entry.badge}</p>
+              <p className="mt-1 text-[11px] text-slate-600">{entry.participations} seva entries • {entry.points} points</p>
+            </div>
+          ))}
+          {(Array.isArray(recognition?.topLeaders) ? recognition.topLeaders : []).length === 0 ? (
+            <p className="text-sm text-slate-500">Recognition data will appear once volunteer registrations are available.</p>
+          ) : null}
+        </div>
       </section>
 
       <section className="space-y-3">

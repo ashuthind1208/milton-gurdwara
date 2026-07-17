@@ -42,6 +42,7 @@ const campaignDefaults = {
   description: '',
   progressTitle: '',
   progressDescription: '',
+  storyBlocksText: '',
   progressPhotosText: '',
   progressUpdatesText: '',
   raised: 0,
@@ -108,12 +109,48 @@ const formatProgressUpdatesText = (updates = []) => {
     .join('\n');
 };
 
+const parseStoryBlocksText = (value = '') => {
+  return String(value || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line, index) => {
+      const [title = '', summary = '', quote = '', beneficiary = '', impactMetric = '', imageUrl = ''] = line.split('|').map((segment) => segment.trim());
+      return {
+        id: `story-${Date.now()}-${index}`,
+        title,
+        summary,
+        quote,
+        beneficiary,
+        impactMetric,
+        imageUrl,
+        isActive: true
+      };
+    })
+    .filter((entry) => entry.title || entry.summary || entry.quote);
+};
+
+const formatStoryBlocksText = (items = []) => {
+  return (Array.isArray(items) ? items : [])
+    .map((entry) => ([
+      String(entry?.title || '').trim(),
+      String(entry?.summary || '').trim(),
+      String(entry?.quote || '').trim(),
+      String(entry?.beneficiary || '').trim(),
+      String(entry?.impactMetric || '').trim(),
+      String(entry?.imageUrl || '').trim()
+    ].join('|')))
+    .filter(Boolean)
+    .join('\n');
+};
+
 const toCampaignPayload = (values = {}) => {
   return {
     name: String(values.name || '').trim(),
     description: String(values.description || '').trim(),
     progressTitle: String(values.progressTitle || '').trim(),
     progressDescription: String(values.progressDescription || '').trim(),
+    storyBlocks: parseStoryBlocksText(values.storyBlocksText || ''),
     progressPhotos: parseProgressPhotosText(values.progressPhotosText || ''),
     progressUpdates: parseProgressUpdatesText(values.progressUpdatesText || ''),
     raised: Number(values.raised || 0),
@@ -346,6 +383,7 @@ const AdminDonationsPage = () => {
       description: campaign.description || '',
       progressTitle: campaign.progressTitle || '',
       progressDescription: campaign.progressDescription || '',
+      storyBlocksText: formatStoryBlocksText(campaign.storyBlocks),
       progressPhotosText: formatProgressPhotosText(campaign.progressPhotos),
       progressUpdatesText: formatProgressUpdatesText(campaign.progressUpdates),
       raised: campaign.raised,
@@ -1170,6 +1208,9 @@ const AdminDonationsPage = () => {
               <label className="text-sm md:col-span-3">Progress Description
                 <textarea rows={2} {...form.register('progressDescription')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" placeholder="Highlight milestones and campaign impact." />
               </label>
+              <label className="text-sm md:col-span-3">Story Blocks (one per line: title|summary|quote|beneficiary|impactMetric|imageUrl)
+                <textarea rows={4} {...form.register('storyBlocksText')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" placeholder="Langar seniors support|Warm meals reached 200 seniors|Their smiles are our strength.|Seniors Program|200 meals/week|https://..." />
+              </label>
               <label className="text-sm md:col-span-3">Progress Photos (one URL per line)
                 <textarea rows={3} {...form.register('progressPhotosText')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" placeholder="https://..." />
               </label>
@@ -1239,6 +1280,21 @@ const AdminDonationsPage = () => {
               <p className="md:col-span-2"><span className="font-semibold text-slate-900">Progress Title:</span> {viewingCampaign.progressTitle || '-'}</p>
               <p className="md:col-span-2"><span className="font-semibold text-slate-900">Progress Description:</span> {viewingCampaign.progressDescription || '-'}</p>
             </div>
+            {(Array.isArray(viewingCampaign.storyBlocks) && viewingCampaign.storyBlocks.length > 0) ? (
+              <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
+                <p className="text-sm font-semibold text-slate-900">Story Blocks</p>
+                <div className="mt-3 space-y-2">
+                  {viewingCampaign.storyBlocks.filter((item) => item?.isActive !== false).map((item) => (
+                    <div key={item.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                      <p className="text-sm font-semibold text-slate-900">{item.title || 'Story'}</p>
+                      {item.summary ? <p className="mt-1 text-xs text-slate-700">{item.summary}</p> : null}
+                      {item.quote ? <p className="mt-1 text-xs italic text-brand-blue">"{item.quote}"</p> : null}
+                      {(item.beneficiary || item.impactMetric) ? <p className="mt-1 text-[11px] font-semibold text-slate-600">{item.beneficiary || '-'} {item.impactMetric ? `• ${item.impactMetric}` : ''}</p> : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             {(Array.isArray(viewingCampaign.progressPhotos) && viewingCampaign.progressPhotos.length > 0) ? (
               <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
                 <p className="text-sm font-semibold text-slate-900">Progress Photos</p>
@@ -1348,6 +1404,9 @@ const AdminDonationsPage = () => {
               </label>
               <label className="text-sm md:col-span-3">Progress Description
                 <textarea rows={2} {...editForm.register('progressDescription')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="text-sm md:col-span-3">Story Blocks (one per line: title|summary|quote|beneficiary|impactMetric|imageUrl)
+                <textarea rows={4} {...editForm.register('storyBlocksText')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
               <label className="text-sm md:col-span-3">Progress Photos (one URL per line)
                 <textarea rows={3} {...editForm.register('progressPhotosText')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />

@@ -534,6 +534,7 @@ const ensureEventsSchema = async () => {
       progress_photos JSONB NOT NULL DEFAULT '[]'::jsonb,
       progress_updates JSONB NOT NULL DEFAULT '[]'::jsonb,
       progress_items JSONB NOT NULL DEFAULT '[]'::jsonb,
+      story_blocks JSONB NOT NULL DEFAULT '[]'::jsonb,
       raised NUMERIC(12, 2) NOT NULL DEFAULT 0,
       target NUMERIC(12, 2) NOT NULL DEFAULT 0,
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -569,6 +570,11 @@ const ensureEventsSchema = async () => {
   await pool.query(`
     ALTER TABLE donation_campaigns
     ADD COLUMN IF NOT EXISTS progress_items JSONB NOT NULL DEFAULT '[]'::jsonb;
+  `);
+
+  await pool.query(`
+    ALTER TABLE donation_campaigns
+    ADD COLUMN IF NOT EXISTS story_blocks JSONB NOT NULL DEFAULT '[]'::jsonb;
   `);
 
   await pool.query(`
@@ -1803,12 +1809,28 @@ const normalizeCampaignProgressItems = (value = []) => {
     .filter((item) => item.title);
 };
 
+const normalizeCampaignStoryBlocks = (value = []) => {
+  return parseJsonArrayField(value)
+    .map((item, index) => ({
+      id: String(item?.id || `story-${Date.now()}-${index}`),
+      title: String(item?.title || '').trim(),
+      summary: String(item?.summary || '').trim(),
+      quote: String(item?.quote || '').trim(),
+      beneficiary: String(item?.beneficiary || '').trim(),
+      impactMetric: String(item?.impactMetric || '').trim(),
+      imageUrl: String(item?.imageUrl || item?.image_url || '').trim(),
+      isActive: item?.isActive !== false
+    }))
+    .filter((item) => item.title || item.summary || item.quote);
+};
+
 const mapCampaignRow = (row) => {
   const raised = Number(row.raised || 0);
   const target = Number(row.target || 0);
   const progressPhotos = parseJsonArrayField(row.progress_photos);
   const progressUpdates = parseJsonArrayField(row.progress_updates);
   const progressItems = normalizeCampaignProgressItems(row.progress_items);
+  const storyBlocks = normalizeCampaignStoryBlocks(row.story_blocks);
 
   return {
     id: Number(row.id),
@@ -1819,6 +1841,7 @@ const mapCampaignRow = (row) => {
     progressPhotos: Array.isArray(progressPhotos) ? progressPhotos : [],
     progressUpdates: Array.isArray(progressUpdates) ? progressUpdates : [],
     progressItems,
+    storyBlocks,
     raised,
     target,
     isActive: row.is_active !== false,
@@ -1845,8 +1868,8 @@ const seedDonationCampaignsIfEmpty = async (seedCampaigns = []) => {
     await pool.query(
       `
       INSERT INTO donation_campaigns
-      (name, description, progress_title, progress_description, progress_photos, progress_updates, progress_items, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key)
-      VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8, $9, $10, $11, $12, $13, $14);
+      (name, description, progress_title, progress_description, progress_photos, progress_updates, progress_items, story_blocks, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key)
+      VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, $14, $15);
       `,
       [
         String(campaign.name || '').trim(),
@@ -1856,6 +1879,7 @@ const seedDonationCampaignsIfEmpty = async (seedCampaigns = []) => {
         JSON.stringify(Array.isArray(campaign.progressPhotos) ? campaign.progressPhotos : []),
         JSON.stringify(Array.isArray(campaign.progressUpdates) ? campaign.progressUpdates : []),
         JSON.stringify(normalizeCampaignProgressItems(campaign.progressItems)),
+        JSON.stringify(normalizeCampaignStoryBlocks(campaign.storyBlocks)),
         Number(campaign.raised || 0),
         Number(campaign.target || 0),
         campaign.isActive !== false,
@@ -1877,7 +1901,7 @@ const getDonationCampaigns = async () => {
 
   const result = await pool.query(
     `
-    SELECT id, name, description, progress_title, progress_description, progress_photos, progress_updates, progress_items, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key
+    SELECT id, name, description, progress_title, progress_description, progress_photos, progress_updates, progress_items, story_blocks, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key
     FROM donation_campaigns
     ORDER BY created_at DESC;
     `
@@ -1894,9 +1918,9 @@ const createDonationCampaign = async (payload = {}) => {
   const result = await pool.query(
     `
     INSERT INTO donation_campaigns
-    (name, description, progress_title, progress_description, progress_photos, progress_updates, progress_items, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key)
-    VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8, $9, $10, $11, $12, $13, $14)
-    RETURNING id, name, description, progress_title, progress_description, progress_photos, progress_updates, progress_items, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key;
+    (name, description, progress_title, progress_description, progress_photos, progress_updates, progress_items, story_blocks, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key)
+    VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, $14, $15)
+    RETURNING id, name, description, progress_title, progress_description, progress_photos, progress_updates, progress_items, story_blocks, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key;
     `,
     [
       String(payload.name || '').trim(),
@@ -1906,6 +1930,7 @@ const createDonationCampaign = async (payload = {}) => {
       JSON.stringify(Array.isArray(payload.progressPhotos) ? payload.progressPhotos : []),
       JSON.stringify(Array.isArray(payload.progressUpdates) ? payload.progressUpdates : []),
       JSON.stringify(normalizeCampaignProgressItems(payload.progressItems)),
+      JSON.stringify(normalizeCampaignStoryBlocks(payload.storyBlocks)),
       Number(payload.raised || 0),
       Number(payload.target || 0),
       payload.isActive !== false,
@@ -1940,6 +1965,9 @@ const updateDonationCampaign = async (id, payload = {}) => {
     progressItems: Array.isArray(payload.progressItems)
       ? normalizeCampaignProgressItems(payload.progressItems)
       : normalizeCampaignProgressItems(current.progress_items),
+    storyBlocks: Array.isArray(payload.storyBlocks)
+      ? normalizeCampaignStoryBlocks(payload.storyBlocks)
+      : normalizeCampaignStoryBlocks(current.story_blocks),
     raised: Number(payload.raised ?? current.raised ?? 0),
     target: Number(payload.target ?? current.target ?? 0),
     isActive: typeof payload.isActive === 'boolean' ? payload.isActive : current.is_active,
@@ -1959,16 +1987,17 @@ const updateDonationCampaign = async (id, payload = {}) => {
         progress_photos = $6::jsonb,
         progress_updates = $7::jsonb,
         progress_items = $8::jsonb,
-        raised = $9,
-        target = $10,
-        is_active = $11,
-        payment_provider = $12,
-        payment_link = $13,
-        stripe_buy_button_id = $14,
-        stripe_publishable_key = $15,
+        story_blocks = $9::jsonb,
+        raised = $10,
+        target = $11,
+        is_active = $12,
+        payment_provider = $13,
+        payment_link = $14,
+        stripe_buy_button_id = $15,
+        stripe_publishable_key = $16,
         updated_at = NOW()
     WHERE id = $1
-    RETURNING id, name, description, progress_title, progress_description, progress_photos, progress_updates, progress_items, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key;
+      RETURNING id, name, description, progress_title, progress_description, progress_photos, progress_updates, progress_items, story_blocks, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key;
     `,
     [
       id,
@@ -1979,6 +2008,7 @@ const updateDonationCampaign = async (id, payload = {}) => {
       JSON.stringify(Array.isArray(next.progressPhotos) ? next.progressPhotos : []),
       JSON.stringify(Array.isArray(next.progressUpdates) ? next.progressUpdates : []),
       JSON.stringify(normalizeCampaignProgressItems(next.progressItems)),
+      JSON.stringify(normalizeCampaignStoryBlocks(next.storyBlocks)),
       Number(next.raised || 0),
       Number(next.target || 0),
       next.isActive !== false,

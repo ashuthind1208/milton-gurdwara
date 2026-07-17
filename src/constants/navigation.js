@@ -33,5 +33,6 @@ export const adminNav = [
   { label: 'Events', path: '/admin/events' },
   { label: 'Kids Learning', path: '/admin/kids-learning' },
   { label: 'Donations', path: '/admin/donations' },
+  { label: 'Audit Trail', path: '/admin/audit-trail' },
   { label: 'Users', path: '/admin/users' }
 ];

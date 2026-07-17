@@ -234,6 +234,7 @@ const DonationPage = () => {
             const target = Number.isFinite(Number(campaign.target)) ? Math.max(0, Number(campaign.target)) : 0;
             const progress = target > 0 ? Math.min((raised / target) * 100, 100) : 0;
             const activeProgressItems = (Array.isArray(campaign.progressItems) ? campaign.progressItems : []).filter((item) => item?.isActive !== false);
+            const activeStoryBlocks = (Array.isArray(campaign.storyBlocks) ? campaign.storyBlocks : []).filter((item) => item?.isActive !== false);
             return (
               <Card key={campaign.id} className="border border-slate-200 bg-white">
                 <h3 className="font-heading text-lg font-semibold text-slate-900">{campaign.name}</h3>
@@ -257,6 +258,19 @@ const DonationPage = () => {
                       >
                         {String(item.title || 'Progress update').slice(0, 25)}
                       </button>
+                    ))}
+                  </div>
+                ) : null}
+                {activeStoryBlocks.length > 0 ? (
+                  <div className="mt-3 space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-amber-800">Impact Stories</p>
+                    {activeStoryBlocks.slice(0, 2).map((story) => (
+                      <div key={story.id} className="rounded-md border border-amber-200/80 bg-white px-2.5 py-2">
+                        <p className="text-sm font-semibold text-slate-900">{story.title || 'Community Story'}</p>
+                        {story.summary ? <p className="mt-0.5 text-xs text-slate-700">{story.summary}</p> : null}
+                        {story.quote ? <p className="mt-1 text-xs italic text-brand-blue">"{story.quote}"</p> : null}
+                        {(story.beneficiary || story.impactMetric) ? <p className="mt-1 text-[11px] font-semibold text-slate-600">{story.beneficiary || '-'} {story.impactMetric ? `• ${story.impactMetric}` : ''}</p> : null}
+                      </div>
                     ))}
                   </div>
                 ) : null}

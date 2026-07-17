@@ -31,6 +31,15 @@ const eventService = {
     return { data: response.data?.data };
   },
 
+  runEventReminders: async (force = false) => {
+    const response = await apiClient.post('/events/reminders/run', { force: Boolean(force) });
+    return { data: response.data?.data };
+  },
+
+  getCalendarFeedUrl: () => '/api/events/calendar.ics',
+
+  getEventCalendarUrl: (id) => `/api/events/${encodeURIComponent(String(id))}/calendar.ics`,
+
   rsvp: async (payload) => {
     const response = await apiClient.post('/events/register', payload);
     return { data: response.data?.data };

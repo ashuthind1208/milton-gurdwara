@@ -63,6 +63,7 @@ const donationsPath = path.join(dataDir, 'donations.json');
 const usersPath = path.join(dataDir, 'users.json');
 const contentStorePath = path.join(dataDir, 'content-store.json');
 const volunteerReminderLogPath = path.join(dataDir, 'volunteer-reminder-log.json');
+const eventReminderLogPath = path.join(dataDir, 'event-reminder-log.json');
 const uploadsDir = path.resolve(__dirname, 'uploads');
 const quizBankDir = path.resolve(workspaceRoot, 'public', 'quiz');
 const maxUploadBytes = 15 * 1024 * 1024;
@@ -76,8 +77,17 @@ const volunteerReminderHtmlTemplateEnabled = String(process.env.VOLUNTEER_REMIND
 const volunteerReminderSendTimeRaw = String(process.env.VOLUNTEER_REMINDER_SEND_TIME || '09:00').trim();
 const volunteerReminderTimeZone = String(process.env.VOLUNTEER_REMINDER_TIME_ZONE || 'America/Toronto').trim() || 'America/Toronto';
 const volunteerReminderDays = [10, 5, 2, 1];
+const eventReminderWebhookUrl = String(process.env.EVENT_REMINDER_WEBHOOK_URL || volunteerReminderWebhookUrl || '').trim();
+const eventReminderSendTimeRaw = String(process.env.EVENT_REMINDER_SEND_TIME || volunteerReminderSendTimeRaw || '09:00').trim();
+const eventReminderTimeZone = String(process.env.EVENT_REMINDER_TIME_ZONE || volunteerReminderTimeZone || 'America/Toronto').trim() || 'America/Toronto';
+const eventReminderDays = String(process.env.EVENT_REMINDER_DAYS || '7,3,1')
+  .split(',')
+  .map((value) => Number(String(value || '').trim()))
+  .filter((value) => Number.isFinite(value) && value >= 0);
 let volunteerReminderSweepRunning = false;
 let volunteerReminderLastRunDateKey = '';
+let eventReminderSweepRunning = false;
+let eventReminderLastRunDateKey = '';
 const darbarSahibStreamSource = String(process.env.DARBAR_SAHIB_STREAM_PROXY_TARGET || 'http://live.sgpc.net:4835/;').trim();
 const adOrganicViewCooldownMs = Number(process.env.AD_ORGANIC_VIEW_COOLDOWN_MS || (24 * 60 * 60 * 1000));
 
@@ -117,6 +127,7 @@ const parseReminderSendTime = (value) => {
 };
 
 const volunteerReminderSendTime = parseReminderSendTime(volunteerReminderSendTimeRaw);
+const eventReminderSendTime = parseReminderSendTime(eventReminderSendTimeRaw);
 
 const getDatePartsInTimeZone = (date = new Date(), timeZone = 'UTC') => {
   try {
@@ -354,7 +365,7 @@ const sendJson = (response, statusCode, payload) => {
   response.writeHead(statusCode, {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Stripe-Signature',
+    'Access-Control-Allow-Headers': 'Content-Type, Stripe-Signature, Authorization, X-Actor-Email, X-Actor-Role, X-Actor-Name',
     'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS'
   });
   response.end(JSON.stringify(payload));
@@ -443,6 +454,9 @@ const ensureStorage = () => {
   if (!fs.existsSync(volunteerReminderLogPath)) {
     fs.writeFileSync(volunteerReminderLogPath, JSON.stringify({ sent: {} }, null, 2), 'utf8');
   }
+  if (!fs.existsSync(eventReminderLogPath)) {
+    fs.writeFileSync(eventReminderLogPath, JSON.stringify({ sent: {} }, null, 2), 'utf8');
+  }
 };
 
 const readVolunteerReminderLog = () => {
@@ -463,6 +477,26 @@ const writeVolunteerReminderLog = (payload) => {
     sent: payload && typeof payload.sent === 'object' && payload.sent ? payload.sent : {}
   };
   fs.writeFileSync(volunteerReminderLogPath, JSON.stringify(next, null, 2), 'utf8');
+};
+
+const readEventReminderLog = () => {
+  ensureStorage();
+  try {
+    const raw = fs.readFileSync(eventReminderLogPath, 'utf8');
+    const parsed = JSON.parse(raw);
+    const sent = parsed && typeof parsed.sent === 'object' && parsed.sent ? parsed.sent : {};
+    return { sent };
+  } catch {
+    return { sent: {} };
+  }
+};
+
+const writeEventReminderLog = (payload) => {
+  ensureStorage();
+  const next = {
+    sent: payload && typeof payload.sent === 'object' && payload.sent ? payload.sent : {}
+  };
+  fs.writeFileSync(eventReminderLogPath, JSON.stringify(next, null, 2), 'utf8');
 };
 
 const readContentStore = () => {
@@ -563,6 +597,169 @@ const getDaysUntilDate = (dateValue) => {
   const now = new Date();
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   return Math.round((target - today) / (24 * 60 * 60 * 1000));
+};
+
+const formatDateTimeLabel = (dateValue, fallback = 'Date TBD') => {
+  const parsed = new Date(dateValue);
+  if (Number.isNaN(parsed.getTime())) {
+    return fallback;
+  }
+
+  try {
+    return parsed.toLocaleString('en-CA', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    });
+  } catch {
+    return parsed.toISOString();
+  }
+};
+
+const escapeIcsText = (value) => {
+  return String(value || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/\r?\n/g, '\\n')
+    .replace(/,/g, '\\,')
+    .replace(/;/g, '\\;');
+};
+
+const formatIcsDateUtc = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  const hours = String(date.getUTCHours()).padStart(2, '0');
+  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+  const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+  return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;
+};
+
+const buildEventIcsBody = (event, urlBase = '') => {
+  const start = new Date(event?.date || '');
+  const endCandidate = new Date(event?.endDate || event?.end || '');
+  const end = Number.isNaN(endCandidate.getTime()) ? new Date(start.getTime() + (60 * 60 * 1000)) : endCandidate;
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return '';
+  }
+
+  const uid = `${String(event?.id || 'event')}-ssm@singhsabhamilton.org`;
+  const created = formatIcsDateUtc(new Date());
+  const startUtc = formatIcsDateUtc(start);
+  const endUtc = formatIcsDateUtc(end);
+  const location = escapeIcsText(event?.location || 'Singh Sabha Milton Gurdwara');
+  const title = escapeIcsText(event?.title || 'Event');
+  const description = escapeIcsText(event?.description || 'Sangat event');
+  const eventUrl = urlBase
+    ? `${String(urlBase).replace(/\/$/, '')}/events?eventId=${encodeURIComponent(String(event?.id || ''))}`
+    : '';
+
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Singh Sabha Milton//Events Calendar//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:${uid}`,
+    `DTSTAMP:${created}`,
+    `DTSTART:${startUtc}`,
+    `DTEND:${endUtc}`,
+    `SUMMARY:${title}`,
+    `DESCRIPTION:${description}`,
+    `LOCATION:${location}`,
+    ...(eventUrl ? [`URL:${escapeIcsText(eventUrl)}`] : []),
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ];
+
+  return `${lines.join('\r\n')}\r\n`;
+};
+
+const buildEventsCalendarIcsBody = (events = [], urlBase = '') => {
+  const header = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Singh Sabha Milton//Events Calendar//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH'
+  ];
+  const footer = ['END:VCALENDAR'];
+  const nowStamp = formatIcsDateUtc(new Date());
+
+  const items = (Array.isArray(events) ? events : [])
+    .filter((event) => Boolean(event?.date))
+    .map((event) => {
+      const start = new Date(event.date);
+      if (Number.isNaN(start.getTime())) {
+        return '';
+      }
+
+      const endCandidate = new Date(event.endDate || event.end || '');
+      const end = Number.isNaN(endCandidate.getTime()) ? new Date(start.getTime() + (60 * 60 * 1000)) : endCandidate;
+      const eventUrl = urlBase
+        ? `${String(urlBase).replace(/\/$/, '')}/events?eventId=${encodeURIComponent(String(event.id || ''))}`
+        : '';
+
+      return [
+        'BEGIN:VEVENT',
+        `UID:${String(event.id || `event-${start.getTime()}`)}-ssm@singhsabhamilton.org`,
+        `DTSTAMP:${nowStamp}`,
+        `DTSTART:${formatIcsDateUtc(start)}`,
+        `DTEND:${formatIcsDateUtc(end)}`,
+        `SUMMARY:${escapeIcsText(event.title || 'Event')}`,
+        `DESCRIPTION:${escapeIcsText(event.description || 'Sangat event')}`,
+        `LOCATION:${escapeIcsText(event.location || 'Singh Sabha Milton Gurdwara')}`,
+        ...(eventUrl ? [`URL:${escapeIcsText(eventUrl)}`] : []),
+        'END:VEVENT'
+      ].join('\r\n');
+    })
+    .filter(Boolean);
+
+  return `${[...header, ...items, ...footer].join('\r\n')}\r\n`;
+};
+
+const getRequestActor = (request) => {
+  const email = String(request.headers['x-actor-email'] || '').trim().toLowerCase();
+  const role = String(request.headers['x-actor-role'] || '').trim();
+  const name = String(request.headers['x-actor-name'] || '').trim();
+  return { email, role, name };
+};
+
+const appendAuditLog = async (request, details = {}) => {
+  try {
+    const actor = getRequestActor(request);
+    const record = {
+      id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      action: String(details.action || '').trim() || 'unknown',
+      targetType: String(details.targetType || '').trim() || 'unknown',
+      targetId: String(details.targetId || '').trim(),
+      description: String(details.description || '').trim(),
+      actorEmail: actor.email,
+      actorRole: actor.role,
+      actorName: actor.name,
+      method: String(request.method || ''),
+      path: String(details.path || request.url || ''),
+      payload: details.payload || null,
+      createdAt: new Date().toISOString()
+    };
+
+    if (eventsDb.hasDatabaseConnection) {
+      await eventsDb.createItem('audit_logs', record);
+      return;
+    }
+
+    createContentItemFallback('audit_logs', record);
+  } catch {
+    // Never block request flow on audit log failures.
+  }
 };
 
 const normalizeVolunteerRegistrationForReminder = (entry = {}) => {
@@ -934,6 +1131,273 @@ const runVolunteerReminderSweep = async (options = {}) => {
   }
 };
 
+const normalizeEventRegistrantForReminder = (entry = {}, event = {}) => {
+  return {
+    id: String(entry.id || '').trim(),
+    email: String(entry.email || entry.contact || '').trim().toLowerCase(),
+    name: String(entry.name || 'Registrant').trim(),
+    status: String(entry.status || 'confirmed').trim().toLowerCase(),
+    eventId: String(event.id || '').trim(),
+    eventTitle: String(event.title || 'Event').trim(),
+    eventDate: String(event.date || '').trim(),
+    eventEndDate: String(event.endDate || event.end || '').trim(),
+    eventLocation: String(event.location || '').trim(),
+    eventDescription: String(event.description || '').trim()
+  };
+};
+
+const getEventRegistrationsForReminder = async () => {
+  const events = await eventsDb.getEvents();
+  const rows = [];
+
+  (Array.isArray(events) ? events : []).forEach((event) => {
+    const registrants = Array.isArray(event?.registrants) ? event.registrants : [];
+    registrants.forEach((entry) => {
+      rows.push(normalizeEventRegistrantForReminder(entry, event));
+    });
+  });
+
+  return rows;
+};
+
+const buildEventReminderEmail = ({ registration, daysRemaining = null }) => {
+  const eventDateLabel = formatDateTimeLabel(registration.eventDate, 'Date TBD');
+  const registrationType = registration.status === 'waitlisted' ? 'waitlist' : 'registration';
+  const subject = `Event Reminder (${daysRemaining} day${daysRemaining === 1 ? '' : 's'}): ${registration.eventTitle}`;
+  const text = [
+    'Vaheguru Ji Ka Khalsa, Vaheguru Ji Ki Fateh',
+    '',
+    `Dear ${registration.name || 'Sangat Member'},`,
+    '',
+    `This is your ${registrationType} reminder for the upcoming event:`,
+    `${registration.eventTitle}`,
+    `Date and Time: ${eventDateLabel}`,
+    `Location: ${registration.eventLocation || 'Singh Sabha Milton Gurdwara'}`,
+    registration.eventDescription ? `Details: ${registration.eventDescription}` : '',
+    '',
+    registration.status === 'waitlisted'
+      ? 'You are currently on the waitlist. If a confirmed spot opens, the team will contact you.'
+      : 'Please arrive a few minutes early so the program can begin on time.',
+    '',
+    'Thank you for your support and participation.'
+  ].filter(Boolean).join('\n');
+
+  const html = `
+  <div style="background:#f8fafc;padding:24px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #dbe7f6;border-radius:12px;overflow:hidden;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 10px;font-size:14px;color:#334155;">Vaheguru Ji Ka Khalsa, Vaheguru Ji Ki Fateh</p>
+        <h2 style="margin:0 0 12px;font-size:20px;color:#0a4d9f;">${escapeHtml(registration.eventTitle || 'Event Reminder')}</h2>
+        <p style="margin:0 0 6px;font-size:14px;"><strong>For:</strong> ${escapeHtml(registration.name || 'Sangat Member')}</p>
+        <p style="margin:0 0 6px;font-size:14px;"><strong>Date and Time:</strong> ${escapeHtml(eventDateLabel)}</p>
+        <p style="margin:0 0 6px;font-size:14px;"><strong>Location:</strong> ${escapeHtml(registration.eventLocation || 'Singh Sabha Milton Gurdwara')}</p>
+        ${registration.eventDescription ? `<p style="margin:12px 0 0;font-size:14px;line-height:1.6;color:#334155;">${escapeHtml(registration.eventDescription)}</p>` : ''}
+        <p style="margin:14px 0 0;font-size:14px;line-height:1.6;color:#334155;">
+          ${registration.status === 'waitlisted'
+            ? 'You are currently on the waitlist. If a confirmed spot opens, the team will contact you.'
+            : 'Please arrive a few minutes early so the program can begin on time.'}
+        </p>
+      </td></tr>
+    </table>
+  </div>`;
+
+  return { subject, text, html };
+};
+
+const sendEventReminderEmail = async (registration, options = {}) => {
+  if (!eventReminderWebhookUrl) {
+    return { sent: false, reason: 'missing_webhook' };
+  }
+
+  const daysRemaining = Number.isFinite(Number(options.daysRemaining)) ? Number(options.daysRemaining) : null;
+  const template = buildEventReminderEmail({ registration, daysRemaining });
+  const htmlBody = String(template.html || '').trim();
+
+  const payload = {
+    type: 'event-registration-reminder',
+    to: registration.email,
+    name: registration.name,
+    subject: template.subject,
+    message: template.text,
+    text: template.text,
+    html: htmlBody,
+    bodyHtml: htmlBody,
+    bodyText: template.text,
+    templateType: htmlBody ? 'html' : 'text',
+    metadata: {
+      reminderDays: daysRemaining,
+      eventId: registration.eventId,
+      eventTitle: registration.eventTitle,
+      eventDate: registration.eventDate,
+      registrationStatus: registration.status
+    },
+    sentAt: new Date().toISOString()
+  };
+
+  try {
+    const response = await fetch(eventReminderWebhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      return { sent: false, reason: 'webhook_error' };
+    }
+
+    return { sent: true };
+  } catch {
+    return { sent: false, reason: 'network_error' };
+  }
+};
+
+const shouldRunEventReminderSweep = (date = new Date()) => {
+  const nowParts = getDatePartsInTimeZone(date, eventReminderTimeZone);
+  const todayDateKey = toDateKeyFromParts(nowParts);
+  const nowMinutes = (nowParts.hour * 60) + nowParts.minute;
+  const scheduledMinutes = (eventReminderSendTime.hour * 60) + eventReminderSendTime.minute;
+
+  if (eventReminderLastRunDateKey === todayDateKey) {
+    return false;
+  }
+
+  return nowMinutes >= scheduledMinutes;
+};
+
+const runEventReminderSweep = async (options = {}) => {
+  if (eventReminderSweepRunning) {
+    return { processed: 0, sent: 0, skipped: 0, reason: 'already_running' };
+  }
+
+  eventReminderSweepRunning = true;
+  const force = options.force === true;
+
+  try {
+    const registrations = await getEventRegistrationsForReminder();
+    const logStore = readEventReminderLog();
+    let processed = 0;
+    let sent = 0;
+    let skipped = 0;
+
+    for (const registration of registrations) {
+      processed += 1;
+
+      if (!registration.id || !registration.email || !registration.eventDate) {
+        skipped += 1;
+        continue;
+      }
+
+      if (registration.status === 'cancelled') {
+        skipped += 1;
+        continue;
+      }
+
+      const daysRemaining = getDaysUntilDate(registration.eventDate);
+      if (daysRemaining == null || !eventReminderDays.includes(daysRemaining)) {
+        skipped += 1;
+        continue;
+      }
+
+      const reminderKey = `${registration.id}:${registration.eventId}:${registration.eventDate}:${daysRemaining}`;
+      if (!force && logStore.sent[reminderKey]) {
+        skipped += 1;
+        continue;
+      }
+
+      const result = await sendEventReminderEmail(registration, { daysRemaining });
+      if (!result.sent) {
+        skipped += 1;
+        continue;
+      }
+
+      sent += 1;
+      logStore.sent[reminderKey] = new Date().toISOString();
+    }
+
+    writeEventReminderLog(logStore);
+    return { processed, sent, skipped, force, webhookConfigured: Boolean(eventReminderWebhookUrl) };
+  } finally {
+    eventReminderSweepRunning = false;
+  }
+};
+
+const runScheduledEventReminderSweep = async () => {
+  if (!shouldRunEventReminderSweep()) {
+    return null;
+  }
+
+  const result = await runEventReminderSweep();
+  const nowParts = getDatePartsInTimeZone(new Date(), eventReminderTimeZone);
+  eventReminderLastRunDateKey = toDateKeyFromParts(nowParts);
+  return result;
+};
+
+const getVolunteerRecognitionData = async () => {
+  const rows = eventsDb.hasDatabaseConnection
+    ? await eventsDb.listItems('volunteer_registrations')
+    : listContentItemsFallback('volunteer_registrations');
+
+  const summaryByKey = new Map();
+
+  (Array.isArray(rows) ? rows : []).forEach((entry) => {
+    const status = String(entry?.status || '').trim().toLowerCase();
+    if (status === 'cancelled' || status === 'rejected') {
+      return;
+    }
+
+    const email = String(entry?.email || '').trim().toLowerCase();
+    const name = String(entry?.name || 'Volunteer').trim() || 'Volunteer';
+    const key = email || name.toLowerCase();
+    const existing = summaryByKey.get(key) || {
+      key,
+      email,
+      name,
+      participations: 0,
+      points: 0,
+      latestSevaDate: ''
+    };
+
+    const participationPoints = status === 'approved' || status === 'completed' ? 2 : 1;
+    const sevaDate = String(entry?.sevaDate || entry?.date || '').trim();
+
+    existing.participations += 1;
+    existing.points += participationPoints;
+    if (sevaDate && (!existing.latestSevaDate || sevaDate > existing.latestSevaDate)) {
+      existing.latestSevaDate = sevaDate;
+    }
+
+    summaryByKey.set(key, existing);
+  });
+
+  const resolveBadge = (points, participations) => {
+    if (points >= 20 || participations >= 12) return 'Platinum Sevadar';
+    if (points >= 12 || participations >= 8) return 'Gold Sevadar';
+    if (points >= 6 || participations >= 4) return 'Silver Sevadar';
+    return 'Bronze Sevadar';
+  };
+
+  const leaders = [...summaryByKey.values()]
+    .map((entry) => ({
+      ...entry,
+      badge: resolveBadge(entry.points, entry.participations)
+    }))
+    .sort((left, right) => {
+      if (right.points !== left.points) {
+        return right.points - left.points;
+      }
+      if (right.participations !== left.participations) {
+        return right.participations - left.participations;
+      }
+      return String(left.name || '').localeCompare(String(right.name || ''));
+    });
+
+  return {
+    totalRecognized: leaders.length,
+    topLeaders: leaders.slice(0, 12),
+    allLeaders: leaders
+  };
+};
+
 const mimeByExtension = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
@@ -1268,6 +1732,21 @@ const normalizeCampaignProgressItems = (items = []) => {
     .filter((item) => item.title);
 };
 
+const normalizeCampaignStoryBlocks = (items = []) => {
+  return (Array.isArray(items) ? items : [])
+    .map((item, index) => ({
+      id: String(item?.id || `story-${Date.now()}-${index}`),
+      title: String(item?.title || '').trim(),
+      summary: String(item?.summary || '').trim(),
+      quote: String(item?.quote || '').trim(),
+      beneficiary: String(item?.beneficiary || '').trim(),
+      impactMetric: String(item?.impactMetric || '').trim(),
+      imageUrl: String(item?.imageUrl || item?.image_url || '').trim(),
+      isActive: item?.isActive !== false
+    }))
+    .filter((item) => item.title || item.summary || item.quote);
+};
+
 const createDonationCampaign = async (payload) => {
   if (eventsDb.hasDatabaseConnection) {
     return eventsDb.createDonationCampaign(payload);
@@ -1282,6 +1761,7 @@ const createDonationCampaign = async (payload) => {
     progressPhotos: Array.isArray(payload.progressPhotos) ? payload.progressPhotos : [],
     progressUpdates: Array.isArray(payload.progressUpdates) ? payload.progressUpdates : [],
     progressItems: normalizeCampaignProgressItems(payload.progressItems),
+    storyBlocks: normalizeCampaignStoryBlocks(payload.storyBlocks),
     raised: Number(payload.raised || 0),
     target: Number(payload.target || 0),
     isActive: payload.isActive !== false,
@@ -1313,6 +1793,9 @@ const updateDonationCampaign = async (id, payload) => {
         progressItems: Array.isArray(payload.progressItems)
           ? normalizeCampaignProgressItems(payload.progressItems)
           : normalizeCampaignProgressItems(entry.progressItems || []),
+        storyBlocks: Array.isArray(payload.storyBlocks)
+          ? normalizeCampaignStoryBlocks(payload.storyBlocks)
+          : normalizeCampaignStoryBlocks(entry.storyBlocks || []),
           id: entry.id,
           isClosed: Number(payload.target ?? entry.target ?? 0) > 0 && Number(payload.raised ?? entry.raised ?? 0) >= Number(payload.target ?? entry.target ?? 0)
         }
@@ -2217,6 +2700,15 @@ const server = http.createServer(async (request, response) => {
       const data = eventsDb.hasDatabaseConnection
         ? await eventsDb.createItem(resource, body)
         : createContentItemFallback(resource, body);
+      if (resource !== 'audit_logs') {
+        await appendAuditLog(request, {
+          action: 'content.create',
+          targetType: resource,
+          targetId: String(data?.id || ''),
+          description: `Created ${resource} item`,
+          payload: body
+        });
+      }
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
       sendJson(response, 500, { ok: false, message: error.message || 'Unable to create content item.' });
@@ -2233,6 +2725,15 @@ const server = http.createServer(async (request, response) => {
       const data = eventsDb.hasDatabaseConnection
         ? await eventsDb.updateItem(resource, id, body)
         : updateContentItemFallback(resource, id, body);
+      if (resource !== 'audit_logs') {
+        await appendAuditLog(request, {
+          action: 'content.update',
+          targetType: resource,
+          targetId: String(id || ''),
+          description: `Updated ${resource} item`,
+          payload: body
+        });
+      }
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
       sendJson(response, 500, { ok: false, message: error.message || 'Unable to update content item.' });
@@ -2247,6 +2748,14 @@ const server = http.createServer(async (request, response) => {
       const data = eventsDb.hasDatabaseConnection
         ? await eventsDb.removeItem(resource, id)
         : removeContentItemFallback(resource, id);
+      if (resource !== 'audit_logs') {
+        await appendAuditLog(request, {
+          action: 'content.delete',
+          targetType: resource,
+          targetId: String(id || ''),
+          description: `Deleted ${resource} item`
+        });
+      }
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
       sendJson(response, 500, { ok: false, message: error.message || 'Unable to delete content item.' });
@@ -2275,9 +2784,65 @@ const server = http.createServer(async (request, response) => {
       const data = eventsDb.hasDatabaseConnection
         ? await eventsDb.setSingleton(resource, body)
         : setContentSingletonFallback(resource, body);
+      await appendAuditLog(request, {
+        action: 'content.singleton.update',
+        targetType: resource,
+        targetId: resource,
+        description: `Updated singleton ${resource}`,
+        payload: body
+      });
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
       sendJson(response, 500, { ok: false, message: error.message || 'Unable to update singleton content.' });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/events/calendar.ics' && request.method === 'GET') {
+    try {
+      const events = await eventsDb.getEvents();
+      const feed = buildEventsCalendarIcsBody(
+        (Array.isArray(events) ? events : []).filter((event) => event?.active !== false),
+        volunteerReminderBaseUrl
+      );
+      response.writeHead(200, {
+        'Content-Type': 'text/calendar; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="ssm-events.ics"',
+        'Access-Control-Allow-Origin': '*'
+      });
+      response.end(feed);
+    } catch (error) {
+      sendJson(response, 500, {
+        ok: false,
+        message: error.message || 'Unable to generate calendar feed.'
+      });
+    }
+    return;
+  }
+
+  const singleEventCalendarMatch = requestUrl.pathname.match(/^\/api\/events\/([^/]+)\/calendar\.ics$/);
+  if (singleEventCalendarMatch && request.method === 'GET') {
+    try {
+      const id = decodeURIComponent(singleEventCalendarMatch[1]);
+      const events = await eventsDb.getEvents();
+      const event = (Array.isArray(events) ? events : []).find((entry) => String(entry.id) === String(id));
+      if (!event) {
+        sendJson(response, 404, { ok: false, message: 'Event not found.' });
+        return;
+      }
+
+      const feed = buildEventIcsBody(event, volunteerReminderBaseUrl);
+      response.writeHead(200, {
+        'Content-Type': 'text/calendar; charset=utf-8',
+        'Content-Disposition': `attachment; filename="event-${String(event.id)}.ics"`,
+        'Access-Control-Allow-Origin': '*'
+      });
+      response.end(feed);
+    } catch (error) {
+      sendJson(response, 500, {
+        ok: false,
+        message: error.message || 'Unable to generate event calendar file.'
+      });
     }
     return;
   }
@@ -2299,6 +2864,13 @@ const server = http.createServer(async (request, response) => {
     try {
       const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
       const data = await eventsDb.createEvent(body);
+      await appendAuditLog(request, {
+        action: 'event.create',
+        targetType: 'event',
+        targetId: String(data?.id || ''),
+        description: `Created event ${String(data?.title || '').trim()}`,
+        payload: body
+      });
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
       sendJson(response, 500, {
@@ -2313,6 +2885,18 @@ const server = http.createServer(async (request, response) => {
     try {
       const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
       const data = await eventsDb.registerForEvent(body);
+      await appendAuditLog(request, {
+        action: 'event.register',
+        targetType: 'event',
+        targetId: String(body?.eventId || ''),
+        description: `Registered ${String(body?.email || body?.contact || body?.name || 'participant')} for event`,
+        payload: {
+          eventId: body?.eventId,
+          name: body?.name,
+          email: body?.email,
+          contact: body?.contact
+        }
+      });
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
       sendJson(response, error.status || 500, {
@@ -2327,6 +2911,16 @@ const server = http.createServer(async (request, response) => {
     try {
       const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
       const data = await eventsDb.removeEventRegistrant(body);
+      await appendAuditLog(request, {
+        action: 'event.registrant.remove',
+        targetType: 'event',
+        targetId: String(body?.eventId || ''),
+        description: `Removed event registrant ${String(body?.registrantId || '')}`,
+        payload: {
+          eventId: body?.eventId,
+          registrantId: body?.registrantId
+        }
+      });
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
       sendJson(response, 500, {
@@ -2343,6 +2937,13 @@ const server = http.createServer(async (request, response) => {
       const id = Number(decodeURIComponent(eventPathMatch[1]));
       const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
       const data = await eventsDb.updateEvent(id, body);
+      await appendAuditLog(request, {
+        action: 'event.update',
+        targetType: 'event',
+        targetId: String(id),
+        description: `Updated event ${String(id)}`,
+        payload: body
+      });
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
       sendJson(response, 500, {
@@ -2357,6 +2958,12 @@ const server = http.createServer(async (request, response) => {
     try {
       const id = Number(decodeURIComponent(eventPathMatch[1]));
       const data = await eventsDb.removeEvent(id);
+      await appendAuditLog(request, {
+        action: 'event.delete',
+        targetType: 'event',
+        targetId: String(id),
+        description: `Deleted event ${String(id)}`
+      });
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
       sendJson(response, 500, {
@@ -2527,6 +3134,40 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (requestUrl.pathname === '/api/events/reminders/run' && request.method === 'POST') {
+    try {
+      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const data = await runEventReminderSweep({ force: body?.force === true });
+      await appendAuditLog(request, {
+        action: 'event.reminders.run',
+        targetType: 'event-reminders',
+        targetId: 'scheduled',
+        description: 'Executed event reminder sweep',
+        payload: { force: body?.force === true, result: data }
+      });
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, {
+        ok: false,
+        message: error.message || 'Unable to run event reminders.'
+      });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/volunteer-recognition' && request.method === 'GET') {
+    try {
+      const data = await getVolunteerRecognitionData();
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, {
+        ok: false,
+        message: error.message || 'Unable to generate volunteer recognition data.'
+      });
+    }
+    return;
+  }
+
   const manualReminderMatch = requestUrl.pathname.match(/^\/api\/volunteer-reminders\/opportunity\/([^/]+)\/send$/i);
   if (manualReminderMatch && request.method === 'POST') {
     try {
@@ -2673,6 +3314,13 @@ const server = http.createServer(async (request, response) => {
     try {
       const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
       const data = await createDonationCampaign(body);
+      await appendAuditLog(request, {
+        action: 'donation.campaign.create',
+        targetType: 'donation-campaign',
+        targetId: String(data?.id || ''),
+        description: `Created campaign ${String(data?.name || '')}`,
+        payload: body
+      });
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
       sendJson(response, 500, { ok: false, message: error.message || 'Unable to create donation campaign.' });
@@ -2686,6 +3334,13 @@ const server = http.createServer(async (request, response) => {
       const id = Number(decodeURIComponent(campaignIdMatch[1]));
       const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
       const data = await updateDonationCampaign(id, body);
+      await appendAuditLog(request, {
+        action: 'donation.campaign.update',
+        targetType: 'donation-campaign',
+        targetId: String(id),
+        description: `Updated campaign ${String(id)}`,
+        payload: body
+      });
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
       sendJson(response, 500, { ok: false, message: error.message || 'Unable to update donation campaign.' });
@@ -2697,6 +3352,12 @@ const server = http.createServer(async (request, response) => {
     try {
       const id = Number(decodeURIComponent(campaignIdMatch[1]));
       const data = await removeDonationCampaign(id);
+      await appendAuditLog(request, {
+        action: 'donation.campaign.delete',
+        targetType: 'donation-campaign',
+        targetId: String(id),
+        description: `Deleted campaign ${String(id)}`
+      });
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
       sendJson(response, 500, { ok: false, message: error.message || 'Unable to remove donation campaign.' });
@@ -2891,6 +3552,8 @@ const bootstrap = async () => {
 
   const configuredTime = `${String(volunteerReminderSendTime.hour).padStart(2, '0')}:${String(volunteerReminderSendTime.minute).padStart(2, '0')}`;
   console.log(`Volunteer reminder scheduler set for ${configuredTime} (${volunteerReminderTimeZone}) daily.`);
+  const eventConfiguredTime = `${String(eventReminderSendTime.hour).padStart(2, '0')}:${String(eventReminderSendTime.minute).padStart(2, '0')}`;
+  console.log(`Event reminder scheduler set for ${eventConfiguredTime} (${eventReminderTimeZone}) daily.`);
 
   // Check every minute, but only send once per day after the configured local send time.
   setInterval(() => {
@@ -2902,6 +3565,17 @@ const bootstrap = async () => {
   // Run one immediate scheduler check on startup in case the server starts after today's send time.
   runScheduledVolunteerReminderSweep().catch((error) => {
     console.error('Initial volunteer reminder scheduler check failed:', error.message || error);
+  });
+
+  // Event reminders use the same minute cadence but maintain their own send window and dedupe log.
+  setInterval(() => {
+    runScheduledEventReminderSweep().catch((error) => {
+      console.error('Event reminder sweep failed:', error.message || error);
+    });
+  }, 60 * 1000);
+
+  runScheduledEventReminderSweep().catch((error) => {
+    console.error('Initial event reminder scheduler check failed:', error.message || error);
   });
 };
 

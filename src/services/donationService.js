@@ -56,6 +56,23 @@ const normalizeCampaignProgressItem = (item = {}, index = 0) => {
   };
 };
 
+const normalizeCampaignStoryBlock = (item = {}, index = 0) => {
+  if (!item || typeof item !== 'object') {
+    return null;
+  }
+
+  return {
+    id: String(item.id || `story-${index + 1}`),
+    title: String(item.title || '').trim(),
+    summary: String(item.summary || '').trim(),
+    quote: String(item.quote || '').trim(),
+    beneficiary: String(item.beneficiary || '').trim(),
+    impactMetric: String(item.impactMetric || '').trim(),
+    imageUrl: String(item.imageUrl || item.image_url || '').trim(),
+    isActive: item.isActive !== false
+  };
+};
+
 const normalizeCampaign = (campaign = {}) => {
   const raisedValue = Number(campaign.raised ?? 0);
   const targetValue = Number(campaign.target ?? 0);
@@ -72,6 +89,9 @@ const normalizeCampaign = (campaign = {}) => {
   const progressItemsSource = Array.isArray(campaign.progressItems)
     ? campaign.progressItems
     : (Array.isArray(campaign.progress_items) ? campaign.progress_items : []);
+  const storyBlocksSource = Array.isArray(campaign.storyBlocks)
+    ? campaign.storyBlocks
+    : (Array.isArray(campaign.story_blocks) ? campaign.story_blocks : []);
 
   return {
     id: Number(campaign.id),
@@ -88,6 +108,9 @@ const normalizeCampaign = (campaign = {}) => {
     progressItems: progressItemsSource
       .map((entry, index) => normalizeCampaignProgressItem(entry, index))
       .filter((entry) => Boolean(entry && entry.title)),
+    storyBlocks: storyBlocksSource
+      .map((entry, index) => normalizeCampaignStoryBlock(entry, index))
+      .filter((entry) => Boolean(entry && (entry.title || entry.summary || entry.quote))),
     raised,
     target,
     isActive: Boolean(campaign.isActive ?? campaign.is_active ?? true),

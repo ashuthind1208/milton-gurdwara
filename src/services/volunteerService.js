@@ -260,6 +260,11 @@ const volunteerService = {
       .map(([date, entries]) => ({ date, entries }));
 
     return serviceResponse(archive);
+  },
+
+  getRecognition: async () => {
+    const response = await fetchJson('/api/volunteer-recognition');
+    return serviceResponse(response.data || { totalRecognized: 0, topLeaders: [], allLeaders: [] });
   }
 };
 

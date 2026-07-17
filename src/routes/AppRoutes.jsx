@@ -42,6 +42,7 @@ const AdminEventsPage = lazy(() => import('../admin/Events/AdminEventsPage'));
 const AdminDonationsPage = lazy(() => import('../admin/Donations/AdminDonationsPage'));
 const AdminUsersPage = lazy(() => import('../admin/Users/AdminUsersPage'));
 const AdminKidsLearningPage = lazy(() => import('../admin/KidsLearning/AdminKidsLearningPage'));
+const AdminAuditTrailPage = lazy(() => import('../admin/AuditTrail/AdminAuditTrailPage'));
 
 const LoadingFallback = () => <div className="py-20 text-center text-slate-600">Loading page...</div>;
 
@@ -87,6 +88,7 @@ const AppRoutes = () => {
             <Route path="/admin/donations" element={<AdminDonationsPage />} />
             <Route path="/admin/users" element={<AdminUsersPage />} />
             <Route path="/admin/kids-learning" element={<AdminKidsLearningPage />} />
+            <Route path="/admin/audit-trail" element={<AdminAuditTrailPage />} />
           </Route>
         </Route>
 

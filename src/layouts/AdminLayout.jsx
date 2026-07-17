@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Bars3Icon,
+  BellAlertIcon,
   ChartBarSquareIcon,
   CalendarDaysIcon,
   CameraIcon,
@@ -60,6 +61,7 @@ const iconByPath = {
   '/admin/events': QueueListIcon,
   '/admin/kids-learning': BookOpenIcon,
   '/admin/donations': CurrencyDollarIcon,
+  '/admin/audit-trail': BellAlertIcon,
   '/admin/users': UsersIcon,
   '/admin/analytics': ChartBarSquareIcon
 };

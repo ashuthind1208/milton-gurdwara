@@ -318,6 +318,17 @@ const EventsPage = () => {
             <p className="mt-1 text-xs text-slate-600">{selectedDateEvents.length} event{selectedDateEvents.length === 1 ? '' : 's'} found</p>
           </div>
 
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">Calendar Subscription</p>
+            <p className="mt-1 text-xs text-emerald-900">Add all gurdwara events to your personal calendar app.</p>
+            <a
+              href={eventService.getCalendarFeedUrl()}
+              className="mt-2 inline-flex rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:border-emerald-400"
+            >
+              Download Events iCal (.ics)
+            </a>
+          </div>
+
           <ReactCalendar
             className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm"
             onChange={setSelectedDate}
@@ -499,6 +510,20 @@ const EventsPage = () => {
                 <p className="mt-2 text-sm leading-relaxed text-slate-700">
                   {selectedEvent.description || 'No description provided for this event yet.'}
                 </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <a
+                    href={eventService.getEventCalendarUrl(selectedEvent.id)}
+                    className="inline-flex rounded-lg border border-brand-blue/30 bg-white px-3 py-1.5 text-xs font-semibold text-brand-blue hover:border-brand-blue/50"
+                  >
+                    Add This Event to Calendar
+                  </a>
+                  <a
+                    href={eventService.getCalendarFeedUrl()}
+                    className="inline-flex rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:border-emerald-400"
+                  >
+                    Subscribe to All Events
+                  </a>
+                </div>
                 {selectedEvent.mediaUrl ? <img src={selectedEvent.mediaUrl} alt={selectedEvent.title || 'Event media'} className="mt-3 h-44 w-full rounded-lg object-cover" loading="lazy" /> : null}
               </section>
 

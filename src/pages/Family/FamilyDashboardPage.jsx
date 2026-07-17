@@ -9,6 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 import eventService from '../../services/eventService';
 import donationService from '../../services/donationService';
 import volunteerService from '../../services/volunteerService';
+import { downloadCsv } from '../../utils/csvExport';
 
 const FamilyDashboardPage = () => {
   const meta = useSeoMeta('Family Dashboard', 'Track your family event RSVPs, waitlists, seva applications, and donations in one view.');
@@ -95,6 +96,48 @@ const FamilyDashboardPage = () => {
     [familyDonations]
   );
 
+  const exportFamilyEventsCsv = () => {
+    downloadCsv({
+      fileName: 'family-event-registrations.csv',
+      headers: ['Event', 'Date', 'Location', 'Contact', 'Registered At'],
+      rows: familyEventRegistrations.map((entry) => ([
+        entry.eventTitle || '',
+        entry.eventDate ? format(new Date(entry.eventDate), 'yyyy-MM-dd HH:mm') : '',
+        entry.location || '',
+        entry.contact || '',
+        entry.createdAt ? format(new Date(entry.createdAt), 'yyyy-MM-dd HH:mm') : ''
+      ]))
+    });
+  };
+
+  const exportFamilySevaCsv = () => {
+    downloadCsv({
+      fileName: 'family-seva-applications.csv',
+      headers: ['Seva Type', 'Date', 'Time', 'Status', 'Submitted'],
+      rows: familySevaApplications.map((entry) => ([
+        entry.sevaType || entry.area || '',
+        entry.sevaDate || '',
+        entry.sevaTime || '',
+        entry.status || '',
+        entry.createdAt ? format(new Date(entry.createdAt), 'yyyy-MM-dd HH:mm') : (entry.date || '')
+      ]))
+    });
+  };
+
+  const exportFamilyDonationsCsv = () => {
+    downloadCsv({
+      fileName: 'family-donations.csv',
+      headers: ['Campaign', 'Amount', 'Status', 'Frequency', 'Date'],
+      rows: familyDonations.map((entry) => ([
+        entry.campaignName || 'General Donation',
+        Number(entry.amount || 0).toFixed(2),
+        entry.paymentStatus || 'PAID',
+        entry.frequency || 'one-time',
+        entry.createdAt ? format(new Date(entry.createdAt), 'yyyy-MM-dd HH:mm') : ''
+      ]))
+    });
+  };
+
   const totalDonationPages = Math.max(1, Math.ceil(familyDonations.length / donationsPerPage));
   const safeDonationPage = Math.min(donationPage, totalDonationPages);
   const paginatedDonations = useMemo(() => {
@@ -126,6 +169,20 @@ const FamilyDashboardPage = () => {
       <Seo {...meta} />
       <PageHero title="Family Dashboard" description="One place to view your RSVPs, waitlist entries, seva applications, and donation history." />
 
+      <section className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-black text-brand-blue">Export Center</h2>
+            <p className="text-xs text-slate-600">Download your family records anytime for personal tracking.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={exportFamilyEventsCsv} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-brand-blue/35">Export Events CSV</button>
+            <button type="button" onClick={exportFamilySevaCsv} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-brand-blue/35">Export Seva CSV</button>
+            <button type="button" onClick={exportFamilyDonationsCsv} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-brand-blue/35">Export Donations CSV</button>
+          </div>
+        </div>
+      </section>
+
       <section className="grid gap-5 lg:grid-cols-2">
         <div className="space-y-5">
           <article className="rounded-2xl border border-brand-blue/20 bg-gradient-to-br from-blue-50 via-white to-blue-100 p-5">
@@ -136,6 +193,11 @@ const FamilyDashboardPage = () => {
                 <div key={`${entry.eventId}-${index}`} className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 text-sm">
                   <p className="font-semibold text-slate-800">{entry.eventTitle}</p>
                   <p className="text-xs text-slate-600">{entry.location || 'Location TBD'} • {format(new Date(entry.eventDate), 'EEE, MMM d yyyy, h:mm a')}</p>
+                  {entry.eventId ? (
+                    <a href={eventService.getEventCalendarUrl(entry.eventId)} className="mt-1 inline-flex text-[11px] font-semibold text-brand-blue underline underline-offset-2">
+                      Add to calendar
+                    </a>
+                  ) : null}
                 </div>
               ))}
               {familyEventRegistrations.length === 0 ? <p className="text-sm text-slate-500">No event registrations found for your profile yet.</p> : null}
