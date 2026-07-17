@@ -21,8 +21,8 @@ const eventService = {
     return { data: response.data?.data };
   },
 
-  registerForEvent: async ({ eventId, name, contact }) => {
-    const response = await apiClient.post('/events/register', { eventId, name, contact });
+  registerForEvent: async ({ eventId, name, contact, email }) => {
+    const response = await apiClient.post('/events/register', { eventId, name, contact, email });
     return { data: response.data?.data };
   },
 

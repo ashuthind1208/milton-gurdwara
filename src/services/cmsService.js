@@ -1,4 +1,4 @@
-import { mockResponse } from './mockApi';
+import { serviceResponse } from './serviceResponse';
 import contentApiService from './contentApiService';
 
 const HOME_CONTENT_RESOURCE = 'cms_home_content';
@@ -426,7 +426,7 @@ const readHomeContent = async () => {
 };
 
 const cmsService = {
-  getHomeContent: async () => mockResponse(await readHomeContent()),
+  getHomeContent: async () => serviceResponse(await readHomeContent()),
   updateHomeContent: async (payload) => {
     const current = await readHomeContent();
     const nextValue = {
@@ -447,9 +447,9 @@ const cmsService = {
       langarItems: payload.langarItems || current.langarItems
     };
 
-    return mockResponse(normalizeContent(await persistContent(nextValue)));
+    return serviceResponse(normalizeContent(await persistContent(nextValue)));
   },
-  getHeroSlides: async () => mockResponse((await readHomeContent()).hero.slides),
+  getHeroSlides: async () => serviceResponse((await readHomeContent()).hero.slides),
   addHeroSlide: async (payload) => {
     const current = await readHomeContent();
     const nextSlide = {
@@ -466,13 +466,13 @@ const cmsService = {
       }
     };
 
-    return mockResponse(normalizeContent(await persistContent(nextValue)).hero.slides);
+    return serviceResponse(normalizeContent(await persistContent(nextValue)).hero.slides);
   },
   updateHeroSlide: async (id, payload) => {
     const current = await readHomeContent();
     const existing = current.hero.slides.find((slide) => slide.id === id);
     if (!existing) {
-      return mockResponse(current.hero.slides);
+      return serviceResponse(current.hero.slides);
     }
 
     const remaining = current.hero.slides.filter((slide) => slide.id !== id);
@@ -491,7 +491,7 @@ const cmsService = {
       }
     };
 
-    return mockResponse(normalizeContent(await persistContent(nextValue)).hero.slides);
+    return serviceResponse(normalizeContent(await persistContent(nextValue)).hero.slides);
   },
   removeHeroSlide: async (id) => {
     const current = await readHomeContent();
@@ -503,7 +503,7 @@ const cmsService = {
       }
     };
 
-    return mockResponse(normalizeContent(await persistContent(nextValue)).hero.slides);
+    return serviceResponse(normalizeContent(await persistContent(nextValue)).hero.slides);
   },
   addLangarItem: async (payload) => {
     const current = await readHomeContent();
@@ -524,7 +524,7 @@ const cmsService = {
       ]
     };
 
-    return mockResponse(normalizeContent(await persistContent(nextValue)).langarItems);
+    return serviceResponse(normalizeContent(await persistContent(nextValue)).langarItems);
   },
   removeLangarItem: async (id) => {
     const current = await readHomeContent();
@@ -533,7 +533,7 @@ const cmsService = {
       langarItems: current.langarItems.filter((item) => item.id !== id)
     };
 
-    return mockResponse(normalizeContent(await persistContent(nextValue)).langarItems);
+    return serviceResponse(normalizeContent(await persistContent(nextValue)).langarItems);
   },
   updateLangarItem: async (id, payload) => {
     const current = await readHomeContent();
@@ -544,7 +544,7 @@ const cmsService = {
       ))
     };
 
-    return mockResponse(normalizeContent(await persistContent(nextValue)).langarItems);
+    return serviceResponse(normalizeContent(await persistContent(nextValue)).langarItems);
   },
   updateSchedule: async (schedule) => {
     const current = await readHomeContent();
@@ -556,7 +556,7 @@ const cmsService = {
         scheduleDays: normalizeScheduleDays(schedule.scheduleDays, current.schedule || defaultSchedule)
       };
 
-      return mockResponse(normalizeContent(await persistContent(nextValue)).scheduleDays);
+      return serviceResponse(normalizeContent(await persistContent(nextValue)).scheduleDays);
     }
 
     if (schedule.day) {
@@ -567,7 +567,7 @@ const cmsService = {
         scheduleDays: [...remaining, nextDay].sort((left, right) => left.dateKey.localeCompare(right.dateKey))
       };
 
-      return mockResponse(normalizeContent(await persistContent(nextValue)).scheduleDays);
+      return serviceResponse(normalizeContent(await persistContent(nextValue)).scheduleDays);
     }
 
     const nextValue = {
@@ -582,11 +582,11 @@ const cmsService = {
       })
     };
 
-    return mockResponse(normalizeContent(await persistContent(nextValue)).schedule);
+    return serviceResponse(normalizeContent(await persistContent(nextValue)).schedule);
   },
   getScheduleForDate: async (dateKey) => {
     const current = await readHomeContent();
-    return mockResponse(resolveScheduleForDate(current.scheduleDays, dateKey || 'default'));
+    return serviceResponse(resolveScheduleForDate(current.scheduleDays, dateKey || 'default'));
   },
   copyScheduleDay: async ({ sourceDateKey, targetDateKey }) => {
     const current = await readHomeContent();
@@ -608,12 +608,12 @@ const cmsService = {
       scheduleDays: [...remaining, copiedDay].sort((left, right) => left.dateKey.localeCompare(right.dateKey))
     };
 
-    return mockResponse(normalizeContent(await persistContent(nextValue)).scheduleDays);
+    return serviceResponse(normalizeContent(await persistContent(nextValue)).scheduleDays);
   },
   removeScheduleDay: async (dateKey) => {
     const current = await readHomeContent();
     if (!dateKey || dateKey === 'default') {
-      return mockResponse(normalizeContent(current).scheduleDays);
+      return serviceResponse(normalizeContent(current).scheduleDays);
     }
 
     const nextValue = {
@@ -621,12 +621,12 @@ const cmsService = {
       scheduleDays: normalizeScheduleDays(current.scheduleDays, current.schedule || defaultSchedule).filter((day) => day.dateKey !== dateKey)
     };
 
-    return mockResponse(normalizeContent(await persistContent(nextValue)).scheduleDays);
+    return serviceResponse(normalizeContent(await persistContent(nextValue)).scheduleDays);
   },
-  getAllPageContent: async () => mockResponse(await readAllPageContent()),
+  getAllPageContent: async () => serviceResponse(await readAllPageContent()),
   getPageContent: async (pageKey) => {
     const allContent = await readAllPageContent();
-    return mockResponse(allContent[pageKey] || allContent.about);
+    return serviceResponse(allContent[pageKey] || allContent.about);
   },
   updatePageContent: async (pageKey, payload) => {
     const allContent = await readAllPageContent();
@@ -641,7 +641,7 @@ const cmsService = {
     };
 
     const saved = normalizeAllPageContent(await persistPageContent(nextValue));
-    return mockResponse(saved[pageKey]);
+    return serviceResponse(saved[pageKey]);
   }
 };
 

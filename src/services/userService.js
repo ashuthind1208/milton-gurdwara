@@ -1,4 +1,4 @@
-import { mockResponse } from './mockApi';
+import { serviceResponse } from './serviceResponse';
 import contentApiService from './contentApiService';
 
 const RESOURCE = 'users';
@@ -73,6 +73,9 @@ const normalizeRole = (value) => {
   if (raw === 'volunteer' || raw === 'volunteer coordinator' || raw === 'volunteer_coordinator') {
     return 'Volunteer';
   }
+  if (raw === 'family') {
+    return 'Family';
+  }
   if (raw === 'editor') {
     return 'Editor';
   }
@@ -88,6 +91,9 @@ const resolveMemberType = (role, fallback) => {
   }
   if (role === 'Volunteer') {
     return 'Volunteer';
+  }
+  if (role === 'Family') {
+    return 'Family';
   }
   return fallback || 'Member';
 };
@@ -141,12 +147,12 @@ const findUserByEmail = async (email) => {
 const userService = {
   getUsers: async () => {
     const users = await ensureSeedUsers();
-    return mockResponse(users);
+    return serviceResponse(users);
   },
 
   getUserByEmail: async (email) => {
     const user = await findUserByEmail(email);
-    return mockResponse(user);
+    return serviceResponse(user);
   },
 
   upsertUserByEmail: async (payload) => {
@@ -158,7 +164,7 @@ const userService = {
         ...normalized,
         id: normalized.id || `user-${Date.now()}`
       });
-      return mockResponse(normalizeUser(created || normalized));
+      return serviceResponse(normalizeUser(created || normalized));
     }
 
     const updated = await contentApiService.update(RESOURCE, existing.id, {
@@ -169,7 +175,7 @@ const userService = {
       updatedAt: new Date().toISOString()
     });
 
-    return mockResponse(normalizeUser(updated || { ...existing, ...normalized }));
+    return serviceResponse(normalizeUser(updated || { ...existing, ...normalized }));
   },
 
   completeRegistration: async ({ email, name, phone, address, memberType, role, avatarUrl }) => {
@@ -203,11 +209,11 @@ const userService = {
         id: existing.id,
         createdAt: existing.createdAt
       });
-      return mockResponse(normalizeUser(saved || updated));
+      return serviceResponse(normalizeUser(saved || updated));
     }
 
     const created = await contentApiService.create(RESOURCE, updated);
-    return mockResponse(normalizeUser(created || updated));
+    return serviceResponse(normalizeUser(created || updated));
   },
 
   createUser: async (payload) => {
@@ -227,7 +233,7 @@ const userService = {
     });
 
     const created = await contentApiService.create(RESOURCE, record);
-    return mockResponse(normalizeUser(created || record));
+    return serviceResponse(normalizeUser(created || record));
   },
 
   updateUser: async (id, payload) => {
@@ -235,14 +241,14 @@ const userService = {
     const existing = users.find((user) => user.id === id) || { id };
     const record = normalizeUser({ ...existing, ...payload, id, createdAt: existing.createdAt });
     const updated = await contentApiService.update(RESOURCE, id, record);
-    return mockResponse(normalizeUser(updated || record));
+    return serviceResponse(normalizeUser(updated || record));
   },
 
   updateApprovalStatus: async (id, approvalStatus) => {
     const users = await ensureSeedUsers();
     const existing = users.find((user) => user.id === id);
     if (!existing) {
-      return mockResponse(null);
+      return serviceResponse(null);
     }
 
     const updated = normalizeUser({
@@ -254,12 +260,12 @@ const userService = {
     });
 
     const saved = await contentApiService.update(RESOURCE, id, updated);
-    return mockResponse(normalizeUser(saved || updated));
+    return serviceResponse(normalizeUser(saved || updated));
   },
 
   removeUser: async (id) => {
     await contentApiService.remove(RESOURCE, id);
-    return mockResponse({ success: true });
+    return serviceResponse({ success: true });
   }
 };
 

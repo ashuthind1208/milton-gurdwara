@@ -1,0 +1,952 @@
+[
+  {
+    "id": 151,
+    "category": "Sikh History",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Sikh History?",
+      "pa": "ਸਿੱਖ ਇਤਿਹਾਸ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Bhai Gurdas Ji",
+        "pa": "ਭਾਈ ਗੁਰਦਾਸ ਜੀ"
+      },
+      {
+        "en": "Bebe Nanaki Ji",
+        "pa": "ਬੇਬੇ ਨਾਨਕੀ ਜੀ"
+      },
+      {
+        "en": "Langar for all",
+        "pa": "ਸਭ ਲਈ ਲੰਗਰ"
+      },
+      {
+        "en": "Maharaja Ranjit Singh",
+        "pa": "ਮਹਾਰਾਜਾ ਰਣਜੀਤ ਸਿੰਘ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Maharaja Ranjit Singh is an accurate match for Sikh History in Sikh learning for ages 6-12.",
+      "pa": "ਮਹਾਰਾਜਾ ਰਣਜੀਤ ਸਿੰਘ ਸਿੱਖ ਇਤਿਹਾਸ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 152,
+    "category": "Sikh History",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Sikh History.",
+      "pa": "ਸਿੱਖ ਇਤਿਹਾਸ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Anandpur Sahib events",
+        "pa": "ਅਨੰਦਪੁਰ ਸਾਹਿਬ ਦੀਆਂ ਘਟਨਾਵਾਂ"
+      },
+      {
+        "en": "Waheguru Ji Ka Khalsa",
+        "pa": "ਵਾਹਿਗੁਰੂ ਜੀ ਕਾ ਖਾਲਸਾ"
+      },
+      {
+        "en": "Bhai Sahib Singh Ji",
+        "pa": "ਭਾਈ ਸਾਹਿਬ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Saint-Soldier ideal",
+        "pa": "ਸੰਤ-ਸਿਪਾਹੀ ਆਦਰਸ਼"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Anandpur Sahib events is an accurate match for Sikh History in Sikh learning for ages 6-12.",
+      "pa": "ਅਨੰਦਪੁਰ ਸਾਹਿਬ ਦੀਆਂ ਘਟਨਾਵਾਂ ਸਿੱਖ ਇਤਿਹਾਸ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 153,
+    "category": "Sikh History",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Sikh History?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਸਿੱਖ ਇਤਿਹਾਸ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Khanda",
+        "pa": "ਖੰਡਾ"
+      },
+      {
+        "en": "Chamkaur battle",
+        "pa": "ਚਮਕੌਰ ਦੀ ਲੜਾਈ"
+      },
+      {
+        "en": "Darbar Sahib hall",
+        "pa": "ਦਰਬਾਰ ਸਾਹਿਬ ਹਾਲ"
+      },
+      {
+        "en": "Two kirpans",
+        "pa": "ਦੋ ਕਿਰਪਾਨਾਂ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Chamkaur battle is an accurate match for Sikh History in Sikh learning for ages 6-12.",
+      "pa": "ਚਮਕੌਰ ਦੀ ਲੜਾਈ ਸਿੱਖ ਇਤਿਹਾਸ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 154,
+    "category": "Sikh History",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Sikh History topic.",
+      "pa": "ਸਿੱਖ ਇਤਿਹਾਸ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Kirat Karni",
+        "pa": "ਕਿਰਤ ਕਰਨੀ"
+      },
+      {
+        "en": "Naam Simran",
+        "pa": "ਨਾਮ ਸਿਮਰਨ"
+      },
+      {
+        "en": "Muktsar battle",
+        "pa": "ਮੁਕਤਸਰ ਦੀ ਲੜਾਈ"
+      },
+      {
+        "en": "Daya (compassion)",
+        "pa": "ਦਇਆ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Muktsar battle is an accurate match for Sikh History in Sikh learning for ages 6-12.",
+      "pa": "ਮੁਕਤਸਰ ਦੀ ਲੜਾਈ ਸਿੱਖ ਇਤਿਹਾਸ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 155,
+    "category": "Sikh History",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Sikh History?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਸਿੱਖ ਇਤਿਹਾਸ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Puranmashi",
+        "pa": "ਪੂਰਨਮਾਸੀ"
+      },
+      {
+        "en": "Baba Deep Singh Ji",
+        "pa": "ਬਾਬਾ ਦੀਪ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Hola Mohalla",
+        "pa": "ਹੋਲਾ ਮਹੱਲਾ"
+      },
+      {
+        "en": "Preserving freedom of faith",
+        "pa": "ਧਰਮ ਦੀ ਆਜ਼ਾਦੀ ਦੀ ਰੱਖਿਆ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Preserving freedom of faith is an accurate match for Sikh History in Sikh learning for ages 6-12.",
+      "pa": "ਧਰਮ ਦੀ ਆਜ਼ਾਦੀ ਦੀ ਰੱਖਿਆ ਸਿੱਖ ਇਤਿਹਾਸ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 156,
+    "category": "Sikh Values",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Sikh Values?",
+      "pa": "ਸਿੱਖ ਮੁੱਲ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Naam Japna",
+        "pa": "ਨਾਮ ਜਪਣਾ"
+      },
+      {
+        "en": "Bhai Gurdas Ji",
+        "pa": "ਭਾਈ ਗੁਰਦਾਸ ਜੀ"
+      },
+      {
+        "en": "Mai Bhago Ji",
+        "pa": "ਮਾਈ ਭਾਗੋ ਜੀ"
+      },
+      {
+        "en": "Community celebration",
+        "pa": "ਸਮੂਹਕ ਮਨਾਉਣ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Naam Japna is an accurate match for Sikh Values in Sikh learning for ages 6-12.",
+      "pa": "ਨਾਮ ਜਪਣਾ ਸਿੱਖ ਮੁੱਲ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 157,
+    "category": "Sikh Values",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Sikh Values.",
+      "pa": "ਸਿੱਖ ਮੁੱਲ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Guru Hargobind Sahib Ji",
+        "pa": "ਗੁਰੂ ਹਰਿਗੋਬਿੰਦ ਸਾਹਿਬ ਜੀ"
+      },
+      {
+        "en": "Saint-Soldier ideal",
+        "pa": "ਸੰਤ-ਸਿਪਾਹੀ ਆਦਰਸ਼"
+      },
+      {
+        "en": "Kirat Karni",
+        "pa": "ਕਿਰਤ ਕਰਨੀ"
+      },
+      {
+        "en": "Guru Granth Sahib Ji",
+        "pa": "ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Kirat Karni is an accurate match for Sikh Values in Sikh learning for ages 6-12.",
+      "pa": "ਕਿਰਤ ਕਰਨੀ ਸਿੱਖ ਮੁੱਲ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 158,
+    "category": "Sikh Values",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Sikh Values?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਸਿੱਖ ਮੁੱਲ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Vand Chhakna",
+        "pa": "ਵੰਡ ਛਕਣਾ"
+      },
+      {
+        "en": "Identity and discipline",
+        "pa": "ਪਹਿਚਾਣ ਅਤੇ ਅਨੁਸ਼ਾਸਨ"
+      },
+      {
+        "en": "Kesh",
+        "pa": "ਕੇਸ਼"
+      },
+      {
+        "en": "Khanda",
+        "pa": "ਖੰਡਾ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Vand Chhakna is an accurate match for Sikh Values in Sikh learning for ages 6-12.",
+      "pa": "ਵੰਡ ਛਕਣਾ ਸਿੱਖ ਮੁੱਲ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 159,
+    "category": "Sikh Values",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Sikh Values topic.",
+      "pa": "ਸਿੱਖ ਮੁੱਲ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Sangat and Pangat",
+        "pa": "ਸੰਗਤ ਅਤੇ ਪੰਗਤ"
+      },
+      {
+        "en": "Naam Simran",
+        "pa": "ਨਾਮ ਸਿਮਰਨ"
+      },
+      {
+        "en": "Rehras Sahib",
+        "pa": "ਰਿਹਰਾਸ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Seva",
+        "pa": "ਸੇਵਾ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Seva is an accurate match for Sikh Values in Sikh learning for ages 6-12.",
+      "pa": "ਸੇਵਾ ਸਿੱਖ ਮੁੱਲ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 160,
+    "category": "Sikh Values",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Sikh Values?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਸਿੱਖ ਮੁੱਲ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Puranmashi",
+        "pa": "ਪੂਰਨਮਾਸੀ"
+      },
+      {
+        "en": "Baba Deep Singh Ji",
+        "pa": "ਬਾਬਾ ਦੀਪ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Nimrata (humility)",
+        "pa": "ਨਿਮਰਤਾ"
+      },
+      {
+        "en": "Hola Mohalla",
+        "pa": "ਹੋਲਾ ਮਹੱਲਾ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Nimrata (humility) is an accurate match for Sikh Values in Sikh learning for ages 6-12.",
+      "pa": "ਨਿਮਰਤਾ ਸਿੱਖ ਮੁੱਲ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 161,
+    "category": "Sikh Values",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Sikh Values?",
+      "pa": "ਸਿੱਖ ਮੁੱਲ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Langar for all",
+        "pa": "ਸਭ ਲਈ ਲੰਗਰ"
+      },
+      {
+        "en": "Sat (truth)",
+        "pa": "ਸੱਚ"
+      },
+      {
+        "en": "Bhai Gurdas Ji",
+        "pa": "ਭਾਈ ਗੁਰਦਾਸ ਜੀ"
+      },
+      {
+        "en": "Bebe Nanaki Ji",
+        "pa": "ਬੇਬੇ ਨਾਨਕੀ ਜੀ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Sat (truth) is an accurate match for Sikh Values in Sikh learning for ages 6-12.",
+      "pa": "ਸੱਚ ਸਿੱਖ ਮੁੱਲ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 162,
+    "category": "Sikh Values",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Sikh Values.",
+      "pa": "ਸਿੱਖ ਮੁੱਲ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Daya (compassion)",
+        "pa": "ਦਇਆ"
+      },
+      {
+        "en": "Saint-Soldier ideal",
+        "pa": "ਸੰਤ-ਸਿਪਾਹੀ ਆਦਰਸ਼"
+      },
+      {
+        "en": "Waheguru Ji Ka Khalsa",
+        "pa": "ਵਾਹਿਗੁਰੂ ਜੀ ਕਾ ਖਾਲਸਾ"
+      },
+      {
+        "en": "Bhai Sahib Singh Ji",
+        "pa": "ਭਾਈ ਸਾਹਿਬ ਸਿੰਘ ਜੀ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Daya (compassion) is an accurate match for Sikh Values in Sikh learning for ages 6-12.",
+      "pa": "ਦਇਆ ਸਿੱਖ ਮੁੱਲ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 163,
+    "category": "Sikh Values",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Sikh Values?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਸਿੱਖ ਮੁੱਲ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Khanda",
+        "pa": "ਖੰਡਾ"
+      },
+      {
+        "en": "Two kirpans",
+        "pa": "ਦੋ ਕਿਰਪਾਨਾਂ"
+      },
+      {
+        "en": "Darbar Sahib hall",
+        "pa": "ਦਰਬਾਰ ਸਾਹਿਬ ਹਾਲ"
+      },
+      {
+        "en": "Sarbat da Bhala",
+        "pa": "ਸਰਬੱਤ ਦਾ ਭਲਾ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Sarbat da Bhala is an accurate match for Sikh Values in Sikh learning for ages 6-12.",
+      "pa": "ਸਰਬੱਤ ਦਾ ਭਲਾ ਸਿੱਖ ਮੁੱਲ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 164,
+    "category": "Sikh Values",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Sikh Values topic.",
+      "pa": "ਸਿੱਖ ਮੁੱਲ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Equality",
+        "pa": "ਬਰਾਬਰੀ"
+      },
+      {
+        "en": "Shaheedi of Guru Arjan Dev Ji",
+        "pa": "ਗੁਰੂ ਅਰਜਨ ਦੇਵ ਜੀ ਦੀ ਸ਼ਹੀਦੀ"
+      },
+      {
+        "en": "Anandpur Sahib events",
+        "pa": "ਅਨੰਦਪੁਰ ਸਾਹਿਬ ਦੀਆਂ ਘਟਨਾਵਾਂ"
+      },
+      {
+        "en": "Naam Simran",
+        "pa": "ਨਾਮ ਸਿਮਰਨ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Equality is an accurate match for Sikh Values in Sikh learning for ages 6-12.",
+      "pa": "ਬਰਾਬਰੀ ਸਿੱਖ ਮੁੱਲ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 165,
+    "category": "Sikh Values",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Sikh Values?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਸਿੱਖ ਮੁੱਲ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Hola Mohalla",
+        "pa": "ਹੋਲਾ ਮਹੱਲਾ"
+      },
+      {
+        "en": "Respect for all",
+        "pa": "ਸਭ ਦਾ ਆਦਰ"
+      },
+      {
+        "en": "Baba Deep Singh Ji",
+        "pa": "ਬਾਬਾ ਦੀਪ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Puranmashi",
+        "pa": "ਪੂਰਨਮਾਸੀ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Respect for all is an accurate match for Sikh Values in Sikh learning for ages 6-12.",
+      "pa": "ਸਭ ਦਾ ਆਦਰ ਸਿੱਖ ਮੁੱਲ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 166,
+    "category": "Sikh Values",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Sikh Values?",
+      "pa": "ਸਿੱਖ ਮੁੱਲ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Guru Arjan Dev Ji",
+        "pa": "ਗੁਰੂ ਅਰਜਨ ਦੇਵ ਜੀ"
+      },
+      {
+        "en": "Langar for all",
+        "pa": "ਸਭ ਲਈ ਲੰਗਰ"
+      },
+      {
+        "en": "Naam Japna",
+        "pa": "ਨਾਮ ਜਪਣਾ"
+      },
+      {
+        "en": "Guru Gobind Singh Ji",
+        "pa": "ਗੁਰੂ ਗੋਬਿੰਦ ਸਿੰਘ ਜੀ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Naam Japna is an accurate match for Sikh Values in Sikh learning for ages 6-12.",
+      "pa": "ਨਾਮ ਜਪਣਾ ਸਿੱਖ ਮੁੱਲ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 167,
+    "category": "Sikh Values",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Sikh Values.",
+      "pa": "ਸਿੱਖ ਮੁੱਲ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Model of seva",
+        "pa": "ਸੇਵਾ ਦਾ ਮਾਡਲ"
+      },
+      {
+        "en": "Kirpan",
+        "pa": "ਕਿਰਪਾਨ"
+      },
+      {
+        "en": "Bhai Sahib Singh Ji",
+        "pa": "ਭਾਈ ਸਾਹਿਬ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Kirat Karni",
+        "pa": "ਕਿਰਤ ਕਰਨੀ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Kirat Karni is an accurate match for Sikh Values in Sikh learning for ages 6-12.",
+      "pa": "ਕਿਰਤ ਕਰਨੀ ਸਿੱਖ ਮੁੱਲ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 168,
+    "category": "Sikh Values",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Sikh Values?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਸਿੱਖ ਮੁੱਲ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Vand Chhakna",
+        "pa": "ਵੰਡ ਛਕਣਾ"
+      },
+      {
+        "en": "Japji Sahib",
+        "pa": "ਜਪੁਜੀ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Respectful silence",
+        "pa": "ਅਦਬ ਵਾਲੀ ਚੁੱਪ"
+      },
+      {
+        "en": "Darbar Sahib hall",
+        "pa": "ਦਰਬਾਰ ਸਾਹਿਬ ਹਾਲ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Vand Chhakna is an accurate match for Sikh Values in Sikh learning for ages 6-12.",
+      "pa": "ਵੰਡ ਛਕਣਾ ਸਿੱਖ ਮੁੱਲ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 169,
+    "category": "Sikh Values",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Sikh Values topic.",
+      "pa": "ਸਿੱਖ ਮੁੱਲ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Anandpur Sahib events",
+        "pa": "ਅਨੰਦਪੁਰ ਸਾਹਿਬ ਦੀਆਂ ਘਟਨਾਵਾਂ"
+      },
+      {
+        "en": "Sangrand",
+        "pa": "ਸੰਗਰਾਂਦ"
+      },
+      {
+        "en": "Seva",
+        "pa": "ਸੇਵਾ"
+      },
+      {
+        "en": "Gurpurab",
+        "pa": "ਗੁਰਪੁਰਬ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Seva is an accurate match for Sikh Values in Sikh learning for ages 6-12.",
+      "pa": "ਸੇਵਾ ਸਿੱਖ ਮੁੱਲ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 170,
+    "category": "Sikh Values",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Sikh Values?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਸਿੱਖ ਮੁੱਲ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Nimrata (humility)",
+        "pa": "ਨਿਮਰਤਾ"
+      },
+      {
+        "en": "Bhai Nand Lal Ji",
+        "pa": "ਭਾਈ ਨੰਦ ਲਾਲ ਜੀ"
+      },
+      {
+        "en": "Baba Deep Singh Ji",
+        "pa": "ਬਾਬਾ ਦੀਪ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Mehta Kalu Ji",
+        "pa": "ਮੇਹਤਾ ਕਾਲੂ ਜੀ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Nimrata (humility) is an accurate match for Sikh Values in Sikh learning for ages 6-12.",
+      "pa": "ਨਿਮਰਤਾ ਸਿੱਖ ਮੁੱਲ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 171,
+    "category": "Festivals",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Festivals?",
+      "pa": "ਤਿਉਹਾਰ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Shoes area (Jora Ghar)",
+        "pa": "ਜੋੜਾ ਘਰ"
+      },
+      {
+        "en": "Asa di Vaar",
+        "pa": "ਆਸਾ ਦੀ ਵਾਰ"
+      },
+      {
+        "en": "Cleanliness and seva",
+        "pa": "ਸਫ਼ਾਈ ਅਤੇ ਸੇਵਾ"
+      },
+      {
+        "en": "Vaisakhi",
+        "pa": "ਵਿਸਾਖੀ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Vaisakhi is an accurate match for Festivals in Sikh learning for ages 6-12.",
+      "pa": "ਵਿਸਾਖੀ ਤਿਉਹਾਰ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 172,
+    "category": "Festivals",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Festivals.",
+      "pa": "ਤਿਉਹਾਰ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Nimrata (humility)",
+        "pa": "ਨਿਮਰਤਾ"
+      },
+      {
+        "en": "Respect for all",
+        "pa": "ਸਭ ਦਾ ਆਦਰ"
+      },
+      {
+        "en": "Gurpurab",
+        "pa": "ਗੁਰਪੁਰਬ"
+      },
+      {
+        "en": "Preserving freedom of faith",
+        "pa": "ਧਰਮ ਦੀ ਆਜ਼ਾਦੀ ਦੀ ਰੱਖਿਆ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Gurpurab is an accurate match for Festivals in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰਪੁਰਬ ਤਿਉਹਾਰ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 173,
+    "category": "Festivals",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Festivals?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਤਿਉਹਾਰ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Japji Sahib",
+        "pa": "ਜਪੁਜੀ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Hola Mohalla",
+        "pa": "ਹੋਲਾ ਮਹੱਲਾ"
+      },
+      {
+        "en": "Bhai Mani Singh Ji",
+        "pa": "ਭਾਈ ਮਨੀ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Talwandi (Nankana Sahib)",
+        "pa": "ਤਲਵੰਡੀ (ਨਨਕਾਣਾ ਸਾਹਿਬ)"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Hola Mohalla is an accurate match for Festivals in Sikh learning for ages 6-12.",
+      "pa": "ਹੋਲਾ ਮਹੱਲਾ ਤਿਉਹਾਰ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 174,
+    "category": "Festivals",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Festivals topic.",
+      "pa": "ਤਿਉਹਾਰ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Maghi",
+        "pa": "ਮਾਘੀ"
+      },
+      {
+        "en": "Anandpur Sahib",
+        "pa": "ਅਨੰਦਪੁਰ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Fearless living",
+        "pa": "ਨਿਰਭਉ ਜੀਵਨ"
+      },
+      {
+        "en": "Bhai Dharam Singh Ji",
+        "pa": "ਭਾਈ ਧਰਮ ਸਿੰਘ ਜੀ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Maghi is an accurate match for Festivals in Sikh learning for ages 6-12.",
+      "pa": "ਮਾਘੀ ਤਿਉਹਾਰ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 175,
+    "category": "Festivals",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Festivals?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਤਿਉਹਾਰ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Khalsa symbols",
+        "pa": "ਖਾਲਸਾ ਚਿੰਨ੍ਹ"
+      },
+      {
+        "en": "Ek Onkar symbol",
+        "pa": "ਇਕ ਓਅੰਕਾਰ ਚਿੰਨ੍ਹ"
+      },
+      {
+        "en": "Sikh flag",
+        "pa": "ਸਿੱਖ ਝੰਡਾ"
+      },
+      {
+        "en": "Bandi Chhor Divas",
+        "pa": "ਬੰਦੀ ਛੋੜ ਦਿਵਸ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Bandi Chhor Divas is an accurate match for Festivals in Sikh learning for ages 6-12.",
+      "pa": "ਬੰਦੀ ਛੋੜ ਦਿਵਸ ਤਿਉਹਾਰ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  }
+]

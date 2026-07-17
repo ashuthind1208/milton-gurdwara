@@ -116,6 +116,36 @@ const AdminUsersPage = () => {
     return users.filter((user) => String(user.approvalStatus || 'pending').toLowerCase() === activeFilter.toLowerCase());
   }, [activeFilter, users]);
 
+  const familyJoinKpi = useMemo(() => {
+    const now = new Date();
+    const month = now.getMonth();
+    const year = now.getFullYear();
+    const families = users.filter((entry) => String(entry.role || '').trim().toLowerCase() === 'family');
+
+    let joinedThisMonth = 0;
+    let joinedThisYear = 0;
+
+    families.forEach((entry) => {
+      const created = new Date(entry.createdAt || 0);
+      if (Number.isNaN(created.getTime())) {
+        return;
+      }
+
+      if (created.getFullYear() === year) {
+        joinedThisYear += 1;
+        if (created.getMonth() === month) {
+          joinedThisMonth += 1;
+        }
+      }
+    });
+
+    return {
+      totalFamilies: families.length,
+      joinedThisMonth,
+      joinedThisYear
+    };
+  }, [users]);
+
   const openEditUser = (user) => {
     setViewUser(null);
     setEditUserId(user.id);
@@ -188,6 +218,21 @@ const AdminUsersPage = () => {
           ))}
         </div>
 
+        <div className="mb-4 grid gap-3 md:grid-cols-3">
+          <div className="rounded-xl border border-brand-blue/20 bg-blue-50 px-3 py-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Families Total</p>
+            <p className="mt-1 text-2xl font-extrabold text-brand-blue">{familyJoinKpi.totalFamilies}</p>
+          </div>
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Families Joined This Month</p>
+            <p className="mt-1 text-2xl font-extrabold text-emerald-700">{familyJoinKpi.joinedThisMonth}</p>
+          </div>
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Families Joined This Year</p>
+            <p className="mt-1 text-2xl font-extrabold text-amber-700">{familyJoinKpi.joinedThisYear}</p>
+          </div>
+        </div>
+
         <div className="overflow-x-auto rounded-xl border border-slate-200">
           <table className="min-w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-500">
@@ -195,6 +240,7 @@ const AdminUsersPage = () => {
                 <th className="px-3 py-2.5">User</th>
                 <th className="px-3 py-2.5">Email</th>
                 <th className="px-3 py-2.5">Role</th>
+                <th className="px-3 py-2.5">Joined</th>
                 <th className="px-3 py-2.5">Approval</th>
                 <th className="px-3 py-2.5">Status</th>
                 <th className="px-3 py-2.5">Actions</th>
@@ -219,6 +265,7 @@ const AdminUsersPage = () => {
                         </div>
                         <p className="text-[12px] leading-snug text-slate-600">{user.email}</p>
                         <p className="text-[12px] leading-snug text-slate-600">{user.role || '-'}</p>
+                        <p className="text-[12px] leading-snug text-slate-600">Joined: {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '-'}</p>
                         <p className="text-[12px] leading-snug text-slate-600">Approval: {approvalStatus}</p>
                         <div>{renderActivePill(user)}</div>
                       </div>
@@ -234,6 +281,7 @@ const AdminUsersPage = () => {
                     </td>
                     <td className="admin-compact-mobile-hidden px-3 py-2.5 text-slate-700">{user.email}</td>
                     <td className="admin-compact-mobile-hidden px-3 py-2.5 text-slate-700">{user.role || '-'}</td>
+                    <td className="admin-compact-mobile-hidden px-3 py-2.5 text-slate-700">{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '-'}</td>
                     <td className="admin-compact-mobile-hidden px-3 py-2.5">
                       <div className="flex items-center gap-2">
                         <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${statusClassMap[approvalStatus] || statusClassMap.pending}`}>
@@ -289,7 +337,7 @@ const AdminUsersPage = () => {
 
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td className="px-3 py-4 text-center text-slate-500" colSpan={6}>No users found for this tab.</td>
+                  <td className="px-3 py-4 text-center text-slate-500" colSpan={7}>No users found for this tab.</td>
                 </tr>
               ) : null}
             </tbody>
@@ -322,6 +370,7 @@ const AdminUsersPage = () => {
               </label>
               <label className="text-sm">Role
                 <select {...form.register('role')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
+                  <option>Family</option>
                   <option>Member</option>
                   <option>Volunteer</option>
                   <option>Admin</option>
@@ -357,6 +406,7 @@ const AdminUsersPage = () => {
               <p><span className="font-semibold">Phone:</span> {viewUser.phone || '-'}</p>
               <p><span className="font-semibold">Address:</span> {viewUser.address || '-'}</p>
               <p><span className="font-semibold">Role:</span> {viewUser.role || '-'}</p>
+              <p><span className="font-semibold">Joined:</span> {viewUser.createdAt ? new Date(viewUser.createdAt).toLocaleDateString() : '-'}</p>
               <p><span className="font-semibold">Approval:</span> {viewUser.approvalStatus || 'pending'}</p>
               <p><span className="font-semibold">Status:</span> {viewUser.isActive === false ? 'Inactive' : 'Active'}</p>
             </div>
@@ -392,6 +442,7 @@ const AdminUsersPage = () => {
               </label>
               <label className="text-sm">Role
                 <select {...editForm.register('role')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
+                  <option>Family</option>
                   <option>Member</option>
                   <option>Volunteer</option>
                   <option>Admin</option>

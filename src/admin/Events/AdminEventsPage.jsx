@@ -17,6 +17,9 @@ import { siteConfig } from '../../constants/siteConfig';
 import { downloadRegistrationCsv, downloadRegistrationPdf } from '../../utils/csvExport';
 import uploadService from '../../services/uploadService';
 import StatusAlert from '../../components/common/StatusAlert';
+import contentApiService from '../../services/contentApiService';
+
+const EVENTS_IDENTITY_SETTING_KEY = 'settings-events-allow-custom-name-email';
 
 const actionIconClass = 'h-4 w-4';
 const quarterMinuteOptions = ['00', '15', '30', '45'];
@@ -167,11 +170,14 @@ const EventTimeField = ({ label, triggerLabel, value, onCommit, required = false
 
 const defaultForm = {
   title: '',
+  description: '',
   date: '',
   endDate: '',
   location: '',
   category: 'Paath',
   mediaUrl: '',
+  capacity: 0,
+  waitlistEnabled: true,
   registrations: 0,
   active: true
 };
@@ -204,6 +210,14 @@ const AdminEventsPage = () => {
   const { data: events = [] } = useQuery({
     queryKey: ['admin-events'],
     queryFn: () => eventService.getEvents().then((res) => res.data)
+  });
+  const { data: eventsIdentitySettings = { enabled: false } } = useQuery({
+    queryKey: [EVENTS_IDENTITY_SETTING_KEY],
+    queryFn: () => contentApiService.getSingleton(EVENTS_IDENTITY_SETTING_KEY, { enabled: false })
+  });
+  const updateEventsIdentitySettingMutation = useMutation({
+    mutationFn: (enabled) => contentApiService.setSingleton(EVENTS_IDENTITY_SETTING_KEY, { enabled: Boolean(enabled) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [EVENTS_IDENTITY_SETTING_KEY] })
   });
 
   const createMutation = useMutation({
@@ -261,11 +275,14 @@ const AdminEventsPage = () => {
 
     editForm.reset({
       title: event.title,
+      description: event.description || '',
       date: startValue,
       endDate: endValue,
       location: event.location,
       category: event.category,
       mediaUrl: event.mediaUrl || '',
+      capacity: Number(event.capacity || 0),
+      waitlistEnabled: event.waitlistEnabled !== false,
       registrations: event.registrations || 0,
       active: typeof event.active === 'boolean' ? event.active : true
     });
@@ -417,6 +434,25 @@ const AdminEventsPage = () => {
   return (
     <div className="space-y-6">
       <h1 className="sr-only">Events</h1>
+
+      <Card>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">Website Identity Override</p>
+            <p className="text-xs text-slate-600">Allow visitors to edit Name and Email on Events registration form.</p>
+          </div>
+          <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
+            <span>{eventsIdentitySettings?.enabled ? 'Enabled' : 'Disabled'}</span>
+            <input
+              type="checkbox"
+              checked={Boolean(eventsIdentitySettings?.enabled)}
+              onChange={(event) => updateEventsIdentitySettingMutation.mutate(event.target.checked)}
+              disabled={updateEventsIdentitySettingMutation.isPending}
+              className="h-4 w-4"
+            />
+          </label>
+        </div>
+      </Card>
 
       <Card>
         <div className="overflow-x-auto">
@@ -615,6 +651,14 @@ const AdminEventsPage = () => {
               <label className="text-sm">Title
                 <input {...createForm.register('title', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
+              <label className="text-sm md:col-span-2">Description
+                <textarea
+                  {...createForm.register('description')}
+                  rows={3}
+                  placeholder="Add event details for attendees"
+                  className="mt-1 w-full rounded-lg border border-slate-300 p-2.5"
+                />
+              </label>
               <input type="hidden" {...createForm.register('date', { required: true })} />
               <input type="hidden" {...createForm.register('endDate', { required: true })} />
               <label className="text-sm md:col-span-2">Event Date
@@ -679,6 +723,13 @@ const AdminEventsPage = () => {
               <label className="text-sm">Expected Registrations
                 <input type="number" min="0" {...createForm.register('registrations')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
+              <label className="text-sm">Capacity (0 = unlimited)
+                <input type="number" min="0" {...createForm.register('capacity', { valueAsNumber: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="text-sm flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 mt-6">
+                <input type="checkbox" {...createForm.register('waitlistEnabled')} />
+                <span>Enable Waitlist</span>
+              </label>
               <label className="text-sm flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 mt-6">
                 <input type="checkbox" {...createForm.register('active')} />
                 <span>Active</span>
@@ -705,6 +756,14 @@ const AdminEventsPage = () => {
               </div>
               <label className="text-sm">Title
                 <input {...editForm.register('title', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="text-sm md:col-span-2">Description
+                <textarea
+                  {...editForm.register('description')}
+                  rows={3}
+                  placeholder="Add event details for attendees"
+                  className="mt-1 w-full rounded-lg border border-slate-300 p-2.5"
+                />
               </label>
               <input type="hidden" {...editForm.register('date', { required: true })} />
               <input type="hidden" {...editForm.register('endDate', { required: true })} />
@@ -770,6 +829,13 @@ const AdminEventsPage = () => {
               <label className="text-sm">Registrations
                 <input type="number" min="0" {...editForm.register('registrations')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
+              <label className="text-sm">Capacity (0 = unlimited)
+                <input type="number" min="0" {...editForm.register('capacity', { valueAsNumber: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="text-sm flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 mt-6">
+                <input type="checkbox" {...editForm.register('waitlistEnabled')} />
+                <span>Enable Waitlist</span>
+              </label>
               <label className="text-sm flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 mt-6">
                 <input type="checkbox" {...editForm.register('active')} />
                 <span>Active</span>
@@ -797,8 +863,11 @@ const AdminEventsPage = () => {
               <p><span className="font-semibold text-brand-blue">Category:</span> {viewEvent.category || '-'}</p>
               <p><span className="font-semibold text-brand-blue">Location:</span> {viewEvent.location || '-'}</p>
               <p><span className="font-semibold text-brand-blue">Media:</span> {viewEvent.mediaUrl ? <a href={viewEvent.mediaUrl} target="_blank" rel="noreferrer" className="text-brand-blue hover:underline">Open media</a> : '-'}</p>
+              <p className="md:col-span-2"><span className="font-semibold text-brand-blue">Description:</span> {viewEvent.description || '-'}</p>
               <p><span className="font-semibold text-brand-blue">Status:</span> {viewEvent.active === false ? 'Inactive' : 'Active'}</p>
               <p><span className="font-semibold text-brand-blue">Total Registrations:</span> {viewEvent.registrations || (viewEvent.registrants || []).length || 0}</p>
+              <p><span className="font-semibold text-brand-blue">Capacity:</span> {Number(viewEvent.capacity || 0) > 0 ? Number(viewEvent.capacity) : 'Unlimited'}</p>
+              <p><span className="font-semibold text-brand-blue">Waitlist:</span> {viewEvent.waitlistEnabled === false ? 'Disabled' : `Enabled (${Number(viewEvent.waitlistCount || 0)})`}</p>
             </div>
             <div className="mt-4 rounded-xl border border-slate-200 bg-white/90 p-3">
               <h4 className="text-sm font-semibold uppercase tracking-wide text-brand-blue">Registrants</h4>
@@ -812,6 +881,7 @@ const AdminEventsPage = () => {
                         <tr className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                           <th className="px-3 py-2">Name</th>
                           <th className="px-3 py-2">Contact</th>
+                          <th className="px-3 py-2">Status</th>
                           <th className="px-3 py-2 text-right">Action</th>
                         </tr>
                       </thead>
@@ -820,6 +890,7 @@ const AdminEventsPage = () => {
                           <tr key={entry.id} className="border-b border-slate-100 last:border-b-0">
                             <td className="px-3 py-2 font-medium text-slate-800">{entry.name || 'Anonymous'}</td>
                             <td className="px-3 py-2 text-slate-700">{entry.contact || 'No contact provided'}</td>
+                            <td className="px-3 py-2 text-slate-700">{entry.status || 'confirmed'}</td>
                             <td className="px-3 py-2 text-right">
                               <button
                                 type="button"

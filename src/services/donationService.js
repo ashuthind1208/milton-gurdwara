@@ -1,8 +1,60 @@
-import { mockResponse } from './mockApi';
+import { serviceResponse } from './serviceResponse';
 
 const LAST_PENDING_DONATION_KEY = 'ssm-donation-last-pending-id';
 
 let pendingCache = [];
+
+const normalizeCampaignProgressPhoto = (photo) => {
+  if (!photo) {
+    return '';
+  }
+
+  if (typeof photo === 'string') {
+    return photo.trim();
+  }
+
+  if (typeof photo === 'object') {
+    return String(photo.url || photo.src || '').trim();
+  }
+
+  return '';
+};
+
+const normalizeCampaignProgressUpdate = (update = {}) => {
+  if (!update || typeof update !== 'object') {
+    return null;
+  }
+
+  const date = String(update.date || '').trim();
+  const title = String(update.title || '').trim();
+  const description = String(update.description || '').trim();
+  const amountRaw = Number(update.amount);
+
+  return {
+    date,
+    title,
+    description,
+    amount: Number.isFinite(amountRaw) ? amountRaw : 0
+  };
+};
+
+const normalizeCampaignProgressItem = (item = {}, index = 0) => {
+  if (!item || typeof item !== 'object') {
+    return null;
+  }
+
+  const photosSource = Array.isArray(item.photos) ? item.photos : [];
+
+  return {
+    id: String(item.id || `progress-${index + 1}`),
+    title: String(item.title || '').trim(),
+    description: String(item.description || '').trim(),
+    details: String(item.details || '').trim(),
+    date: String(item.date || '').trim(),
+    isActive: item.isActive !== false,
+    photos: photosSource.map((photo) => normalizeCampaignProgressPhoto(photo)).filter(Boolean)
+  };
+};
 
 const normalizeCampaign = (campaign = {}) => {
   const raisedValue = Number(campaign.raised ?? 0);
@@ -11,11 +63,31 @@ const normalizeCampaign = (campaign = {}) => {
   const target = Number.isFinite(targetValue) ? Math.max(0, targetValue) : 0;
   const isClosed = target > 0 && raised >= target;
   const provider = String(campaign.paymentProvider || campaign.payment_provider || 'STRIPE').toUpperCase();
+  const progressPhotosSource = Array.isArray(campaign.progressPhotos)
+    ? campaign.progressPhotos
+    : (Array.isArray(campaign.progress_photos) ? campaign.progress_photos : []);
+  const progressUpdatesSource = Array.isArray(campaign.progressUpdates)
+    ? campaign.progressUpdates
+    : (Array.isArray(campaign.progress_updates) ? campaign.progress_updates : []);
+  const progressItemsSource = Array.isArray(campaign.progressItems)
+    ? campaign.progressItems
+    : (Array.isArray(campaign.progress_items) ? campaign.progress_items : []);
 
   return {
     id: Number(campaign.id),
     name: campaign.name || '',
     description: campaign.description || '',
+    progressTitle: String(campaign.progressTitle || campaign.progress_title || '').trim(),
+    progressDescription: String(campaign.progressDescription || campaign.progress_description || '').trim(),
+    progressPhotos: progressPhotosSource
+      .map((entry) => normalizeCampaignProgressPhoto(entry))
+      .filter(Boolean),
+    progressUpdates: progressUpdatesSource
+      .map((entry) => normalizeCampaignProgressUpdate(entry))
+      .filter(Boolean),
+    progressItems: progressItemsSource
+      .map((entry, index) => normalizeCampaignProgressItem(entry, index))
+      .filter((entry) => Boolean(entry && entry.title)),
     raised,
     target,
     isActive: Boolean(campaign.isActive ?? campaign.is_active ?? true),
@@ -184,7 +256,7 @@ const sendReceiptEmail = async ({ donorEmail, donorName, receiptId, amount, camp
     return { sent: false, reason: 'missing_email' };
   }
 
-  return mockResponse(
+  return serviceResponse(
     {
       sent: true,
       to: donorEmail,
@@ -397,20 +469,20 @@ const resolveCheckoutUrl = async ({ campaign, amount, donorName, donorEmail, pen
 const donationService = {
   getCampaigns: async () => {
     const campaigns = await applyServerRaisedTotals(await readCampaignsFromServer());
-    return mockResponse(campaigns.filter((campaign) => campaign.isActive));
+    return serviceResponse(campaigns.filter((campaign) => campaign.isActive));
   },
 
   getAllCampaigns: async () => {
     const campaigns = await applyServerRaisedTotals(await readCampaignsFromServer());
-    return mockResponse(campaigns);
+    return serviceResponse(campaigns);
   },
 
   getDonations: async () => {
     const merged = mergeDonations(await readServerDonations());
-    return mockResponse(merged);
+    return serviceResponse(merged);
   },
 
-  getPendingDonations: async () => mockResponse(await readPendingFromServer()),
+  getPendingDonations: async () => serviceResponse(await readPendingFromServer()),
 
   getLastPendingDonationId: () => readLastPendingDonationId(),
 
@@ -431,7 +503,7 @@ const donationService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload || {})
     });
-    return mockResponse(normalizeCampaign(response.data || payload));
+    return serviceResponse(normalizeCampaign(response.data || payload));
   },
 
   updateCampaign: async (id, payload) => {
@@ -440,19 +512,19 @@ const donationService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload || {})
     });
-    return mockResponse(normalizeCampaign(response.data || { ...payload, id }));
+    return serviceResponse(normalizeCampaign(response.data || { ...payload, id }));
   },
 
   removeCampaign: async (id) => {
     await fetchJson(`/api/donation-campaigns/${encodeURIComponent(id)}`, { method: 'DELETE' });
-    return mockResponse({ success: true });
+    return serviceResponse({ success: true });
   },
 
   clearDonations: async () => {
     await fetchJson('/api/donations', { method: 'DELETE' });
     pendingCache = [];
     writeLastPendingDonationId('');
-    return mockResponse({ success: true, cleared: true });
+    return serviceResponse({ success: true, cleared: true });
   },
 
   resolveStripePaymentDetails,
@@ -531,7 +603,7 @@ const donationService = {
     pendingCache = [createdPending, ...pendingCache.filter((entry) => entry.id !== createdPending.id)];
     writeLastPendingDonationId(createdPending.id);
 
-    return mockResponse({
+    return serviceResponse({
       success: true,
       pendingId: createdPending.id,
       checkoutUrl: createdPending.checkoutUrl,
@@ -562,7 +634,7 @@ const donationService = {
 
       const campaigns = await readCampaignsFromServer();
       const campaign = campaigns.find((entry) => Number(entry.id) === Number(existingDonation.campaignId)) || null;
-      return mockResponse({
+      return serviceResponse({
         success: true,
         receiptId: existingDonation.receiptId,
         emailSent: Boolean(existingDonation.emailSent),
@@ -642,7 +714,7 @@ const donationService = {
       writeLastPendingDonationId('');
     }
 
-    return mockResponse({
+    return serviceResponse({
       success: true,
       receiptId,
       emailSent: donationRecord.emailSent,
@@ -717,7 +789,7 @@ const donationService = {
       body: JSON.stringify({ raised: nextRaised })
     });
 
-    return mockResponse({
+    return serviceResponse({
       success: true,
       receiptId,
       emailSent: donationRecord.emailSent,

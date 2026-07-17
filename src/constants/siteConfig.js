@@ -55,6 +55,7 @@ export const siteConfig = {
 export const userRoles = {
   SUPER_ADMIN: 'Super Admin',
   ADMIN: 'Admin',
+  FAMILY: 'Family',
   MEMBER: 'Member',
   VOLUNTEER: 'Volunteer'
 };

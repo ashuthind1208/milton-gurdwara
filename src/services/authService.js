@@ -1,13 +1,6 @@
-import { mockResponse } from './mockApi';
+import { serviceResponse } from './serviceResponse';
 import { userRoles } from '../constants/siteConfig';
 import userService from './userService';
-
-const mockUser = {
-  id: '1',
-  name: 'Admin Singh',
-  email: 'admin@singhsabhamilton.org',
-  role: userRoles.SUPER_ADMIN
-};
 
 const getAdminEmails = () => {
   const configured = process.env.REACT_APP_ADMIN_EMAILS || '';
@@ -27,6 +20,9 @@ const resolveMemberType = (role) => {
   if (role === userRoles.VOLUNTEER) {
     return 'Volunteer';
   }
+  if (role === userRoles.FAMILY) {
+    return 'Family';
+  }
   return 'Member';
 };
 
@@ -34,11 +30,8 @@ const mapRoleByEmail = (email) => {
   const adminEmails = getAdminEmails();
   const normalizedEmail = String(email || '').toLowerCase();
 
-  // If admin emails are not configured, keep a safe fallback for the seeded admin account only.
   if (adminEmails.length === 0) {
-    return normalizedEmail === String(mockUser.email).toLowerCase()
-      ? userRoles.SUPER_ADMIN
-      : null;
+    return null;
   }
 
   return adminEmails.includes(normalizedEmail)
@@ -46,25 +39,79 @@ const mapRoleByEmail = (email) => {
     : null;
 };
 
-const getAssignedRole = ({ email, fallbackRole = userRoles.MEMBER }) => mapRoleByEmail(email) || fallbackRole;
+const getAssignedRole = ({ email, fallbackRole = userRoles.FAMILY }) => mapRoleByEmail(email) || fallbackRole;
+
+const resolveAuthPolicy = ({ email, intent = 'signin', existingUser = null }) => {
+  const isAllowlistedAdmin = mapRoleByEmail(email) === userRoles.SUPER_ADMIN;
+  if (isAllowlistedAdmin) {
+    return {
+      role: userRoles.SUPER_ADMIN,
+      approvalStatus: 'approved',
+      registrationComplete: true
+    };
+  }
+
+  if (intent === 'signup') {
+    return {
+      role: userRoles.MEMBER,
+      approvalStatus: 'pending',
+      registrationComplete: true
+    };
+  }
+
+  if (existingUser?.role) {
+    return {
+      role: existingUser.role,
+      approvalStatus: existingUser.approvalStatus || 'approved',
+      registrationComplete: true
+    };
+  }
+
+  return {
+    role: userRoles.FAMILY,
+    approvalStatus: 'approved',
+    registrationComplete: true
+  };
+};
+
+const getPersistedUser = () => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem('gurdwara_user');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
 
 const authService = {
   login: async ({ email }) => {
-    const resolvedEmail = email || mockUser.email;
-    const assignedRole = getAssignedRole({ email: resolvedEmail, fallbackRole: userRoles.MEMBER });
+    const resolvedEmail = String(email || '').trim();
+    if (!resolvedEmail) {
+      throw new Error('Email is required for login.');
+    }
+    const existingUser = await userService.getUserByEmail(resolvedEmail).then((res) => res.data);
+    const policy = resolveAuthPolicy({ email: resolvedEmail, intent: 'signin', existingUser });
+    const assignedRole = policy.role;
     const persisted = await userService.upsertUserByEmail({
-      name: resolvedEmail.split('@')[0],
+      name: existingUser?.name || resolvedEmail.split('@')[0],
       email: resolvedEmail,
       role: assignedRole,
       memberType: resolveMemberType(assignedRole),
       authProvider: 'LOCAL',
-      registrationComplete: false
+      registrationComplete: policy.registrationComplete,
+      approvalStatus: policy.approvalStatus,
+      phone: existingUser?.phone || '',
+      address: existingUser?.address || '',
+      avatarUrl: existingUser?.avatarUrl || ''
     }).then((res) => res.data);
 
-    return mockResponse({
-      token: 'mock-jwt-token',
+    return serviceResponse({
+      token: `session-token-${Date.now()}`,
       user: {
-        ...mockUser,
         ...persisted,
         email: resolvedEmail,
         role: assignedRole
@@ -72,23 +119,14 @@ const authService = {
     });
   },
   loginWithGoogle: async ({ email, name, avatarUrl, intent = 'signin' }) => {
-    const resolvedEmail = email || mockUser.email;
-    const role = mapRoleByEmail(resolvedEmail);
-    const existingUser = await userService.getUserByEmail(resolvedEmail).then((res) => res.data);
-
-    if (intent === 'signin' && !existingUser) {
-      const error = new Error('Please register.');
-      error.code = 'USER_NOT_REGISTERED';
-      throw error;
+    const resolvedEmail = String(email || '').trim();
+    if (!resolvedEmail) {
+      throw new Error('Email is required for Google login.');
     }
-
-    const fallbackRole = existingUser?.role || (role || userRoles.MEMBER);
-    const assignedRole = getAssignedRole({ email: resolvedEmail, fallbackRole });
+    const existingUser = await userService.getUserByEmail(resolvedEmail).then((res) => res.data);
+    const policy = resolveAuthPolicy({ email: resolvedEmail, intent, existingUser });
+    const assignedRole = policy.role;
     const existingMemberType = resolveMemberType(assignedRole);
-    const existingRegistrationComplete = Boolean(existingUser?.registrationComplete);
-    const existingApprovalStatus = assignedRole === userRoles.SUPER_ADMIN || assignedRole === userRoles.ADMIN
-      ? 'approved'
-      : (existingUser?.approvalStatus || 'pending');
 
     const persisted = await userService.upsertUserByEmail({
       name: existingUser?.name || name || resolvedEmail.split('@')[0],
@@ -99,12 +137,12 @@ const authService = {
       avatarUrl: avatarUrl || existingUser?.avatarUrl || existingUser?.picture || existingUser?.photoURL,
       phone: existingUser?.phone || '',
       address: existingUser?.address || '',
-      registrationComplete: intent === 'signin' ? true : existingRegistrationComplete,
-      approvalStatus: existingApprovalStatus
+      registrationComplete: policy.registrationComplete,
+      approvalStatus: policy.approvalStatus
     }).then((res) => res.data);
 
-    return mockResponse({
-      token: `google-mock-token-${Date.now()}`,
+    return serviceResponse({
+      token: `google-session-token-${Date.now()}`,
       user: {
         ...persisted,
         id: persisted.id,
@@ -117,7 +155,7 @@ const authService = {
     });
   },
   completeRegistration: async ({ email, name, phone, address, memberType, role, avatarUrl }) => {
-    const assignedRole = getAssignedRole({ email, fallbackRole: role || userRoles.MEMBER });
+    const assignedRole = getAssignedRole({ email, fallbackRole: role || userRoles.FAMILY });
     const updatedUser = await userService.completeRegistration({
       email,
       name,
@@ -128,8 +166,8 @@ const authService = {
       avatarUrl
     }).then((res) => res.data);
 
-    return mockResponse({
-      token: `google-mock-token-${Date.now()}`,
+    return serviceResponse({
+      token: `google-session-token-${Date.now()}`,
       user: {
         ...updatedUser,
         role: getAssignedRole({ email: updatedUser.email, fallbackRole: updatedUser.role || assignedRole })
@@ -164,8 +202,8 @@ const authService = {
       return sanitized;
     }
   },
-  logout: async () => mockResponse({ success: true }),
-  me: async () => mockResponse({ user: mockUser })
+  logout: async () => serviceResponse({ success: true }),
+  me: async () => serviceResponse({ user: getPersistedUser() })
 };
 
 export default authService;

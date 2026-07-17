@@ -1,0 +1,952 @@
+[
+  {
+    "id": 1,
+    "category": "Guru Nanak Dev Ji",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Guru Nanak Dev Ji?",
+      "pa": "ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Guru Arjan Dev Ji",
+        "pa": "ਗੁਰੂ ਅਰਜਨ ਦੇਵ ਜੀ"
+      },
+      {
+        "en": "Khande di Pahul",
+        "pa": "ਖੰਡੇ ਦੀ ਪਾਹੁਲ"
+      },
+      {
+        "en": "Talwandi (Nankana Sahib)",
+        "pa": "ਤਲਵੰਡੀ (ਨਨਕਾਣਾ ਸਾਹਿਬ)"
+      },
+      {
+        "en": "Guru Gobind Singh Ji",
+        "pa": "ਗੁਰੂ ਗੋਬਿੰਦ ਸਿੰਘ ਜੀ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Talwandi (Nankana Sahib) is an accurate match for Guru Nanak Dev Ji in Sikh learning for ages 6-12.",
+      "pa": "ਤਲਵੰਡੀ (ਨਨਕਾਣਾ ਸਾਹਿਬ) ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 2,
+    "category": "Guru Nanak Dev Ji",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Guru Nanak Dev Ji.",
+      "pa": "ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Mata Tripta Ji",
+        "pa": "ਮਾਤਾ ਤ੍ਰਿਪਤਾ ਜੀ"
+      },
+      {
+        "en": "Kirpan",
+        "pa": "ਕਿਰਪਾਨ"
+      },
+      {
+        "en": "Model of seva",
+        "pa": "ਸੇਵਾ ਦਾ ਮਾਡਲ"
+      },
+      {
+        "en": "Live with rehat",
+        "pa": "ਰਹਿਤ ਨਾਲ ਜੀਵਨ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Mata Tripta Ji is an accurate match for Guru Nanak Dev Ji in Sikh learning for ages 6-12.",
+      "pa": "ਮਾਤਾ ਤ੍ਰਿਪਤਾ ਜੀ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 3,
+    "category": "Guru Nanak Dev Ji",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Guru Nanak Dev Ji?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Respectful silence",
+        "pa": "ਅਦਬ ਵਾਲੀ ਚੁੱਪ"
+      },
+      {
+        "en": "Formation of Khalsa in 1699",
+        "pa": "1699 ਵਿੱਚ ਖਾਲਸਾ ਸਾਜਨਾ"
+      },
+      {
+        "en": "Shabad kirtan",
+        "pa": "ਸ਼ਬਦ ਕੀਰਤਨ"
+      },
+      {
+        "en": "Mehta Kalu Ji",
+        "pa": "ਮੇਹਤਾ ਕਾਲੂ ਜੀ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Mehta Kalu Ji is an accurate match for Guru Nanak Dev Ji in Sikh learning for ages 6-12.",
+      "pa": "ਮੇਹਤਾ ਕਾਲੂ ਜੀ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 4,
+    "category": "Guru Nanak Dev Ji",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Guru Nanak Dev Ji topic.",
+      "pa": "ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Daya (compassion)",
+        "pa": "ਦਇਆ"
+      },
+      {
+        "en": "Gurpurab",
+        "pa": "ਗੁਰਪੁਰਬ"
+      },
+      {
+        "en": "Bebe Nanaki Ji",
+        "pa": "ਬੇਬੇ ਨਾਨਕੀ ਜੀ"
+      },
+      {
+        "en": "Kirat Karni",
+        "pa": "ਕਿਰਤ ਕਰਨੀ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Bebe Nanaki Ji is an accurate match for Guru Nanak Dev Ji in Sikh learning for ages 6-12.",
+      "pa": "ਬੇਬੇ ਨਾਨਕੀ ਜੀ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 5,
+    "category": "Guru Nanak Dev Ji",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Guru Nanak Dev Ji?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Guru Tegh Bahadur Ji",
+        "pa": "ਗੁਰੂ ਤੇਗ ਬਹਾਦੁਰ ਜੀ"
+      },
+      {
+        "en": "Bhai Mardana Ji",
+        "pa": "ਭਾਈ ਮਰਦਾਨਾ ਜੀ"
+      },
+      {
+        "en": "Bhai Nand Lal Ji",
+        "pa": "ਭਾਈ ਨੰਦ ਲਾਲ ਜੀ"
+      },
+      {
+        "en": "Guru Ram Das Ji",
+        "pa": "ਗੁਰੂ ਰਾਮ ਦਾਸ ਜੀ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Bhai Mardana Ji is an accurate match for Guru Nanak Dev Ji in Sikh learning for ages 6-12.",
+      "pa": "ਭਾਈ ਮਰਦਾਨਾ ਜੀ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 6,
+    "category": "Guru Nanak Dev Ji",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Guru Nanak Dev Ji?",
+      "pa": "ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Japji Sahib",
+        "pa": "ਜਪੁਜੀ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Khande di Pahul",
+        "pa": "ਖੰਡੇ ਦੀ ਪਾਹੁਲ"
+      },
+      {
+        "en": "Discipline (Rehat)",
+        "pa": "ਰਹਿਤ ਅਨੁਸ਼ਾਸਨ"
+      },
+      {
+        "en": "Bhai Mohkam Singh Ji",
+        "pa": "ਭਾਈ ਮੋਹਕਮ ਸਿੰਘ ਜੀ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Japji Sahib is an accurate match for Guru Nanak Dev Ji in Sikh learning for ages 6-12.",
+      "pa": "ਜਪੁਜੀ ਸਾਹਿਬ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 7,
+    "category": "Guru Nanak Dev Ji",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Guru Nanak Dev Ji.",
+      "pa": "ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Live with rehat",
+        "pa": "ਰਹਿਤ ਨਾਲ ਜੀਵਨ"
+      },
+      {
+        "en": "Chakkar",
+        "pa": "ਚੱਕਰ"
+      },
+      {
+        "en": "Unity and courage",
+        "pa": "ਏਕਤਾ ਅਤੇ ਹਿੰਮਤ"
+      },
+      {
+        "en": "Udasis (travels)",
+        "pa": "ਉਦਾਸੀਆਂ (ਯਾਤਰਾਵਾਂ)"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Udasis (travels) is an accurate match for Guru Nanak Dev Ji in Sikh learning for ages 6-12.",
+      "pa": "ਉਦਾਸੀਆਂ (ਯਾਤਰਾਵਾਂ) ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 8,
+    "category": "Guru Nanak Dev Ji",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Guru Nanak Dev Ji?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Ik Onkar",
+        "pa": "ਇਕ ਓਅੰਕਾਰ"
+      },
+      {
+        "en": "Formation of Khalsa in 1699",
+        "pa": "1699 ਵਿੱਚ ਖਾਲਸਾ ਸਾਜਨਾ"
+      },
+      {
+        "en": "Maharaja Ranjit Singh",
+        "pa": "ਮਹਾਰਾਜਾ ਰਣਜੀਤ ਸਿੰਘ"
+      },
+      {
+        "en": "Shabad kirtan",
+        "pa": "ਸ਼ਬਦ ਕੀਰਤਨ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Ik Onkar is an accurate match for Guru Nanak Dev Ji in Sikh learning for ages 6-12.",
+      "pa": "ਇਕ ਓਅੰਕਾਰ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 9,
+    "category": "Guru Nanak Dev Ji",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Guru Nanak Dev Ji topic.",
+      "pa": "ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Gurpurab",
+        "pa": "ਗੁਰਪੁਰਬ"
+      },
+      {
+        "en": "Langar for all",
+        "pa": "ਸਭ ਲਈ ਲੰਗਰ"
+      },
+      {
+        "en": "Mata Khivi Ji",
+        "pa": "ਮਾਤਾ ਖੀਵੀ ਜੀ"
+      },
+      {
+        "en": "Sangrand",
+        "pa": "ਸੰਗਰਾਂਦ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Langar for all is an accurate match for Guru Nanak Dev Ji in Sikh learning for ages 6-12.",
+      "pa": "ਸਭ ਲਈ ਲੰਗਰ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 10,
+    "category": "Guru Nanak Dev Ji",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Guru Nanak Dev Ji?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Guru Tegh Bahadur Ji",
+        "pa": "ਗੁਰੂ ਤੇਗ ਬਹਾਦੁਰ ਜੀ"
+      },
+      {
+        "en": "Guru Ram Das Ji",
+        "pa": "ਗੁਰੂ ਰਾਮ ਦਾਸ ਜੀ"
+      },
+      {
+        "en": "Kirat Karo",
+        "pa": "ਕਿਰਤ ਕਰੋ"
+      },
+      {
+        "en": "Amrit Sanchar",
+        "pa": "ਅੰਮ੍ਰਿਤ ਸੰਚਾਰ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Kirat Karo is an accurate match for Guru Nanak Dev Ji in Sikh learning for ages 6-12.",
+      "pa": "ਕਿਰਤ ਕਰੋ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 11,
+    "category": "Guru Nanak Dev Ji",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Guru Nanak Dev Ji?",
+      "pa": "ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Role in Amrit ceremony",
+        "pa": "ਅੰਮ੍ਰਿਤ ਸਮਾਗਮ ਵਿੱਚ ਭੂਮਿਕਾ"
+      },
+      {
+        "en": "Kachhera",
+        "pa": "ਕਛਹਿਰਾ"
+      },
+      {
+        "en": "Bhai Mohkam Singh Ji",
+        "pa": "ਭਾਈ ਮੋਹਕਮ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Talwandi (Nankana Sahib)",
+        "pa": "ਤਲਵੰਡੀ (ਨਨਕਾਣਾ ਸਾਹਿਬ)"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Talwandi (Nankana Sahib) is an accurate match for Guru Nanak Dev Ji in Sikh learning for ages 6-12.",
+      "pa": "ਤਲਵੰਡੀ (ਨਨਕਾਣਾ ਸਾਹਿਬ) ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 12,
+    "category": "Guru Nanak Dev Ji",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Guru Nanak Dev Ji.",
+      "pa": "ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Mata Tripta Ji",
+        "pa": "ਮਾਤਾ ਤ੍ਰਿਪਤਾ ਜੀ"
+      },
+      {
+        "en": "Listening to kirtan",
+        "pa": "ਕੀਰਤਨ ਸੁਣਨਾ"
+      },
+      {
+        "en": "Head covered",
+        "pa": "ਸਿਰ ਢੱਕਣਾ"
+      },
+      {
+        "en": "Unity and courage",
+        "pa": "ਏਕਤਾ ਅਤੇ ਹਿੰਮਤ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Mata Tripta Ji is an accurate match for Guru Nanak Dev Ji in Sikh learning for ages 6-12.",
+      "pa": "ਮਾਤਾ ਤ੍ਰਿਪਤਾ ਜੀ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 13,
+    "category": "Guru Nanak Dev Ji",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Guru Nanak Dev Ji?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Maharaja Ranjit Singh",
+        "pa": "ਮਹਾਰਾਜਾ ਰਣਜੀਤ ਸਿੰਘ"
+      },
+      {
+        "en": "Sat (truth)",
+        "pa": "ਸੱਚ"
+      },
+      {
+        "en": "Mehta Kalu Ji",
+        "pa": "ਮੇਹਤਾ ਕਾਲੂ ਜੀ"
+      },
+      {
+        "en": "Naam Japna",
+        "pa": "ਨਾਮ ਜਪਣਾ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Mehta Kalu Ji is an accurate match for Guru Nanak Dev Ji in Sikh learning for ages 6-12.",
+      "pa": "ਮੇਹਤਾ ਕਾਲੂ ਜੀ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 14,
+    "category": "Guru Nanak Dev Ji",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Guru Nanak Dev Ji topic.",
+      "pa": "ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Bebe Nanaki Ji",
+        "pa": "ਬੇਬੇ ਨਾਨਕੀ ਜੀ"
+      },
+      {
+        "en": "Maharaja Ranjit Singh",
+        "pa": "ਮਹਾਰਾਜਾ ਰਣਜੀਤ ਸਿੰਘ"
+      },
+      {
+        "en": "Mata Khivi Ji",
+        "pa": "ਮਾਤਾ ਖੀਵੀ ਜੀ"
+      },
+      {
+        "en": "Guru Amar Das Ji",
+        "pa": "ਗੁਰੂ ਅਮਰ ਦਾਸ ਜੀ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Bebe Nanaki Ji is an accurate match for Guru Nanak Dev Ji in Sikh learning for ages 6-12.",
+      "pa": "ਬੇਬੇ ਨਾਨਕੀ ਜੀ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 15,
+    "category": "Guru Nanak Dev Ji",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Guru Nanak Dev Ji?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Guru Tegh Bahadur Ji",
+        "pa": "ਗੁਰੂ ਤੇਗ ਬਹਾਦੁਰ ਜੀ"
+      },
+      {
+        "en": "Equality of all",
+        "pa": "ਸਭ ਦੀ ਬਰਾਬਰੀ"
+      },
+      {
+        "en": "Amrit Sanchar",
+        "pa": "ਅੰਮ੍ਰਿਤ ਸੰਚਾਰ"
+      },
+      {
+        "en": "Bhai Mardana Ji",
+        "pa": "ਭਾਈ ਮਰਦਾਨਾ ਜੀ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Bhai Mardana Ji is an accurate match for Guru Nanak Dev Ji in Sikh learning for ages 6-12.",
+      "pa": "ਭਾਈ ਮਰਦਾਨਾ ਜੀ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 16,
+    "category": "Guru Nanak Dev Ji",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Guru Nanak Dev Ji?",
+      "pa": "ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Spiritual reminder",
+        "pa": "ਆਧਿਆਤਮਿਕ ਯਾਦ"
+      },
+      {
+        "en": "Kesri color",
+        "pa": "ਕੇਸਰੀ ਰੰਗ"
+      },
+      {
+        "en": "Japji Sahib",
+        "pa": "ਜਪੁਜੀ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Kachhera",
+        "pa": "ਕਛਹਿਰਾ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Japji Sahib is an accurate match for Guru Nanak Dev Ji in Sikh learning for ages 6-12.",
+      "pa": "ਜਪੁਜੀ ਸਾਹਿਬ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 17,
+    "category": "Guru Nanak Dev Ji",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Guru Nanak Dev Ji.",
+      "pa": "ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Live Gurbani values",
+        "pa": "ਗੁਰਬਾਣੀ ਮੁੱਲਾਂ ਅਨੁਸਾਰ ਜੀਵਨ"
+      },
+      {
+        "en": "Udasis (travels)",
+        "pa": "ਉਦਾਸੀਆਂ (ਯਾਤਰਾਵਾਂ)"
+      },
+      {
+        "en": "Listening to kirtan",
+        "pa": "ਕੀਰਤਨ ਸੁਣਨਾ"
+      },
+      {
+        "en": "Nitnem banis",
+        "pa": "ਨਿੱਤਨੇਮ ਬਾਣੀਆਂ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Udasis (travels) is an accurate match for Guru Nanak Dev Ji in Sikh learning for ages 6-12.",
+      "pa": "ਉਦਾਸੀਆਂ (ਯਾਤਰਾਵਾਂ) ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 18,
+    "category": "Guru Nanak Dev Ji",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Guru Nanak Dev Ji?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Ik Onkar",
+        "pa": "ਇਕ ਓਅੰਕਾਰ"
+      },
+      {
+        "en": "Sat (truth)",
+        "pa": "ਸੱਚ"
+      },
+      {
+        "en": "Vaisakhi",
+        "pa": "ਵਿਸਾਖੀ"
+      },
+      {
+        "en": "Parkash Purab",
+        "pa": "ਪਰਕਾਸ਼ ਪੁਰਬ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Ik Onkar is an accurate match for Guru Nanak Dev Ji in Sikh learning for ages 6-12.",
+      "pa": "ਇਕ ਓਅੰਕਾਰ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 19,
+    "category": "Guru Nanak Dev Ji",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Guru Nanak Dev Ji topic.",
+      "pa": "ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Guru Amar Das Ji",
+        "pa": "ਗੁਰੂ ਅਮਰ ਦਾਸ ਜੀ"
+      },
+      {
+        "en": "Guru Har Krishan Ji",
+        "pa": "ਗੁਰੂ ਹਰਿਕ੍ਰਿਸ਼ਨ ਜੀ"
+      },
+      {
+        "en": "Anandpur Sahib",
+        "pa": "ਅਨੰਦਪੁਰ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Langar for all",
+        "pa": "ਸਭ ਲਈ ਲੰਗਰ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Langar for all is an accurate match for Guru Nanak Dev Ji in Sikh learning for ages 6-12.",
+      "pa": "ਸਭ ਲਈ ਲੰਗਰ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 20,
+    "category": "Guru Nanak Dev Ji",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Guru Nanak Dev Ji?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Kirat Karo",
+        "pa": "ਕਿਰਤ ਕਰੋ"
+      },
+      {
+        "en": "Bhai Himmat Singh Ji",
+        "pa": "ਭਾਈ ਹਿੰਮਤ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Offered their heads",
+        "pa": "ਸਿਰ ਵਾਰ ਦਿੱਤੇ"
+      },
+      {
+        "en": "Equality of all",
+        "pa": "ਸਭ ਦੀ ਬਰਾਬਰੀ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Kirat Karo is an accurate match for Guru Nanak Dev Ji in Sikh learning for ages 6-12.",
+      "pa": "ਕਿਰਤ ਕਰੋ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 21,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Ten Sikh Gurus?",
+      "pa": "ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Bhai Mohkam Singh Ji",
+        "pa": "ਭਾਈ ਮੋਹਕਮ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Guru Angad Dev Ji",
+        "pa": "ਗੁਰੂ ਅੰਗਦ ਦੇਵ ਜੀ"
+      },
+      {
+        "en": "Kachhera",
+        "pa": "ਕਛਹਿਰਾ"
+      },
+      {
+        "en": "Role in Amrit ceremony",
+        "pa": "ਅੰਮ੍ਰਿਤ ਸਮਾਗਮ ਵਿੱਚ ਭੂਮਿਕਾ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Guru Angad Dev Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਅੰਗਦ ਦੇਵ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 22,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Ten Sikh Gurus.",
+      "pa": "ਦਸ ਸਿੱਖ ਗੁਰੂ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Head covered",
+        "pa": "ਸਿਰ ਢੱਕਣਾ"
+      },
+      {
+        "en": "Unity and courage",
+        "pa": "ਏਕਤਾ ਅਤੇ ਹਿੰਮਤ"
+      },
+      {
+        "en": "Guru Amar Das Ji",
+        "pa": "ਗੁਰੂ ਅਮਰ ਦਾਸ ਜੀ"
+      },
+      {
+        "en": "Listening to kirtan",
+        "pa": "ਕੀਰਤਨ ਸੁਣਨਾ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Guru Amar Das Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਅਮਰ ਦਾਸ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 23,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Ten Sikh Gurus?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Naam Japna",
+        "pa": "ਨਾਮ ਜਪਣਾ"
+      },
+      {
+        "en": "Sat (truth)",
+        "pa": "ਸੱਚ"
+      },
+      {
+        "en": "Maharaja Ranjit Singh",
+        "pa": "ਮਹਾਰਾਜਾ ਰਣਜੀਤ ਸਿੰਘ"
+      },
+      {
+        "en": "Guru Ram Das Ji",
+        "pa": "ਗੁਰੂ ਰਾਮ ਦਾਸ ਜੀ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Guru Ram Das Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਰਾਮ ਦਾਸ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 24,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Ten Sikh Gurus topic.",
+      "pa": "ਦਸ ਸਿੱਖ ਗੁਰੂ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Guru Arjan Dev Ji",
+        "pa": "ਗੁਰੂ ਅਰਜਨ ਦੇਵ ਜੀ"
+      },
+      {
+        "en": "Mata Tripta Ji",
+        "pa": "ਮਾਤਾ ਤ੍ਰਿਪਤਾ ਜੀ"
+      },
+      {
+        "en": "Maharaja Ranjit Singh",
+        "pa": "ਮਹਾਰਾਜਾ ਰਣਜੀਤ ਸਿੰਘ"
+      },
+      {
+        "en": "Mata Khivi Ji",
+        "pa": "ਮਾਤਾ ਖੀਵੀ ਜੀ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Guru Arjan Dev Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਅਰਜਨ ਦੇਵ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 25,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Ten Sikh Gurus?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Amrit Sanchar",
+        "pa": "ਅੰਮ੍ਰਿਤ ਸੰਚਾਰ"
+      },
+      {
+        "en": "Bhai Himmat Singh Ji",
+        "pa": "ਭਾਈ ਹਿੰਮਤ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Guru Hargobind Sahib Ji",
+        "pa": "ਗੁਰੂ ਹਰਿਗੋਬਿੰਦ ਸਾਹਿਬ ਜੀ"
+      },
+      {
+        "en": "Equality of all",
+        "pa": "ਸਭ ਦੀ ਬਰਾਬਰੀ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Guru Hargobind Sahib Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਹਰਿਗੋਬਿੰਦ ਸਾਹਿਬ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  }
+]

@@ -1,0 +1,952 @@
+[
+  {
+    "id": 76,
+    "category": "Panj Pyare",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Panj Pyare?",
+      "pa": "ਪੰਜ ਪਿਆਰੇ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Equality",
+        "pa": "ਬਰਾਬਰੀ"
+      },
+      {
+        "en": "Maghi",
+        "pa": "ਮਾਘੀ"
+      },
+      {
+        "en": "Five beloved ones",
+        "pa": "ਪੰਜ ਪਿਆਰੇ"
+      },
+      {
+        "en": "Seva",
+        "pa": "ਸੇਵਾ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Five beloved ones is an accurate match for Panj Pyare in Sikh learning for ages 6-12.",
+      "pa": "ਪੰਜ ਪਿਆਰੇ ਪੰਜ ਪਿਆਰੇ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 77,
+    "category": "Panj Pyare",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Panj Pyare.",
+      "pa": "ਪੰਜ ਪਿਆਰੇ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Kirat Karo",
+        "pa": "ਕਿਰਤ ਕਰੋ"
+      },
+      {
+        "en": "Courage and devotion",
+        "pa": "ਹਿੰਮਤ ਅਤੇ ਭਗਤੀ"
+      },
+      {
+        "en": "Bhai Vir Singh Ji",
+        "pa": "ਭਾਈ ਵੀਰ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Bhai Mardana Ji",
+        "pa": "ਭਾਈ ਮਰਦਾਨਾ ਜੀ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Courage and devotion is an accurate match for Panj Pyare in Sikh learning for ages 6-12.",
+      "pa": "ਹਿੰਮਤ ਅਤੇ ਭਗਤੀ ਪੰਜ ਪਿਆਰੇ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 78,
+    "category": "Panj Pyare",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Panj Pyare?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਪੰਜ ਪਿਆਰੇ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Offered their heads",
+        "pa": "ਸਿਰ ਵਾਰ ਦਿੱਤੇ"
+      },
+      {
+        "en": "Khalsa roop",
+        "pa": "ਖਾਲਸਾ ਰੂਪ"
+      },
+      {
+        "en": "Kesh",
+        "pa": "ਕੇਸ਼"
+      },
+      {
+        "en": "Identity and discipline",
+        "pa": "ਪਹਿਚਾਣ ਅਤੇ ਅਨੁਸ਼ਾਸਨ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Offered their heads is an accurate match for Panj Pyare in Sikh learning for ages 6-12.",
+      "pa": "ਸਿਰ ਵਾਰ ਦਿੱਤੇ ਪੰਜ ਪਿਆਰੇ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 79,
+    "category": "Panj Pyare",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Panj Pyare topic.",
+      "pa": "ਪੰਜ ਪਿਆਰੇ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Nishan Sahib",
+        "pa": "ਨਿਸ਼ਾਨ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Nishan pole",
+        "pa": "ਨਿਸ਼ਾਨ ਦਾ ਡੰਡਾ"
+      },
+      {
+        "en": "Langar hall",
+        "pa": "ਲੰਗਰ ਹਾਲ"
+      },
+      {
+        "en": "Role in Amrit ceremony",
+        "pa": "ਅੰਮ੍ਰਿਤ ਸਮਾਗਮ ਵਿੱਚ ਭੂਮਿਕਾ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Role in Amrit ceremony is an accurate match for Panj Pyare in Sikh learning for ages 6-12.",
+      "pa": "ਅੰਮ੍ਰਿਤ ਸਮਾਗਮ ਵਿੱਚ ਭੂਮਿਕਾ ਪੰਜ ਪਿਆਰੇ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 80,
+    "category": "Panj Pyare",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Panj Pyare?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਪੰਜ ਪਿਆਰੇ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Model of seva",
+        "pa": "ਸੇਵਾ ਦਾ ਮਾਡਲ"
+      },
+      {
+        "en": "Shaheedi of Guru Tegh Bahadur Ji",
+        "pa": "ਗੁਰੂ ਤੇਗ ਬਹਾਦੁਰ ਜੀ ਦੀ ਸ਼ਹੀਦੀ"
+      },
+      {
+        "en": "Chamkaur battle",
+        "pa": "ਚਮਕੌਰ ਦੀ ਲੜਾਈ"
+      },
+      {
+        "en": "Guru Granth Sahib Ji",
+        "pa": "ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Model of seva is an accurate match for Panj Pyare in Sikh learning for ages 6-12.",
+      "pa": "ਸੇਵਾ ਦਾ ਮਾਡਲ ਪੰਜ ਪਿਆਰੇ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 81,
+    "category": "Panj Pyare",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Panj Pyare?",
+      "pa": "ਪੰਜ ਪਿਆਰੇ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Maghi",
+        "pa": "ਮਾਘੀ"
+      },
+      {
+        "en": "Bhai Daya Singh Ji",
+        "pa": "ਭਾਈ ਦਇਆ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Mai Bhago Ji",
+        "pa": "ਮਾਈ ਭਾਗੋ ਜੀ"
+      },
+      {
+        "en": "Community celebration",
+        "pa": "ਸਮੂਹਕ ਮਨਾਉਣ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Bhai Daya Singh Ji is an accurate match for Panj Pyare in Sikh learning for ages 6-12.",
+      "pa": "ਭਾਈ ਦਇਆ ਸਿੰਘ ਜੀ ਪੰਜ ਪਿਆਰੇ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 82,
+    "category": "Panj Pyare",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Panj Pyare.",
+      "pa": "ਪੰਜ ਪਿਆਰੇ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Guru Hargobind Sahib Ji",
+        "pa": "ਗੁਰੂ ਹਰਿਗੋਬਿੰਦ ਸਾਹਿਬ ਜੀ"
+      },
+      {
+        "en": "Kirat Karo",
+        "pa": "ਕਿਰਤ ਕਰੋ"
+      },
+      {
+        "en": "Bhai Dharam Singh Ji",
+        "pa": "ਭਾਈ ਧਰਮ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Guru Granth Sahib Ji",
+        "pa": "ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Bhai Dharam Singh Ji is an accurate match for Panj Pyare in Sikh learning for ages 6-12.",
+      "pa": "ਭਾਈ ਧਰਮ ਸਿੰਘ ਜੀ ਪੰਜ ਪਿਆਰੇ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 83,
+    "category": "Panj Pyare",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Panj Pyare?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਪੰਜ ਪਿਆਰੇ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Identity and discipline",
+        "pa": "ਪਹਿਚਾਣ ਅਤੇ ਅਨੁਸ਼ਾਸਨ"
+      },
+      {
+        "en": "Khanda",
+        "pa": "ਖੰਡਾ"
+      },
+      {
+        "en": "Kesh",
+        "pa": "ਕੇਸ਼"
+      },
+      {
+        "en": "Bhai Himmat Singh Ji",
+        "pa": "ਭਾਈ ਹਿੰਮਤ ਸਿੰਘ ਜੀ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Bhai Himmat Singh Ji is an accurate match for Panj Pyare in Sikh learning for ages 6-12.",
+      "pa": "ਭਾਈ ਹਿੰਮਤ ਸਿੰਘ ਜੀ ਪੰਜ ਪਿਆਰੇ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 84,
+    "category": "Panj Pyare",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Panj Pyare topic.",
+      "pa": "ਪੰਜ ਪਿਆਰੇ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Bhai Mohkam Singh Ji",
+        "pa": "ਭਾਈ ਮੋਹਕਮ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Rehras Sahib",
+        "pa": "ਰਿਹਰਾਸ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Sangat and Pangat",
+        "pa": "ਸੰਗਤ ਅਤੇ ਪੰਗਤ"
+      },
+      {
+        "en": "Langar hall",
+        "pa": "ਲੰਗਰ ਹਾਲ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Bhai Mohkam Singh Ji is an accurate match for Panj Pyare in Sikh learning for ages 6-12.",
+      "pa": "ਭਾਈ ਮੋਹਕਮ ਸਿੰਘ ਜੀ ਪੰਜ ਪਿਆਰੇ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 85,
+    "category": "Panj Pyare",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Panj Pyare?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਪੰਜ ਪਿਆਰੇ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Chamkaur battle",
+        "pa": "ਚਮਕੌਰ ਦੀ ਲੜਾਈ"
+      },
+      {
+        "en": "Sarbat da Bhala",
+        "pa": "ਸਰਬੱਤ ਦਾ ਭਲਾ"
+      },
+      {
+        "en": "Bhai Sahib Singh Ji",
+        "pa": "ਭਾਈ ਸਾਹਿਬ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Vand Chhakna",
+        "pa": "ਵੰਡ ਛਕਣਾ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Bhai Sahib Singh Ji is an accurate match for Panj Pyare in Sikh learning for ages 6-12.",
+      "pa": "ਭਾਈ ਸਾਹਿਬ ਸਿੰਘ ਜੀ ਪੰਜ ਪਿਆਰੇ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 86,
+    "category": "Five Ks",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Five Ks?",
+      "pa": "ਪੰਜ ਕਕਾਰ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Kesh",
+        "pa": "ਕੇਸ਼"
+      },
+      {
+        "en": "Kesri color",
+        "pa": "ਕੇਸਰੀ ਰੰਗ"
+      },
+      {
+        "en": "Role in Amrit ceremony",
+        "pa": "ਅੰਮ੍ਰਿਤ ਸਮਾਗਮ ਵਿੱਚ ਭੂਮਿਕਾ"
+      },
+      {
+        "en": "Khalsa emblem",
+        "pa": "ਖਾਲਸਾ ਨਿਸ਼ਾਨ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Kesh is an accurate match for Five Ks in Sikh learning for ages 6-12.",
+      "pa": "ਕੇਸ਼ ਪੰਜ ਕਕਾਰ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 87,
+    "category": "Five Ks",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Five Ks.",
+      "pa": "ਪੰਜ ਕਕਾਰ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Head covered",
+        "pa": "ਸਿਰ ਢੱਕਣਾ"
+      },
+      {
+        "en": "Nitnem banis",
+        "pa": "ਨਿੱਤਨੇਮ ਬਾਣੀਆਂ"
+      },
+      {
+        "en": "Listening to kirtan",
+        "pa": "ਕੀਰਤਨ ਸੁਣਨਾ"
+      },
+      {
+        "en": "Kangha",
+        "pa": "ਕੰਘਾ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Kangha is an accurate match for Five Ks in Sikh learning for ages 6-12.",
+      "pa": "ਕੰਘਾ ਪੰਜ ਕਕਾਰ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 88,
+    "category": "Five Ks",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Five Ks?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਪੰਜ ਕਕਾਰ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Sat (truth)",
+        "pa": "ਸੱਚ"
+      },
+      {
+        "en": "Vaisakhi",
+        "pa": "ਵਿਸਾਖੀ"
+      },
+      {
+        "en": "Kara",
+        "pa": "ਕੜਾ"
+      },
+      {
+        "en": "Naam Japna",
+        "pa": "ਨਾਮ ਜਪਣਾ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Kara is an accurate match for Five Ks in Sikh learning for ages 6-12.",
+      "pa": "ਕੜਾ ਪੰਜ ਕਕਾਰ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 89,
+    "category": "Five Ks",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Five Ks topic.",
+      "pa": "ਪੰਜ ਕਕਾਰ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Udasis (travels)",
+        "pa": "ਉਦਾਸੀਆਂ (ਯਾਤਰਾਵਾਂ)"
+      },
+      {
+        "en": "Kachhera",
+        "pa": "ਕਛਹਿਰਾ"
+      },
+      {
+        "en": "Maharaja Ranjit Singh",
+        "pa": "ਮਹਾਰਾਜਾ ਰਣਜੀਤ ਸਿੰਘ"
+      },
+      {
+        "en": "Mata Tripta Ji",
+        "pa": "ਮਾਤਾ ਤ੍ਰਿਪਤਾ ਜੀ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Kachhera is an accurate match for Five Ks in Sikh learning for ages 6-12.",
+      "pa": "ਕਛਹਿਰਾ ਪੰਜ ਕਕਾਰ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 90,
+    "category": "Five Ks",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Five Ks?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਪੰਜ ਕਕਾਰ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Kirpan",
+        "pa": "ਕਿਰਪਾਨ"
+      },
+      {
+        "en": "Amrit Sanchar",
+        "pa": "ਅੰਮ੍ਰਿਤ ਸੰਚਾਰ"
+      },
+      {
+        "en": "Equality of all",
+        "pa": "ਸਭ ਦੀ ਬਰਾਬਰੀ"
+      },
+      {
+        "en": "Bhai Himmat Singh Ji",
+        "pa": "ਭਾਈ ਹਿੰਮਤ ਸਿੰਘ ਜੀ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Kirpan is an accurate match for Five Ks in Sikh learning for ages 6-12.",
+      "pa": "ਕਿਰਪਾਨ ਪੰਜ ਕਕਾਰ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 91,
+    "category": "Five Ks",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Five Ks?",
+      "pa": "ਪੰਜ ਕਕਾਰ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Kesri color",
+        "pa": "ਕੇਸਰੀ ਰੰਗ"
+      },
+      {
+        "en": "Khalsa emblem",
+        "pa": "ਖਾਲਸਾ ਨਿਸ਼ਾਨ"
+      },
+      {
+        "en": "Shoes area (Jora Ghar)",
+        "pa": "ਜੋੜਾ ਘਰ"
+      },
+      {
+        "en": "Identity and discipline",
+        "pa": "ਪਹਿਚਾਣ ਅਤੇ ਅਨੁਸ਼ਾਸਨ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Identity and discipline is an accurate match for Five Ks in Sikh learning for ages 6-12.",
+      "pa": "ਪਹਿਚਾਣ ਅਤੇ ਅਨੁਸ਼ਾਸਨ ਪੰਜ ਕਕਾਰ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 92,
+    "category": "Five Ks",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Five Ks.",
+      "pa": "ਪੰਜ ਕਕਾਰ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Daily commitment",
+        "pa": "ਰੋਜ਼ਾਨਾ ਵਚਨਬੱਧਤਾ"
+      },
+      {
+        "en": "Live Gurbani values",
+        "pa": "ਗੁਰਬਾਣੀ ਮੁੱਲਾਂ ਅਨੁਸਾਰ ਜੀਵਨ"
+      },
+      {
+        "en": "Misls period",
+        "pa": "ਮਿਸਲਾਂ ਦਾ ਦੌਰ"
+      },
+      {
+        "en": "Nitnem banis",
+        "pa": "ਨਿੱਤਨੇਮ ਬਾਣੀਆਂ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Daily commitment is an accurate match for Five Ks in Sikh learning for ages 6-12.",
+      "pa": "ਰੋਜ਼ਾਨਾ ਵਚਨਬੱਧਤਾ ਪੰਜ ਕਕਾਰ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 93,
+    "category": "Five Ks",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Five Ks?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਪੰਜ ਕਕਾਰ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Vaisakhi",
+        "pa": "ਵਿਸਾਖੀ"
+      },
+      {
+        "en": "Khalsa symbols",
+        "pa": "ਖਾਲਸਾ ਚਿੰਨ੍ਹ"
+      },
+      {
+        "en": "Bhai Kanhaiya Ji",
+        "pa": "ਭਾਈ ਕਨ੍ਹૈયਾ ਜੀ"
+      },
+      {
+        "en": "Parkash Purab",
+        "pa": "ਪਰਕਾਸ਼ ਪੁਰਬ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Khalsa symbols is an accurate match for Five Ks in Sikh learning for ages 6-12.",
+      "pa": "ਖਾਲਸਾ ਚਿੰਨ੍ਹ ਪੰਜ ਕਕਾਰ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 94,
+    "category": "Five Ks",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Five Ks topic.",
+      "pa": "ਪੰਜ ਕਕਾਰ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Guru Amar Das Ji",
+        "pa": "ਗੁਰੂ ਅਮਰ ਦਾਸ ਜੀ"
+      },
+      {
+        "en": "Udasis (travels)",
+        "pa": "ਉਦਾਸੀਆਂ (ਯਾਤਰਾਵਾਂ)"
+      },
+      {
+        "en": "Spiritual reminder",
+        "pa": "ਆਧਿਆਤਮਿਕ ਯਾਦ"
+      },
+      {
+        "en": "Guru Har Krishan Ji",
+        "pa": "ਗੁਰੂ ਹਰਿਕ੍ਰਿਸ਼ਨ ਜੀ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Spiritual reminder is an accurate match for Five Ks in Sikh learning for ages 6-12.",
+      "pa": "ਆਧਿਆਤਮਿਕ ਯਾਦ ਪੰਜ ਕਕਾਰ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 95,
+    "category": "Five Ks",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Five Ks?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਪੰਜ ਕਕਾਰ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Offered their heads",
+        "pa": "ਸਿਰ ਵਾਰ ਦਿੱਤੇ"
+      },
+      {
+        "en": "Ek Onkar symbol",
+        "pa": "ਇਕ ਓਅੰਕਾਰ ਚਿੰਨ੍ਹ"
+      },
+      {
+        "en": "Bhai Himmat Singh Ji",
+        "pa": "ਭਾਈ ਹਿੰਮਤ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Live with rehat",
+        "pa": "ਰਹਿਤ ਨਾਲ ਜੀਵਨ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Live with rehat is an accurate match for Five Ks in Sikh learning for ages 6-12.",
+      "pa": "ਰਹਿਤ ਨਾਲ ਜੀਵਨ ਪੰਜ ਕਕਾਰ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 96,
+    "category": "Five Ks",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Five Ks?",
+      "pa": "ਪੰਜ ਕਕਾਰ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Kesh",
+        "pa": "ਕੇਸ਼"
+      },
+      {
+        "en": "Cleanliness and seva",
+        "pa": "ਸਫ਼ਾਈ ਅਤੇ ਸੇਵਾ"
+      },
+      {
+        "en": "Shoes area (Jora Ghar)",
+        "pa": "ਜੋੜਾ ਘਰ"
+      },
+      {
+        "en": "Khalsa emblem",
+        "pa": "ਖਾਲਸਾ ਨਿਸ਼ਾਨ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Kesh is an accurate match for Five Ks in Sikh learning for ages 6-12.",
+      "pa": "ਕੇਸ਼ ਪੰਜ ਕਕਾਰ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 97,
+    "category": "Five Ks",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Five Ks.",
+      "pa": "ਪੰਜ ਕਕਾਰ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Misls period",
+        "pa": "ਮਿਸਲਾਂ ਦਾ ਦੌਰ"
+      },
+      {
+        "en": "Nimrata (humility)",
+        "pa": "ਨਿਮਰਤਾ"
+      },
+      {
+        "en": "Kangha",
+        "pa": "ਕੰਘਾ"
+      },
+      {
+        "en": "Preserving freedom of faith",
+        "pa": "ਧਰਮ ਦੀ ਆਜ਼ਾਦੀ ਦੀ ਰੱਖਿਆ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Kangha is an accurate match for Five Ks in Sikh learning for ages 6-12.",
+      "pa": "ਕੰਘਾ ਪੰਜ ਕਕਾਰ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 98,
+    "category": "Five Ks",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Five Ks?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਪੰਜ ਕਕਾਰ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Kara",
+        "pa": "ਕੜਾ"
+      },
+      {
+        "en": "Bhai Mani Singh Ji",
+        "pa": "ਭਾਈ ਮਨੀ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Bhai Kanhaiya Ji",
+        "pa": "ਭਾਈ ਕਨ੍ਹૈયਾ ਜੀ"
+      },
+      {
+        "en": "Talwandi (Nankana Sahib)",
+        "pa": "ਤਲਵੰਡੀ (ਨਨਕਾਣਾ ਸਾਹਿਬ)"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Kara is an accurate match for Five Ks in Sikh learning for ages 6-12.",
+      "pa": "ਕੜਾ ਪੰਜ ਕਕਾਰ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 99,
+    "category": "Five Ks",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Five Ks topic.",
+      "pa": "ਪੰਜ ਕਕਾਰ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Guru Har Krishan Ji",
+        "pa": "ਗੁਰੂ ਹਰਿਕ੍ਰਿਸ਼ਨ ਜੀ"
+      },
+      {
+        "en": "Fearless living",
+        "pa": "ਨਿਰਭਉ ਜੀਵਨ"
+      },
+      {
+        "en": "Anandpur Sahib",
+        "pa": "ਅਨੰਦਪੁਰ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Kachhera",
+        "pa": "ਕਛਹਿਰਾ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Kachhera is an accurate match for Five Ks in Sikh learning for ages 6-12.",
+      "pa": "ਕਛਹਿਰਾ ਪੰਜ ਕਕਾਰ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 100,
+    "category": "Five Ks",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Five Ks?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਪੰਜ ਕਕਾਰ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Sikh flag",
+        "pa": "ਸਿੱਖ ਝੰਡਾ"
+      },
+      {
+        "en": "Seva in kitchen",
+        "pa": "ਰਸੋਈ ਵਿੱਚ ਸੇਵਾ"
+      },
+      {
+        "en": "Kirpan",
+        "pa": "ਕਿਰਪਾਨ"
+      },
+      {
+        "en": "Ek Onkar symbol",
+        "pa": "ਇਕ ਓਅੰਕਾਰ ਚਿੰਨ੍ਹ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Kirpan is an accurate match for Five Ks in Sikh learning for ages 6-12.",
+      "pa": "ਕਿਰਪਾਨ ਪੰਜ ਕਕਾਰ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  }
+]

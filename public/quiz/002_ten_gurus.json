@@ -1,0 +1,952 @@
+[
+  {
+    "id": 26,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Ten Sikh Gurus?",
+      "pa": "ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Guru Har Rai Ji",
+        "pa": "ਗੁਰੂ ਹਰ ਰਾਇ ਜੀ"
+      },
+      {
+        "en": "Spiritual reminder",
+        "pa": "ਆਧਿਆਤਮਿਕ ਯਾਦ"
+      },
+      {
+        "en": "Kachhera",
+        "pa": "ਕਛਹਿਰਾ"
+      },
+      {
+        "en": "Kesri color",
+        "pa": "ਕੇਸਰੀ ਰੰਗ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Guru Har Rai Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਹਰ ਰਾਇ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 27,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Ten Sikh Gurus.",
+      "pa": "ਦਸ ਸਿੱਖ ਗੁਰੂ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Listening to kirtan",
+        "pa": "ਕੀਰਤਨ ਸੁਣਨਾ"
+      },
+      {
+        "en": "Live Gurbani values",
+        "pa": "ਗੁਰਬਾਣੀ ਮੁੱਲਾਂ ਅਨੁਸਾਰ ਜੀਵਨ"
+      },
+      {
+        "en": "Nitnem banis",
+        "pa": "ਨਿੱਤਨੇਮ ਬਾਣੀਆਂ"
+      },
+      {
+        "en": "Guru Har Krishan Ji",
+        "pa": "ਗੁਰੂ ਹਰਿਕ੍ਰਿਸ਼ਨ ਜੀ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Guru Har Krishan Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਹਰਿਕ੍ਰਿਸ਼ਨ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 28,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Ten Sikh Gurus?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Vaisakhi",
+        "pa": "ਵਿਸਾਖੀ"
+      },
+      {
+        "en": "Parkash Purab",
+        "pa": "ਪਰਕਾਸ਼ ਪੁਰਬ"
+      },
+      {
+        "en": "Guru Tegh Bahadur Ji",
+        "pa": "ਗੁਰੂ ਤੇਗ ਬਹਾਦੁਰ ਜੀ"
+      },
+      {
+        "en": "Sat (truth)",
+        "pa": "ਸੱਚ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Guru Tegh Bahadur Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਤੇਗ ਬਹਾਦੁਰ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 29,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Ten Sikh Gurus topic.",
+      "pa": "ਦਸ ਸਿੱਖ ਗੁਰੂ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Anandpur Sahib",
+        "pa": "ਅਨੰਦਪੁਰ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Guru Gobind Singh Ji",
+        "pa": "ਗੁਰੂ ਗੋਬਿੰਦ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Mata Tripta Ji",
+        "pa": "ਮਾਤਾ ਤ੍ਰਿਪਤਾ ਜੀ"
+      },
+      {
+        "en": "Udasis (travels)",
+        "pa": "ਉਦਾਸੀਆਂ (ਯਾਤਰਾਵਾਂ)"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Guru Gobind Singh Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਗੋਬਿੰਦ ਸਿੰਘ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 30,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Ten Sikh Gurus?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Guru Granth Sahib Ji",
+        "pa": "ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ"
+      },
+      {
+        "en": "Equality of all",
+        "pa": "ਸਭ ਦੀ ਬਰਾਬਰੀ"
+      },
+      {
+        "en": "Bhai Himmat Singh Ji",
+        "pa": "ਭਾਈ ਹਿੰਮਤ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Offered their heads",
+        "pa": "ਸਿਰ ਵਾਰ ਦਿੱਤੇ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Guru Granth Sahib Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 31,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Ten Sikh Gurus?",
+      "pa": "ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Kesri color",
+        "pa": "ਕੇਸਰੀ ਰੰਗ"
+      },
+      {
+        "en": "Khalsa emblem",
+        "pa": "ਖਾਲਸਾ ਨਿਸ਼ਾਨ"
+      },
+      {
+        "en": "Shoes area (Jora Ghar)",
+        "pa": "ਜੋੜਾ ਘਰ"
+      },
+      {
+        "en": "Guru Angad Dev Ji",
+        "pa": "ਗੁਰੂ ਅੰਗਦ ਦੇਵ ਜੀ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Guru Angad Dev Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਅੰਗਦ ਦੇਵ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 32,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Ten Sikh Gurus.",
+      "pa": "ਦਸ ਸਿੱਖ ਗੁਰੂ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Guru Amar Das Ji",
+        "pa": "ਗੁਰੂ ਅਮਰ ਦਾਸ ਜੀ"
+      },
+      {
+        "en": "Misls period",
+        "pa": "ਮਿਸਲਾਂ ਦਾ ਦੌਰ"
+      },
+      {
+        "en": "Preserving freedom of faith",
+        "pa": "ਧਰਮ ਦੀ ਆਜ਼ਾਦੀ ਦੀ ਰੱਖਿਆ"
+      },
+      {
+        "en": "Live Gurbani values",
+        "pa": "ਗੁਰਬਾਣੀ ਮੁੱਲਾਂ ਅਨੁਸਾਰ ਜੀਵਨ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Guru Amar Das Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਅਮਰ ਦਾਸ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 33,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Ten Sikh Gurus?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Parkash Purab",
+        "pa": "ਪਰਕਾਸ਼ ਪੁਰਬ"
+      },
+      {
+        "en": "Guru Ram Das Ji",
+        "pa": "ਗੁਰੂ ਰਾਮ ਦਾਸ ਜੀ"
+      },
+      {
+        "en": "Bhai Mani Singh Ji",
+        "pa": "ਭਾਈ ਮਨੀ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Bhai Kanhaiya Ji",
+        "pa": "ਭਾਈ ਕਨ੍ਹૈયਾ ਜੀ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Guru Ram Das Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਰਾਮ ਦਾਸ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 34,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Ten Sikh Gurus topic.",
+      "pa": "ਦਸ ਸਿੱਖ ਗੁਰੂ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Fearless living",
+        "pa": "ਨਿਰਭਉ ਜੀਵਨ"
+      },
+      {
+        "en": "Anandpur Sahib",
+        "pa": "ਅਨੰਦਪੁਰ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Guru Arjan Dev Ji",
+        "pa": "ਗੁਰੂ ਅਰਜਨ ਦੇਵ ਜੀ"
+      },
+      {
+        "en": "Bhai Dharam Singh Ji",
+        "pa": "ਭਾਈ ਧਰਮ ਸਿੰਘ ਜੀ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Guru Arjan Dev Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਅਰਜਨ ਦੇਵ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 35,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Ten Sikh Gurus?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Kara",
+        "pa": "ਕੜਾ"
+      },
+      {
+        "en": "Khalsa symbols",
+        "pa": "ਖਾਲਸਾ ਚਿੰਨ੍ਹ"
+      },
+      {
+        "en": "Offered their heads",
+        "pa": "ਸਿਰ ਵਾਰ ਦਿੱਤੇ"
+      },
+      {
+        "en": "Guru Hargobind Sahib Ji",
+        "pa": "ਗੁਰੂ ਹਰਿਗੋਬਿੰਦ ਸਾਹਿਬ ਜੀ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Guru Hargobind Sahib Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਹਰਿਗੋਬਿੰਦ ਸਾਹਿਬ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 36,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Ten Sikh Gurus?",
+      "pa": "ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Guru Har Rai Ji",
+        "pa": "ਗੁਰੂ ਹਰ ਰਾਇ ਜੀ"
+      },
+      {
+        "en": "Asa di Vaar",
+        "pa": "ਆਸਾ ਦੀ ਵਾਰ"
+      },
+      {
+        "en": "Cleanliness and seva",
+        "pa": "ਸਫ਼ਾਈ ਅਤੇ ਸੇਵਾ"
+      },
+      {
+        "en": "Shoes area (Jora Ghar)",
+        "pa": "ਜੋੜਾ ਘਰ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Guru Har Rai Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਹਰ ਰਾਇ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 37,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Ten Sikh Gurus.",
+      "pa": "ਦਸ ਸਿੱਖ ਗੁਰੂ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Preserving freedom of faith",
+        "pa": "ਧਰਮ ਦੀ ਆਜ਼ਾਦੀ ਦੀ ਰੱਖਿਆ"
+      },
+      {
+        "en": "Respect for all",
+        "pa": "ਸਭ ਦਾ ਆਦਰ"
+      },
+      {
+        "en": "Guru Har Krishan Ji",
+        "pa": "ਗੁਰੂ ਹਰਿਕ੍ਰਿਸ਼ਨ ਜੀ"
+      },
+      {
+        "en": "Nimrata (humility)",
+        "pa": "ਨਿਮਰਤਾ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Guru Har Krishan Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਹਰਿਕ੍ਰਿਸ਼ਨ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 38,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Ten Sikh Gurus?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Guru Tegh Bahadur Ji",
+        "pa": "ਗੁਰੂ ਤੇਗ ਬਹਾਦੁਰ ਜੀ"
+      },
+      {
+        "en": "Talwandi (Nankana Sahib)",
+        "pa": "ਤਲਵੰਡੀ (ਨਨਕਾਣਾ ਸਾਹਿਬ)"
+      },
+      {
+        "en": "Bhai Mani Singh Ji",
+        "pa": "ਭਾਈ ਮਨੀ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Japji Sahib",
+        "pa": "ਜਪੁਜੀ ਸਾਹਿਬ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Guru Tegh Bahadur Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਤੇਗ ਬਹਾਦੁਰ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 39,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Ten Sikh Gurus topic.",
+      "pa": "ਦਸ ਸਿੱਖ ਗੁਰੂ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Anandpur Sahib",
+        "pa": "ਅਨੰਦਪੁਰ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Bhai Dharam Singh Ji",
+        "pa": "ਭਾਈ ਧਰਮ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Fearless living",
+        "pa": "ਨਿਰਭਉ ਜੀਵਨ"
+      },
+      {
+        "en": "Guru Gobind Singh Ji",
+        "pa": "ਗੁਰੂ ਗੋਬਿੰਦ ਸਿੰਘ ਜੀ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Guru Gobind Singh Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਗੋਬਿੰਦ ਸਿੰਘ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 40,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Ten Sikh Gurus?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Ek Onkar symbol",
+        "pa": "ਇਕ ਓਅੰਕਾਰ ਚਿੰਨ੍ਹ"
+      },
+      {
+        "en": "Sikh flag",
+        "pa": "ਸਿੱਖ ਝੰਡਾ"
+      },
+      {
+        "en": "Guru Granth Sahib Ji",
+        "pa": "ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ"
+      },
+      {
+        "en": "Khalsa symbols",
+        "pa": "ਖਾਲਸਾ ਚਿੰਨ੍ਹ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Guru Granth Sahib Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 41,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Ten Sikh Gurus?",
+      "pa": "ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Banda Singh Bahadur",
+        "pa": "ਬੰਦਾ ਸਿੰਘ ਬਹਾਦੁਰ"
+      },
+      {
+        "en": "Guru Angad Dev Ji",
+        "pa": "ਗੁਰੂ ਅੰਗਦ ਦੇਵ ਜੀ"
+      },
+      {
+        "en": "Asa di Vaar",
+        "pa": "ਆਸਾ ਦੀ ਵਾਰ"
+      },
+      {
+        "en": "Meaning of shabad",
+        "pa": "ਸ਼ਬਦ ਦਾ ਅਰਥ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Guru Angad Dev Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਅੰਗਦ ਦੇਵ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 42,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Ten Sikh Gurus.",
+      "pa": "ਦਸ ਸਿੱਖ ਗੁਰੂ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Guru Amar Das Ji",
+        "pa": "ਗੁਰੂ ਅਮਰ ਦਾਸ ਜੀ"
+      },
+      {
+        "en": "Respect for all",
+        "pa": "ਸਭ ਦਾ ਆਦਰ"
+      },
+      {
+        "en": "Bandi Chhor Divas",
+        "pa": "ਬੰਦੀ ਛੋੜ ਦਿਵਸ"
+      },
+      {
+        "en": "Ardas and kirtan",
+        "pa": "ਅਰਦਾਸ ਅਤੇ ਕੀਰਤਨ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Guru Amar Das Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਅਮਰ ਦਾਸ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 43,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Ten Sikh Gurus?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Japji Sahib",
+        "pa": "ਜਪੁਜੀ ਸਾਹਿਬ"
+      },
+      {
+        "en": "1699 Vaisakhi",
+        "pa": "1699 ਵਿਸਾਖੀ"
+      },
+      {
+        "en": "Khalsa roop",
+        "pa": "ਖਾਲਸਾ ਰੂਪ"
+      },
+      {
+        "en": "Guru Ram Das Ji",
+        "pa": "ਗੁਰੂ ਰਾਮ ਦਾਸ ਜੀ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Guru Ram Das Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਰਾਮ ਦਾਸ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 44,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Ten Sikh Gurus topic.",
+      "pa": "ਦਸ ਸਿੱਖ ਗੁਰੂ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Guru Arjan Dev Ji",
+        "pa": "ਗੁਰੂ ਅਰਜਨ ਦੇਵ ਜੀ"
+      },
+      {
+        "en": "Courage and devotion",
+        "pa": "ਹਿੰਮਤ ਅਤੇ ਭਗਤੀ"
+      },
+      {
+        "en": "Kangha",
+        "pa": "ਕੰਘਾ"
+      },
+      {
+        "en": "Bhai Dharam Singh Ji",
+        "pa": "ਭਾਈ ਧਰਮ ਸਿੰਘ ਜੀ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Guru Arjan Dev Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਅਰਜਨ ਦੇਵ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 45,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Ten Sikh Gurus?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Sikh flag",
+        "pa": "ਸਿੱਖ ਝੰਡਾ"
+      },
+      {
+        "en": "Guru Hargobind Sahib Ji",
+        "pa": "ਗੁਰੂ ਹਰਿਗੋਬਿੰਦ ਸਾਹਿਬ ਜੀ"
+      },
+      {
+        "en": "Ardas together",
+        "pa": "ਇਕੱਠੇ ਅਰਦਾਸ"
+      },
+      {
+        "en": "Seva in kitchen",
+        "pa": "ਰਸੋਈ ਵਿੱਚ ਸੇਵਾ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Guru Hargobind Sahib Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਹਰਿਗੋਬਿੰਦ ਸਾਹਿਬ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 46,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Ten Sikh Gurus?",
+      "pa": "ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Muktsar battle",
+        "pa": "ਮੁਕਤਸਰ ਦੀ ਲੜਾਈ"
+      },
+      {
+        "en": "Banda Singh Bahadur",
+        "pa": "ਬੰਦਾ ਸਿੰਘ ਬਹਾਦੁਰ"
+      },
+      {
+        "en": "Guru Har Rai Ji",
+        "pa": "ਗੁਰੂ ਹਰ ਰਾਇ ਜੀ"
+      },
+      {
+        "en": "Seva",
+        "pa": "ਸੇਵਾ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Guru Har Rai Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਹਰ ਰਾਇ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 47,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Ten Sikh Gurus.",
+      "pa": "ਦਸ ਸਿੱਖ ਗੁਰੂ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Bhai Taru Singh Ji",
+        "pa": "ਭਾਈ ਤਾਰੂ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Bhai Vir Singh Ji",
+        "pa": "ਭਾਈ ਵੀਰ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Ardas and kirtan",
+        "pa": "ਅਰਦਾਸ ਅਤੇ ਕੀਰਤਨ"
+      },
+      {
+        "en": "Guru Har Krishan Ji",
+        "pa": "ਗੁਰੂ ਹਰਿਕ੍ਰਿਸ਼ਨ ਜੀ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Guru Har Krishan Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਹਰਿਕ੍ਰਿਸ਼ਨ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 48,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Ten Sikh Gurus?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Guru Tegh Bahadur Ji",
+        "pa": "ਗੁਰੂ ਤੇਗ ਬਹਾਦੁਰ ਜੀ"
+      },
+      {
+        "en": "Bhai Daya Singh Ji",
+        "pa": "ਭਾਈ ਦਇਆ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Khalsa roop",
+        "pa": "ਖਾਲਸਾ ਰੂਪ"
+      },
+      {
+        "en": "1699 Vaisakhi",
+        "pa": "1699 ਵਿਸਾਖੀ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Guru Tegh Bahadur Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਤੇਗ ਬਹਾਦੁਰ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 49,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Ten Sikh Gurus topic.",
+      "pa": "ਦਸ ਸਿੱਖ ਗੁਰੂ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Kangha",
+        "pa": "ਕੰਘਾ"
+      },
+      {
+        "en": "Nishan Sahib",
+        "pa": "ਨਿਸ਼ਾਨ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Guru Gobind Singh Ji",
+        "pa": "ਗੁਰੂ ਗੋਬਿੰਦ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Daily commitment",
+        "pa": "ਰੋਜ਼ਾਨਾ ਵਚਨਬੱਧਤਾ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Guru Gobind Singh Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਗੋਬਿੰਦ ਸਿੰਘ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 50,
+    "category": "Ten Sikh Gurus",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Ten Sikh Gurus?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Guru Granth Sahib Ji",
+        "pa": "ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ"
+      },
+      {
+        "en": "Kirtan Sohila",
+        "pa": "ਕੀਰਤਨ ਸੋਹਿਲਾ"
+      },
+      {
+        "en": "Ardas together",
+        "pa": "ਇਕੱਠੇ ਅਰਦਾਸ"
+      },
+      {
+        "en": "Shaheedi of Guru Tegh Bahadur Ji",
+        "pa": "ਗੁਰੂ ਤੇਗ ਬਹਾਦੁਰ ਜੀ ਦੀ ਸ਼ਹੀਦੀ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Guru Granth Sahib Ji is an accurate match for Ten Sikh Gurus in Sikh learning for ages 6-12.",
+      "pa": "ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ ਦਸ ਸਿੱਖ ਗੁਰੂ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  }
+]

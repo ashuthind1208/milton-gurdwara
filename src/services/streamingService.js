@@ -1,4 +1,4 @@
-import { mockResponse } from './mockApi';
+import { serviceResponse } from './serviceResponse';
 import { siteConfig } from '../constants/siteConfig';
 import { getYouTubeEmbedUrl } from './videoService';
 import contentApiService from './contentApiService';
@@ -117,19 +117,19 @@ export const verifyStreamingAvailability = async (streaming) => {
 const streamingService = {
   getStreamingItems: async () => {
     const rows = await ensureSeedStreaming();
-    return mockResponse(rows.map((row, index) => normalizeStreaming(row, index)));
+    return serviceResponse(rows.map((row, index) => normalizeStreaming(row, index)));
   },
 
   getStreaming: async () => {
     const rows = await ensureSeedStreaming();
-    return mockResponse(rows.find((entry) => entry.active) || rows[0] || null);
+    return serviceResponse(rows.find((entry) => entry.active) || rows[0] || null);
   },
 
   addStreaming: async (payload) => {
     const record = normalizeStreaming({ ...payload, id: `stream-${Date.now()}`, updatedAt: new Date().toISOString() });
     await contentApiService.create(RESOURCE, record);
     const rows = await contentApiService.list(RESOURCE);
-    return mockResponse(rows.map((row, index) => normalizeStreaming(row, index)));
+    return serviceResponse(rows.map((row, index) => normalizeStreaming(row, index)));
   },
 
   updateStreaming: async (id, payload) => {
@@ -138,19 +138,19 @@ const streamingService = {
     const updated = normalizeStreaming({ ...existing, ...payload, id, updatedAt: new Date().toISOString() });
     await contentApiService.update(RESOURCE, id, updated);
     const next = await contentApiService.list(RESOURCE);
-    return mockResponse(next.map((row, index) => normalizeStreaming(row, index)));
+    return serviceResponse(next.map((row, index) => normalizeStreaming(row, index)));
   },
 
   removeStreaming: async (id) => {
     await contentApiService.remove(RESOURCE, id);
     const rows = await contentApiService.list(RESOURCE);
-    return mockResponse(rows.map((row, index) => normalizeStreaming(row, index)));
+    return serviceResponse(rows.map((row, index) => normalizeStreaming(row, index)));
   },
 
   setStreamingActive: async (idOrActive, activeValue) => {
     const rows = await ensureSeedStreaming();
     if (rows.length === 0) {
-      return mockResponse([]);
+      return serviceResponse([]);
     }
 
     let targetId = '';
@@ -167,7 +167,7 @@ const streamingService = {
 
     const target = rows.find((entry) => entry.id === targetId);
     if (!target) {
-      return mockResponse(rows);
+      return serviceResponse(rows);
     }
 
     await contentApiService.update(RESOURCE, targetId, {
@@ -177,7 +177,7 @@ const streamingService = {
     });
 
     const next = await contentApiService.list(RESOURCE);
-    return mockResponse(next.map((row, index) => normalizeStreaming(row, index)));
+    return serviceResponse(next.map((row, index) => normalizeStreaming(row, index)));
   },
 
   saveStreaming: async (payload) => {

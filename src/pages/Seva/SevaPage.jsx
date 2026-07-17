@@ -1,12 +1,17 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronRightIcon } from '@heroicons/react/24/outline';
+import { Link } from 'react-router-dom';
 import VolunteerForm from '../../components/forms/VolunteerForm';
 import Card from '../../components/ui/Card';
 import volunteerService from '../../services/volunteerService';
 import advertisementService from '../../services/advertisementService';
 import useSeoMeta from '../../hooks/useSeoMeta';
 import Seo from '../../components/common/Seo';
+import { useAuth } from '../../context/AuthContext';
+import contentApiService from '../../services/contentApiService';
+
+const SEVA_IDENTITY_SETTING_KEY = 'settings-seva-allow-custom-name-email';
 
 const formatDateLabel = (value) => {
   if (!value) {
@@ -25,8 +30,17 @@ const formatShortDate = (value) => {
 const SevaPage = () => {
   const meta = useSeoMeta('Seva', 'Volunteer opportunities for langar, parking, teaching, and events.');
   const queryClient = useQueryClient();
+  const { user, isAuthenticated } = useAuth();
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [volunteerModalOpportunityId, setVolunteerModalOpportunityId] = useState('');
+  const { data: sevaIdentitySettings = { enabled: false } } = useQuery({
+    queryKey: [SEVA_IDENTITY_SETTING_KEY],
+    queryFn: () => contentApiService.getSingleton(SEVA_IDENTITY_SETTING_KEY, { enabled: false })
+  });
+  const profilePhoneMissing = !String(user?.phone || '').trim();
+  const currentUserEmail = String(user?.email || '').trim().toLowerCase();
+  const currentUserPhone = String(user?.phone || '').trim().toLowerCase();
+  const currentUserName = String(user?.name || '').trim().toLowerCase();
 
   const { data: registrations = [] } = useQuery({
     queryKey: ['admin-volunteers'],
@@ -47,6 +61,15 @@ const SevaPage = () => {
   const sevaFooterAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Seva Footer Banner').slice(0, 2), [ads]);
 
   const onSubmit = async (payload) => {
+    if (!isAuthenticated) {
+      window.alert('Please sign in before registering for seva.');
+      return;
+    }
+    if (profilePhoneMissing) {
+      window.alert('Please add your phone number in profile before registering for seva.');
+      return;
+    }
+
     try {
       await volunteerService.apply(payload);
       await Promise.all([
@@ -142,10 +165,24 @@ const SevaPage = () => {
 
   const selectableOptions = useMemo(() => enrichedOpportunities
     .filter((item) => item.isOpen)
-    .map((item) => ({
-      id: item.id,
-      label: `${item.sevaType} • ${formatDateLabel(item.date)}${item.time ? ` • ${item.time}` : ''} • ${item.registered}/${item.totalRequired}`
-    })), [enrichedOpportunities]);
+    .map((item) => {
+      const existingRows = volunteerRowsByOpportunity[item.id] || [];
+      const alreadyRegistered = existingRows.some((entry) => {
+        const entryEmail = String(entry.email || '').trim().toLowerCase();
+        const entryPhone = String(entry.phone || entry.whatsapp || '').trim().toLowerCase();
+        const entryName = String(entry.name || '').trim().toLowerCase();
+        return (currentUserEmail && entryEmail === currentUserEmail)
+          || (currentUserPhone && entryPhone === currentUserPhone)
+          || (currentUserName && entryName === currentUserName);
+      });
+
+      return {
+        id: item.id,
+        label: `${item.sevaType} • ${formatDateLabel(item.date)}${item.time ? ` • ${item.time}` : ''} • ${item.registered}/${item.totalRequired}${alreadyRegistered ? ' • Already registered' : ''}`,
+        disabled: alreadyRegistered,
+        alreadyRegistered
+      };
+    }), [currentUserEmail, currentUserName, currentUserPhone, enrichedOpportunities, volunteerRowsByOpportunity]);
 
   const sevaTickerItems = useMemo(() => {
     if (enrichedOpportunities.length === 0) {
@@ -244,16 +281,29 @@ const SevaPage = () => {
             <h2 className="font-heading text-2xl font-bold text-slate-900">Seva Readiness & Opportunity Details</h2>
             <p className="text-sm text-slate-600">Live session-wise progress, availability, and volunteer visibility in one place.</p>
           </div>
-          <button
-            type="button"
-            onClick={() => setIsRegisterModalOpen(true)}
-            disabled={selectableOptions.length === 0}
-            className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-brand-blue via-blue-600 to-brand-saffron px-4 py-2 text-xs font-bold uppercase tracking-wide text-white transition hover:from-amber-200 hover:via-amber-300 hover:to-brand-saffron hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Register for Seva
-            <ChevronRightIcon className="h-4 w-4" />
-          </button>
+          {isAuthenticated ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (profilePhoneMissing) {
+                  window.alert('Please add your phone number in profile before registering for seva.');
+                  return;
+                }
+                setIsRegisterModalOpen(true);
+              }}
+              disabled={selectableOptions.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-brand-blue via-blue-600 to-brand-saffron px-4 py-2 text-xs font-bold uppercase tracking-wide text-white transition hover:from-amber-200 hover:via-amber-300 hover:to-brand-saffron hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Register for Seva
+              <ChevronRightIcon className="h-4 w-4" />
+            </button>
+          ) : null}
         </div>
+        {!isAuthenticated ? (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            Please <Link to="/login?next=/seva" className="font-bold underline">sign in</Link> to register for seva opportunities.
+          </p>
+        ) : null}
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {enrichedOpportunities.map((item) => {
             const remaining = Math.max(0, item.totalRequired - item.registered);
@@ -361,7 +411,7 @@ const SevaPage = () => {
         </div>
       ) : null}
 
-      {isRegisterModalOpen ? (
+      {isAuthenticated && isRegisterModalOpen ? (
         <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-900/45 px-4 py-6">
           <div className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl">
             <div className="flex items-center justify-between gap-3">
@@ -369,7 +419,17 @@ const SevaPage = () => {
               <button type="button" onClick={() => setIsRegisterModalOpen(false)} className="rounded-md border border-slate-300 px-2 py-1 text-sm">Close</button>
             </div>
             <div className="mt-4">
-              <VolunteerForm onSubmit={onSubmit} options={selectableOptions} disableSubmit={selectableOptions.length === 0} />
+              <VolunteerForm
+                onSubmit={onSubmit}
+                options={selectableOptions}
+                disableSubmit={selectableOptions.length === 0}
+                allowNameEmailEdit={Boolean(sevaIdentitySettings?.enabled)}
+                initialValues={{
+                  name: user?.name || '',
+                  email: user?.email || '',
+                  phone: user?.phone || ''
+                }}
+              />
             </div>
           </div>
         </div>

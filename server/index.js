@@ -64,6 +64,7 @@ const usersPath = path.join(dataDir, 'users.json');
 const contentStorePath = path.join(dataDir, 'content-store.json');
 const volunteerReminderLogPath = path.join(dataDir, 'volunteer-reminder-log.json');
 const uploadsDir = path.resolve(__dirname, 'uploads');
+const quizBankDir = path.resolve(workspaceRoot, 'public', 'quiz');
 const maxUploadBytes = 15 * 1024 * 1024;
 const volunteerReminderWebhookUrl = String(
   process.env.VOLUNTEER_REMINDER_WEBHOOK_URL || process.env.REACT_APP_APPROVAL_EMAIL_WEBHOOK_URL || ''
@@ -258,6 +259,28 @@ const seedDonationCampaigns = [
   {
     name: 'Langar Fund',
     description: 'Monthly langar and seva support.',
+    progressTitle: 'Kitchen Expansion Progress',
+    progressDescription: 'Funding upgrades for stoves, prep counters, and weekly ingredient reserves to serve more sangat.',
+    progressPhotos: [],
+    progressUpdates: [
+      {
+        date: '2026-06-01',
+        title: 'Industrial Stove Ordered',
+        description: 'Vendor order confirmed for dual industrial stoves.',
+        amount: 12500
+      }
+    ],
+    progressItems: [
+      {
+        id: 'langar-kitchen-upgrade',
+        title: 'Kitchen Upgrade',
+        description: 'Upgrade kitchen equipment and prep stations.',
+        details: 'Phase 1 focuses on industrial stove replacement and prep counter modernization.',
+        date: '2026-06-01',
+        isActive: true,
+        photos: []
+      }
+    ],
     raised: 42000,
     target: 60000,
     isActive: true,
@@ -269,6 +292,11 @@ const seedDonationCampaigns = [
   {
     name: 'Building Fund',
     description: 'Expansion and maintenance project support.',
+    progressTitle: 'Hall Renovation Milestones',
+    progressDescription: 'Structural, flooring, and accessibility improvements for main congregation areas.',
+    progressPhotos: [],
+    progressUpdates: [],
+    progressItems: [],
     raised: 110000,
     target: 250000,
     isActive: true,
@@ -280,6 +308,11 @@ const seedDonationCampaigns = [
   {
     name: 'Education Seva',
     description: 'Punjabi and gurmat classes for youth.',
+    progressTitle: 'Classroom Resource Rollout',
+    progressDescription: 'Books, digital displays, and learning aids for weekly youth classes.',
+    progressPhotos: [],
+    progressUpdates: [],
+    progressItems: [],
     raised: 18000,
     target: 30000,
     isActive: true,
@@ -977,6 +1010,30 @@ const safeUploadPathSegments = (encodedRelativePath = '') => {
     .filter(Boolean);
 };
 
+const normalizeQuizFileName = (value = '') => {
+  const normalized = String(value || '').trim();
+  if (!/^[0-9]{3}_[a-z0-9_]+\.json$/i.test(normalized)) {
+    return '';
+  }
+  return normalized;
+};
+
+const getQuizBankFilePath = (fileName) => {
+  const normalized = normalizeQuizFileName(fileName);
+  if (!normalized) {
+    return '';
+  }
+
+  const filePath = path.join(quizBankDir, normalized);
+  const quizRoot = `${path.resolve(quizBankDir)}${path.sep}`;
+  const resolvedPath = path.resolve(filePath);
+  if (!resolvedPath.startsWith(quizRoot)) {
+    return '';
+  }
+
+  return resolvedPath;
+};
+
 const buildUploadDirectory = (service) => {
   const now = new Date();
   const year = String(now.getFullYear());
@@ -998,6 +1055,9 @@ const normalizeUser = (user = {}) => {
     if (raw === 'volunteer' || raw === 'volunteer coordinator' || raw === 'volunteer_coordinator') {
       return 'Volunteer';
     }
+    if (raw === 'family') {
+      return 'Family';
+    }
     if (!raw) {
       return 'Member';
     }
@@ -1013,6 +1073,9 @@ const normalizeUser = (user = {}) => {
     }
     if (role === 'Volunteer') {
       return 'Volunteer';
+    }
+    if (role === 'Family') {
+      return 'Family';
     }
     return 'Member';
   };
@@ -1189,6 +1252,22 @@ const getDonationCampaigns = async () => {
   return donationCampaignsFallback;
 };
 
+const normalizeCampaignProgressItems = (items = []) => {
+  return (Array.isArray(items) ? items : [])
+    .map((item, index) => ({
+      id: String(item?.id || `progress-${Date.now()}-${index}`),
+      title: String(item?.title || '').trim(),
+      description: String(item?.description || '').trim(),
+      details: String(item?.details || '').trim(),
+      date: String(item?.date || '').trim(),
+      isActive: item?.isActive !== false,
+      photos: (Array.isArray(item?.photos) ? item.photos : [])
+        .map((photo) => String(photo || '').trim())
+        .filter(Boolean)
+    }))
+    .filter((item) => item.title);
+};
+
 const createDonationCampaign = async (payload) => {
   if (eventsDb.hasDatabaseConnection) {
     return eventsDb.createDonationCampaign(payload);
@@ -1198,6 +1277,11 @@ const createDonationCampaign = async (payload) => {
     id: Date.now(),
     name: String(payload.name || '').trim(),
     description: String(payload.description || '').trim(),
+    progressTitle: String(payload.progressTitle || '').trim(),
+    progressDescription: String(payload.progressDescription || '').trim(),
+    progressPhotos: Array.isArray(payload.progressPhotos) ? payload.progressPhotos : [],
+    progressUpdates: Array.isArray(payload.progressUpdates) ? payload.progressUpdates : [],
+    progressItems: normalizeCampaignProgressItems(payload.progressItems),
     raised: Number(payload.raised || 0),
     target: Number(payload.target || 0),
     isActive: payload.isActive !== false,
@@ -1222,6 +1306,13 @@ const updateDonationCampaign = async (id, payload) => {
       ? {
           ...entry,
           ...payload,
+        progressTitle: payload.progressTitle ?? entry.progressTitle ?? '',
+        progressDescription: payload.progressDescription ?? entry.progressDescription ?? '',
+        progressPhotos: Array.isArray(payload.progressPhotos) ? payload.progressPhotos : (entry.progressPhotos || []),
+        progressUpdates: Array.isArray(payload.progressUpdates) ? payload.progressUpdates : (entry.progressUpdates || []),
+        progressItems: Array.isArray(payload.progressItems)
+          ? normalizeCampaignProgressItems(payload.progressItems)
+          : normalizeCampaignProgressItems(entry.progressItems || []),
           id: entry.id,
           isClosed: Number(payload.target ?? entry.target ?? 0) > 0 && Number(payload.raised ?? entry.raised ?? 0) >= Number(payload.target ?? entry.target ?? 0)
         }
@@ -1247,6 +1338,92 @@ const getDonationSummary = async () => {
   }
 
   return summarizeByCampaign(await readDonations());
+};
+
+const syncCampaignRaisedTotal = async ({ campaignId, campaignName } = {}) => {
+  const summary = await getDonationSummary();
+  const normalizedName = String(campaignName || '').trim().toLowerCase();
+  const numericCampaignId = Number(campaignId);
+
+  const allCampaigns = await getDonationCampaigns();
+  const matchedCampaign = Number.isFinite(numericCampaignId) && numericCampaignId > 0
+    ? allCampaigns.find((entry) => Number(entry.id) === numericCampaignId)
+    : allCampaigns.find((entry) => String(entry.name || '').trim().toLowerCase() === normalizedName);
+
+  if (!matchedCampaign) {
+    return null;
+  }
+
+  const byId = Number(summary[`id:${Number(matchedCampaign.id)}`] || 0);
+  const byName = Number(summary[`name:${String(matchedCampaign.name || '').trim().toLowerCase()}`] || 0);
+  const nextRaised = Math.max(0, Number.isFinite(byId) ? byId : 0, Number.isFinite(byName) ? byName : 0);
+
+  return updateDonationCampaign(Number(matchedCampaign.id), { raised: nextRaised });
+};
+
+const reconcilePaidPendingDonations = async () => {
+  if (!stripe) {
+    return { reconciled: 0, checked: 0, skipped: 0 };
+  }
+
+  const pendingRows = await getPendingDonations();
+  if (!Array.isArray(pendingRows) || pendingRows.length === 0) {
+    return { reconciled: 0, checked: 0, skipped: 0 };
+  }
+
+  const stripeClient = requireStripeClient();
+  let reconciled = 0;
+  let checked = 0;
+  let skipped = 0;
+
+  for (const pending of pendingRows.slice(0, 50)) {
+    const sessionId = String(pending?.sessionId || '').trim();
+    const provider = String(pending?.paymentProvider || '').trim().toUpperCase();
+
+    if (provider !== 'STRIPE' || !sessionId) {
+      skipped += 1;
+      continue;
+    }
+
+    checked += 1;
+
+    try {
+      const session = await stripeClient.checkout.sessions.retrieve(sessionId);
+      const isPaid = String(session?.status || '').toLowerCase() === 'complete'
+        && String(session?.payment_status || '').toLowerCase() === 'paid';
+
+      if (!isPaid) {
+        continue;
+      }
+
+      const donationRecord = {
+        ...mapWebhookDonation(session, `reconcile-${session.id}`),
+        sourcePendingId: String(pending.id || ''),
+        campaignId: Number.isFinite(Number(pending.campaignId)) ? Number(pending.campaignId) : null,
+        campaignName: String(pending.campaignName || '').trim() || mapWebhookDonation(session, `reconcile-${session.id}`).campaignName,
+        donorName: String(pending.donorName || '').trim() || mapWebhookDonation(session, `reconcile-${session.id}`).donorName,
+        donorEmail: String(pending.donorEmail || '').trim() || mapWebhookDonation(session, `reconcile-${session.id}`).donorEmail,
+        source: 'stripe-reconcile'
+      };
+
+      const persistedDonation = await upsertDonation(donationRecord);
+      await syncCampaignRaisedTotal({
+        campaignId: persistedDonation?.campaignId,
+        campaignName: persistedDonation?.campaignName
+      });
+      await removePendingDonation(pending.id);
+      reconciled += 1;
+    } catch (error) {
+      // Leave pending record untouched; it can be retried on subsequent requests.
+      console.error('[donations] reconcile failed for pending row', {
+        pendingId: pending?.id,
+        sessionId,
+        message: error?.message || 'unknown error'
+      });
+    }
+  }
+
+  return { reconciled, checked, skipped };
 };
 
 const clearDonations = async () => {
@@ -1902,6 +2079,123 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (requestUrl.pathname === '/api/quiz-bank' && request.method === 'GET') {
+    try {
+      if (!fs.existsSync(quizBankDir)) {
+        fs.mkdirSync(quizBankDir, { recursive: true });
+      }
+
+      const filesystemFiles = fs.readdirSync(quizBankDir)
+        .filter((name) => normalizeQuizFileName(name))
+        .sort((left, right) => left.localeCompare(right))
+        .map((name) => {
+          const filePath = path.join(quizBankDir, name);
+          let questionCount = 0;
+          try {
+            const payload = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            questionCount = Array.isArray(payload) ? payload.length : 0;
+          } catch {
+            questionCount = 0;
+          }
+
+          return { fileName: name, questionCount };
+        });
+
+      if (eventsDb.hasDatabaseConnection) {
+        let data = await eventsDb.listQuizBankFiles();
+
+        if (!Array.isArray(data) || data.length === 0) {
+          for (const file of filesystemFiles) {
+            const filePath = getQuizBankFilePath(file.fileName);
+            if (!filePath || !fs.existsSync(filePath)) {
+              continue;
+            }
+            try {
+              const payload = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+              const questions = Array.isArray(payload) ? payload : [];
+              await eventsDb.upsertQuizBankFile(file.fileName, questions);
+            } catch {
+              // Ignore file parse failures during DB backfill.
+            }
+          }
+          data = await eventsDb.listQuizBankFiles();
+        }
+
+        sendJson(response, 200, { ok: true, data: Array.isArray(data) && data.length > 0 ? data : filesystemFiles });
+        return;
+      }
+
+      sendJson(response, 200, { ok: true, data: filesystemFiles });
+    } catch (error) {
+      sendJson(response, 500, { ok: false, message: error.message || 'Unable to list quiz files.' });
+    }
+    return;
+  }
+
+  const quizBankFileMatch = requestUrl.pathname.match(/^\/api\/quiz-bank\/([^/]+)$/i);
+  if (quizBankFileMatch && request.method === 'GET') {
+    try {
+      const fileName = decodeURIComponent(quizBankFileMatch[1]);
+      const filePath = getQuizBankFilePath(fileName);
+      if (!filePath) {
+        sendJson(response, 400, { ok: false, message: 'Invalid quiz file name.' });
+        return;
+      }
+
+      const normalizedFileName = path.basename(filePath);
+      if (eventsDb.hasDatabaseConnection) {
+        const dbRecord = await eventsDb.getQuizBankFile(normalizedFileName);
+        if (dbRecord) {
+          sendJson(response, 200, { ok: true, data: dbRecord });
+          return;
+        }
+      }
+
+      if (!fs.existsSync(filePath)) {
+        sendJson(response, 404, { ok: false, message: 'Quiz file not found.' });
+        return;
+      }
+
+      const payload = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      const questions = Array.isArray(payload) ? payload : [];
+
+      if (eventsDb.hasDatabaseConnection) {
+        await eventsDb.upsertQuizBankFile(normalizedFileName, questions);
+      }
+
+      sendJson(response, 200, { ok: true, data: { fileName: normalizedFileName, questions } });
+    } catch (error) {
+      sendJson(response, 500, { ok: false, message: error.message || 'Unable to read quiz file.' });
+    }
+    return;
+  }
+
+  if (quizBankFileMatch && request.method === 'PUT') {
+    try {
+      const fileName = decodeURIComponent(quizBankFileMatch[1]);
+      const filePath = getQuizBankFilePath(fileName);
+      if (!filePath) {
+        sendJson(response, 400, { ok: false, message: 'Invalid quiz file name.' });
+        return;
+      }
+
+      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const questions = Array.isArray(body.questions) ? body.questions : [];
+      fs.mkdirSync(quizBankDir, { recursive: true });
+      fs.writeFileSync(filePath, JSON.stringify(questions, null, 2), 'utf8');
+
+      const normalizedFileName = path.basename(filePath);
+      if (eventsDb.hasDatabaseConnection) {
+        await eventsDb.upsertQuizBankFile(normalizedFileName, questions);
+      }
+
+      sendJson(response, 200, { ok: true, data: { fileName: normalizedFileName, questions } });
+    } catch (error) {
+      sendJson(response, 500, { ok: false, message: error.message || 'Unable to update quiz file.' });
+    }
+    return;
+  }
+
   const contentResourceMatch = requestUrl.pathname.match(/^\/api\/content\/([a-z0-9_-]+)$/i);
   if (contentResourceMatch && request.method === 'GET') {
     try {
@@ -2021,7 +2315,7 @@ const server = http.createServer(async (request, response) => {
       const data = await eventsDb.registerForEvent(body);
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
-      sendJson(response, 500, {
+      sendJson(response, error.status || 500, {
         ok: false,
         message: error.message || 'Unable to register for event.'
       });
@@ -2310,7 +2604,11 @@ const server = http.createServer(async (request, response) => {
       if (event.type === 'checkout.session.completed') {
         const session = event.data.object;
         const donationRecord = mapWebhookDonation(session, event.id);
-        await upsertDonation(donationRecord);
+        const persistedDonation = await upsertDonation(donationRecord);
+        await syncCampaignRaisedTotal({
+          campaignId: persistedDonation?.campaignId,
+          campaignName: persistedDonation?.campaignName
+        });
       }
 
       sendJson(response, 200, { received: true });
@@ -2324,6 +2622,7 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (requestUrl.pathname === '/api/donations' && request.method === 'GET') {
+    await reconcilePaidPendingDonations();
     const data = (await readDonations()).sort((left, right) => {
       const l = new Date(left.createdAt || 0).getTime();
       const r = new Date(right.createdAt || 0).getTime();
@@ -2337,6 +2636,7 @@ const server = http.createServer(async (request, response) => {
     try {
       const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
       const data = await upsertDonation(body);
+      await syncCampaignRaisedTotal({ campaignId: data?.campaignId, campaignName: data?.campaignName });
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
       sendJson(response, 500, { ok: false, message: error.message || 'Unable to upsert donation.' });
@@ -2356,12 +2656,14 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (requestUrl.pathname === '/api/donations/summary' && request.method === 'GET') {
+    await reconcilePaidPendingDonations();
     const summary = await getDonationSummary();
     sendJson(response, 200, { ok: true, data: summary });
     return;
   }
 
   if (requestUrl.pathname === '/api/donation-campaigns' && request.method === 'GET') {
+    await reconcilePaidPendingDonations();
     const data = await getDonationCampaigns();
     sendJson(response, 200, { ok: true, data });
     return;
@@ -2403,12 +2705,14 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (requestUrl.pathname === '/api/donation-pending' && request.method === 'GET') {
+    await reconcilePaidPendingDonations();
     const data = await getPendingDonations();
     sendJson(response, 200, { ok: true, data });
     return;
   }
 
   if (requestUrl.pathname === '/api/donation-pending/latest' && request.method === 'GET') {
+    await reconcilePaidPendingDonations();
     const list = await getPendingDonations();
     sendJson(response, 200, { ok: true, data: list[0] || null });
     return;

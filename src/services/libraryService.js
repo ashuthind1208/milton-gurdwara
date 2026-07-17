@@ -1,4 +1,4 @@
-import { mockResponse } from './mockApi';
+import { serviceResponse } from './serviceResponse';
 import contentApiService from './contentApiService';
 import eventService from './eventService';
 
@@ -377,12 +377,12 @@ const fetchOpenLibraryAuthors = async (authors = []) => {
 };
 
 const libraryService = {
-  getLibraryData: async () => mockResponse(await readLibraryData()),
+  getLibraryData: async () => serviceResponse(await readLibraryData()),
 
   lookupBookByIsbn: async (isbn) => {
     const normalizedIsbn = String(isbn || '').replace(/[^0-9Xx]/g, '').toUpperCase();
     if (!normalizedIsbn) {
-      return mockResponse({ found: false });
+      return serviceResponse({ found: false });
     }
 
     try {
@@ -443,15 +443,15 @@ const libraryService = {
       );
 
       if (!hasAnyDetails) {
-        return mockResponse({ found: false });
+        return serviceResponse({ found: false });
       }
 
-      return mockResponse({
+      return serviceResponse({
         found: true,
         details: mergedDetails
       });
     } catch {
-      return mockResponse({ found: false });
+      return serviceResponse({ found: false });
     }
   },
 
@@ -470,7 +470,7 @@ const libraryService = {
       ]
     };
 
-    return mockResponse((await persistLibraryData(nextData)).physicalBooks);
+    return serviceResponse((await persistLibraryData(nextData)).physicalBooks);
   },
 
   updatePhysicalBook: async (id, payload) => {
@@ -484,7 +484,7 @@ const libraryService = {
       ))
     };
 
-    return mockResponse((await persistLibraryData(nextData)).physicalBooks);
+    return serviceResponse((await persistLibraryData(nextData)).physicalBooks);
   },
 
   removePhysicalBook: async (id) => {
@@ -494,7 +494,7 @@ const libraryService = {
       physicalBooks: current.physicalBooks.filter((book) => book.id !== id)
     };
 
-    return mockResponse((await persistLibraryData(nextData)).physicalBooks);
+    return serviceResponse((await persistLibraryData(nextData)).physicalBooks);
   },
 
   addIssueRecord: async (bookId, payload) => {
@@ -523,7 +523,7 @@ const libraryService = {
       })
     };
 
-    return mockResponse((await persistLibraryData(nextData)).physicalBooks);
+    return serviceResponse((await persistLibraryData(nextData)).physicalBooks);
   },
 
   markIssueReturned: async (bookId, issueId) => {
@@ -549,7 +549,7 @@ const libraryService = {
       })
     };
 
-    return mockResponse((await persistLibraryData(nextData)).physicalBooks);
+    return serviceResponse((await persistLibraryData(nextData)).physicalBooks);
   },
 
   addDigitalResource: async (payload) => {
@@ -562,7 +562,7 @@ const libraryService = {
       ]
     };
 
-    return mockResponse((await persistLibraryData(nextData)).digitalResources);
+    return serviceResponse((await persistLibraryData(nextData)).digitalResources);
   },
 
   updateDigitalResource: async (id, payload) => {
@@ -576,7 +576,7 @@ const libraryService = {
       ))
     };
 
-    return mockResponse((await persistLibraryData(nextData)).digitalResources);
+    return serviceResponse((await persistLibraryData(nextData)).digitalResources);
   },
 
   removeDigitalResource: async (id) => {
@@ -586,7 +586,7 @@ const libraryService = {
       digitalResources: current.digitalResources.filter((resource) => resource.id !== id)
     };
 
-    return mockResponse((await persistLibraryData(nextData)).digitalResources);
+    return serviceResponse((await persistLibraryData(nextData)).digitalResources);
   },
 
   addProgramUpdate: async (payload) => {
@@ -611,14 +611,14 @@ const libraryService = {
       ]
     };
 
-    return mockResponse((await persistLibraryData(nextData)).programUpdates);
+    return serviceResponse((await persistLibraryData(nextData)).programUpdates);
   },
 
   updateProgramUpdate: async (id, payload) => {
     const current = await readLibraryData();
     const existing = current.programUpdates.find((entry) => entry.id === id);
     if (!existing) {
-      return mockResponse(current.programUpdates);
+      return serviceResponse(current.programUpdates);
     }
 
     const merged = normalizeProgramUpdate({
@@ -651,7 +651,7 @@ const libraryService = {
       ))
     };
 
-    return mockResponse((await persistLibraryData(nextData)).programUpdates);
+    return serviceResponse((await persistLibraryData(nextData)).programUpdates);
   },
 
   removeProgramUpdate: async (id) => {
@@ -665,7 +665,7 @@ const libraryService = {
       programUpdates: current.programUpdates.filter((entry) => entry.id !== id)
     };
 
-    return mockResponse((await persistLibraryData(nextData)).programUpdates);
+    return serviceResponse((await persistLibraryData(nextData)).programUpdates);
   },
 
   addMediaResource: async (payload) => {
@@ -678,7 +678,7 @@ const libraryService = {
       ]
     };
 
-    return mockResponse((await persistLibraryData(nextData)).mediaResources);
+    return serviceResponse((await persistLibraryData(nextData)).mediaResources);
   },
 
   updateMediaResource: async (id, payload) => {
@@ -692,7 +692,7 @@ const libraryService = {
       ))
     };
 
-    return mockResponse((await persistLibraryData(nextData)).mediaResources);
+    return serviceResponse((await persistLibraryData(nextData)).mediaResources);
   },
 
   removeMediaResource: async (id) => {
@@ -702,7 +702,7 @@ const libraryService = {
       mediaResources: current.mediaResources.filter((entry) => entry.id !== id)
     };
 
-    return mockResponse((await persistLibraryData(nextData)).mediaResources);
+    return serviceResponse((await persistLibraryData(nextData)).mediaResources);
   }
 };
 

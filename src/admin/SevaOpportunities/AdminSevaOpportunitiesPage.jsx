@@ -3,21 +3,18 @@ import { useOutletContext } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  CheckIcon,
-  EllipsisVerticalIcon,
-  EyeIcon,
-  EnvelopeIcon,
-  PencilSquareIcon,
-  TrashIcon
+  EllipsisVerticalIcon
 } from '@heroicons/react/24/outline';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton';
 import volunteerService from '../../services/volunteerService';
+import contentApiService from '../../services/contentApiService';
 import { siteConfig } from '../../constants/siteConfig';
 import { downloadRegistrationCsv, downloadRegistrationPdf } from '../../utils/csvExport';
 
 const actionIconClass = 'h-4 w-4';
+const SEVA_IDENTITY_SETTING_KEY = 'settings-seva-allow-custom-name-email';
 
 const defaultForm = {
   sevaType: '',
@@ -26,6 +23,18 @@ const defaultForm = {
   totalVolunteersRequired: 10,
   expiryDate: '',
   active: true
+};
+
+const getStatusPillClasses = (item, clickable) => {
+  if (item.status === 'closed') {
+    return 'bg-rose-100 text-rose-700';
+  }
+
+  if (item.active) {
+    return `bg-emerald-100 text-emerald-700 ${clickable ? 'hover:bg-emerald-200' : ''}`.trim();
+  }
+
+  return `bg-slate-200 text-slate-700 ${clickable ? 'hover:bg-slate-300' : ''}`.trim();
 };
 
 const AdminSevaOpportunitiesPage = () => {
@@ -42,6 +51,14 @@ const AdminSevaOpportunitiesPage = () => {
   const { data: opportunities = [] } = useQuery({
     queryKey: ['seva-opportunities', 'admin'],
     queryFn: () => volunteerService.getSevaOpportunities({ includeClosed: true }).then((res) => res.data)
+  });
+  const { data: sevaIdentitySettings = { enabled: false } } = useQuery({
+    queryKey: [SEVA_IDENTITY_SETTING_KEY],
+    queryFn: () => contentApiService.getSingleton(SEVA_IDENTITY_SETTING_KEY, { enabled: false })
+  });
+  const updateSevaIdentitySettingMutation = useMutation({
+    mutationFn: (enabled) => contentApiService.setSingleton(SEVA_IDENTITY_SETTING_KEY, { enabled: Boolean(enabled) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [SEVA_IDENTITY_SETTING_KEY] })
   });
 
   const { data: registrations = [] } = useQuery({
@@ -132,6 +149,13 @@ const AdminSevaOpportunitiesPage = () => {
     setEditing(null);
   };
 
+  const toggleOpportunityStatus = (item) => {
+    if (item.status === 'closed') {
+      return;
+    }
+    toggleActiveMutation.mutate({ id: item.id, active: !item.active });
+  };
+
   const getOpportunityVolunteers = (opportunity) => registrations.filter((entry) => (
     entry.opportunityId === opportunity.id ||
     (!entry.opportunityId && (entry.sevaType || entry.area) === opportunity.sevaType && entry.sevaDate === opportunity.date)
@@ -190,6 +214,25 @@ const AdminSevaOpportunitiesPage = () => {
       <h1 className="sr-only">Seva Opportunities</h1>
 
       <Card>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">Website Identity Override</p>
+            <p className="text-xs text-slate-600">Allow visitors to edit Name and Email on Seva registration form.</p>
+          </div>
+          <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
+            <span>{sevaIdentitySettings?.enabled ? 'Enabled' : 'Disabled'}</span>
+            <input
+              type="checkbox"
+              checked={Boolean(sevaIdentitySettings?.enabled)}
+              onChange={(event) => updateSevaIdentitySettingMutation.mutate(event.target.checked)}
+              disabled={updateSevaIdentitySettingMutation.isPending}
+              className="h-4 w-4"
+            />
+          </label>
+        </div>
+      </Card>
+
+      <Card>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead>
@@ -205,16 +248,22 @@ const AdminSevaOpportunitiesPage = () => {
             <tbody>
               {opportunities.map((item) => (
                 <tr key={item.id} className="border-b border-slate-100">
-                  <td className="py-2 pr-3 font-semibold text-slate-800">
-                    <div className="space-y-1.5 lg:hidden">
-                      <p className="text-sm font-bold leading-tight text-slate-800">{item.sevaType || '-'}</p>
-                      <p className="text-[12px] leading-snug text-slate-600">{item.date || '-'}</p>
-                      <p className="text-[12px] leading-snug text-slate-600">{item.time || '-'}</p>
-                      <p className="text-[12px] leading-snug text-slate-600">{(volunteersByOpportunity[item.id] || []).length}/{item.totalVolunteersRequired || 10}</p>
-                      <div className="pt-0.5">
-                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${item.status === 'closed' ? 'bg-rose-100 text-rose-700' : item.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'}`}>
+                  <td className="py-1.5 pr-2.5 font-semibold text-slate-800 lg:py-2 lg:pr-3">
+                    <div className="space-y-1 lg:hidden">
+                      <p className="text-[13px] font-bold leading-tight text-slate-800">{item.sevaType || '-'}</p>
+                      <p className="text-[11px] leading-snug text-slate-600">{item.date || '-'} • {item.time || '-'}</p>
+                      <p className="text-[11px] leading-snug text-slate-600">Volunteers: {(volunteersByOpportunity[item.id] || []).length}/{item.totalVolunteersRequired || 10}</p>
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => toggleOpportunityStatus(item)}
+                          disabled={item.status === 'closed' || toggleActiveMutation.isPending}
+                          className={`inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-70 ${getStatusPillClasses(item, item.status !== 'closed')}`}
+                          title={item.status === 'closed' ? 'Closed opportunities cannot be reactivated until the date is updated.' : (item.active ? 'Set inactive' : 'Set active')}
+                          aria-label={item.status === 'closed' ? 'Closed' : (item.active ? 'Set inactive' : 'Set active')}
+                        >
                           {item.status === 'closed' ? 'Closed' : item.active ? 'Active' : 'Inactive'}
-                        </span>
+                        </button>
                       </div>
                     </div>
                     <span className="hidden lg:inline">{item.sevaType || '-'}</span>
@@ -223,33 +272,30 @@ const AdminSevaOpportunitiesPage = () => {
                   <td className="admin-seva-mobile-hidden py-2 pr-3">{item.time || '-'}</td>
                   <td className="admin-seva-mobile-hidden py-2 pr-3">{(volunteersByOpportunity[item.id] || []).length}/{item.totalVolunteersRequired || 10}</td>
                   <td className="admin-seva-mobile-hidden py-2 pr-3">
-                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${item.status === 'closed' ? 'bg-rose-100 text-rose-700' : item.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'}`}>
+                    <button
+                      type="button"
+                      onClick={() => toggleOpportunityStatus(item)}
+                      disabled={item.status === 'closed' || toggleActiveMutation.isPending}
+                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-70 ${getStatusPillClasses(item, item.status !== 'closed')}`}
+                      title={item.status === 'closed' ? 'Closed opportunities cannot be reactivated until the date is updated.' : (item.active ? 'Set inactive' : 'Set active')}
+                      aria-label={item.status === 'closed' ? 'Closed' : (item.active ? 'Set inactive' : 'Set active')}
+                    >
                       {item.status === 'closed' ? 'Closed' : item.active ? 'Active' : 'Inactive'}
-                    </span>
+                    </button>
                   </td>
-                  <td className="py-2 pr-3">
-                    <div className="relative lg:hidden">
+                  <td className="py-1.5 pr-2.5 lg:py-2 lg:pr-3">
+                    <div className="relative">
                       <button
                         type="button"
                         onClick={() => setOpenActionMenuId((prev) => (prev === item.id ? '' : item.id))}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-100 lg:h-8 lg:w-8 lg:rounded-lg"
                         aria-label="More actions"
                         title="More actions"
                       >
                         <EllipsisVerticalIcon className={actionIconClass} />
                       </button>
                       {openActionMenuId === item.id ? (
-                        <div className="absolute right-0 top-9 z-20 min-w-[160px] rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              toggleActiveMutation.mutate({ id: item.id, active: !item.active });
-                              setOpenActionMenuId('');
-                            }}
-                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                          >
-                            {item.active ? 'Mark inactive' : 'Mark active'}
-                          </button>
+                        <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-lg border border-slate-200 bg-white p-1 shadow-lg lg:top-9">
                           <button
                             type="button"
                             onClick={() => {
@@ -317,75 +363,6 @@ const AdminSevaOpportunitiesPage = () => {
                       ) : null}
                     </div>
 
-                    <div className="hidden items-center gap-2 lg:flex">
-                      <button
-                        type="button"
-                        onClick={() => toggleActiveMutation.mutate({ id: item.id, active: !item.active })}
-                        className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border ${item.active ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-50' : 'border-slate-300 text-slate-700 hover:bg-slate-100'}`}
-                        title={item.active ? 'Mark inactive' : 'Mark active'}
-                        aria-label={item.active ? 'Mark inactive' : 'Mark active'}
-                      >
-                        <CheckIcon className={actionIconClass} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setViewOpportunity(item)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100"
-                        title="View"
-                        aria-label="View"
-                      >
-                        <EyeIcon className={actionIconClass} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openEdit(item)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50"
-                        title="Edit"
-                        aria-label="Edit"
-                      >
-                        <PencilSquareIcon className={actionIconClass} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => exportOpportunityVolunteers(item, 'csv')}
-                        disabled={getOpportunityVolunteers(item).length === 0}
-                        className="inline-flex h-8 items-center justify-center rounded-lg border border-indigo-200 px-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-40"
-                        title="Download CSV"
-                        aria-label="Download CSV"
-                      >
-                        CSV
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => exportOpportunityVolunteers(item, 'pdf')}
-                        disabled={getOpportunityVolunteers(item).length === 0}
-                        className="inline-flex h-8 items-center justify-center rounded-lg border border-indigo-200 px-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-40"
-                        title="Download PDF"
-                        aria-label="Download PDF"
-                      >
-                        PDF
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => manualReminderMutation.mutate(item)}
-                        disabled={getOpportunityVolunteers(item).length === 0 || manualReminderMutation.isPending}
-                        className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-amber-200 px-2 text-xs font-semibold text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-40"
-                        title="Send reminder emails"
-                        aria-label="Send reminder emails"
-                      >
-                        <EnvelopeIcon className="h-3.5 w-3.5" />
-                        Email
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => deleteMutation.mutate(item.id)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-700 hover:bg-red-50"
-                        title="Delete"
-                        aria-label="Delete"
-                      >
-                        <TrashIcon className={actionIconClass} />
-                      </button>
-                    </div>
                   </td>
                 </tr>
               ))}

@@ -1,4 +1,4 @@
-import { mockResponse } from './mockApi';
+import { serviceResponse } from './serviceResponse';
 import contentApiService from './contentApiService';
 
 const RESOURCE = 'sponsors';
@@ -22,7 +22,7 @@ const sponsorService = {
 
       return { data: normalized };
     } catch {
-      return mockResponse([]);
+      return serviceResponse([]);
     }
   },
 
@@ -44,7 +44,7 @@ const sponsorService = {
 
   removeSponsor: async (id) => {
     await contentApiService.remove(RESOURCE, id);
-    return mockResponse({ success: true });
+    return serviceResponse({ success: true });
   }
 };
 

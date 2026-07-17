@@ -1,4 +1,4 @@
-import { mockResponse } from './mockApi';
+import { serviceResponse } from './serviceResponse';
 import contentApiService from './contentApiService';
 
 const RESOURCE = 'gallery_albums';
@@ -117,7 +117,7 @@ const galleryService = {
       const records = await contentApiService.list(RESOURCE);
       return { data: sortAlbums(records.map((album, index) => normalizeAlbum(album, index))) };
     } catch {
-      return mockResponse([]);
+      return serviceResponse([]);
     }
   },
 
@@ -138,7 +138,7 @@ const galleryService = {
 
   removeAlbum: async (id) => {
     await contentApiService.remove(RESOURCE, id);
-    return mockResponse({ success: true });
+    return serviceResponse({ success: true });
   },
 
   getPublicAlbums: async () => {

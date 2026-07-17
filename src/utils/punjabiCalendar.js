@@ -135,6 +135,20 @@ const FIXED_OBSERVANCES = [
 const DAY_MS = 24 * 60 * 60 * 1000;
 const GURMUKHI_DIGITS = ['੦', '੧', '੨', '੩', '੪', '੫', '੬', '੭', '੮', '੯'];
 const WEEK_DAYS = 7;
+const NANAKSHAHI_MONTH_INDEX_BY_NAME = {
+  Chet: 1,
+  Vaisakh: 2,
+  Jeth: 3,
+  Harh: 4,
+  Sawan: 5,
+  Bhadon: 6,
+  Assu: 7,
+  Katak: 8,
+  Maghar: 9,
+  Poh: 10,
+  Magh: 11,
+  Phagun: 12
+};
 
 const ISO_DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -179,6 +193,59 @@ const formatDateLabelPa = (date) => {
   const day = date.getDate();
   const month = date.toLocaleString('en-CA', { month: 'short' });
   return `${toGurmukhiNumber(day)} ${month}`;
+};
+
+const buildApiNanakshahiLabel = (nanakshahiDate) => {
+  if (!nanakshahiDate) {
+    return { en: '', pa: '' };
+  }
+
+  const day = Number(nanakshahiDate.day || 0);
+  const monthNameEn = String(nanakshahiDate.monthNameEn || '').trim();
+  const monthNamePa = String(nanakshahiDate.monthNamePa || '').trim();
+  const year = Number(nanakshahiDate.year || 0);
+
+  if (!day || !monthNameEn || !year) {
+    return { en: '', pa: '' };
+  }
+
+  const labelEn = `${day} ${monthNameEn} ${year} Nanakshahi`;
+  const labelPa = `${toGurmukhiNumber(day)} ${monthNamePa} ${toGurmukhiNumber(year)} ਨਾਨਕਸ਼ਾਹੀ`.trim();
+
+  return { en: labelEn, pa: labelPa };
+};
+const buildCalendarLabelMetadata = (event, dateObj) => {
+  const fixedNanakshahi = getNanakshahiDate(dateObj);
+  const apiLabels = buildApiNanakshahiLabel(event.nanakshahiDate || null);
+
+  const hasAlternate = Boolean(
+    apiLabels.en
+    && apiLabels.en.toLowerCase() !== fixedNanakshahi.label.toLowerCase()
+  );
+
+  const primaryLabelEn = fixedNanakshahi.label;
+  const primaryLabelPa = fixedNanakshahi.labelPa;
+  const alternateLabelEn = hasAlternate ? apiLabels.en : '';
+  const alternateLabelPa = hasAlternate ? (apiLabels.pa || apiLabels.en) : '';
+
+  const noteEn = hasAlternate
+    ? `Primary display: ${primaryLabelEn}. Alternate reference: ${alternateLabelEn}.`
+    : 'Fixed Nanakshahi date aligns with available published calendar data.';
+  const notePa = hasAlternate
+    ? `ਮੁੱਖ ਮਿਤੀ: ${primaryLabelPa}। ਵਿਕਲਪਿਕ ਹਵਾਲਾ: ${alternateLabelPa}।`
+    : 'ਸਥਿਰ ਨਾਨਕਸ਼ਾਹੀ ਮਿਤੀ ਪ੍ਰਕਾਸ਼ਿਤ ਕੈਲੰਡਰ ਡਾਟਾ ਨਾਲ ਮਿਲਦੀ ਹੈ।';
+
+  return {
+    primaryLabelEn,
+    primaryLabelPa,
+    alternateLabelEn,
+    alternateLabelPa,
+    hasAlternate,
+    noteEn,
+    notePa,
+    fixedNanakshahiDate: fixedNanakshahi,
+    apiNanakshahiDate: event.nanakshahiDate || null
+  };
 };
 
 const hasGurmukhiScript = (value = '') => /[\u0A00-\u0A7F]/.test(String(value));
@@ -256,7 +323,7 @@ const transliterateTitleToGurmukhi = (value = '') => {
 const buildObservanceContext = (entry) => {
   const token = String(entry.type || '').toLowerCase();
 
-  if (token.includes('masya')) {
+  if (token.includes('masya') || token.includes('massia')) {
     return {
       blurb: 'A reflective moon phase day for ardas, simran, humility, and renewed spiritual focus.',
       blurbPa: 'ਮੱਸਿਆ ਮਨਨ, ਅਰਦਾਸ, ਸਿਮਰਨ ਅਤੇ ਨਿਮਰਤਾ ਨਾਲ ਰੂਹਾਨੀ ਕੇਂਦ੍ਰਿਤਤਾ ਨਵੀਂ ਕਰਨ ਦਾ ਦਿਨ ਹੈ।'
@@ -296,6 +363,46 @@ const buildObservanceContext = (entry) => {
     blurbPa: 'ਇਹ ਸਿੱਖ ਕੈਲੰਡਰ ਅਨੁਸਾਰ ਅਰਥਪੂਰਨ ਦਿਹਾੜਾ ਹੈ, ਜੋ ਯਾਦ ਅਤੇ ਮਨਨ ਦੀ ਪ੍ਰੇਰਨਾ ਦਿੰਦਾ ਹੈ।'
   };
 };
+
+const normalizeObservanceEntry = (entry) => {
+  const context = buildObservanceContext(entry);
+  const title = String(entry.title || '').trim();
+  const titlePa = String(entry.titlePa || '').trim();
+
+  return {
+    ...entry,
+    title,
+    titlePa: titlePa || transliterateTitleToGurmukhi(title),
+    type: String(entry.type || entry.eventType || 'observance').trim(),
+    occasion: String(entry.occasion || entry.eventEn || entry.type || 'Observance').trim(),
+    blurb: String(entry.blurb || entry.significanceEn || context.blurb).trim(),
+    blurbPa: String(entry.blurbPa || entry.significancePa || context.blurbPa).trim(),
+    personEn: String(entry.personEn || '').trim(),
+    personPa: String(entry.personPa || '').trim(),
+    eventEn: String(entry.eventEn || '').trim(),
+    eventPa: String(entry.eventPa || '').trim(),
+    eventType: String(entry.eventType || entry.type || '').trim(),
+    significanceEn: String(entry.significanceEn || entry.blurb || '').trim(),
+    significancePa: String(entry.significancePa || entry.blurbPa || '').trim(),
+    gregorianDate: String(entry.gregorianDate || entry.date || '').trim(),
+    nanakshahiDate: entry.nanakshahiDate || null
+  };
+};
+
+const buildObservancesByDate = (observances) => observances.reduce((acc, rawEntry) => {
+  const normalized = normalizeObservanceEntry(rawEntry);
+  const dateKey = String(normalized.date || normalized.gregorianDate || '').trim();
+  if (!dateKey) {
+    return acc;
+  }
+
+  if (!acc[dateKey]) {
+    acc[dateKey] = [];
+  }
+
+  acc[dateKey].push(normalized);
+  return acc;
+}, {});
 
 export const toGurmukhiNumber = (value) => String(value)
   .split('')
@@ -342,7 +449,7 @@ export const getNanakshahiDate = (inputDate = new Date()) => {
   };
 };
 
-export const getNanakshahiMonthCalendar = (inputDate = new Date()) => {
+export const getNanakshahiMonthCalendar = (inputDate = new Date(), observanceSource = FIXED_OBSERVANCES) => {
   const target = toDateOnly(inputDate);
   const candidates = [
     ...buildMonthStartCandidates(target.getFullYear() - 1),
@@ -367,20 +474,52 @@ export const getNanakshahiMonthCalendar = (inputDate = new Date()) => {
   const totalDays = Math.max(1, Math.round((nextMonthStart.date.getTime() - monthStart.date.getTime()) / DAY_MS));
   const activeDate = getNanakshahiDate(target);
   const startWeekday = monthStart.date.getDay();
-  const observancesByDate = FIXED_OBSERVANCES.reduce((acc, entry) => {
-    if (!acc[entry.date]) {
-      acc[entry.date] = [];
-    }
-    const context = buildObservanceContext(entry);
-    const occasion = entry.occasion || entry.type || 'Observance';
-    acc[entry.date].push({
-      title: entry.title,
-      titlePa: entry.titlePa || transliterateTitleToGurmukhi(entry.title),
-      type: entry.type,
-      occasion,
-      blurb: context.blurb,
-      blurbPa: context.blurbPa
+  const source = Array.isArray(observanceSource) ? observanceSource : FIXED_OBSERVANCES;
+  const observancesByDate = buildObservancesByDate(source);
+  const activeMonthIndex = NANAKSHAHI_MONTH_INDEX_BY_NAME[activeDate.month];
+
+  const dedupeCellObservances = (items = []) => {
+    const seen = new Set();
+    const output = [];
+
+    items.forEach((entry) => {
+      const key = [
+        String(entry?.id || '').trim().toLowerCase(),
+        String(entry?.type || '').trim().toLowerCase(),
+        String(entry?.title || '').trim().toLowerCase(),
+        String(entry?.personEn || '').trim().toLowerCase(),
+        String(entry?.eventEn || '').trim().toLowerCase()
+      ].join('::');
+
+      if (!seen.has(key)) {
+        seen.add(key);
+        output.push(entry);
+      }
     });
+
+    return output;
+  };
+
+  const observancesByNanakshahiDay = source.reduce((acc, rawEntry) => {
+    const entry = normalizeObservanceEntry(rawEntry);
+    const hasGregorianDate = Boolean(String(entry?.date || entry?.gregorianDate || '').trim());
+    if (hasGregorianDate) {
+      return acc;
+    }
+
+    const monthValue = Number(entry?.nanakshahiDate?.month || 0);
+    const dayValue = Number(entry?.nanakshahiDate?.day || 0);
+    const yearValue = Number(entry?.nanakshahiDate?.year || 0);
+
+    if (monthValue !== activeMonthIndex || dayValue < 1 || yearValue !== Number(activeDate.year)) {
+      return acc;
+    }
+
+    if (!acc[dayValue]) {
+      acc[dayValue] = [];
+    }
+
+    acc[dayValue].push(entry);
     return acc;
   }, {});
 
@@ -389,9 +528,12 @@ export const getNanakshahiMonthCalendar = (inputDate = new Date()) => {
   for (let day = 1; day <= totalDays; day += 1) {
     const gregorianDate = new Date(monthStart.date.getTime() + ((day - 1) * DAY_MS));
     const dateKey = toDateKey(gregorianDate);
-    const observances = observancesByDate[dateKey] || [];
+    const gregorianObservances = observancesByDate[dateKey] || [];
+    const fallbackNanakshahiObservances = observancesByNanakshahiDay[day] || [];
+    const observances = dedupeCellObservances([...gregorianObservances, ...fallbackNanakshahiObservances]);
     cells.push({
       day,
+      displayDay: day,
       dayPa: toGurmukhiNumber(day),
       gregorianDate,
       isToday: day === activeDate.day,
@@ -424,27 +566,49 @@ export const getNanakshahiMonthCalendar = (inputDate = new Date()) => {
   };
 };
 
-export const getUpcomingPunjabiObservances = (daysAhead = 10, now = new Date()) => {
+export const getUpcomingPunjabiObservances = (
+  daysAhead = 10,
+  now = new Date(),
+  observanceSource = FIXED_OBSERVANCES
+) => {
   const today = toDateOnly(now);
   const windowEnd = new Date(today.getTime() + daysAhead * DAY_MS);
+  const source = (Array.isArray(observanceSource) ? observanceSource : FIXED_OBSERVANCES)
+    .map((entry) => normalizeObservanceEntry(entry));
 
-  return FIXED_OBSERVANCES
+  return source
     .map((event) => ({ ...event, dateObj: toDateOnly(event.date) }))
     .filter((event) => event.dateObj >= today && event.dateObj <= windowEnd)
     .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime())
     .map((event) => {
-      const nanakshahi = getNanakshahiDate(event.dateObj);
+      const calendarMeta = buildCalendarLabelMetadata(event, event.dateObj);
+
       return ({
-      id: `${event.type}-${event.date}`,
+      id: event.id || `${event.type}-${event.date}`,
       title: event.title,
-      titlePa: event.titlePa || transliterateTitleToGurmukhi(event.title),
+      titlePa: event.titlePa,
       type: event.type,
       occasion: event.occasion || event.type || 'Observance',
       date: event.date,
       dateLabel: formatDateLabel(event.dateObj),
       dateLabelPa: formatDateLabelPa(event.dateObj),
-      nanakshahiLabel: nanakshahi.label,
-      nanakshahiLabelPa: nanakshahi.labelPa
+      nanakshahiLabel: calendarMeta.primaryLabelEn,
+      nanakshahiLabelPa: calendarMeta.primaryLabelPa,
+      alternateNanakshahiLabel: calendarMeta.alternateLabelEn,
+      alternateNanakshahiLabelPa: calendarMeta.alternateLabelPa,
+      hasAlternateNanakshahiLabel: calendarMeta.hasAlternate,
+      calendarNoteEn: calendarMeta.noteEn,
+      calendarNotePa: calendarMeta.notePa,
+      personEn: event.personEn,
+      personPa: event.personPa,
+      eventEn: event.eventEn,
+      eventPa: event.eventPa,
+      eventType: event.eventType,
+      significanceEn: event.significanceEn,
+      significancePa: event.significancePa,
+      gregorianDate: event.gregorianDate,
+      nanakshahiDate: calendarMeta.fixedNanakshahiDate,
+      apiNanakshahiDate: calendarMeta.apiNanakshahiDate
       });
     });
 };

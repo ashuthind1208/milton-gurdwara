@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import authService from '../services/authService';
+import userService from '../services/userService';
 
 const AuthContext = createContext(null);
 
@@ -55,6 +56,23 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  const updateProfile = useCallback(async (payload) => {
+    if (!user?.id) {
+      throw new Error('No signed-in user found.');
+    }
+
+    setLoading(true);
+    try {
+      const response = await userService.updateUser(user.id, payload || {});
+      const nextUser = response?.data || { ...user, ...(payload || {}) };
+      setUser(nextUser);
+      localStorage.setItem('gurdwara_user', JSON.stringify(nextUser));
+      return response;
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
   const logout = useCallback(async () => {
     await authService.logout();
     setUser(null);
@@ -64,8 +82,18 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const value = useMemo(
-    () => ({ user, token, loading, isAuthenticated: Boolean(token), login, loginWithGoogle, completeRegistration, logout }),
-    [user, token, loading, login, loginWithGoogle, completeRegistration, logout]
+    () => ({
+      user,
+      token,
+      loading,
+      isAuthenticated: Boolean(token),
+      login,
+      loginWithGoogle,
+      completeRegistration,
+      updateProfile,
+      logout
+    }),
+    [user, token, loading, login, loginWithGoogle, completeRegistration, updateProfile, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,4 +1,4 @@
-import { mockResponse } from './mockApi';
+import { serviceResponse } from './serviceResponse';
 import userService from './userService';
 import contentApiService from './contentApiService';
 
@@ -73,6 +73,8 @@ const countRegisteredForOpportunity = (opportunity, registrations) => registrati
   (!entry.opportunityId && (entry.sevaType || entry.area) === opportunity.sevaType && entry.sevaDate === opportunity.date)
 )).length;
 
+const normalizeComparableValue = (value) => String(value || '').trim().toLowerCase();
+
 const fetchJson = async (url, options = {}) => {
   const response = await fetch(url, options);
   const data = await response.json().catch(() => ({}));
@@ -85,15 +87,15 @@ const fetchJson = async (url, options = {}) => {
 const opportunities = ['Langar', 'Cleaning', 'Parking', 'Teaching', 'Events'];
 
 const volunteerService = {
-  getOpportunities: async () => mockResponse(opportunities),
+  getOpportunities: async () => serviceResponse(opportunities),
 
   getSevaOpportunities: async (options = {}) => {
     const rows = await ensureDefaultOpportunities();
     const enriched = rows.map((item) => enrichOpportunityStatus(item));
     if (options.includeClosed) {
-      return mockResponse(enriched);
+      return serviceResponse(enriched);
     }
-    return mockResponse(enriched.filter((item) => !item.isClosed));
+    return serviceResponse(enriched.filter((item) => !item.isClosed));
   },
 
   createSevaOpportunity: async (payload) => {
@@ -107,7 +109,7 @@ const volunteerService = {
       active: normalizeBoolean(payload.active, true)
     });
     const created = await contentApiService.create(OPPORTUNITIES_RESOURCE, record);
-    return mockResponse(normalizeOpportunity(created || record));
+    return serviceResponse(normalizeOpportunity(created || record));
   },
 
   updateSevaOpportunity: async (id, payload) => {
@@ -115,12 +117,12 @@ const volunteerService = {
     const existing = current.find((item) => item.id === id) || { id };
     const next = normalizeOpportunity({ ...existing, ...payload, id });
     await contentApiService.update(OPPORTUNITIES_RESOURCE, id, next);
-    return mockResponse(next);
+    return serviceResponse(next);
   },
 
   removeSevaOpportunity: async (id) => {
     await contentApiService.remove(OPPORTUNITIES_RESOURCE, id);
-    return mockResponse({ success: true });
+    return serviceResponse({ success: true });
   },
 
   apply: async (payload) => {
@@ -140,6 +142,36 @@ const volunteerService = {
     const registeredCount = countRegisteredForOpportunity(selectedOpportunity, allRecords);
     if (registeredCount >= selectedOpportunity.totalVolunteersRequired) {
       throw new Error('Volunteer limit reached for this seva opportunity.');
+    }
+
+    const payloadEmail = normalizeComparableValue(payload.email);
+    const payloadPhone = normalizeComparableValue(payload.phone);
+    const payloadName = normalizeComparableValue(payload.name);
+
+    const alreadyRegistered = allRecords.some((entry) => {
+      const sameOpportunity =
+        String(entry.opportunityId || '').trim() === String(selectedOpportunity.id || '').trim()
+        || (
+          !entry.opportunityId
+          && normalizeComparableValue(entry.sevaType || entry.area) === normalizeComparableValue(selectedOpportunity.sevaType)
+          && String(entry.sevaDate || '').trim() === String(selectedOpportunity.date || '').trim()
+        );
+
+      if (!sameOpportunity) {
+        return false;
+      }
+
+      const entryEmail = normalizeComparableValue(entry.email);
+      const entryPhone = normalizeComparableValue(entry.phone || entry.whatsapp);
+      const entryName = normalizeComparableValue(entry.name);
+
+      return (payloadEmail && entryEmail === payloadEmail)
+        || (payloadPhone && entryPhone === payloadPhone)
+        || (payloadName && entryName === payloadName);
+    });
+
+    if (alreadyRegistered) {
+      throw new Error('You have already registered for this seva opportunity.');
     }
 
     const record = {
@@ -178,12 +210,12 @@ const volunteerService = {
       // Do not block volunteer registration if user upsert fails.
     }
 
-    return mockResponse({ success: true, payload: record });
+    return serviceResponse({ success: true, payload: record });
   },
 
   getApplications: async () => {
     const rows = await readRegistrations();
-    return mockResponse(rows);
+    return serviceResponse(rows);
   },
 
   updateApplication: async (id, payload) => {
@@ -191,7 +223,7 @@ const volunteerService = {
     const existing = rows.find((item) => item.id === id) || { id };
     const updated = { ...existing, ...payload, id };
     await contentApiService.update(APPLICATIONS_RESOURCE, id, updated);
-    return mockResponse(updated);
+    return serviceResponse(updated);
   },
 
   sendOpportunityReminderEmails: async (opportunityId) => {
@@ -200,18 +232,18 @@ const volunteerService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({})
     });
-    return mockResponse(response.data || {});
+    return serviceResponse(response.data || {});
   },
 
   getOpportunityReminderPreview: async (opportunityId) => {
     const response = await fetchJson(`/api/volunteer-reminders/opportunity/${encodeURIComponent(opportunityId)}/preview?format=json`);
-    return mockResponse(response.data || {});
+    return serviceResponse(response.data || {});
   },
 
   getTodayRegistrations: async () => {
     const today = toIsoDate(Date.now());
     const records = (await readRegistrations()).filter((item) => item.date === today);
-    return mockResponse(records);
+    return serviceResponse(records);
   },
 
   getArchive: async () => {
@@ -227,7 +259,7 @@ const volunteerService = {
       .sort(([a], [b]) => (a < b ? 1 : -1))
       .map(([date, entries]) => ({ date, entries }));
 
-    return mockResponse(archive);
+    return serviceResponse(archive);
   }
 };
 

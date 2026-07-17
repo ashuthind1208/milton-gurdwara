@@ -1,4 +1,4 @@
-import { mockResponse } from './mockApi';
+import { serviceResponse } from './serviceResponse';
 import contentApiService from './contentApiService';
 
 const RESOURCE = 'advertisements';
@@ -116,7 +116,7 @@ const advertisementService = {
       const data = await contentApiService.list(RESOURCE);
       return { data: data.map((ad, index) => normalizeAd(ad, index)) };
     } catch {
-      return mockResponse([]);
+      return serviceResponse([]);
     }
   },
 
@@ -146,7 +146,7 @@ const advertisementService = {
 
   recordAdClick: async (id) => {
     if (!id) {
-      return mockResponse({ success: false });
+      return serviceResponse({ success: false });
     }
 
     const nowMs = Date.now();
@@ -165,7 +165,7 @@ const advertisementService = {
     const ads = await contentApiService.list(RESOURCE);
     const current = (ads || []).find((entry) => String(entry.id) === String(id));
     if (!current) {
-      return mockResponse({ success: false });
+      return serviceResponse({ success: false });
     }
 
     const signature = getOrganicViewerSignature();
@@ -206,7 +206,7 @@ const advertisementService = {
 
   removeAd: async (id) => {
     await contentApiService.remove(RESOURCE, id);
-    return mockResponse({ success: true });
+    return serviceResponse({ success: true });
   }
 };
 

@@ -1,4 +1,4 @@
-import { mockResponse } from './mockApi';
+import { serviceResponse } from './serviceResponse';
 import contentApiService from './contentApiService';
 
 const RESOURCE = 'videos';
@@ -137,7 +137,7 @@ const ensureSeedVideos = async () => {
 const videoService = {
   getVideos: async () => {
     const rows = await ensureSeedVideos();
-    return mockResponse(rows.map((v, i) => normalizeVideo(v, i)));
+    return serviceResponse(rows.map((v, i) => normalizeVideo(v, i)));
   },
 
   addVideo: async (payload) => {
@@ -150,7 +150,7 @@ const videoService = {
 
     const created = await contentApiService.create(RESOURCE, record);
     const allRows = await contentApiService.list(RESOURCE);
-    return mockResponse([normalizeVideo(created || record), ...allRows.filter((v) => v.id !== (created || record).id).map(normalizeVideo)]);
+    return serviceResponse([normalizeVideo(created || record), ...allRows.filter((v) => v.id !== (created || record).id).map(normalizeVideo)]);
   },
 
   updateVideo: async (id, payload) => {
@@ -166,13 +166,13 @@ const videoService = {
 
     await contentApiService.update(RESOURCE, id, updatedPayload);
     const rows = await contentApiService.list(RESOURCE);
-    return mockResponse(rows.map((v, i) => normalizeVideo(v, i)));
+    return serviceResponse(rows.map((v, i) => normalizeVideo(v, i)));
   },
 
   removeVideo: async (id) => {
     await contentApiService.remove(RESOURCE, id);
     const rows = await contentApiService.list(RESOURCE);
-    return mockResponse(rows.map((v, i) => normalizeVideo(v, i)));
+    return serviceResponse(rows.map((v, i) => normalizeVideo(v, i)));
   }
 };
 

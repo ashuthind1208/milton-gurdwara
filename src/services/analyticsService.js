@@ -1,4 +1,4 @@
-import { mockResponse } from './mockApi';
+import { serviceResponse } from './serviceResponse';
 import contentApiService from './contentApiService';
 
 const RESOURCE = 'analytics_daily_metrics';
@@ -64,13 +64,13 @@ const analyticsService = {
       const rows = await ensureSeed();
       const sorted = [...rows].sort((a, b) => a.metricDate.localeCompare(b.metricDate));
 
-      return mockResponse(sorted.map((row) => ({
+      return serviceResponse(sorted.map((row) => ({
         name: dayLabel(row.metricDate),
         visitors: row.totalVisits,
         donations: row.donationsAmount
       })));
     } catch {
-      return mockResponse(defaultTrend.map((row) => ({
+      return serviceResponse(defaultTrend.map((row) => ({
         name: dayLabel(row.metricDate),
         visitors: row.totalVisits,
         donations: row.donationsAmount
@@ -81,9 +81,9 @@ const analyticsService = {
   getMetrics: async () => {
     try {
       const rows = await ensureSeed();
-      return mockResponse(summarizeMetrics(rows));
+      return serviceResponse(summarizeMetrics(rows));
     } catch {
-      return mockResponse(summarizeMetrics(defaultTrend.map((row) => normalizeMetricRow(row))));
+      return serviceResponse(summarizeMetrics(defaultTrend.map((row) => normalizeMetricRow(row))));
     }
   }
 };

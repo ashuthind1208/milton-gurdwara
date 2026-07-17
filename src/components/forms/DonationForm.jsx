@@ -2,12 +2,22 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import Button from '../ui/Button';
 
-const DonationForm = ({ onSubmit, loading, campaigns = [], user, submitLabel = 'Generate Payment Options', preferredCampaignId = '' }) => {
+const DonationForm = ({
+  onSubmit,
+  loading,
+  campaigns = [],
+  user,
+  submitLabel = 'Generate Payment Options',
+  preferredCampaignId = '',
+  allowNameEmailEdit = false
+}) => {
   const defaultCampaign = campaigns[0];
+  const identityLocked = !allowNameEmailEdit;
   const { register, handleSubmit, setValue } = useForm({
     defaultValues: {
       donorName: user?.name || '',
       donorEmail: user?.email || '',
+      donorPhone: user?.phone || '',
       frequency: 'one-time',
       campaignId: preferredCampaignId || defaultCampaign?.id || '',
       amount: ''
@@ -44,7 +54,8 @@ const DonationForm = ({ onSubmit, loading, campaigns = [], user, submitLabel = '
           <input
             {...register('donorName', { required: true })}
             type="text"
-            className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5"
+            readOnly={identityLocked}
+            className={`mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 ${identityLocked ? 'font-extrabold text-base text-slate-900' : ''}`}
           />
         </label>
 
@@ -52,7 +63,20 @@ const DonationForm = ({ onSubmit, loading, campaigns = [], user, submitLabel = '
           Email
           <input
             {...register('donorEmail', { required: true })}
-            className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5"
+            readOnly={identityLocked}
+            className={`mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 ${identityLocked ? 'font-extrabold text-base text-slate-900' : ''}`}
+            type="email"
+          />
+        </label>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <label className="text-sm font-medium text-slate-700">
+          Phone
+          <input
+            {...register('donorPhone', { required: true })}
+            readOnly
+            className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-base font-extrabold text-slate-900"
           />
         </label>
       </div>

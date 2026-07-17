@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, NavLink, useLocation } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createPortal } from 'react-dom';
 import jsPDF from 'jspdf';
 import {
@@ -18,7 +18,11 @@ import {
   GiftIcon,
   PhotoIcon,
   PhoneIcon,
-  FilmIcon
+  FilmIcon,
+  UserCircleIcon,
+  ArrowRightOnRectangleIcon,
+  HeartIcon,
+  SparklesIcon
 } from '@heroicons/react/24/outline';
 import { publicNav } from '../../constants/navigation';
 import { siteConfig } from '../../constants/siteConfig';
@@ -27,6 +31,13 @@ import notoSansGurmukhiRegular from '../../assets/fonts/NotoSansGurmukhi-Regular
 import notoSansGurmukhiBold from '../../assets/fonts/NotoSansGurmukhi-Bold.ttf';
 import { getNanakshahiDate, getNanakshahiMonthCalendar, getUpcomingPunjabiObservances } from '../../utils/punjabiCalendar';
 import streamingService from '../../services/streamingService';
+import nanakshahiHolidayService from '../../services/nanakshahiHolidayService';
+import sponsorService from '../../services/sponsorService';
+import advertisementService from '../../services/advertisementService';
+import eventService from '../../services/eventService';
+import volunteerService from '../../services/volunteerService';
+import donationService from '../../services/donationService';
+import { useAuth } from '../../context/AuthContext';
 import StreamingModal from '../common/StreamingModal';
 import AudioPillPlayer from '../common/AudioPillPlayer';
 
@@ -37,21 +48,52 @@ const compactNavClass = ({ isActive }) =>
   `border-b-[2px] px-1.5 py-1 text-[13px] font-bold tracking-tight text-brand-blue transition ${isActive ? 'border-brand-saffron' : 'border-transparent hover:border-brand-blue/30'}`;
 
 const iconClass = 'h-4.5 w-4.5';
-const socialGlyphClass = 'h-3.5 w-3.5';
 const streamGlyphClass = 'h-6 w-6';
 const darbarSahibDirectFallbackUrl = 'https://live.sgpc.net:8442/';
 const NANAKSHAHI_WEEKDAY_LABELS_PA = ['ਐ', 'ਸੋ', 'ਮੰ', 'ਬੁੱ', 'ਵੀ', 'ਸ਼ੁੱ', 'ਸ਼ੱ'];
 const CALENDAR_NAV_DAY_MS = 24 * 60 * 60 * 1000;
 const PDF_HEADER_BG = [0, 64, 129];
+const COMPACT_ENTER_SCROLL_Y = 72;
+const COMPACT_EXIT_SCROLL_Y = 36;
+const PDF_HOLIDAY_PILL_PALETTE = [
+  { bg: [220, 252, 231], text: [22, 101, 52] },
+  { bg: [254, 243, 199], text: [146, 64, 14] },
+  { bg: [237, 233, 254], text: [91, 33, 182] },
+  { bg: [224, 242, 254], text: [3, 105, 161] },
+  { bg: [255, 228, 230], text: [159, 18, 57] },
+  { bg: [254, 249, 195], text: [133, 77, 14] },
+  { bg: [226, 232, 240], text: [30, 41, 59] },
+  { bg: [240, 253, 244], text: [21, 128, 61] }
+];
 
 const getPdfEventTone = (type = '') => {
   const token = String(type || '').toLowerCase();
   if (token.includes('puranmashi')) return { bg: [254, 249, 195], text: [146, 64, 14] };
   if (token.includes('gurpurab') || token.includes('gurgaddi') || token.includes('joti jot') || token.includes('prakash') || token.includes('birth') || token.includes('birthday') || token.includes('holiday')) return { bg: [254, 243, 199], text: [146, 64, 14] };
-  if (token.includes('masya')) return { bg: [237, 233, 254], text: [91, 33, 182] };
+  if (token.includes('masya') || token.includes('massia')) return { bg: [237, 233, 254], text: [91, 33, 182] };
   if (token.includes('sangrand')) return { bg: [254, 243, 199], text: [146, 64, 14] };
   if (token.includes('shaheedi')) return { bg: [255, 232, 238], text: [159, 18, 57] };
   return { bg: [220, 252, 231], text: [22, 101, 52] };
+};
+
+const getToneHash = (value = '') => {
+  const token = String(value || 'x');
+  let hash = 0;
+  for (let index = 0; index < token.length; index += 1) {
+    hash = ((hash << 5) - hash) + token.charCodeAt(index);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+};
+
+const getPdfHolidayPillTone = (event = {}) => {
+  const token = String(event?.type || '').toLowerCase();
+  if (token.includes('massia') || token.includes('masya')) return { bg: [237, 233, 254], text: [91, 33, 182] };
+  if (token.includes('puranmashi')) return { bg: [254, 249, 195], text: [146, 64, 14] };
+
+  const key = `${event?.id || ''}-${event?.titlePa || event?.title || ''}`;
+  const toneIndex = getToneHash(key) % PDF_HOLIDAY_PILL_PALETTE.length;
+  return PDF_HOLIDAY_PILL_PALETTE[toneIndex];
 };
 
 const formatGregorianLabel = (date) => new Intl.DateTimeFormat('en-US', {
@@ -68,6 +110,19 @@ const formatGregorianMiniLabel = (date) => {
   return `${month}, ${day}`;
 };
 
+const formatCompactDonationTotal = (value) => {
+  const amount = Number(value) || 0;
+  const absAmount = Math.abs(amount);
+
+  if (absAmount >= 1000) {
+    const inThousands = amount / 1000;
+    const fractionDigits = Math.abs(inThousands) >= 100 ? 0 : 1;
+    return `$${inThousands.toFixed(fractionDigits)}K`;
+  }
+
+  return `$${amount.toFixed(2)}`;
+};
+
 const toBase64FromArrayBuffer = (buffer) => {
   const bytes = new Uint8Array(buffer);
   let binary = '';
@@ -81,36 +136,140 @@ const toBase64FromArrayBuffer = (buffer) => {
 
 const truncatePdfText = (value = '', max = 30) => (value.length > max ? `${value.slice(0, max - 1)}...` : value);
 
-const observanceToneClass = (type = '') => {
-  const token = String(type || '').toLowerCase();
-  if (token.includes('puranmashi')) {
-    return 'ring-1 ring-yellow-300/70 bg-yellow-100 text-yellow-900';
-  }
-  if (token.includes('gurpurab') || token.includes('gurgaddi') || token.includes('joti jot') || token.includes('prakash') || token.includes('birth') || token.includes('birthday')) {
-    return 'ring-1 ring-yellow-300/70 bg-yellow-100 text-yellow-900';
-  }
-  if (token.includes('masya')) {
-    return 'ring-1 ring-violet-300/70 bg-violet-100 text-violet-900';
-  }
-  if (token.includes('sangrand')) {
-    return 'ring-1 ring-amber-300/70 bg-amber-100 text-amber-900';
-  }
-  if (token.includes('shaheedi')) {
-    return 'ring-1 ring-rose-300/70 bg-rose-100 text-rose-900';
-  }
-  return 'ring-1 ring-emerald-300/70 bg-emerald-100 text-emerald-900';
+const toIsoDateKeyFromDate = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
-const WebsiteGlyph = () => (
-  <svg viewBox="0 0 24 24" className={socialGlyphClass} aria-hidden="true">
-    <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="1.8" />
-    <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" fill="none" stroke="currentColor" strokeWidth="1.6" />
-  </svg>
-);
+const resolveObservanceTypeKey = (type = '') => {
+  const token = String(type || '').toLowerCase();
+  if (token.includes('puranmashi') || token.includes('pooranmashi') || token.includes('pooranmasi')) return 'puranmashi';
+  if (token.includes('masya') || token.includes('massia') || token.includes('maseya') || token.includes('masseya')) return 'massia';
+  if (token.includes('gurpurab')) return 'gurpurab';
+  if (token.includes('joti jot')) return 'joti-jot';
+  if (token.includes('gurgaddi')) return 'gurgaddi';
+  if (token.includes('prakash') || token.includes('parkash')) return 'prakash';
+  if (token.includes('shaheedi')) return 'shaheedi';
+  if (token.includes('sangrand')) return 'sangrand';
+  if (token.includes('historical') || token.includes('history')) return 'historical';
+  if (token.includes('festival') || token.includes('celebration') || token.includes('holiday') || token.includes('birth') || token.includes('birthday')) return 'festival';
+  return 'default';
+};
+
+const getObservanceTypeStyles = (type = '') => {
+  const key = resolveObservanceTypeKey(type);
+  const palette = {
+    puranmashi: {
+      cell: 'ring-1 ring-yellow-300/70 bg-yellow-100 text-yellow-900',
+      badge: 'bg-yellow-100 text-yellow-900 ring-1 ring-yellow-300/70',
+      title: 'text-yellow-900',
+      dot: 'bg-yellow-500',
+      gradient: '#facc15'
+    },
+    massia: {
+      cell: 'ring-1 ring-violet-300/70 bg-violet-100 text-violet-900',
+      badge: 'bg-violet-100 text-violet-900 ring-1 ring-violet-300/70',
+      title: 'text-violet-900',
+      dot: 'bg-violet-500',
+      gradient: '#a78bfa'
+    },
+    gurpurab: {
+      cell: 'ring-1 ring-amber-300/70 bg-amber-100 text-amber-900',
+      badge: 'bg-amber-100 text-amber-900 ring-1 ring-amber-300/70',
+      title: 'text-amber-900',
+      dot: 'bg-amber-500',
+      gradient: '#f59e0b'
+    },
+    'joti-jot': {
+      cell: 'ring-1 ring-rose-300/70 bg-rose-100 text-rose-900',
+      badge: 'bg-rose-100 text-rose-900 ring-1 ring-rose-300/70',
+      title: 'text-rose-900',
+      dot: 'bg-rose-500',
+      gradient: '#fb7185'
+    },
+    gurgaddi: {
+      cell: 'ring-1 ring-green-300/70 bg-green-100 text-green-900',
+      badge: 'bg-green-100 text-green-900 ring-1 ring-green-300/70',
+      title: 'text-green-900',
+      dot: 'bg-green-500',
+      gradient: '#22c55e'
+    },
+    prakash: {
+      cell: 'ring-1 ring-orange-300/70 bg-orange-100 text-orange-900',
+      badge: 'bg-orange-100 text-orange-900 ring-1 ring-orange-300/70',
+      title: 'text-orange-900',
+      dot: 'bg-orange-500',
+      gradient: '#fb923c'
+    },
+    shaheedi: {
+      cell: 'ring-1 ring-red-300/70 bg-red-100 text-red-900',
+      badge: 'bg-red-100 text-red-900 ring-1 ring-red-300/70',
+      title: 'text-red-900',
+      dot: 'bg-red-500',
+      gradient: '#ef4444'
+    },
+    sangrand: {
+      cell: 'ring-1 ring-lime-300/70 bg-lime-100 text-lime-900',
+      badge: 'bg-lime-100 text-lime-900 ring-1 ring-lime-300/70',
+      title: 'text-lime-900',
+      dot: 'bg-lime-500',
+      gradient: '#84cc16'
+    },
+    historical: {
+      cell: 'ring-1 ring-sky-300/70 bg-sky-100 text-sky-900',
+      badge: 'bg-sky-100 text-sky-900 ring-1 ring-sky-300/70',
+      title: 'text-sky-900',
+      dot: 'bg-sky-500',
+      gradient: '#38bdf8'
+    },
+    festival: {
+      cell: 'ring-1 ring-fuchsia-300/70 bg-fuchsia-100 text-fuchsia-900',
+      badge: 'bg-fuchsia-100 text-fuchsia-900 ring-1 ring-fuchsia-300/70',
+      title: 'text-fuchsia-900',
+      dot: 'bg-fuchsia-500',
+      gradient: '#d946ef'
+    },
+    default: {
+      cell: 'ring-1 ring-emerald-300/70 bg-emerald-100 text-emerald-900',
+      badge: 'bg-emerald-100 text-emerald-900 ring-1 ring-emerald-300/70',
+      title: 'text-emerald-900',
+      dot: 'bg-emerald-500',
+      gradient: '#10b981'
+    }
+  };
+
+  return palette[key] || palette.default;
+};
+
+const observanceToneClass = (type = '') => getObservanceTypeStyles(type).cell;
+
+const getObservanceGradientStyle = (observances = []) => {
+  const uniqueTones = Array.from(new Map(
+    observances.map((event) => [resolveObservanceTypeKey(event.type), getObservanceTypeStyles(event.type)])
+  ).values());
+
+  if (uniqueTones.length <= 1) {
+    return null;
+  }
+
+  const step = 100 / uniqueTones.length;
+  const stops = uniqueTones.map((tone, index) => {
+    const start = (index * step).toFixed(2);
+    const end = ((index + 1) * step).toFixed(2);
+    return `${tone.gradient} ${start}% ${end}%`;
+  }).join(', ');
+
+  return {
+    backgroundImage: `linear-gradient(135deg, ${stops})`,
+    color: '#0f172a'
+  };
+};
 
 const YouTubeGlyph = () => (
   <svg viewBox="0 0 24 24" className={streamGlyphClass} aria-hidden="true">
-    <path d="M22 12c0 2.5-.3 4.2-.7 5.2a3.6 3.6 0 0 1-2 2C18.2 19.6 16.5 20 12 20s-6.2-.4-7.3-.8a3.6 3.6 0 0 1-2-2C2.3 16.2 2 14.5 2 12s.3-4.2.7-5.2a3.6 3.6 0 0 1 2-2C5.8 4.4 7.5 4 12 4s6.2.4 7.3.8a3.6 3.6 0 0 1 2 2c.4 1 .7 2.7.7 5.2Z" fill="currentColor" />
+    <path d="M22 12c0 2.5-.3 4.2-.7 5.2a3.6 3.6 0 0 1-2 2C18.2 19.6 16.5 20 12 20s-6.2-.4-7.3-.8a3.6 3.6 0 0 1-2-2C2.3 16.2 2 14.5 2 12s.3-4.2.7-5.2a3.6 3.6 0 0 1 2-2C5.8 4.4 7.5 4 12 4s6.2.4 7.3.8a3.6 3.6 0 0 1 2 2c.4 1 .7 2.7.7 5.2Z" fill="none" stroke="currentColor" strokeWidth="1.8" />
     <path d="m10 9 5 3-5 3V9Z" fill="#f5a623" />
   </svg>
 );
@@ -120,20 +279,6 @@ const LiveStreamGlyph = () => (
     <path d="M22 12c0 2.5-.3 4.2-.7 5.2a3.6 3.6 0 0 1-2 2C18.2 19.6 16.5 20 12 20s-6.2-.4-7.3-.8a3.6 3.6 0 0 1-2-2C2.3 16.2 2 14.5 2 12s.3-4.2.7-5.2a3.6 3.6 0 0 1 2-2C5.8 4.4 7.5 4 12 4s6.2.4 7.3.8a3.6 3.6 0 0 1 2 2c.4 1 .7 2.7.7 5.2Z" fill="#0a4d9f" />
     <path d="m10 9 5 3-5 3V9Z" fill="#ffffff" />
     <circle cx="19" cy="6.5" r="1.6" fill="#f5a623" />
-  </svg>
-);
-
-const FacebookGlyph = () => (
-  <svg viewBox="0 0 24 24" className={socialGlyphClass} aria-hidden="true">
-    <path d="M13.6 22V13.3h2.9l.4-3.4h-3.3V7.8c0-1 .3-1.7 1.8-1.7H17V3.1c-.8-.1-1.6-.1-2.5-.1-2.5 0-4.1 1.5-4.1 4.4v2.5H7.6v3.4h2.8V22h3.2Z" fill="currentColor" />
-  </svg>
-);
-
-const InstagramGlyph = () => (
-  <svg viewBox="0 0 24 24" className={socialGlyphClass} aria-hidden="true">
-    <rect x="4" y="4" width="16" height="16" rx="5" ry="5" fill="none" stroke="currentColor" strokeWidth="1.8" />
-    <circle cx="12" cy="12" r="3.6" fill="none" stroke="currentColor" strokeWidth="1.8" />
-    <circle cx="17.4" cy="6.6" r="1.1" fill="currentColor" />
   </svg>
 );
 
@@ -153,12 +298,31 @@ const rightMenu = [
   { label: 'Contact', path: '/contact', icon: PhoneIcon }
 ];
 
+const FULL_ACCESS_ROLES = new Set(['Super Admin', 'Admin']);
+const ADMIN_PORTAL_BUTTON_ROLES = new Set(['Super Admin', 'Admin', 'Member', 'Volunteer']);
+const PENDING_APPROVAL_MESSAGE = 'Access is pending till your status is approved by an admin.';
+
+const resolveLandingPathByRole = () => '/';
+
 const Navbar = () => {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const { user, isAuthenticated, logout, updateProfile } = useAuth();
   const [open, setOpen] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
   const [compactStreamsOpen, setCompactStreamsOpen] = useState(false);
   const [dateInfoOpen, setDateInfoOpen] = useState(false);
   const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
+  const [isProfilePopoverOpen, setIsProfilePopoverOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isProfileSaving, setIsProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState('');
+  const [profileForm, setProfileForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: ''
+  });
   const [isPdfBusy, setIsPdfBusy] = useState(false);
   const [isKirtanPlaying, setIsKirtanPlaying] = useState(false);
   const [isKirtanLoading, setIsKirtanLoading] = useState(false);
@@ -170,17 +334,67 @@ const Navbar = () => {
   const kirtanUseDirectFallbackRef = useRef(false);
   const kirtanReconnectInFlightRef = useRef(false);
   const datePopoverCloseTimeoutRef = useRef(null);
+  const profilePopoverCloseTimeoutRef = useRef(null);
   const pdfFontCacheRef = useRef(null);
   const compactScrollRestoreRef = useRef(null);
   const compactRestoreFramesRef = useRef({ first: 0, second: 0 });
   const preserveCompactUntilRef = useRef(0);
+  const isCompactRef = useRef(false);
   const [calendarViewDate, setCalendarViewDate] = useState(() => new Date());
   const nanakshahiDate = useMemo(() => getNanakshahiDate(new Date()), []);
-  const nanakshahiMonthCalendar = useMemo(() => getNanakshahiMonthCalendar(calendarViewDate), [calendarViewDate]);
+  const calendarViewNanakshahiYear = useMemo(
+    () => nanakshahiHolidayService.getNanakshahiYearFromDate(calendarViewDate),
+    [calendarViewDate]
+  );
+  const { data: nanakshahiObservances = [] } = useQuery({
+    queryKey: ['nanakshahi-holidays-window', calendarViewNanakshahiYear],
+    queryFn: () => nanakshahiHolidayService.getHolidaysForDateWindow(calendarViewDate),
+    staleTime: 12 * 60 * 60 * 1000,
+    placeholderData: (previousData) => previousData
+  });
+  const nanakshahiMonthCalendar = useMemo(
+    () => getNanakshahiMonthCalendar(calendarViewDate, nanakshahiObservances),
+    [calendarViewDate, nanakshahiObservances]
+  );
   const location = useLocation();
+  const userEmail = String(user?.email || '').trim().toLowerCase();
+  const userName = String(user?.name || '').trim().toLowerCase();
+  const userDisplayName = String(user?.name || '').trim() || 'Sangat Member';
+  const userDisplayEmail = String(user?.email || '').trim() || 'No email available';
+  const userAvatarUrl = user?.avatarUrl || user?.picture || user?.photoURL || '';
+  const userInitial = userDisplayName.charAt(0).toUpperCase() || 'S';
+  const profilePhoneMissing = !String(user?.phone || '').trim();
+  const hasFullAccess = FULL_ACCESS_ROLES.has(String(user?.role || ''));
+  const canSeeAdminPortalButton = ADMIN_PORTAL_BUTTON_ROLES.has(String(user?.role || ''));
+  const isApprovalPending = isAuthenticated && !hasFullAccess && String(user?.approvalStatus || '') !== 'approved';
+  const { data: familyEvents = [] } = useQuery({
+    queryKey: ['navbar-family-events'],
+    queryFn: () => eventService.getEvents().then((res) => res.data),
+    enabled: isAuthenticated
+  });
+  const { data: familySeva = [] } = useQuery({
+    queryKey: ['navbar-family-seva'],
+    queryFn: () => volunteerService.getApplications().then((res) => res.data),
+    enabled: isAuthenticated
+  });
+  const { data: familyDonations = [] } = useQuery({
+    queryKey: ['navbar-family-donations'],
+    queryFn: () => donationService.getDonations().then((res) => res.data),
+    enabled: isAuthenticated
+  });
   const { data: streamingItems = [] } = useQuery({
     queryKey: ['streaming-config'],
     queryFn: () => streamingService.getStreamingItems().then((res) => res.data)
+  });
+  const { data: sponsors = [] } = useQuery({
+    queryKey: ['public-sponsors', 'pdf-banners'],
+    queryFn: () => sponsorService.getSponsors().then((res) => res.data || []),
+    staleTime: 12 * 60 * 60 * 1000
+  });
+  const { data: advertisements = [] } = useQuery({
+    queryKey: ['public-advertisements', 'pdf-banners'],
+    queryFn: () => advertisementService.getAds().then((res) => res.data || []),
+    staleTime: 12 * 60 * 60 * 1000
   });
   const todayIso = useMemo(() => {
     const today = new Date();
@@ -190,7 +404,41 @@ const Navbar = () => {
     return `${year}-${month}-${day}`;
   }, []);
   const todayGregorianKey = todayIso;
-  const upcomingObservances = useMemo(() => getUpcomingPunjabiObservances(20, new Date()), []);
+  const upcomingObservances = useMemo(
+    () => getUpcomingPunjabiObservances(20, new Date(), nanakshahiObservances),
+    [nanakshahiObservances]
+  );
+  const pdfBannerImageUrls = useMemo(() => {
+    const sponsorBanners = (Array.isArray(sponsors) ? sponsors : [])
+      .filter((entry) => entry?.active !== false && entry?.bannerUrl)
+      .map((entry) => String(entry.bannerUrl || '').trim())
+      .filter(Boolean);
+    const advertisementBanners = (Array.isArray(advertisements) ? advertisements : [])
+      .filter((entry) => entry?.active !== false && entry?.bannerUrl)
+      .map((entry) => String(entry.bannerUrl || '').trim())
+      .filter(Boolean);
+
+    return [...sponsorBanners, ...advertisementBanners].slice(0, 8);
+  }, [sponsors, advertisements]);
+
+  useEffect(() => {
+    const previousAnchorDate = new Date(calendarViewDate.getTime() - (32 * CALENDAR_NAV_DAY_MS));
+    const nextAnchorDate = new Date(calendarViewDate.getTime() + (32 * CALENDAR_NAV_DAY_MS));
+    const previousYear = nanakshahiHolidayService.getNanakshahiYearFromDate(previousAnchorDate);
+    const nextYear = nanakshahiHolidayService.getNanakshahiYearFromDate(nextAnchorDate);
+
+    queryClient.prefetchQuery({
+      queryKey: ['nanakshahi-holidays-window', previousYear],
+      queryFn: () => nanakshahiHolidayService.getHolidaysForDateWindow(previousAnchorDate),
+      staleTime: 12 * 60 * 60 * 1000
+    });
+
+    queryClient.prefetchQuery({
+      queryKey: ['nanakshahi-holidays-window', nextYear],
+      queryFn: () => nanakshahiHolidayService.getHolidaysForDateWindow(nextAnchorDate),
+      staleTime: 12 * 60 * 60 * 1000
+    });
+  }, [calendarViewDate, queryClient]);
 
   const leftMenuBalanced = useMemo(() => {
     const libraryFromRight = rightMenu.find((item) => item.path === '/library');
@@ -249,6 +497,8 @@ const Navbar = () => {
 
           const primaryObservance = cell.observances[0] || null;
           const eventTone = primaryObservance ? observanceToneClass(primaryObservance.type) : '';
+          const gradientStyle = cell.hasObservance ? getObservanceGradientStyle(cell.observances) : null;
+          const hasMultiTypeGradient = Boolean(gradientStyle);
           const cellGregorianKey = `${cell.gregorianDate.getFullYear()}-${String(cell.gregorianDate.getMonth() + 1).padStart(2, '0')}-${String(cell.gregorianDate.getDate()).padStart(2, '0')}`;
           const isGregorianToday = cellGregorianKey === todayGregorianKey;
           const englishDateLabel = new Intl.DateTimeFormat('en-US', {
@@ -258,35 +508,52 @@ const Navbar = () => {
           }).format(cell.gregorianDate);
           const hasScrollableObservances = cell.observances.length > 2;
 
+          const uniqueTypeDots = Array.from(new Map(
+            cell.observances.map((event) => [resolveObservanceTypeKey(event.type), getObservanceTypeStyles(event.type)])
+          ).values()).slice(0, 4);
+
           return (
             <span
               key={`${cell.day}-${cell.gregorianDate.toISOString()}`}
-              className={`group/date relative inline-flex h-8 w-8 items-center justify-center rounded-lg ${isGregorianToday ? 'ring-2 ring-brand-saffron shadow-[0_0_0_4px_rgba(245,166,35,0.22)] bg-amber-100/45' : ''}`}
+              className={`group/date relative inline-flex h-8 w-8 items-center justify-center rounded-lg ${isGregorianToday ? 'ring-2 ring-cyan-400 shadow-[0_0_0_4px_rgba(34,211,238,0.24)] bg-cyan-100/55' : ''}`}
             >
               <span
-                className={`relative z-10 inline-flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold ${cell.isToday ? 'bg-brand-blue text-white shadow-[0_8px_18px_rgba(10,77,159,0.22)]' : cell.hasObservance ? eventTone : 'text-slate-700'} ${isGregorianToday ? 'animate-pulse' : ''}`}
+                className={`relative z-10 inline-flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold ${cell.isToday ? 'bg-brand-blue text-white shadow-[0_8px_18px_rgba(10,77,159,0.22)]' : cell.hasObservance ? (hasMultiTypeGradient ? 'ring-1 ring-slate-300/70 text-slate-900' : eventTone) : 'text-slate-700'} ${isGregorianToday ? '!bg-cyan-600 !text-white ring-2 ring-white/70 shadow-[0_10px_22px_rgba(8,145,178,0.45)] animate-pulse' : ''}`}
+                style={!cell.isToday && hasMultiTypeGradient ? gradientStyle : undefined}
               >
                 {cell.dayPa}
               </span>
-              {cell.hasObservance ? <span className="absolute bottom-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-brand-saffron" /> : null}
+              {cell.hasObservance ? (
+                <span className="absolute bottom-0.5 right-0.5 inline-flex items-center gap-0.5 rounded-full bg-white/80 px-0.5 py-0.5 shadow-sm">
+                  {uniqueTypeDots.map((tone, dotIndex) => (
+                    <span
+                      key={`${cell.day}-${dotIndex}`}
+                      className={`h-1.5 w-1.5 rounded-full ${tone.dot}`}
+                    />
+                  ))}
+                </span>
+              ) : null}
               {cell.hasObservance ? (
                 <span className={`pointer-events-none invisible absolute left-1/2 top-[calc(100%+8px)] z-[999] w-64 -translate-x-1/2 rounded-2xl border border-brand-blue/30 bg-gradient-to-br from-amber-50 via-white to-blue-50 p-3 text-left opacity-0 shadow-[0_16px_38px_rgba(15,23,42,0.2)] transition duration-150 group-hover/date:visible group-hover/date:opacity-100 ${hasScrollableObservances ? 'max-h-72 overflow-y-auto pr-2' : ''}`}>
-                  {cell.observances.map((event, eventIndex) => (
+                  {cell.observances.map((event, eventIndex) => {
+                    const tone = getObservanceTypeStyles(event.type);
+                    return (
                     <span
                       key={`${event.type}-${event.titlePa}-${eventIndex}`}
                       className={`block ${eventIndex > 0 ? 'mt-3 border-t border-brand-blue/15 pt-3' : ''}`}
                     >
-                      <span className="inline-flex items-center gap-1 rounded-full bg-brand-blue/10 px-2 py-0.5 text-[10px] font-bold text-brand-blue">
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${tone.badge}`}>
                         <CalendarDaysIcon className="h-3 w-3 flex-shrink-0" />
                         {event.occasion}
                       </span>
-                      <span className="mt-1 block text-[11px] font-bold text-brand-blue">{event.titlePa}</span>
+                      <span className={`mt-1 block text-[11px] font-bold ${tone.title}`}>{event.titlePa}</span>
                       <span className="block text-[10px] font-semibold text-slate-700">{event.title}</span>
-                      <span className="mt-0.5 block text-[10px] font-bold tracking-wide text-brand-blue">{englishDateLabel}</span>
+                      <span className="mt-0.5 block text-[10px] font-bold tracking-wide text-slate-700">{englishDateLabel}</span>
                       <span className="mt-1 block text-[10px] leading-snug text-slate-600">{event.blurbPa}</span>
                       <span className="mt-0.5 block text-[10px] leading-snug text-slate-600">{event.blurb}</span>
                     </span>
-                  ))}
+                    );
+                  })}
                 </span>
               ) : null}
             </span>
@@ -297,17 +564,54 @@ const Navbar = () => {
   );
 
   useEffect(() => {
-    const onScroll = () => {
-      if (Date.now() < preserveCompactUntilRef.current) {
-        setIsCompact(true);
+    isCompactRef.current = isCompact;
+  }, [isCompact]);
+
+  useEffect(() => {
+    let rafId = 0;
+    let ticking = false;
+
+    const syncCompactState = (nextValue) => {
+      if (isCompactRef.current === nextValue) {
         return;
       }
-      setIsCompact(window.scrollY > 56);
+
+      isCompactRef.current = nextValue;
+      setIsCompact(nextValue);
     };
 
-    onScroll();
+    const evaluateCompactState = () => {
+      ticking = false;
+
+      if (Date.now() < preserveCompactUntilRef.current) {
+        syncCompactState(true);
+        return;
+      }
+
+      const scrollY = window.scrollY;
+      const shouldCompact = isCompactRef.current
+        ? scrollY > COMPACT_EXIT_SCROLL_Y
+        : scrollY > COMPACT_ENTER_SCROLL_Y;
+
+      syncCompactState(shouldCompact);
+    };
+
+    const onScroll = () => {
+      if (ticking) {
+        return;
+      }
+
+      ticking = true;
+      rafId = window.requestAnimationFrame(evaluateCompactState);
+    };
+
+    evaluateCompactState();
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.cancelAnimationFrame(rafId);
+    };
   }, []);
 
   useEffect(() => {
@@ -317,6 +621,7 @@ const Navbar = () => {
 
     const restoreY = compactScrollRestoreRef.current;
     const safeRestoreY = Math.max(restoreY, 76);
+    isCompactRef.current = true;
     setIsCompact(true);
 
     let frameOne = 0;
@@ -325,6 +630,7 @@ const Navbar = () => {
     frameOne = window.requestAnimationFrame(() => {
       frameTwo = window.requestAnimationFrame(() => {
         window.scrollTo({ top: safeRestoreY, behavior: 'auto' });
+        isCompactRef.current = true;
         setIsCompact(true);
         compactScrollRestoreRef.current = null;
       });
@@ -365,6 +671,129 @@ const Navbar = () => {
     () => upcomingObservances.find((entry) => entry.date === todayIso) || null,
     [todayIso, upcomingObservances]
   );
+  const familySummary = useMemo(() => {
+    if (!isAuthenticated) {
+      return {
+        eventCount: 0,
+        waitlistCount: 0,
+        sevaCount: 0,
+        donationTotal: 0
+      };
+    }
+
+    let eventCount = 0;
+    let waitlistCount = 0;
+    familyEvents.forEach((event) => {
+      const registrants = Array.isArray(event.registrants) ? event.registrants : [];
+      registrants.forEach((entry) => {
+        const entryName = String(entry.name || '').trim().toLowerCase();
+        const entryContact = String(entry.contact || '').trim().toLowerCase();
+        const entryEmail = String(entry.email || '').trim().toLowerCase();
+        const belongsToUser = (userEmail && (entryEmail === userEmail || entryContact === userEmail)) || (userName && entryName === userName);
+        if (!belongsToUser) {
+          return;
+        }
+        eventCount += 1;
+        if (String(entry.status || '').toLowerCase() === 'waitlisted') {
+          waitlistCount += 1;
+        }
+      });
+    });
+
+    const sevaCount = familySeva.filter((entry) => {
+      const entryEmail = String(entry.email || '').trim().toLowerCase();
+      const entryName = String(entry.name || '').trim().toLowerCase();
+      return (userEmail && entryEmail === userEmail) || (userName && entryName === userName);
+    }).length;
+
+    const donationTotal = familyDonations
+      .filter((entry) => String(entry.donorEmail || '').trim().toLowerCase() === userEmail)
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+    return {
+      eventCount,
+      waitlistCount,
+      sevaCount,
+      donationTotal
+    };
+  }, [familyDonations, familyEvents, familySeva, isAuthenticated, userEmail, userName]);
+
+  const handleLogout = async () => {
+    setIsProfilePopoverOpen(false);
+    await logout();
+    setOpen(false);
+    navigate('/', { replace: true });
+  };
+
+  const openProfileModal = () => {
+    setProfileError('');
+    setIsProfilePopoverOpen(false);
+    setProfileForm({
+      name: String(user?.name || ''),
+      email: String(user?.email || ''),
+      phone: String(user?.phone || ''),
+      address: String(user?.address || '')
+    });
+    setIsProfileModalOpen(true);
+  };
+
+  const handleProfileFormChange = (field) => (event) => {
+    setProfileForm((previous) => ({ ...previous, [field]: event.target.value }));
+  };
+
+  const handleSaveProfile = async (event) => {
+    event.preventDefault();
+    const nextName = String(profileForm.name || '').trim();
+    const nextEmail = String(user?.email || profileForm.email || '').trim().toLowerCase();
+    const nextPhone = String(profileForm.phone || '').trim();
+
+    if (!nextName || !nextPhone) {
+      setProfileError('Name and phone are required.');
+      return;
+    }
+
+    try {
+      setIsProfileSaving(true);
+      setProfileError('');
+      await updateProfile({
+        name: nextName,
+        email: nextEmail,
+        phone: nextPhone,
+        address: String(profileForm.address || '').trim()
+      });
+      setIsProfileModalOpen(false);
+    } catch (error) {
+      setProfileError(error?.message || 'Unable to update profile right now.');
+    } finally {
+      setIsProfileSaving(false);
+    }
+  };
+
+  const handleSignInClick = (event) => {
+    if (!isAuthenticated) {
+      return;
+    }
+
+    event.preventDefault();
+    navigate(resolveLandingPathByRole());
+  };
+
+  const handleBecomeMemberClick = (event) => {
+    if (!isAuthenticated) {
+      return;
+    }
+
+    event.preventDefault();
+    navigate(resolveLandingPathByRole());
+  };
+
+  const handleProfileQuickLink = (targetPath) => (event) => {
+    setIsProfilePopoverOpen(false);
+    if (location.pathname === targetPath) {
+      event.preventDefault();
+      window.location.reload();
+    }
+  };
 
   const dateContext = useMemo(() => {
     const weekdayEn = new Date().toLocaleDateString('en-CA', { weekday: 'long' });
@@ -568,12 +997,36 @@ const Navbar = () => {
     }, 180);
   };
 
+  const openProfilePopover = () => {
+    if (profilePopoverCloseTimeoutRef.current) {
+      window.clearTimeout(profilePopoverCloseTimeoutRef.current);
+      profilePopoverCloseTimeoutRef.current = null;
+    }
+    setIsProfilePopoverOpen(true);
+  };
+
+  const closeProfilePopoverWithDelay = () => {
+    if (profilePopoverCloseTimeoutRef.current) {
+      window.clearTimeout(profilePopoverCloseTimeoutRef.current);
+    }
+    profilePopoverCloseTimeoutRef.current = window.setTimeout(() => {
+      setIsProfilePopoverOpen(false);
+      profilePopoverCloseTimeoutRef.current = null;
+    }, 220);
+  };
+
   const handleCompactNavClick = () => {
     compactScrollRestoreRef.current = window.scrollY;
     preserveCompactUntilRef.current = Date.now() + 800;
   };
 
-  const getLogoDataUrl = async () => new Promise((resolve) => {
+  const getImageDataUrl = async (source) => new Promise((resolve) => {
+    const src = String(source || '').trim();
+    if (!src) {
+      resolve(null);
+      return;
+    }
+
     const image = new Image();
     image.crossOrigin = 'anonymous';
     image.onload = () => {
@@ -591,8 +1044,20 @@ const Navbar = () => {
       resolve(canvas.toDataURL('image/png'));
     };
     image.onerror = () => resolve(null);
-    image.src = gurdwaraLogo;
+    image.src = src;
   });
+
+  const getLogoDataUrl = async () => getImageDataUrl(gurdwaraLogo);
+
+  const getPdfBannerDataUrls = async (urls = []) => {
+    const selected = (Array.isArray(urls) ? urls : []).slice(0, 8);
+    if (selected.length === 0) {
+      return [];
+    }
+
+    const settled = await Promise.all(selected.map((url) => getImageDataUrl(url).catch(() => null)));
+    return settled.filter(Boolean);
+  };
 
   const getPdfGurmukhiFonts = async () => {
     if (pdfFontCacheRef.current) {
@@ -652,11 +1117,11 @@ const Navbar = () => {
   };
 
   const getNanakshahiYearMonths = () => {
-    let firstMonth = getNanakshahiMonthCalendar(nanakshahiMonthCalendar.monthStartGregorian);
+    let firstMonth = getNanakshahiMonthCalendar(nanakshahiMonthCalendar.monthStartGregorian, nanakshahiObservances);
     let rewindGuard = 0;
 
     while (firstMonth.month !== 'Chet' && rewindGuard < 14) {
-      firstMonth = getNanakshahiMonthCalendar(new Date(firstMonth.monthStartGregorian.getTime() - CALENDAR_NAV_DAY_MS));
+      firstMonth = getNanakshahiMonthCalendar(new Date(firstMonth.monthStartGregorian.getTime() - CALENDAR_NAV_DAY_MS), nanakshahiObservances);
       rewindGuard += 1;
     }
 
@@ -665,7 +1130,7 @@ const Navbar = () => {
 
     for (let index = 0; index < 12; index += 1) {
       yearMonths.push(cursor);
-      cursor = getNanakshahiMonthCalendar(new Date(cursor.nextMonthStartGregorian.getTime()));
+      cursor = getNanakshahiMonthCalendar(new Date(cursor.nextMonthStartGregorian.getTime()), nanakshahiObservances);
     }
 
     return yearMonths;
@@ -693,6 +1158,7 @@ const Navbar = () => {
         doc.addFont('NotoSansGurmukhi-Bold.ttf', 'NotoSansGurmukhi', 'bold');
       }
       const logoDataUrl = await getLogoDataUrl();
+      const bannerDataUrls = await getPdfBannerDataUrls(pdfBannerImageUrls);
       const monthStart = nanakshahiMonthCalendar.monthStartGregorian;
       const nextMonthStart = nanakshahiMonthCalendar.nextMonthStartGregorian;
       const monthEnd = new Date(nextMonthStart.getTime() - CALENDAR_NAV_DAY_MS);
@@ -713,12 +1179,13 @@ const Navbar = () => {
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
         const marginX = 8;
-        const marginBottom = 8;
+        const bannerStripHeight = bannerDataUrls.length > 0 ? 9 : 0;
+        const marginBottom = 8 + (bannerStripHeight > 0 ? bannerStripHeight + 2 : 0);
         const topY = 40;
-        const columns = 3;
-        const rows = 4;
+        const columns = 4;
+        const rows = 3;
         const gapX = 3.5;
-        const gapY = 3.5;
+        const gapY = 2.5;
         const cardWidth = (pageWidth - (marginX * 2) - ((columns - 1) * gapX)) / columns;
         const cardHeight = (pageHeight - topY - marginBottom - ((rows - 1) * gapY)) / rows;
 
@@ -748,12 +1215,15 @@ const Navbar = () => {
           });
 
           const monthWeeks = monthData.weeks.slice(0, 6);
-          const cellHeight = (cardHeight - 11.6) / 6;
+          const calendarTopY = y + 10.4;
+          const calendarBottomY = y + 31.2;
+          const calendarHeight = calendarBottomY - calendarTopY;
+          const cellHeight = calendarHeight / 6;
 
           monthWeeks.forEach((week, weekIndex) => {
             week.forEach((cell, dayIndex) => {
               const cellX = x + 1.1 + (dayIndex * miniColWidth);
-              const cellY = y + 10.2 + (weekIndex * cellHeight);
+              const cellY = calendarTopY + (weekIndex * cellHeight);
 
               doc.setDrawColor(10, 77, 159);
               doc.setLineWidth(0.14);
@@ -771,22 +1241,116 @@ const Navbar = () => {
               }
 
               if (cell.hasObservance) {
+                const tone = getPdfEventTone(cell.observances[0]?.type);
+                doc.setFillColor(...tone.bg);
+                doc.roundedRect(cellX + 0.08, cellY + 0.08, miniColWidth - 0.16, cellHeight - 0.16, 0.3, 0.3, 'F');
                 doc.setFillColor(245, 166, 35);
                 doc.circle(cellX + miniColWidth - 0.6, cellY + 0.7, 0.26, 'F');
               }
 
               doc.setTextColor(cell.hasObservance ? 10 : 51, cell.hasObservance ? 77 : 65, cell.hasObservance ? 159 : 85);
               doc.setFont(hasGurmukhiFont ? 'NotoSansGurmukhi' : 'helvetica', 'bold');
-              doc.setFontSize(5.8);
-              doc.text(String(cell.dayPa), cellX + (miniColWidth / 2), cellY + 2.2, { align: 'center' });
+              doc.setFontSize(4.7);
+              doc.text(String(cell.dayPa), cellX + (miniColWidth / 2), cellY + 1.75, { align: 'center' });
 
               doc.setFont('helvetica', 'normal');
               doc.setTextColor(71, 85, 105);
-              doc.setFontSize(3.9);
-              doc.text(formatGregorianMiniLabel(cell.gregorianDate), cellX + (miniColWidth / 2), cellY + (cellHeight - 0.8), { align: 'center' });
+              doc.setFontSize(3.5);
+              doc.text(formatGregorianMiniLabel(cell.gregorianDate), cellX + (miniColWidth / 2), cellY + (cellHeight - 0.35), { align: 'center' });
             });
           });
+
+          const monthEvents = monthData.weeks
+            .flat()
+            .filter(Boolean)
+            .flatMap((cell) => cell.observances.map((event) => ({
+              dateKey: toIsoDateKeyFromDate(cell.gregorianDate),
+              event,
+              dateObj: cell.gregorianDate
+            })))
+            .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
+
+          const uniqueEvents = [];
+          const seenEventKeys = new Set();
+          monthEvents.forEach((entry) => {
+            const key = `${entry.dateKey}::${entry.event.title}`;
+            if (!seenEventKeys.has(key)) {
+              seenEventKeys.add(key);
+              uniqueEvents.push(entry);
+            }
+          });
+
+          uniqueEvents.sort((left, right) => {
+            const leftPriority = Number(left?.event?.importance || 999);
+            const rightPriority = Number(right?.event?.importance || 999);
+            if (leftPriority !== rightPriority) {
+              return leftPriority - rightPriority;
+            }
+            return left.dateObj.getTime() - right.dateObj.getTime();
+          });
+
+          const listTitleY = y + 33.4;
+          doc.setTextColor(15, 23, 42);
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(4.9);
+          doc.text('Holidays:', x + 1.2, listTitleY);
+
+          const pillHeight = 2.25;
+          const pillGapX = 0.55;
+          const pillGapY = 0.55;
+          const pillsStartX = x + 1.2;
+          const pillsMaxX = x + cardWidth - 1.2;
+          const availablePillHeight = (y + cardHeight - 1.2) - (listTitleY + 1.1);
+          const maxRows = Math.max(1, Math.floor((availablePillHeight + pillGapY) / (pillHeight + pillGapY)));
+          let cursorX = pillsStartX;
+          let cursorY = listTitleY + 1.1;
+          let pillRow = 1;
+
+          uniqueEvents.forEach((entry) => {
+            if (pillRow > maxRows) {
+              return;
+            }
+
+            const sourceTitle = String(entry?.event?.titlePa || entry?.event?.title || '').trim();
+            const label = truncatePdfText(sourceTitle, 30);
+            doc.setFont(hasGurmukhiFont ? 'NotoSansGurmukhi' : 'helvetica', 'bold');
+            doc.setFontSize(3.2);
+            const textWidth = doc.getTextWidth(label);
+            const estimatedWidth = Math.min((pillsMaxX - pillsStartX), Math.max(6.2, textWidth + 1.5));
+
+            if (cursorX + estimatedWidth > pillsMaxX) {
+              cursorX = pillsStartX;
+              cursorY += pillHeight + pillGapY;
+              pillRow += 1;
+              if (pillRow > maxRows) {
+                return;
+              }
+            }
+
+            const tone = getPdfHolidayPillTone(entry.event);
+            doc.setFillColor(...tone.bg);
+            doc.roundedRect(cursorX, cursorY, estimatedWidth, pillHeight, 1.2, 1.2, 'F');
+            doc.setTextColor(...tone.text);
+            doc.setFont(hasGurmukhiFont ? 'NotoSansGurmukhi' : 'helvetica', 'bold');
+            doc.setFontSize(3.2);
+            doc.text(label, cursorX + 0.7, cursorY + 1.55);
+
+            cursorX += estimatedWidth + pillGapX;
+          });
         });
+
+        if (bannerDataUrls.length > 0) {
+          const stripY = pageHeight - bannerStripHeight - 4;
+          const stripGap = 1.4;
+          const itemWidth = (pageWidth - (marginX * 2) - ((bannerDataUrls.length - 1) * stripGap)) / bannerDataUrls.length;
+
+          bannerDataUrls.forEach((bannerDataUrl, index) => {
+            const imageX = marginX + (index * (itemWidth + stripGap));
+            doc.setDrawColor(203, 213, 225);
+            doc.roundedRect(imageX, stripY, itemWidth, bannerStripHeight, 0.8, 0.8, 'S');
+            doc.addImage(bannerDataUrl, 'PNG', imageX + 0.25, stripY + 0.25, itemWidth - 0.5, bannerStripHeight - 0.5);
+          });
+        }
 
         doc.save(`nanakshahi-${yearMonths[0].year}-compact-year-grid.pdf`);
         return;
@@ -844,6 +1408,12 @@ const Navbar = () => {
             doc.setLineWidth(0.2);
           }
 
+          if (cell.hasObservance) {
+            const tone = getPdfEventTone(cell.observances[0]?.type);
+            doc.setFillColor(...tone.bg);
+            doc.roundedRect(x + 0.4, y + 0.4, colWidth - 0.8, rowHeight - 0.8, 0.7, 0.7, 'F');
+          }
+
           doc.setFont(hasGurmukhiFont ? 'NotoSansGurmukhi' : 'helvetica', 'bold');
           doc.setTextColor(10, 77, 159);
           doc.setFontSize(isDetailed ? 12 : 15);
@@ -881,6 +1451,9 @@ const Navbar = () => {
   useEffect(() => () => {
     if (datePopoverCloseTimeoutRef.current) {
       window.clearTimeout(datePopoverCloseTimeoutRef.current);
+    }
+    if (profilePopoverCloseTimeoutRef.current) {
+      window.clearTimeout(profilePopoverCloseTimeoutRef.current);
     }
   }, []);
 
@@ -938,25 +1511,24 @@ const Navbar = () => {
                 }}
               />
             </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="hidden items-center gap-1.5 lg:flex">
-              <div
-                className="group relative"
-                onMouseEnter={openDatePopover}
-                onMouseLeave={closeDatePopoverWithDelay}
-                onFocus={openDatePopover}
-                onBlur={closeDatePopoverWithDelay}
-              >
-              <div
-                className="max-w-[340px] truncate whitespace-nowrap rounded-full border border-blue-200/30 px-2 py-0.5 text-[11px] font-extrabold leading-none tracking-tight text-blue-50 transition hover:bg-blue-800/40"
+            <span className="text-blue-200">|</span>
+            <div
+              className="group relative"
+              onMouseEnter={openDatePopover}
+              onMouseLeave={closeDatePopoverWithDelay}
+              onFocus={openDatePopover}
+              onBlur={closeDatePopoverWithDelay}
+            >
+              <button
+                type="button"
+                onClick={() => setDateInfoOpen(true)}
+                className="max-w-[260px] truncate whitespace-nowrap rounded-full border border-blue-200/30 px-2 py-1 text-xs font-bold leading-none tracking-tight text-blue-50 transition hover:bg-blue-800/40"
                 title="View Nanakshahi date details"
                 aria-label="View Nanakshahi date details"
-                role="note"
               >
                 {nanakshahiDate.labelPa}
-              </div>
-              <div className={`pointer-events-auto absolute right-0 top-full z-[250] w-[360px] rounded-3xl border-2 border-brand-blue/35 bg-gradient-to-br from-blue-50/95 via-white to-amber-50/95 p-4 shadow-[0_24px_60px_rgba(15,23,42,0.22)] transition duration-200 ${isDatePopoverOpen ? 'visible translate-y-0 opacity-100' : 'invisible translate-y-1 opacity-0'}`}>
+              </button>
+              <div className={`pointer-events-auto absolute left-0 top-full z-[250] w-[360px] rounded-3xl border-2 border-brand-blue/35 bg-gradient-to-br from-blue-50/95 via-white to-amber-50/95 p-4 shadow-[0_24px_60px_rgba(15,23,42,0.22)] transition duration-200 ${isDatePopoverOpen ? 'visible translate-y-0 opacity-100' : 'invisible translate-y-1 opacity-0'}`}>
                 <div className="space-y-3">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">ਅੱਜ</p>
@@ -971,7 +1543,7 @@ const Navbar = () => {
                       className="inline-flex h-7 items-center justify-center whitespace-nowrap rounded-full border border-brand-blue/25 bg-white px-3 text-[10px] font-bold text-brand-blue transition hover:bg-brand-saffron/40 hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <ArrowDownTrayIcon className="mr-1 h-3.5 w-3.5" />
-                      Month Snapshot
+                      Year Snapshot
                     </button>
                     <button
                       type="button"
@@ -980,61 +1552,119 @@ const Navbar = () => {
                       className="inline-flex h-7 items-center justify-center whitespace-nowrap rounded-full border border-brand-blue/25 bg-white px-3 text-[10px] font-bold text-brand-blue transition hover:bg-brand-saffron/40 hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <ArrowDownTrayIcon className="mr-1 h-3.5 w-3.5" />
-                      Detailed Calendar
+                      Current Month
                     </button>
                   </div>
                   {renderNanakshahiCalendar(true)}
-                  <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-3">
-                    <p className="text-sm font-semibold text-slate-800">ਅੱਜ ਦੀ ਰੂਹਾਨੀ ਸੋਚ</p>
-                    <p className="mt-1 text-sm leading-relaxed text-slate-700">{dateContext.insight.pa}</p>
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
-                    <p className="text-sm font-semibold text-slate-800">Thought of the Day</p>
-                    <p className="mt-1 text-sm leading-relaxed text-slate-700">{dateContext.insight.en}</p>
-                  </div>
                 </div>
               </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link to="/login?mode=join&next=/family-dashboard" onClick={handleBecomeMemberClick} className="rounded-full border border-emerald-300 bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-900 shadow-[0_6px_12px_rgba(16,185,129,0.2)] transition hover:bg-emerald-200">Become Member</Link>
+            {isAuthenticated ? (
+              <div className="relative flex items-center gap-2">
+                <span className="text-[11px] font-bold text-blue-50">Welcome, {userDisplayName}</span>
+                <button
+                  type="button"
+                  onClick={() => setIsProfilePopoverOpen((previous) => !previous)}
+                  onMouseEnter={openProfilePopover}
+                  onFocus={openProfilePopover}
+                  aria-expanded={isProfilePopoverOpen}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-brand-saffron bg-brand-saffron px-2.5 py-0.5 text-[11px] font-bold text-brand-navy shadow-[0_6px_12px_rgba(245,166,35,0.3)] transition hover:bg-amber-300"
+                >
+                  <span>Details</span>
+                </button>
+                <div className="pointer-events-auto absolute right-0 top-full z-[275] h-4 w-full min-w-[360px]" />
+                <div onMouseEnter={openProfilePopover} onMouseLeave={closeProfilePopoverWithDelay} className={`absolute right-0 top-[calc(100%+8px)] z-[276] w-[360px] rounded-3xl border border-brand-blue/35 bg-gradient-to-br from-blue-50/95 via-white to-amber-50/95 p-4 shadow-[0_24px_60px_rgba(15,23,42,0.24)] transition duration-200 ${isProfilePopoverOpen ? 'pointer-events-auto translate-y-0 opacity-100' : 'pointer-events-none translate-y-1 opacity-0'}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      {userAvatarUrl ? (
+                        <img src={userAvatarUrl} alt={userDisplayName} className="h-12 w-12 rounded-full border-2 border-brand-saffron object-cover" />
+                      ) : (
+                        <span className="inline-flex h-12 w-12 items-center justify-center rounded-full border-2 border-brand-saffron bg-brand-blue text-lg font-black text-white">{userInitial}</span>
+                      )}
+                      <div>
+                        <p className="text-sm font-extrabold text-brand-blue">{userDisplayName}</p>
+                        <p className="text-xs font-semibold text-slate-600">{userDisplayEmail}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-bold text-rose-700 transition hover:bg-rose-100"
+                    >
+                      <ArrowRightOnRectangleIcon className="h-3.5 w-3.5" />
+                      Logout
+                    </button>
+                  </div>
+
+                  <div className="mt-2.5 grid grid-cols-2 grid-rows-2 gap-2">
+                    <div className="flex h-[62px] flex-col justify-center rounded-xl border border-brand-blue/20 bg-white px-2 py-1.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Event RSVPs</p>
+                      <p className="mt-0.5 text-base font-black leading-none text-brand-blue">{familySummary.eventCount}</p>
+                      <p className="mt-0.5 text-[10px] text-amber-700">Waitlist: {familySummary.waitlistCount}</p>
+                    </div>
+                    <div className="row-span-2 flex min-h-[126px] flex-col items-start justify-start rounded-xl border border-emerald-200 bg-white px-2.5 py-1.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Donations</p>
+                      <p className="mt-1 text-[1.85rem] font-black leading-none text-emerald-700">{formatCompactDonationTotal(familySummary.donationTotal)}</p>
+                    </div>
+                    <div className="flex h-[62px] flex-col justify-center rounded-xl border border-brand-blue/20 bg-white px-2 py-1.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Seva Applications</p>
+                      <p className="mt-0.5 text-base font-black leading-none text-brand-blue">{familySummary.sevaCount}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-4 gap-2">
+                    <button type="button" onClick={openProfileModal} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-2 py-1.5 text-[10px] font-bold text-brand-blue hover:bg-blue-50">
+                      <UserCircleIcon className="h-4.5 w-4.5" />
+                      Profile
+                    </button>
+                    <Link to="/events" onClick={handleProfileQuickLink('/events')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-2 py-1.5 text-[10px] font-bold text-brand-blue hover:bg-blue-50">
+                      <CalendarDaysIcon className="h-4.5 w-4.5" />
+                      Events
+                    </Link>
+                    <Link to="/seva" onClick={handleProfileQuickLink('/seva')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-2 py-1.5 text-[10px] font-bold text-brand-blue hover:bg-blue-50">
+                      <HandRaisedIcon className="h-4.5 w-4.5" />
+                      Seva
+                    </Link>
+                    <Link to="/donation" onClick={handleProfileQuickLink('/donation')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-2 py-1.5 text-[10px] font-bold text-brand-blue hover:bg-blue-50">
+                      <HeartIcon className="h-4.5 w-4.5" />
+                      Donation
+                    </Link>
+                  </div>
+
+                  <Link to="/family-dashboard" onClick={handleProfileQuickLink('/family-dashboard')} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-brand-saffron bg-brand-saffron px-3 py-1.5 text-xs font-extrabold uppercase tracking-wide text-brand-navy transition hover:bg-amber-300">
+                    <SparklesIcon className="h-4 w-4" />
+                    Open Family Dashboard
+                  </Link>
+                  {canSeeAdminPortalButton ? (
+                    <Link to="/admin" onClick={handleProfileQuickLink('/admin')} className="mt-2 inline-flex w-full items-center justify-center rounded-full border border-brand-blue/30 bg-gradient-to-r from-brand-blue via-blue-600 to-brand-saffron px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white shadow-[0_8px_20px_rgba(10,77,159,0.28)] transition hover:from-blue-700 hover:via-brand-blue hover:to-amber-500">
+                      Go to Admin Portal
+                    </Link>
+                  ) : null}
+                </div>
               </div>
-            </div>
-            <div
-              className="rounded-full border border-blue-200/30 px-2 py-0.5 text-[11px] font-extrabold leading-none tracking-tight text-blue-50 transition hover:bg-blue-800/40 lg:hidden"
-              title="View Nanakshahi date details"
-              aria-label="View Nanakshahi date details"
-              role="note"
-            >
-              {nanakshahiDate.labelPa}
-            </div>
-            <Link to="/login?mode=admin&next=/admin" className="rounded-full border border-blue-200/40 px-2 py-0.5 text-[11px] font-semibold text-blue-50 hover:bg-blue-800/40">Admin Portal</Link>
-            <Link to="/login?mode=join&type=volunteer" className="rounded-full border border-blue-200/40 px-2 py-0.5 text-[11px] font-semibold text-blue-50 hover:bg-blue-800/40">Join Volunteer</Link>
-            <a href={siteConfig.baseUrl} target="_blank" rel="noreferrer" className="text-blue-50/90 transition hover:text-white" aria-label="Website">
-              <WebsiteGlyph />
-            </a>
-            <a href={siteConfig.social.youtube} target="_blank" rel="noreferrer" className="text-blue-50/90 transition hover:text-white" aria-label="YouTube">
-                <YouTubeGlyph />
-            </a>
-            <a href={siteConfig.social.facebook} target="_blank" rel="noreferrer" className="text-blue-50/90 transition hover:text-white" aria-label="Facebook">
-              <FacebookGlyph />
-            </a>
-            <a href={siteConfig.social.instagram} target="_blank" rel="noreferrer" className="text-blue-50/90 transition hover:text-white" aria-label="Instagram">
-              <InstagramGlyph />
-            </a>
+            ) : (
+              <Link to="/login?next=/family-dashboard" onClick={handleSignInClick} className="rounded-full border border-brand-saffron bg-brand-saffron px-2.5 py-0.5 text-[11px] font-bold text-brand-navy shadow-[0_6px_12px_rgba(245,166,35,0.3)] transition hover:bg-amber-300">Sign In</Link>
+            )}
           </div>
         </div>
       </div>
 
       <div className="w-full bg-gradient-to-r from-blue-50/55 via-white/95 to-amber-50/45">
         <div className="mx-auto max-w-7xl px-4 md:px-6">
-          <div className={`relative hidden items-center transition-[min-height,padding] duration-500 ease-in-out lg:flex ${isCompact ? 'min-h-[86px] py-2' : 'min-h-[146px] py-2'}`}>
+          <div className={`relative hidden items-center transition-[min-height,padding] duration-300 ease-in-out lg:flex ${isCompact ? 'min-h-[86px] py-2' : 'min-h-[146px] py-2'}`}>
           <Link
             to="/"
             preventScrollReset={isCompact}
             onClick={isCompact ? handleCompactNavClick : undefined}
-            className={`absolute top-1/2 z-20 flex -translate-y-1/2 items-center justify-center text-brand-blue transition-all duration-500 ease-in-out ${isCompact ? 'left-0 translate-x-0' : 'left-1/2 -translate-x-1/2'}`}
+            className={`absolute top-1/2 z-20 flex -translate-y-1/2 items-center justify-center text-brand-blue transition-all duration-300 ease-in-out ${isCompact ? 'left-0 translate-x-0' : 'left-1/2 -translate-x-1/2'}`}
           >
             <img
               src={gurdwaraLogo}
               alt="Gurdwara Singh Sabha Milton logo"
-              className={`rounded-full border-2 border-brand-saffron object-cover shadow-[0_4px_16px_rgba(245,166,35,0.25)] transition-all duration-500 ease-in-out ${isCompact ? 'h-[4.5rem] w-[4.5rem]' : 'h-[7.7rem] w-[7.7rem]'}`}
+              className={`rounded-full border-2 border-brand-saffron object-cover shadow-[0_4px_16px_rgba(245,166,35,0.25)] transition-all duration-300 ease-in-out ${isCompact ? 'h-[4.5rem] w-[4.5rem]' : 'h-[7.7rem] w-[7.7rem]'}`}
             />
           </Link>
 
@@ -1141,6 +1771,16 @@ const Navbar = () => {
             </button>
           </div>
         </div>
+        <div className="mt-2 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setDateInfoOpen(true)}
+            className="inline-flex items-center gap-2 rounded-full border border-brand-blue/30 bg-gradient-to-r from-white via-blue-50 to-amber-50 px-3 py-1 text-[11px] font-bold text-brand-blue"
+          >
+            <CalendarDaysIcon className="h-3.5 w-3.5" />
+            View Nanakshahi Date Details
+          </button>
+        </div>
       </div>
 
       {!isCompact ? (
@@ -1199,7 +1839,7 @@ const Navbar = () => {
                 <button
                   type="button"
                   onClick={() => setCompactStreamsOpen(false)}
-                  className="rounded-full border border-slate-200 p-1.5 text-slate-600 hover:border-brand-blue hover:text-brand-blue"
+                  className="rounded-full border border-brand-blue/40 bg-blue-50 p-1.5 text-brand-blue transition hover:border-brand-saffron hover:bg-amber-100 hover:text-amber-700"
                   aria-label="Close live channels list"
                 >
                   <XMarkIcon className="h-4 w-4" />
@@ -1263,13 +1903,13 @@ const Navbar = () => {
       {dateInfoOpen ? createPortal(
         <div className="fixed inset-0 z-[230] overflow-y-auto bg-slate-950/65 px-4 py-6" onClick={() => setDateInfoOpen(false)}>
           <div className="flex min-h-full items-center justify-center">
-            <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
               <div className="flex items-center justify-between border-b border-slate-200 bg-blue-50 px-4 py-3">
                 <h3 className="text-lg font-bold text-brand-blue">Nanakshahi Date Details</h3>
                 <button
                   type="button"
                   onClick={() => setDateInfoOpen(false)}
-                  className="rounded-full border border-slate-200 p-1.5 text-slate-600 hover:border-brand-blue hover:text-brand-blue"
+                  className="rounded-full border border-brand-blue/40 bg-blue-50 p-1.5 text-brand-blue transition hover:border-brand-saffron hover:bg-amber-100 hover:text-amber-700"
                   aria-label="Close Nanakshahi date details"
                 >
                   <XMarkIcon className="h-4 w-4" />
@@ -1299,6 +1939,13 @@ const Navbar = () => {
                     <p className="text-sm font-semibold text-amber-900">Today in Sikh Calendar</p>
                     <p className="mt-1 text-sm font-semibold text-amber-900">{todayObservance.titlePa}</p>
                     <p className="text-sm text-amber-800">{todayObservance.title}</p>
+                    <p className="mt-1 text-xs font-semibold text-amber-900/90">{todayObservance.nanakshahiLabelPa}</p>
+                    {todayObservance.hasAlternateNanakshahiLabel ? (
+                      <p className="text-xs text-amber-800/90">Alternate published date: {todayObservance.alternateNanakshahiLabel}</p>
+                    ) : null}
+                    {todayObservance.significanceEn ? (
+                      <p className="mt-1 text-xs text-amber-800">{todayObservance.significanceEn}</p>
+                    ) : null}
                   </div>
                 ) : (
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -1320,24 +1967,92 @@ const Navbar = () => {
         />
       ) : null}
 
+      {isProfileModalOpen ? createPortal(
+        <div className="fixed inset-0 z-[280] overflow-y-auto bg-slate-900/55 px-4 py-6" onClick={() => setIsProfileModalOpen(false)}>
+          <div className="mx-auto flex min-h-full items-center justify-center">
+          <div className="w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="font-heading text-lg font-semibold text-slate-900">Update Profile</h3>
+              <button type="button" onClick={() => setIsProfileModalOpen(false)} className="rounded-full border border-slate-300 p-1.5 text-slate-600 hover:bg-slate-100" aria-label="Close profile modal">
+                <XMarkIcon className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form className="mt-4 space-y-3" onSubmit={handleSaveProfile}>
+              <label className="block text-sm font-semibold text-slate-700">
+                Name
+                <input value={profileForm.name} onChange={handleProfileFormChange('name')} required className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-extrabold text-slate-900" />
+              </label>
+              <label className="block text-sm font-semibold text-slate-700">
+                Email
+                <input value={profileForm.email} type="email" readOnly className="mt-1 w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 font-extrabold text-slate-700" />
+              </label>
+              <label className="block text-sm font-semibold text-slate-700">
+                Phone
+                <input value={profileForm.phone} onChange={handleProfileFormChange('phone')} required className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-extrabold text-slate-900" />
+              </label>
+              <label className="block text-sm font-semibold text-slate-700">
+                Address (optional)
+                <input value={profileForm.address} onChange={handleProfileFormChange('address')} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
+              </label>
+
+              {profileError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{profileError}</p> : null}
+              {profilePhoneMissing ? <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">Add a phone number to unlock event, seva, and donation registrations.</p> : null}
+
+              <button type="submit" disabled={isProfileSaving} className="w-full rounded-lg bg-brand-blue px-3 py-2 text-sm font-bold text-white disabled:opacity-60">
+                {isProfileSaving ? 'Saving...' : 'Save Profile'}
+              </button>
+            </form>
+          </div>
+          </div>
+        </div>
+      , document.body) : null}
+
       {open ? (
         <div className="max-h-[calc(100vh-6.5rem)] overflow-y-auto border-t border-slate-100 bg-gradient-to-b from-white to-slate-50 px-4 py-3 lg:hidden">
           <div className="mb-3 grid gap-2 sm:grid-cols-2">
             <Link
-              to="/login?mode=admin&next=/admin"
-              className="rounded-xl border border-brand-blue/20 bg-brand-blue px-3 py-2 text-center text-sm font-semibold text-white"
-              onClick={() => setOpen(false)}
+              to="/login?mode=join&next=/family-dashboard"
+              onClick={(event) => {
+                handleBecomeMemberClick(event);
+                setOpen(false);
+              }}
+              className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-center text-sm font-semibold text-emerald-800"
             >
-              Admin Portal
+              Become Member
             </Link>
             <Link
-              to="/login?mode=join&type=volunteer"
+              to={isAuthenticated ? resolveLandingPathByRole(user?.role) : '/login?next=/family-dashboard'}
+              onClick={(event) => {
+                handleSignInClick(event);
+                setOpen(false);
+              }}
               className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-sm font-semibold text-slate-700"
-              onClick={() => setOpen(false)}
             >
-              Join Volunteer
+              {isAuthenticated ? `Welcome, ${userDisplayName}` : 'Sign In'}
             </Link>
           </div>
+          {isApprovalPending ? (
+            <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">{PENDING_APPROVAL_MESSAGE}</p>
+          ) : null}
+          {isAuthenticated && canSeeAdminPortalButton ? (
+            <Link
+              to="/admin"
+              onClick={() => setOpen(false)}
+              className="mb-2 inline-flex w-full items-center justify-center rounded-xl border border-brand-blue/30 bg-gradient-to-r from-brand-blue via-blue-600 to-brand-saffron px-3 py-2 text-sm font-bold uppercase tracking-wide text-white shadow-[0_8px_20px_rgba(10,77,159,0.28)] transition hover:from-blue-700 hover:via-brand-blue hover:to-amber-500"
+            >
+              Go to Admin Portal
+            </Link>
+          ) : null}
+          {isAuthenticated ? (
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="mb-3 w-full rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700"
+            >
+              Logout
+            </button>
+          ) : null}
           <div className="grid gap-2">
             {mobileMenuItems.map((item) => (
               <NavLink key={item.path} to={item.path} className={navClass} onClick={() => setOpen(false)}>

@@ -1,0 +1,952 @@
+[
+  {
+    "id": 176,
+    "category": "Festivals",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Festivals?",
+      "pa": "ਤਿਉਹਾਰ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Parkash Purab",
+        "pa": "ਪਰਕਾਸ਼ ਪੁਰਬ"
+      },
+      {
+        "en": "Meaning of shabad",
+        "pa": "ਸ਼ਬਦ ਦਾ ਅਰਥ"
+      },
+      {
+        "en": "Banda Singh Bahadur",
+        "pa": "ਬੰਦਾ ਸਿੰਘ ਬਹਾਦੁਰ"
+      },
+      {
+        "en": "Asa di Vaar",
+        "pa": "ਆਸਾ ਦੀ ਵਾਰ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Parkash Purab is an accurate match for Festivals in Sikh learning for ages 6-12.",
+      "pa": "ਪਰਕਾਸ਼ ਪੁਰਬ ਤਿਉਹਾਰ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 177,
+    "category": "Festivals",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Festivals.",
+      "pa": "ਤਿਉਹਾਰ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Respect for all",
+        "pa": "ਸਭ ਦਾ ਆਦਰ"
+      },
+      {
+        "en": "Sangrand",
+        "pa": "ਸੰਗਰਾਂਦ"
+      },
+      {
+        "en": "Bhai Vir Singh Ji",
+        "pa": "ਭਾਈ ਵੀਰ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Bhai Taru Singh Ji",
+        "pa": "ਭਾਈ ਤਾਰੂ ਸਿੰਘ ਜੀ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Sangrand is an accurate match for Festivals in Sikh learning for ages 6-12.",
+      "pa": "ਸੰਗਰਾਂਦ ਤਿਉਹਾਰ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 178,
+    "category": "Festivals",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Festivals?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਤਿਉਹਾਰ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Guru Angad Dev Ji",
+        "pa": "ਗੁਰੂ ਅੰਗਦ ਦੇਵ ਜੀ"
+      },
+      {
+        "en": "Japji Sahib",
+        "pa": "ਜਪੁਜੀ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Puranmashi",
+        "pa": "ਪੂਰਨਮਾਸੀ"
+      },
+      {
+        "en": "Guru Har Rai Ji",
+        "pa": "ਗੁਰੂ ਹਰ ਰਾਇ ਜੀ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Puranmashi is an accurate match for Festivals in Sikh learning for ages 6-12.",
+      "pa": "ਪੂਰਨਮਾਸੀ ਤਿਉਹਾਰ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 179,
+    "category": "Festivals",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Festivals topic.",
+      "pa": "ਤਿਉਹਾਰ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Courage and devotion",
+        "pa": "ਹਿੰਮਤ ਅਤੇ ਭਗਤੀ"
+      },
+      {
+        "en": "Kangha",
+        "pa": "ਕੰਘਾ"
+      },
+      {
+        "en": "Bhai Dharam Singh Ji",
+        "pa": "ਭਾਈ ਧਰਮ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Community celebration",
+        "pa": "ਸਮੂਹਕ ਮਨਾਉਣ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Community celebration is an accurate match for Festivals in Sikh learning for ages 6-12.",
+      "pa": "ਸਮੂਹਕ ਮਨਾਉਣ ਤਿਉਹਾਰ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 180,
+    "category": "Festivals",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Festivals?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਤਿਉਹਾਰ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Ardas and kirtan",
+        "pa": "ਅਰਦਾਸ ਅਤੇ ਕੀਰਤਨ"
+      },
+      {
+        "en": "Ardas together",
+        "pa": "ਇਕੱਠੇ ਅਰਦਾਸ"
+      },
+      {
+        "en": "Seva in kitchen",
+        "pa": "ਰਸੋਈ ਵਿੱਚ ਸੇਵਾ"
+      },
+      {
+        "en": "Sikh flag",
+        "pa": "ਸਿੱਖ ਝੰਡਾ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Ardas and kirtan is an accurate match for Festivals in Sikh learning for ages 6-12.",
+      "pa": "ਅਰਦਾਸ ਅਤੇ ਕੀਰਤਨ ਤਿਉਹਾਰ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 181,
+    "category": "Famous Sikhs",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Famous Sikhs?",
+      "pa": "ਮਸ਼ਹੂਰ ਸਿੱਖ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Asa di Vaar",
+        "pa": "ਆਸਾ ਦੀ ਵਾਰ"
+      },
+      {
+        "en": "Banda Singh Bahadur",
+        "pa": "ਬੰਦਾ ਸਿੰਘ ਬਹਾਦੁਰ"
+      },
+      {
+        "en": "Bhai Kanhaiya Ji",
+        "pa": "ਭਾਈ ਕਨ੍ਹૈયਾ ਜੀ"
+      },
+      {
+        "en": "Meaning of shabad",
+        "pa": "ਸ਼ਬਦ ਦਾ ਅਰਥ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Bhai Kanhaiya Ji is an accurate match for Famous Sikhs in Sikh learning for ages 6-12.",
+      "pa": "ਭਾਈ ਕਨ੍ਹૈયਾ ਜੀ ਮਸ਼ਹੂਰ ਸਿੱਖ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 182,
+    "category": "Famous Sikhs",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Famous Sikhs.",
+      "pa": "ਮਸ਼ਹੂਰ ਸਿੱਖ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Mata Khivi Ji",
+        "pa": "ਮਾਤਾ ਖੀਵੀ ਜੀ"
+      },
+      {
+        "en": "Bandi Chhor Divas",
+        "pa": "ਬੰਦੀ ਛੋੜ ਦਿਵਸ"
+      },
+      {
+        "en": "Respect for all",
+        "pa": "ਸਭ ਦਾ ਆਦਰ"
+      },
+      {
+        "en": "Ardas and kirtan",
+        "pa": "ਅਰਦਾਸ ਅਤੇ ਕੀਰਤਨ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Mata Khivi Ji is an accurate match for Famous Sikhs in Sikh learning for ages 6-12.",
+      "pa": "ਮਾਤਾ ਖੀਵੀ ਜੀ ਮਸ਼ਹੂਰ ਸਿੱਖ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 183,
+    "category": "Famous Sikhs",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Famous Sikhs?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਮਸ਼ਹੂਰ ਸਿੱਖ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Japji Sahib",
+        "pa": "ਜਪੁਜੀ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Guru Har Rai Ji",
+        "pa": "ਗੁਰੂ ਹਰ ਰਾਇ ਜੀ"
+      },
+      {
+        "en": "Guru Angad Dev Ji",
+        "pa": "ਗੁਰੂ ਅੰਗਦ ਦੇਵ ਜੀ"
+      },
+      {
+        "en": "Baba Deep Singh Ji",
+        "pa": "ਬਾਬਾ ਦੀਪ ਸਿੰਘ ਜੀ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Baba Deep Singh Ji is an accurate match for Famous Sikhs in Sikh learning for ages 6-12.",
+      "pa": "ਬਾਬਾ ਦੀਪ ਸਿੰਘ ਜੀ ਮਸ਼ਹੂਰ ਸਿੱਖ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 184,
+    "category": "Famous Sikhs",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Famous Sikhs topic.",
+      "pa": "ਮਸ਼ਹੂਰ ਸਿੱਖ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Courage and devotion",
+        "pa": "ਹਿੰਮਤ ਅਤੇ ਭਗਤੀ"
+      },
+      {
+        "en": "Kangha",
+        "pa": "ਕੰਘਾ"
+      },
+      {
+        "en": "Mai Bhago Ji",
+        "pa": "ਮਾਈ ਭਾਗੋ ਜੀ"
+      },
+      {
+        "en": "Bhai Dharam Singh Ji",
+        "pa": "ਭਾਈ ਧਰਮ ਸਿੰਘ ਜੀ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Mai Bhago Ji is an accurate match for Famous Sikhs in Sikh learning for ages 6-12.",
+      "pa": "ਮਾਈ ਭਾਗੋ ਜੀ ਮਸ਼ਹੂਰ ਸਿੱਖ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 185,
+    "category": "Famous Sikhs",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Famous Sikhs?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਮਸ਼ਹੂਰ ਸਿੱਖ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Ardas together",
+        "pa": "ਇਕੱਠੇ ਅਰਦਾਸ"
+      },
+      {
+        "en": "Bhai Taru Singh Ji",
+        "pa": "ਭਾਈ ਤਾਰੂ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Sikh flag",
+        "pa": "ਸਿੱਖ ਝੰਡਾ"
+      },
+      {
+        "en": "Seva in kitchen",
+        "pa": "ਰਸੋਈ ਵਿੱਚ ਸੇਵਾ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Bhai Taru Singh Ji is an accurate match for Famous Sikhs in Sikh learning for ages 6-12.",
+      "pa": "ਭਾਈ ਤਾਰੂ ਸਿੰਘ ਜੀ ਮਸ਼ਹੂਰ ਸਿੱਖ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 186,
+    "category": "Famous Sikhs",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Famous Sikhs?",
+      "pa": "ਮਸ਼ਹੂਰ ਸਿੱਖ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Bhai Mani Singh Ji",
+        "pa": "ਭਾਈ ਮਨੀ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Banda Singh Bahadur",
+        "pa": "ਬੰਦਾ ਸਿੰਘ ਬਹਾਦੁਰ"
+      },
+      {
+        "en": "Muktsar battle",
+        "pa": "ਮੁਕਤਸਰ ਦੀ ਲੜਾਈ"
+      },
+      {
+        "en": "Seva",
+        "pa": "ਸੇਵਾ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Bhai Mani Singh Ji is an accurate match for Famous Sikhs in Sikh learning for ages 6-12.",
+      "pa": "ਭਾਈ ਮਨੀ ਸਿੰਘ ਜੀ ਮਸ਼ਹੂਰ ਸਿੱਖ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 187,
+    "category": "Famous Sikhs",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Famous Sikhs.",
+      "pa": "ਮਸ਼ਹੂਰ ਸਿੱਖ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Ardas and kirtan",
+        "pa": "ਅਰਦਾਸ ਅਤੇ ਕੀਰਤਨ"
+      },
+      {
+        "en": "Bhai Mardana Ji",
+        "pa": "ਭਾਈ ਮਰਦਾਨਾ ਜੀ"
+      },
+      {
+        "en": "Kirat Karo",
+        "pa": "ਕਿਰਤ ਕਰੋ"
+      },
+      {
+        "en": "Maharaja Ranjit Singh",
+        "pa": "ਮਹਾਰਾਜਾ ਰਣਜੀਤ ਸਿੰਘ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Maharaja Ranjit Singh is an accurate match for Famous Sikhs in Sikh learning for ages 6-12.",
+      "pa": "ਮਹਾਰਾਜਾ ਰਣਜੀਤ ਸਿੰਘ ਮਸ਼ਹੂਰ ਸਿੱਖ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 188,
+    "category": "Famous Sikhs",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Famous Sikhs?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਮਸ਼ਹੂਰ ਸਿੱਖ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Bhai Nand Lal Ji",
+        "pa": "ਭਾਈ ਨੰਦ ਲਾਲ ਜੀ"
+      },
+      {
+        "en": "1699 Vaisakhi",
+        "pa": "1699 ਵਿਸਾਖੀ"
+      },
+      {
+        "en": "Khalsa roop",
+        "pa": "ਖਾਲਸਾ ਰੂਪ"
+      },
+      {
+        "en": "Guru Har Rai Ji",
+        "pa": "ਗੁਰੂ ਹਰ ਰਾਇ ਜੀ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Bhai Nand Lal Ji is an accurate match for Famous Sikhs in Sikh learning for ages 6-12.",
+      "pa": "ਭਾਈ ਨੰਦ ਲਾਲ ਜੀ ਮਸ਼ਹੂਰ ਸਿੱਖ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 189,
+    "category": "Famous Sikhs",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Famous Sikhs topic.",
+      "pa": "ਮਸ਼ਹੂਰ ਸਿੱਖ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Kangha",
+        "pa": "ਕੰਘਾ"
+      },
+      {
+        "en": "Bhai Gurdas Ji",
+        "pa": "ਭਾਈ ਗੁਰਦਾਸ ਜੀ"
+      },
+      {
+        "en": "Nishan Sahib",
+        "pa": "ਨਿਸ਼ਾਨ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Daily commitment",
+        "pa": "ਰੋਜ਼ਾਨਾ ਵਚਨਬੱਧਤਾ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Bhai Gurdas Ji is an accurate match for Famous Sikhs in Sikh learning for ages 6-12.",
+      "pa": "ਭਾਈ ਗੁਰਦਾਸ ਜੀ ਮਸ਼ਹੂਰ ਸਿੱਖ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 190,
+    "category": "Famous Sikhs",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Famous Sikhs?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਮਸ਼ਹੂਰ ਸਿੱਖ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Kirtan Sohila",
+        "pa": "ਕੀਰਤਨ ਸੋਹਿਲਾ"
+      },
+      {
+        "en": "Ardas together",
+        "pa": "ਇਕੱਠੇ ਅਰਦਾਸ"
+      },
+      {
+        "en": "Bhai Vir Singh Ji",
+        "pa": "ਭਾਈ ਵੀਰ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Guru Granth Sahib Ji",
+        "pa": "ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Bhai Vir Singh Ji is an accurate match for Famous Sikhs in Sikh learning for ages 6-12.",
+      "pa": "ਭਾਈ ਵੀਰ ਸਿੰਘ ਜੀ ਮਸ਼ਹੂਰ ਸਿੱਖ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 191,
+    "category": "Mixed Review",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is a core Sikh learning concept from our quiz review?",
+      "pa": "ਸਾਡੇ ਕਵੀਜ਼ ਰੀਵਿਊ ਵਿੱਚੋਂ ਸਿੱਖ ਸਿੱਖਿਆ ਦਾ ਮੁੱਖ ਸੰਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Panj Pyare",
+        "pa": "ਪੰਜ ਪਿਆਰੇ"
+      },
+      {
+        "en": "Nishan Sahib",
+        "pa": "ਨਿਸ਼ਾਨ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Vand Chhakna",
+        "pa": "ਵੰਡ ਛਕਣਾ"
+      },
+      {
+        "en": "Guru Nanak Dev Ji",
+        "pa": "ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Nishan Sahib is a correct Sikh concept used for mixed revision practice.",
+      "pa": "ਨਿਸ਼ਾਨ ਸਾਹਿਬ ਮਿਕਸਡ ਰੀਵਿਊ ਅਭਿਆਸ ਵਿੱਚ ਵਰਤਿਆ ਜਾਣ ਵਾਲਾ ਸਹੀ ਸਿੱਖ ਸੰਕਲਪ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sikh Rehat / Sikh history basics",
+      "pa": "ਸਿੱਖ ਰਹਿਤ / ਸਿੱਖ ਇਤਿਹਾਸ ਆਧਾਰ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 192,
+    "category": "Mixed Review",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Which option is a core Sikh learning concept from our quiz review?",
+      "pa": "ਸਾਡੇ ਕਵੀਜ਼ ਰੀਵਿਊ ਵਿੱਚੋਂ ਸਿੱਖ ਸਿੱਖਿਆ ਦਾ ਮੁੱਖ ਸੰਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Guru Gobind Singh Ji",
+        "pa": "ਗੁਰੂ ਗੋਬਿੰਦ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Seva",
+        "pa": "ਸੇਵਾ"
+      },
+      {
+        "en": "Kesh",
+        "pa": "ਕੇਸ਼"
+      },
+      {
+        "en": "Khalsa",
+        "pa": "ਖਾਲਸਾ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Guru Gobind Singh Ji is a correct Sikh concept used for mixed revision practice.",
+      "pa": "ਗੁਰੂ ਗੋਬਿੰਦ ਸਿੰਘ ਜੀ ਮਿਕਸਡ ਰੀਵਿਊ ਅਭਿਆਸ ਵਿੱਚ ਵਰਤਿਆ ਜਾਣ ਵਾਲਾ ਸਹੀ ਸਿੱਖ ਸੰਕਲਪ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sikh Rehat / Sikh history basics",
+      "pa": "ਸਿੱਖ ਰਹਿਤ / ਸਿੱਖ ਇਤਿਹਾਸ ਆਧਾਰ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 193,
+    "category": "Mixed Review",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is a core Sikh learning concept from our quiz review?",
+      "pa": "ਸਾਡੇ ਕਵੀਜ਼ ਰੀਵਿਊ ਵਿੱਚੋਂ ਸਿੱਖ ਸਿੱਖਿਆ ਦਾ ਮੁੱਖ ਸੰਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Nishan Sahib",
+        "pa": "ਨਿਸ਼ਾਨ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Guru Nanak Dev Ji",
+        "pa": "ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ"
+      },
+      {
+        "en": "Panj Pyare",
+        "pa": "ਪੰਜ ਪਿਆਰੇ"
+      },
+      {
+        "en": "Gurbani",
+        "pa": "ਗੁਰਬਾਣੀ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Gurbani is a correct Sikh concept used for mixed revision practice.",
+      "pa": "ਗੁਰਬਾਣੀ ਮਿਕਸਡ ਰੀਵਿਊ ਅਭਿਆਸ ਵਿੱਚ ਵਰਤਿਆ ਜਾਣ ਵਾਲਾ ਸਹੀ ਸਿੱਖ ਸੰਕਲਪ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sikh Rehat / Sikh history basics",
+      "pa": "ਸਿੱਖ ਰਹਿਤ / ਸਿੱਖ ਇਤਿਹਾਸ ਆਧਾਰ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 194,
+    "category": "Mixed Review",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Which option is a core Sikh learning concept from our quiz review?",
+      "pa": "ਸਾਡੇ ਕਵੀਜ਼ ਰੀਵਿਊ ਵਿੱਚੋਂ ਸਿੱਖ ਸਿੱਖਿਆ ਦਾ ਮੁੱਖ ਸੰਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Seva",
+        "pa": "ਸੇਵਾ"
+      },
+      {
+        "en": "Guru Gobind Singh Ji",
+        "pa": "ਗੁਰੂ ਗੋਬਿੰਦ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Khalsa",
+        "pa": "ਖਾਲਸਾ"
+      },
+      {
+        "en": "Kesh",
+        "pa": "ਕੇਸ਼"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Seva is a correct Sikh concept used for mixed revision practice.",
+      "pa": "ਸੇਵਾ ਮਿਕਸਡ ਰੀਵਿਊ ਅਭਿਆਸ ਵਿੱਚ ਵਰਤਿਆ ਜਾਣ ਵਾਲਾ ਸਹੀ ਸਿੱਖ ਸੰਕਲਪ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sikh Rehat / Sikh history basics",
+      "pa": "ਸਿੱਖ ਰਹਿਤ / ਸਿੱਖ ਇਤਿਹਾਸ ਆਧਾਰ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 195,
+    "category": "Mixed Review",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is a core Sikh learning concept from our quiz review?",
+      "pa": "ਸਾਡੇ ਕਵੀਜ਼ ਰੀਵਿਊ ਵਿੱਚੋਂ ਸਿੱਖ ਸਿੱਖਿਆ ਦਾ ਮੁੱਖ ਸੰਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Panj Pyare",
+        "pa": "ਪੰਜ ਪਿਆਰੇ"
+      },
+      {
+        "en": "Guru Nanak Dev Ji",
+        "pa": "ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ"
+      },
+      {
+        "en": "Vand Chhakna",
+        "pa": "ਵੰਡ ਛਕਣਾ"
+      },
+      {
+        "en": "Gurbani",
+        "pa": "ਗੁਰਬਾਣੀ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Guru Nanak Dev Ji is a correct Sikh concept used for mixed revision practice.",
+      "pa": "ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਮਿਕਸਡ ਰੀਵਿਊ ਅਭਿਆਸ ਵਿੱਚ ਵਰਤਿਆ ਜਾਣ ਵਾਲਾ ਸਹੀ ਸਿੱਖ ਸੰਕਲਪ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sikh Rehat / Sikh history basics",
+      "pa": "ਸਿੱਖ ਰਹਿਤ / ਸਿੱਖ ਇਤਿਹਾਸ ਆਧਾਰ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 196,
+    "category": "Mixed Review",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Which option is a core Sikh learning concept from our quiz review?",
+      "pa": "ਸਾਡੇ ਕਵੀਜ਼ ਰੀਵਿਊ ਵਿੱਚੋਂ ਸਿੱਖ ਸਿੱਖਿਆ ਦਾ ਮੁੱਖ ਸੰਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Naam Japna",
+        "pa": "ਨਾਮ ਜਪਣਾ"
+      },
+      {
+        "en": "Guru Gobind Singh Ji",
+        "pa": "ਗੁਰੂ ਗੋਬਿੰਦ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Khalsa",
+        "pa": "ਖਾਲਸਾ"
+      },
+      {
+        "en": "Seva",
+        "pa": "ਸੇਵਾ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Khalsa is a correct Sikh concept used for mixed revision practice.",
+      "pa": "ਖਾਲਸਾ ਮਿਕਸਡ ਰੀਵਿਊ ਅਭਿਆਸ ਵਿੱਚ ਵਰਤਿਆ ਜਾਣ ਵਾਲਾ ਸਹੀ ਸਿੱਖ ਸੰਕਲਪ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sikh Rehat / Sikh history basics",
+      "pa": "ਸਿੱਖ ਰਹਿਤ / ਸਿੱਖ ਇਤਿਹਾਸ ਆਧਾਰ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 197,
+    "category": "Mixed Review",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is a core Sikh learning concept from our quiz review?",
+      "pa": "ਸਾਡੇ ਕਵੀਜ਼ ਰੀਵਿਊ ਵਿੱਚੋਂ ਸਿੱਖ ਸਿੱਖਿਆ ਦਾ ਮੁੱਖ ਸੰਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Gurbani",
+        "pa": "ਗੁਰਬਾਣੀ"
+      },
+      {
+        "en": "Nishan Sahib",
+        "pa": "ਨਿਸ਼ਾਨ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Panj Pyare",
+        "pa": "ਪੰਜ ਪਿਆਰੇ"
+      },
+      {
+        "en": "Vand Chhakna",
+        "pa": "ਵੰਡ ਛਕਣਾ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Vand Chhakna is a correct Sikh concept used for mixed revision practice.",
+      "pa": "ਵੰਡ ਛਕਣਾ ਮਿਕਸਡ ਰੀਵਿਊ ਅਭਿਆਸ ਵਿੱਚ ਵਰਤਿਆ ਜਾਣ ਵਾਲਾ ਸਹੀ ਸਿੱਖ ਸੰਕਲਪ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sikh Rehat / Sikh history basics",
+      "pa": "ਸਿੱਖ ਰਹਿਤ / ਸਿੱਖ ਇਤਿਹਾਸ ਆਧਾਰ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 198,
+    "category": "Mixed Review",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Which option is a core Sikh learning concept from our quiz review?",
+      "pa": "ਸਾਡੇ ਕਵੀਜ਼ ਰੀਵਿਊ ਵਿੱਚੋਂ ਸਿੱਖ ਸਿੱਖਿਆ ਦਾ ਮੁੱਖ ਸੰਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Kesh",
+        "pa": "ਕੇਸ਼"
+      },
+      {
+        "en": "Seva",
+        "pa": "ਸੇਵਾ"
+      },
+      {
+        "en": "Naam Japna",
+        "pa": "ਨਾਮ ਜਪਣਾ"
+      },
+      {
+        "en": "Khalsa",
+        "pa": "ਖਾਲਸਾ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Kesh is a correct Sikh concept used for mixed revision practice.",
+      "pa": "ਕੇਸ਼ ਮਿਕਸਡ ਰੀਵਿਊ ਅਭਿਆਸ ਵਿੱਚ ਵਰਤਿਆ ਜਾਣ ਵਾਲਾ ਸਹੀ ਸਿੱਖ ਸੰਕਲਪ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sikh Rehat / Sikh history basics",
+      "pa": "ਸਿੱਖ ਰਹਿਤ / ਸਿੱਖ ਇਤਿਹਾਸ ਆਧਾਰ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 199,
+    "category": "Mixed Review",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is a core Sikh learning concept from our quiz review?",
+      "pa": "ਸਾਡੇ ਕਵੀਜ਼ ਰੀਵਿਊ ਵਿੱਚੋਂ ਸਿੱਖ ਸਿੱਖਿਆ ਦਾ ਮੁੱਖ ਸੰਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Gurbani",
+        "pa": "ਗੁਰਬਾਣੀ"
+      },
+      {
+        "en": "Nishan Sahib",
+        "pa": "ਨਿਸ਼ਾਨ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Panj Pyare",
+        "pa": "ਪੰਜ ਪਿਆਰੇ"
+      },
+      {
+        "en": "Vand Chhakna",
+        "pa": "ਵੰਡ ਛਕਣਾ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Panj Pyare is a correct Sikh concept used for mixed revision practice.",
+      "pa": "ਪੰਜ ਪਿਆਰੇ ਮਿਕਸਡ ਰੀਵਿਊ ਅਭਿਆਸ ਵਿੱਚ ਵਰਤਿਆ ਜਾਣ ਵਾਲਾ ਸਹੀ ਸਿੱਖ ਸੰਕਲਪ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sikh Rehat / Sikh history basics",
+      "pa": "ਸਿੱਖ ਰਹਿਤ / ਸਿੱਖ ਇਤਿਹਾਸ ਆਧਾਰ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 200,
+    "category": "Mixed Review",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Which option is a core Sikh learning concept from our quiz review?",
+      "pa": "ਸਾਡੇ ਕਵੀਜ਼ ਰੀਵਿਊ ਵਿੱਚੋਂ ਸਿੱਖ ਸਿੱਖਿਆ ਦਾ ਮੁੱਖ ਸੰਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Naam Japna",
+        "pa": "ਨਾਮ ਜਪਣਾ"
+      },
+      {
+        "en": "Kesh",
+        "pa": "ਕੇਸ਼"
+      },
+      {
+        "en": "Seva",
+        "pa": "ਸੇਵਾ"
+      },
+      {
+        "en": "Guru Gobind Singh Ji",
+        "pa": "ਗੁਰੂ ਗੋਬਿੰਦ ਸਿੰਘ ਜੀ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Naam Japna is a correct Sikh concept used for mixed revision practice.",
+      "pa": "ਨਾਮ ਜਪਣਾ ਮਿਕਸਡ ਰੀਵਿਊ ਅਭਿਆਸ ਵਿੱਚ ਵਰਤਿਆ ਜਾਣ ਵਾਲਾ ਸਹੀ ਸਿੱਖ ਸੰਕਲਪ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sikh Rehat / Sikh history basics",
+      "pa": "ਸਿੱਖ ਰਹਿਤ / ਸਿੱਖ ਇਤਿਹਾਸ ਆਧਾਰ"
+    },
+    "points": 10,
+    "image": null
+  }
+]

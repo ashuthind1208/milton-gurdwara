@@ -1,0 +1,952 @@
+[
+  {
+    "id": 101,
+    "category": "Sikh Symbols",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Sikh Symbols?",
+      "pa": "ਸਿੱਖ ਚਿੰਨ੍ਹ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Bebe Nanaki Ji",
+        "pa": "ਬੇਬੇ ਨਾਨਕੀ ਜੀ"
+      },
+      {
+        "en": "Khanda",
+        "pa": "ਖੰਡਾ"
+      },
+      {
+        "en": "Mai Bhago Ji",
+        "pa": "ਮਾਈ ਭਾਗੋ ਜੀ"
+      },
+      {
+        "en": "Bhai Gurdas Ji",
+        "pa": "ਭਾਈ ਗੁਰਦਾਸ ਜੀ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Khanda is an accurate match for Sikh Symbols in Sikh learning for ages 6-12.",
+      "pa": "ਖੰਡਾ ਸਿੱਖ ਚਿੰਨ੍ਹ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 102,
+    "category": "Sikh Symbols",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Sikh Symbols.",
+      "pa": "ਸਿੱਖ ਚਿੰਨ੍ਹ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Nishan Sahib",
+        "pa": "ਨਿਸ਼ਾਨ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Guru Granth Sahib Ji",
+        "pa": "ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ"
+      },
+      {
+        "en": "Saint-Soldier ideal",
+        "pa": "ਸੰਤ-ਸਿਪਾਹੀ ਆਦਰਸ਼"
+      },
+      {
+        "en": "Waheguru Ji Ka Khalsa",
+        "pa": "ਵਾਹਿਗੁਰੂ ਜੀ ਕਾ ਖਾਲਸਾ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Nishan Sahib is an accurate match for Sikh Symbols in Sikh learning for ages 6-12.",
+      "pa": "ਨਿਸ਼ਾਨ ਸਾਹਿਬ ਸਿੱਖ ਚਿੰਨ੍ਹ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 103,
+    "category": "Sikh Symbols",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Sikh Symbols?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਸਿੱਖ ਚਿੰਨ੍ਹ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Identity and discipline",
+        "pa": "ਪਹਿਚਾਣ ਅਤੇ ਅਨੁਸ਼ਾਸਨ"
+      },
+      {
+        "en": "Darbar Sahib hall",
+        "pa": "ਦਰਬਾਰ ਸਾਹਿਬ ਹਾਲ"
+      },
+      {
+        "en": "Respectful silence",
+        "pa": "ਅਦਬ ਵਾਲੀ ਚੁੱਪ"
+      },
+      {
+        "en": "Ek Onkar symbol",
+        "pa": "ਇਕ ਓਅੰਕਾਰ ਚਿੰਨ੍ਹ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Ek Onkar symbol is an accurate match for Sikh Symbols in Sikh learning for ages 6-12.",
+      "pa": "ਇਕ ਓਅੰਕਾਰ ਚਿੰਨ੍ਹ ਸਿੱਖ ਚਿੰਨ੍ਹ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 104,
+    "category": "Sikh Symbols",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Sikh Symbols topic.",
+      "pa": "ਸਿੱਖ ਚਿੰਨ੍ਹ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Kesri color",
+        "pa": "ਕੇਸਰੀ ਰੰਗ"
+      },
+      {
+        "en": "Naam Simran",
+        "pa": "ਨਾਮ ਸਿਮਰਨ"
+      },
+      {
+        "en": "Shaheedi of Guru Arjan Dev Ji",
+        "pa": "ਗੁਰੂ ਅਰਜਨ ਦੇਵ ਜੀ ਦੀ ਸ਼ਹੀਦੀ"
+      },
+      {
+        "en": "Rehras Sahib",
+        "pa": "ਰਿਹਰਾਸ ਸਾਹਿਬ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Kesri color is an accurate match for Sikh Symbols in Sikh learning for ages 6-12.",
+      "pa": "ਕੇਸਰੀ ਰੰਗ ਸਿੱਖ ਚਿੰਨ੍ਹ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 105,
+    "category": "Sikh Symbols",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Sikh Symbols?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਸਿੱਖ ਚਿੰਨ੍ਹ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Sarbat da Bhala",
+        "pa": "ਸਰਬੱਤ ਦਾ ਭਲਾ"
+      },
+      {
+        "en": "Chakkar",
+        "pa": "ਚੱਕਰ"
+      },
+      {
+        "en": "Puranmashi",
+        "pa": "ਪੂਰਨਮਾਸੀ"
+      },
+      {
+        "en": "Hola Mohalla",
+        "pa": "ਹੋਲਾ ਮਹੱਲਾ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Chakkar is an accurate match for Sikh Symbols in Sikh learning for ages 6-12.",
+      "pa": "ਚੱਕਰ ਸਿੱਖ ਚਿੰਨ੍ਹ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 106,
+    "category": "Sikh Symbols",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Sikh Symbols?",
+      "pa": "ਸਿੱਖ ਚਿੰਨ੍ਹ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Langar for all",
+        "pa": "ਸਭ ਲਈ ਲੰਗਰ"
+      },
+      {
+        "en": "Bebe Nanaki Ji",
+        "pa": "ਬੇਬੇ ਨਾਨਕੀ ਜੀ"
+      },
+      {
+        "en": "Two kirpans",
+        "pa": "ਦੋ ਕਿਰਪਾਨਾਂ"
+      },
+      {
+        "en": "Guru Arjan Dev Ji",
+        "pa": "ਗੁਰੂ ਅਰਜਨ ਦੇਵ ਜੀ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Two kirpans is an accurate match for Sikh Symbols in Sikh learning for ages 6-12.",
+      "pa": "ਦੋ ਕਿਰਪਾਨਾਂ ਸਿੱਖ ਚਿੰਨ੍ਹ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 107,
+    "category": "Sikh Symbols",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Sikh Symbols.",
+      "pa": "ਸਿੱਖ ਚਿੰਨ੍ਹ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Bhai Sahib Singh Ji",
+        "pa": "ਭਾਈ ਸਾਹਿਬ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Model of seva",
+        "pa": "ਸੇਵਾ ਦਾ ਮਾਡਲ"
+      },
+      {
+        "en": "Waheguru Ji Ka Khalsa",
+        "pa": "ਵਾਹਿਗੁਰੂ ਜੀ ਕਾ ਖਾਲਸਾ"
+      },
+      {
+        "en": "Nishan pole",
+        "pa": "ਨਿਸ਼ਾਨ ਦਾ ਡੰਡਾ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Nishan pole is an accurate match for Sikh Symbols in Sikh learning for ages 6-12.",
+      "pa": "ਨਿਸ਼ਾਨ ਦਾ ਡੰਡਾ ਸਿੱਖ ਚਿੰਨ੍ਹ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 108,
+    "category": "Sikh Symbols",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Sikh Symbols?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਸਿੱਖ ਚਿੰਨ੍ਹ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Sikh flag",
+        "pa": "ਸਿੱਖ ਝੰਡਾ"
+      },
+      {
+        "en": "Japji Sahib",
+        "pa": "ਜਪੁਜੀ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Respectful silence",
+        "pa": "ਅਦਬ ਵਾਲੀ ਚੁੱਪ"
+      },
+      {
+        "en": "Darbar Sahib hall",
+        "pa": "ਦਰਬਾਰ ਸਾਹਿਬ ਹਾਲ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Sikh flag is an accurate match for Sikh Symbols in Sikh learning for ages 6-12.",
+      "pa": "ਸਿੱਖ ਝੰਡਾ ਸਿੱਖ ਚਿੰਨ੍ਹ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 109,
+    "category": "Sikh Symbols",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Sikh Symbols topic.",
+      "pa": "ਸਿੱਖ ਚਿੰਨ੍ਹ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Shaheedi of Guru Arjan Dev Ji",
+        "pa": "ਗੁਰੂ ਅਰਜਨ ਦੇਵ ਜੀ ਦੀ ਸ਼ਹੀਦੀ"
+      },
+      {
+        "en": "Kirat Karni",
+        "pa": "ਕਿਰਤ ਕਰਨੀ"
+      },
+      {
+        "en": "Khalsa emblem",
+        "pa": "ਖਾਲਸਾ ਨਿਸ਼ਾਨ"
+      },
+      {
+        "en": "Anandpur Sahib events",
+        "pa": "ਅਨੰਦਪੁਰ ਸਾਹਿਬ ਦੀਆਂ ਘਟਨਾਵਾਂ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Khalsa emblem is an accurate match for Sikh Symbols in Sikh learning for ages 6-12.",
+      "pa": "ਖਾਲਸਾ ਨਿਸ਼ਾਨ ਸਿੱਖ ਚਿੰਨ੍ਹ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 110,
+    "category": "Sikh Symbols",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Sikh Symbols?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਸਿੱਖ ਚਿੰਨ੍ਹ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Unity and courage",
+        "pa": "ਏਕਤਾ ਅਤੇ ਹਿੰਮਤ"
+      },
+      {
+        "en": "Baba Deep Singh Ji",
+        "pa": "ਬਾਬਾ ਦੀਪ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Puranmashi",
+        "pa": "ਪੂਰਨਮਾਸੀ"
+      },
+      {
+        "en": "Bhai Nand Lal Ji",
+        "pa": "ਭਾਈ ਨੰਦ ਲਾਲ ਜੀ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Unity and courage is an accurate match for Sikh Symbols in Sikh learning for ages 6-12.",
+      "pa": "ਏਕਤਾ ਅਤੇ ਹਿੰਮਤ ਸਿੱਖ ਚਿੰਨ੍ਹ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 111,
+    "category": "Gurdwara",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Gurdwara?",
+      "pa": "ਗੁਰਦੁਆਰਾ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Bebe Nanaki Ji",
+        "pa": "ਬੇਬੇ ਨਾਨਕੀ ਜੀ"
+      },
+      {
+        "en": "Guru Arjan Dev Ji",
+        "pa": "ਗੁਰੂ ਅਰਜਨ ਦੇਵ ਜੀ"
+      },
+      {
+        "en": "Langar for all",
+        "pa": "ਸਭ ਲਈ ਲੰਗਰ"
+      },
+      {
+        "en": "Darbar Sahib hall",
+        "pa": "ਦਰਬਾਰ ਸਾਹਿਬ ਹਾਲ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Darbar Sahib hall is an accurate match for Gurdwara in Sikh learning for ages 6-12.",
+      "pa": "ਦਰਬਾਰ ਸਾਹਿਬ ਹਾਲ ਗੁਰਦੁਆਰਾ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 112,
+    "category": "Gurdwara",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Gurdwara.",
+      "pa": "ਗੁਰਦੁਆਰਾ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Bhai Sahib Singh Ji",
+        "pa": "ਭਾਈ ਸਾਹਿਬ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Model of seva",
+        "pa": "ਸੇਵਾ ਦਾ ਮਾਡਲ"
+      },
+      {
+        "en": "Langar hall",
+        "pa": "ਲੰਗਰ ਹਾਲ"
+      },
+      {
+        "en": "Waheguru Ji Ka Khalsa",
+        "pa": "ਵਾਹਿਗੁਰੂ ਜੀ ਕਾ ਖਾਲਸਾ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Langar hall is an accurate match for Gurdwara in Sikh learning for ages 6-12.",
+      "pa": "ਲੰਗਰ ਹਾਲ ਗੁਰਦੁਆਰਾ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 113,
+    "category": "Gurdwara",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Gurdwara?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਗੁਰਦੁਆਰਾ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Shabad kirtan",
+        "pa": "ਸ਼ਬਦ ਕੀਰਤਨ"
+      },
+      {
+        "en": "Seva in kitchen",
+        "pa": "ਰਸੋਈ ਵਿੱਚ ਸੇਵਾ"
+      },
+      {
+        "en": "Two kirpans",
+        "pa": "ਦੋ ਕਿਰਪਾਨਾਂ"
+      },
+      {
+        "en": "Japji Sahib",
+        "pa": "ਜਪੁਜੀ ਸਾਹਿਬ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Seva in kitchen is an accurate match for Gurdwara in Sikh learning for ages 6-12.",
+      "pa": "ਰਸੋਈ ਵਿੱਚ ਸੇਵਾ ਗੁਰਦੁਆਰਾ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 114,
+    "category": "Gurdwara",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Gurdwara topic.",
+      "pa": "ਗੁਰਦੁਆਰਾ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Shoes area (Jora Ghar)",
+        "pa": "ਜੋੜਾ ਘਰ"
+      },
+      {
+        "en": "Shaheedi of Guru Arjan Dev Ji",
+        "pa": "ਗੁਰੂ ਅਰਜਨ ਦੇਵ ਜੀ ਦੀ ਸ਼ਹੀਦੀ"
+      },
+      {
+        "en": "Anandpur Sahib events",
+        "pa": "ਅਨੰਦਪੁਰ ਸਾਹਿਬ ਦੀਆਂ ਘਟਨਾਵਾਂ"
+      },
+      {
+        "en": "Kirat Karni",
+        "pa": "ਕਿਰਤ ਕਰਨੀ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Shoes area (Jora Ghar) is an accurate match for Gurdwara in Sikh learning for ages 6-12.",
+      "pa": "ਜੋੜਾ ਘਰ ਗੁਰਦੁਆਰਾ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 115,
+    "category": "Gurdwara",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Gurdwara?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਗੁਰਦੁਆਰਾ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Puranmashi",
+        "pa": "ਪੂਰਨਮਾਸੀ"
+      },
+      {
+        "en": "Baba Deep Singh Ji",
+        "pa": "ਬਾਬਾ ਦੀਪ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Bhai Nand Lal Ji",
+        "pa": "ਭਾਈ ਨੰਦ ਲਾਲ ਜੀ"
+      },
+      {
+        "en": "Head covered",
+        "pa": "ਸਿਰ ਢੱਕਣਾ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Head covered is an accurate match for Gurdwara in Sikh learning for ages 6-12.",
+      "pa": "ਸਿਰ ਢੱਕਣਾ ਗੁਰਦੁਆਰਾ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 116,
+    "category": "Gurdwara",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Gurdwara?",
+      "pa": "ਗੁਰਦੁਆਰਾ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Respectful silence",
+        "pa": "ਅਦਬ ਵਾਲੀ ਚੁੱਪ"
+      },
+      {
+        "en": "Guru Gobind Singh Ji",
+        "pa": "ਗੁਰੂ ਗੋਬਿੰਦ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Khande di Pahul",
+        "pa": "ਖੰਡੇ ਦੀ ਪਾਹੁਲ"
+      },
+      {
+        "en": "Guru Arjan Dev Ji",
+        "pa": "ਗੁਰੂ ਅਰਜਨ ਦੇਵ ਜੀ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Respectful silence is an accurate match for Gurdwara in Sikh learning for ages 6-12.",
+      "pa": "ਅਦਬ ਵਾਲੀ ਚੁੱਪ ਗੁਰਦੁਆਰਾ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 117,
+    "category": "Gurdwara",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Gurdwara.",
+      "pa": "ਗੁਰਦੁਆਰਾ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Model of seva",
+        "pa": "ਸੇਵਾ ਦਾ ਮਾਡਲ"
+      },
+      {
+        "en": "Sangat and Pangat",
+        "pa": "ਸੰਗਤ ਅਤੇ ਪੰਗਤ"
+      },
+      {
+        "en": "Live with rehat",
+        "pa": "ਰਹਿਤ ਨਾਲ ਜੀਵਨ"
+      },
+      {
+        "en": "Kirpan",
+        "pa": "ਕਿਰਪਾਨ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Sangat and Pangat is an accurate match for Gurdwara in Sikh learning for ages 6-12.",
+      "pa": "ਸੰਗਤ ਅਤੇ ਪੰਗਤ ਗੁਰਦੁਆਰਾ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 118,
+    "category": "Gurdwara",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Gurdwara?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਗੁਰਦੁਆਰਾ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Shabad kirtan",
+        "pa": "ਸ਼ਬਦ ਕੀਰਤਨ"
+      },
+      {
+        "en": "Japji Sahib",
+        "pa": "ਜਪੁਜੀ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Ardas together",
+        "pa": "ਇਕੱਠੇ ਅਰਦਾਸ"
+      },
+      {
+        "en": "Formation of Khalsa in 1699",
+        "pa": "1699 ਵਿੱਚ ਖਾਲਸਾ ਸਾਜਨਾ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Ardas together is an accurate match for Gurdwara in Sikh learning for ages 6-12.",
+      "pa": "ਇਕੱਠੇ ਅਰਦਾਸ ਗੁਰਦੁਆਰਾ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 119,
+    "category": "Gurdwara",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Gurdwara topic.",
+      "pa": "ਗੁਰਦੁਆਰਾ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Daya (compassion)",
+        "pa": "ਦਇਆ"
+      },
+      {
+        "en": "Gurpurab",
+        "pa": "ਗੁਰਪੁਰਬ"
+      },
+      {
+        "en": "Kirat Karni",
+        "pa": "ਕਿਰਤ ਕਰਨੀ"
+      },
+      {
+        "en": "Cleanliness and seva",
+        "pa": "ਸਫ਼ਾਈ ਅਤੇ ਸੇਵਾ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Cleanliness and seva is an accurate match for Gurdwara in Sikh learning for ages 6-12.",
+      "pa": "ਸਫ਼ਾਈ ਅਤੇ ਸੇਵਾ ਗੁਰਦੁਆਰਾ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 120,
+    "category": "Gurdwara",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Gurdwara?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਗੁਰਦੁਆਰਾ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Listening to kirtan",
+        "pa": "ਕੀਰਤਨ ਸੁਣਨਾ"
+      },
+      {
+        "en": "Ik Onkar",
+        "pa": "ਇਕ ਓਅੰਕਾਰ"
+      },
+      {
+        "en": "Mehta Kalu Ji",
+        "pa": "ਮੇਹਤਾ ਕਾਲੂ ਜੀ"
+      },
+      {
+        "en": "Bhai Nand Lal Ji",
+        "pa": "ਭਾਈ ਨੰਦ ਲਾਲ ਜੀ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Listening to kirtan is an accurate match for Gurdwara in Sikh learning for ages 6-12.",
+      "pa": "ਕੀਰਤਨ ਸੁਣਨਾ ਗੁਰਦੁਆਰਾ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 121,
+    "category": "Gurbani",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Gurbani?",
+      "pa": "ਗੁਰਬਾਣੀ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Guru Arjan Dev Ji",
+        "pa": "ਗੁਰੂ ਅਰਜਨ ਦੇਵ ਜੀ"
+      },
+      {
+        "en": "Khande di Pahul",
+        "pa": "ਖੰਡੇ ਦੀ ਪਾਹੁਲ"
+      },
+      {
+        "en": "Japji Sahib",
+        "pa": "ਜਪੁਜੀ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Guru Gobind Singh Ji",
+        "pa": "ਗੁਰੂ ਗੋਬਿੰਦ ਸਿੰਘ ਜੀ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Japji Sahib is an accurate match for Gurbani in Sikh learning for ages 6-12.",
+      "pa": "ਜਪੁਜੀ ਸਾਹਿਬ ਗੁਰਬਾਣੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 122,
+    "category": "Gurbani",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Gurbani.",
+      "pa": "ਗੁਰਬਾਣੀ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Rehras Sahib",
+        "pa": "ਰਿਹਰਾਸ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Kirpan",
+        "pa": "ਕਿਰਪਾਨ"
+      },
+      {
+        "en": "Model of seva",
+        "pa": "ਸੇਵਾ ਦਾ ਮਾਡਲ"
+      },
+      {
+        "en": "Live with rehat",
+        "pa": "ਰਹਿਤ ਨਾਲ ਜੀਵਨ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Rehras Sahib is an accurate match for Gurbani in Sikh learning for ages 6-12.",
+      "pa": "ਰਿਹਰਾਸ ਸਾਹਿਬ ਗੁਰਬਾਣੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 123,
+    "category": "Gurbani",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Gurbani?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਗੁਰਬਾਣੀ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Respectful silence",
+        "pa": "ਅਦਬ ਵਾਲੀ ਚੁੱਪ"
+      },
+      {
+        "en": "Maharaja Ranjit Singh",
+        "pa": "ਮਹਾਰਾਜਾ ਰਣਜੀਤ ਸਿੰਘ"
+      },
+      {
+        "en": "Formation of Khalsa in 1699",
+        "pa": "1699 ਵਿੱਚ ਖਾਲਸਾ ਸਾਜਨਾ"
+      },
+      {
+        "en": "Kirtan Sohila",
+        "pa": "ਕੀਰਤਨ ਸੋਹਿਲਾ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Kirtan Sohila is an accurate match for Gurbani in Sikh learning for ages 6-12.",
+      "pa": "ਕੀਰਤਨ ਸੋਹਿਲਾ ਗੁਰਬਾਣੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 124,
+    "category": "Gurbani",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Gurbani topic.",
+      "pa": "ਗੁਰਬਾਣੀ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Daya (compassion)",
+        "pa": "ਦਇਆ"
+      },
+      {
+        "en": "Gurpurab",
+        "pa": "ਗੁਰਪੁਰਬ"
+      },
+      {
+        "en": "Asa di Vaar",
+        "pa": "ਆਸਾ ਦੀ ਵਾਰ"
+      },
+      {
+        "en": "Kirat Karni",
+        "pa": "ਕਿਰਤ ਕਰਨੀ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Asa di Vaar is an accurate match for Gurbani in Sikh learning for ages 6-12.",
+      "pa": "ਆਸਾ ਦੀ ਵਾਰ ਗੁਰਬਾਣੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 125,
+    "category": "Gurbani",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Gurbani?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਗੁਰਬਾਣੀ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Ik Onkar",
+        "pa": "ਇਕ ਓਅੰਕਾਰ"
+      },
+      {
+        "en": "Nitnem banis",
+        "pa": "ਨਿੱਤਨੇਮ ਬਾਣੀਆਂ"
+      },
+      {
+        "en": "Bhai Nand Lal Ji",
+        "pa": "ਭਾਈ ਨੰਦ ਲਾਲ ਜੀ"
+      },
+      {
+        "en": "Mehta Kalu Ji",
+        "pa": "ਮੇਹਤਾ ਕਾਲੂ ਜੀ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Nitnem banis is an accurate match for Gurbani in Sikh learning for ages 6-12.",
+      "pa": "ਨਿੱਤਨੇਮ ਬਾਣੀਆਂ ਗੁਰਬਾਣੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  }
+]

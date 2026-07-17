@@ -1,4 +1,4 @@
-import { mockResponse } from './mockApi';
+import { serviceResponse } from './serviceResponse';
 import contentApiService from './contentApiService';
 
 const RESOURCE = 'news_articles';
@@ -49,7 +49,7 @@ const newsService = {
       const data = await contentApiService.list(RESOURCE);
       return { data: sortChronological(data.map((article, index) => normalizeArticle(article, index))) };
     } catch {
-      return mockResponse([]);
+      return serviceResponse([]);
     }
   },
 
@@ -66,13 +66,13 @@ const newsService = {
 
   removeArticle: async (id) => {
     await contentApiService.remove(RESOURCE, id);
-    return mockResponse({ success: true });
+    return serviceResponse({ success: true });
   },
 
   getLatestLiveArticle: async () => {
     const articles = await newsService.getArticles().then((res) => res.data || []);
     const latest = sortChronological(articles).find((article) => isLiveArticle(article));
-    return mockResponse(latest || null);
+    return serviceResponse(latest || null);
   },
 
   isLiveArticle

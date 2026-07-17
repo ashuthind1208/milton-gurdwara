@@ -1,0 +1,952 @@
+[
+  {
+    "id": 51,
+    "category": "Khalsa & Vaisakhi",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Khalsa & Vaisakhi?",
+      "pa": "ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Shoes area (Jora Ghar)",
+        "pa": "ਜੋੜਾ ਘਰ"
+      },
+      {
+        "en": "Asa di Vaar",
+        "pa": "ਆਸਾ ਦੀ ਵਾਰ"
+      },
+      {
+        "en": "Cleanliness and seva",
+        "pa": "ਸਫ਼ਾਈ ਅਤੇ ਸੇਵਾ"
+      },
+      {
+        "en": "1699 Vaisakhi",
+        "pa": "1699 ਵਿਸਾਖੀ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "1699 Vaisakhi is an accurate match for Khalsa & Vaisakhi in Sikh learning for ages 6-12.",
+      "pa": "1699 ਵਿਸਾਖੀ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 52,
+    "category": "Khalsa & Vaisakhi",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Khalsa & Vaisakhi.",
+      "pa": "ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Nimrata (humility)",
+        "pa": "ਨਿਮਰਤਾ"
+      },
+      {
+        "en": "Respect for all",
+        "pa": "ਸਭ ਦਾ ਆਦਰ"
+      },
+      {
+        "en": "Anandpur Sahib",
+        "pa": "ਅਨੰਦਪੁਰ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Preserving freedom of faith",
+        "pa": "ਧਰਮ ਦੀ ਆਜ਼ਾਦੀ ਦੀ ਰੱਖਿਆ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Anandpur Sahib is an accurate match for Khalsa & Vaisakhi in Sikh learning for ages 6-12.",
+      "pa": "ਅਨੰਦਪੁਰ ਸਾਹਿਬ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 53,
+    "category": "Khalsa & Vaisakhi",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Khalsa & Vaisakhi?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Japji Sahib",
+        "pa": "ਜਪੁਜੀ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Amrit Sanchar",
+        "pa": "ਅੰਮ੍ਰਿਤ ਸੰਚਾਰ"
+      },
+      {
+        "en": "Bhai Mani Singh Ji",
+        "pa": "ਭਾਈ ਮਨੀ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Talwandi (Nankana Sahib)",
+        "pa": "ਤਲਵੰਡੀ (ਨਨਕਾਣਾ ਸਾਹਿਬ)"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Amrit Sanchar is an accurate match for Khalsa & Vaisakhi in Sikh learning for ages 6-12.",
+      "pa": "ਅੰਮ੍ਰਿਤ ਸੰਚਾਰ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 54,
+    "category": "Khalsa & Vaisakhi",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Khalsa & Vaisakhi topic.",
+      "pa": "ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Khande di Pahul",
+        "pa": "ਖੰਡੇ ਦੀ ਪਾਹੁਲ"
+      },
+      {
+        "en": "Bhai Dharam Singh Ji",
+        "pa": "ਭਾਈ ਧਰਮ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Courage and devotion",
+        "pa": "ਹਿੰਮਤ ਅਤੇ ਭਗਤੀ"
+      },
+      {
+        "en": "Kangha",
+        "pa": "ਕੰਘਾ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Khande di Pahul is an accurate match for Khalsa & Vaisakhi in Sikh learning for ages 6-12.",
+      "pa": "ਖੰਡੇ ਦੀ ਪਾਹੁਲ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 55,
+    "category": "Khalsa & Vaisakhi",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Khalsa & Vaisakhi?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Khalsa symbols",
+        "pa": "ਖਾਲਸਾ ਚਿੰਨ੍ਹ"
+      },
+      {
+        "en": "Ek Onkar symbol",
+        "pa": "ਇਕ ਓਅੰਕਾਰ ਚਿੰਨ੍ਹ"
+      },
+      {
+        "en": "Sikh flag",
+        "pa": "ਸਿੱਖ ਝੰਡਾ"
+      },
+      {
+        "en": "Saint-Soldier ideal",
+        "pa": "ਸੰਤ-ਸਿਪਾਹੀ ਆਦਰਸ਼"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Saint-Soldier ideal is an accurate match for Khalsa & Vaisakhi in Sikh learning for ages 6-12.",
+      "pa": "ਸੰਤ-ਸਿਪਾਹੀ ਆਦਰਸ਼ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 56,
+    "category": "Khalsa & Vaisakhi",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Khalsa & Vaisakhi?",
+      "pa": "ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Khalsa roop",
+        "pa": "ਖਾਲਸਾ ਰੂਪ"
+      },
+      {
+        "en": "Meaning of shabad",
+        "pa": "ਸ਼ਬਦ ਦਾ ਅਰਥ"
+      },
+      {
+        "en": "Banda Singh Bahadur",
+        "pa": "ਬੰਦਾ ਸਿੰਘ ਬਹਾਦੁਰ"
+      },
+      {
+        "en": "Asa di Vaar",
+        "pa": "ਆਸਾ ਦੀ ਵਾਰ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Khalsa roop is an accurate match for Khalsa & Vaisakhi in Sikh learning for ages 6-12.",
+      "pa": "ਖਾਲਸਾ ਰੂਪ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 57,
+    "category": "Khalsa & Vaisakhi",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Khalsa & Vaisakhi.",
+      "pa": "ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Respect for all",
+        "pa": "ਸਭ ਦਾ ਆਦਰ"
+      },
+      {
+        "en": "Fearless living",
+        "pa": "ਨਿਰਭਉ ਜੀਵਨ"
+      },
+      {
+        "en": "Ardas and kirtan",
+        "pa": "ਅਰਦਾਸ ਅਤੇ ਕੀਰਤਨ"
+      },
+      {
+        "en": "Bandi Chhor Divas",
+        "pa": "ਬੰਦੀ ਛੋੜ ਦਿਵਸ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Fearless living is an accurate match for Khalsa & Vaisakhi in Sikh learning for ages 6-12.",
+      "pa": "ਨਿਰਭਉ ਜੀਵਨ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 58,
+    "category": "Khalsa & Vaisakhi",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Khalsa & Vaisakhi?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Guru Angad Dev Ji",
+        "pa": "ਗੁਰੂ ਅੰਗਦ ਦੇਵ ਜੀ"
+      },
+      {
+        "en": "Japji Sahib",
+        "pa": "ਜਪੁਜੀ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Equality of all",
+        "pa": "ਸਭ ਦੀ ਬਰਾਬਰੀ"
+      },
+      {
+        "en": "Guru Har Rai Ji",
+        "pa": "ਗੁਰੂ ਹਰ ਰਾਇ ਜੀ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Equality of all is an accurate match for Khalsa & Vaisakhi in Sikh learning for ages 6-12.",
+      "pa": "ਸਭ ਦੀ ਬਰਾਬਰੀ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 59,
+    "category": "Khalsa & Vaisakhi",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Khalsa & Vaisakhi topic.",
+      "pa": "ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Courage and devotion",
+        "pa": "ਹਿੰਮਤ ਅਤੇ ਭਗਤੀ"
+      },
+      {
+        "en": "Kangha",
+        "pa": "ਕੰਘਾ"
+      },
+      {
+        "en": "Bhai Dharam Singh Ji",
+        "pa": "ਭਾਈ ਧਰਮ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Discipline (Rehat)",
+        "pa": "ਰਹਿਤ ਅਨੁਸ਼ਾਸਨ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Discipline (Rehat) is an accurate match for Khalsa & Vaisakhi in Sikh learning for ages 6-12.",
+      "pa": "ਰਹਿਤ ਅਨੁਸ਼ਾਸਨ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 60,
+    "category": "Khalsa & Vaisakhi",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Khalsa & Vaisakhi?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Waheguru Ji Ka Khalsa",
+        "pa": "ਵਾਹਿਗੁਰੂ ਜੀ ਕਾ ਖਾਲਸਾ"
+      },
+      {
+        "en": "Ardas together",
+        "pa": "ਇਕੱਠੇ ਅਰਦਾਸ"
+      },
+      {
+        "en": "Seva in kitchen",
+        "pa": "ਰਸੋਈ ਵਿੱਚ ਸੇਵਾ"
+      },
+      {
+        "en": "Sikh flag",
+        "pa": "ਸਿੱਖ ਝੰਡਾ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Waheguru Ji Ka Khalsa is an accurate match for Khalsa & Vaisakhi in Sikh learning for ages 6-12.",
+      "pa": "ਵਾਹਿਗੁਰੂ ਜੀ ਕਾ ਖਾਲਸਾ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 61,
+    "category": "Khalsa & Vaisakhi",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Khalsa & Vaisakhi?",
+      "pa": "ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Banda Singh Bahadur",
+        "pa": "ਬੰਦਾ ਸਿੰਘ ਬਹਾਦੁਰ"
+      },
+      {
+        "en": "Seva",
+        "pa": "ਸੇਵਾ"
+      },
+      {
+        "en": "1699 Vaisakhi",
+        "pa": "1699 ਵਿਸਾਖੀ"
+      },
+      {
+        "en": "Muktsar battle",
+        "pa": "ਮੁਕਤਸਰ ਦੀ ਲੜਾਈ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "1699 Vaisakhi is an accurate match for Khalsa & Vaisakhi in Sikh learning for ages 6-12.",
+      "pa": "1699 ਵਿਸਾਖੀ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 62,
+    "category": "Khalsa & Vaisakhi",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Khalsa & Vaisakhi.",
+      "pa": "ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Anandpur Sahib",
+        "pa": "ਅਨੰਦਪੁਰ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Bhai Taru Singh Ji",
+        "pa": "ਭਾਈ ਤਾਰੂ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Ardas and kirtan",
+        "pa": "ਅਰਦਾਸ ਅਤੇ ਕੀਰਤਨ"
+      },
+      {
+        "en": "Bhai Vir Singh Ji",
+        "pa": "ਭਾਈ ਵੀਰ ਸਿੰਘ ਜੀ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Anandpur Sahib is an accurate match for Khalsa & Vaisakhi in Sikh learning for ages 6-12.",
+      "pa": "ਅਨੰਦਪੁਰ ਸਾਹਿਬ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 63,
+    "category": "Khalsa & Vaisakhi",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Khalsa & Vaisakhi?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Guru Har Rai Ji",
+        "pa": "ਗੁਰੂ ਹਰ ਰਾਇ ਜੀ"
+      },
+      {
+        "en": "Five beloved ones",
+        "pa": "ਪੰਜ ਪਿਆਰੇ"
+      },
+      {
+        "en": "Bhai Daya Singh Ji",
+        "pa": "ਭਾਈ ਦਇਆ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Amrit Sanchar",
+        "pa": "ਅੰਮ੍ਰਿਤ ਸੰਚਾਰ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Amrit Sanchar is an accurate match for Khalsa & Vaisakhi in Sikh learning for ages 6-12.",
+      "pa": "ਅੰਮ੍ਰਿਤ ਸੰਚਾਰ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 64,
+    "category": "Khalsa & Vaisakhi",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Khalsa & Vaisakhi topic.",
+      "pa": "ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Daily commitment",
+        "pa": "ਰੋਜ਼ਾਨਾ ਵਚਨਬੱਧਤਾ"
+      },
+      {
+        "en": "Nishan Sahib",
+        "pa": "ਨਿਸ਼ਾਨ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Khande di Pahul",
+        "pa": "ਖੰਡੇ ਦੀ ਪਾਹੁਲ"
+      },
+      {
+        "en": "Kangha",
+        "pa": "ਕੰਘਾ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Khande di Pahul is an accurate match for Khalsa & Vaisakhi in Sikh learning for ages 6-12.",
+      "pa": "ਖੰਡੇ ਦੀ ਪਾਹੁਲ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 65,
+    "category": "Khalsa & Vaisakhi",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Khalsa & Vaisakhi?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Guru Granth Sahib Ji",
+        "pa": "ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ"
+      },
+      {
+        "en": "Saint-Soldier ideal",
+        "pa": "ਸੰਤ-ਸਿਪਾਹੀ ਆਦਰਸ਼"
+      },
+      {
+        "en": "Ardas together",
+        "pa": "ਇਕੱਠੇ ਅਰਦਾਸ"
+      },
+      {
+        "en": "Kirtan Sohila",
+        "pa": "ਕੀਰਤਨ ਸੋਹਿਲਾ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Saint-Soldier ideal is an accurate match for Khalsa & Vaisakhi in Sikh learning for ages 6-12.",
+      "pa": "ਸੰਤ-ਸਿਪਾਹੀ ਆਦਰਸ਼ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 66,
+    "category": "Khalsa & Vaisakhi",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Khalsa & Vaisakhi?",
+      "pa": "ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Khalsa roop",
+        "pa": "ਖਾਲਸਾ ਰੂਪ"
+      },
+      {
+        "en": "Seva",
+        "pa": "ਸੇਵਾ"
+      },
+      {
+        "en": "Equality",
+        "pa": "ਬਰਾਬਰੀ"
+      },
+      {
+        "en": "Maghi",
+        "pa": "ਮਾਘੀ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Khalsa roop is an accurate match for Khalsa & Vaisakhi in Sikh learning for ages 6-12.",
+      "pa": "ਖਾਲਸਾ ਰੂਪ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 67,
+    "category": "Khalsa & Vaisakhi",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Khalsa & Vaisakhi.",
+      "pa": "ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Bhai Vir Singh Ji",
+        "pa": "ਭਾਈ ਵੀਰ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Bhai Mardana Ji",
+        "pa": "ਭਾਈ ਮਰਦਾਨਾ ਜੀ"
+      },
+      {
+        "en": "Kirat Karo",
+        "pa": "ਕਿਰਤ ਕਰੋ"
+      },
+      {
+        "en": "Fearless living",
+        "pa": "ਨਿਰਭਉ ਜੀਵਨ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Fearless living is an accurate match for Khalsa & Vaisakhi in Sikh learning for ages 6-12.",
+      "pa": "ਨਿਰਭਉ ਜੀਵਨ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 68,
+    "category": "Khalsa & Vaisakhi",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Khalsa & Vaisakhi?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Equality of all",
+        "pa": "ਸਭ ਦੀ ਬਰਾਬਰੀ"
+      },
+      {
+        "en": "Five beloved ones",
+        "pa": "ਪੰਜ ਪਿਆਰੇ"
+      },
+      {
+        "en": "Kesh",
+        "pa": "ਕੇਸ਼"
+      },
+      {
+        "en": "Bhai Daya Singh Ji",
+        "pa": "ਭਾਈ ਦਇਆ ਸਿੰਘ ਜੀ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Equality of all is an accurate match for Khalsa & Vaisakhi in Sikh learning for ages 6-12.",
+      "pa": "ਸਭ ਦੀ ਬਰਾਬਰੀ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 69,
+    "category": "Khalsa & Vaisakhi",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Khalsa & Vaisakhi topic.",
+      "pa": "ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Nishan Sahib",
+        "pa": "ਨਿਸ਼ਾਨ ਸਾਹਿਬ"
+      },
+      {
+        "en": "Discipline (Rehat)",
+        "pa": "ਰਹਿਤ ਅਨੁਸ਼ਾਸਨ"
+      },
+      {
+        "en": "Langar hall",
+        "pa": "ਲੰਗਰ ਹਾਲ"
+      },
+      {
+        "en": "Nishan pole",
+        "pa": "ਨਿਸ਼ਾਨ ਦਾ ਡੰਡਾ"
+      }
+    ],
+    "correctAnswer": 1,
+    "explanation": {
+      "en": "Discipline (Rehat) is an accurate match for Khalsa & Vaisakhi in Sikh learning for ages 6-12.",
+      "pa": "ਰਹਿਤ ਅਨੁਸ਼ਾਸਨ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 70,
+    "category": "Khalsa & Vaisakhi",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Khalsa & Vaisakhi?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Shaheedi of Guru Tegh Bahadur Ji",
+        "pa": "ਗੁਰੂ ਤੇਗ ਬਹਾਦੁਰ ਜੀ ਦੀ ਸ਼ਹੀਦੀ"
+      },
+      {
+        "en": "Guru Granth Sahib Ji",
+        "pa": "ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ"
+      },
+      {
+        "en": "Waheguru Ji Ka Khalsa",
+        "pa": "ਵਾਹਿਗੁਰੂ ਜੀ ਕਾ ਖਾਲਸਾ"
+      },
+      {
+        "en": "Chamkaur battle",
+        "pa": "ਚਮਕੌਰ ਦੀ ਲੜਾਈ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Waheguru Ji Ka Khalsa is an accurate match for Khalsa & Vaisakhi in Sikh learning for ages 6-12.",
+      "pa": "ਵਾਹਿਗੁਰੂ ਜੀ ਕਾ ਖਾਲਸਾ ਖਾਲਸਾ ਅਤੇ ਵਿਸਾਖੀ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 71,
+    "category": "Panj Pyare",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Which option is correctly connected to Panj Pyare?",
+      "pa": "ਪੰਜ ਪਿਆਰੇ ਨਾਲ ਸਹੀ ਜੁੜਿਆ ਹੋਇਆ ਵਿਕਲਪ ਕਿਹੜਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Muktsar battle",
+        "pa": "ਮੁਕਤਸਰ ਦੀ ਲੜਾਈ"
+      },
+      {
+        "en": "Seva",
+        "pa": "ਸੇਵਾ"
+      },
+      {
+        "en": "Banda Singh Bahadur",
+        "pa": "ਬੰਦਾ ਸਿੰਘ ਬਹਾਦੁਰ"
+      },
+      {
+        "en": "Bhai Daya Singh Ji",
+        "pa": "ਭਾਈ ਦਇਆ ਸਿੰਘ ਜੀ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Bhai Daya Singh Ji is an accurate match for Panj Pyare in Sikh learning for ages 6-12.",
+      "pa": "ਭਾਈ ਦਇਆ ਸਿੰਘ ਜੀ ਪੰਜ ਪਿਆਰੇ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 72,
+    "category": "Panj Pyare",
+    "difficulty": "Easy",
+    "question": {
+      "en": "Choose the correct Sikh learning point for Panj Pyare.",
+      "pa": "ਪੰਜ ਪਿਆਰੇ ਲਈ ਸਹੀ ਸਿੱਖਿਆ ਬਿੰਦੂ ਚੁਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Bhai Dharam Singh Ji",
+        "pa": "ਭਾਈ ਧਰਮ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Bhai Vir Singh Ji",
+        "pa": "ਭਾਈ ਵੀਰ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Bhai Taru Singh Ji",
+        "pa": "ਭਾਈ ਤਾਰੂ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Ardas and kirtan",
+        "pa": "ਅਰਦਾਸ ਅਤੇ ਕੀਰਤਨ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Bhai Dharam Singh Ji is an accurate match for Panj Pyare in Sikh learning for ages 6-12.",
+      "pa": "ਭਾਈ ਧਰਮ ਸਿੰਘ ਜੀ ਪੰਜ ਪਿਆਰੇ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 73,
+    "category": "Panj Pyare",
+    "difficulty": "Medium",
+    "question": {
+      "en": "For children learning Sikhi, which option matches Panj Pyare?",
+      "pa": "ਸਿੱਖੀ ਸਿੱਖ ਰਹੇ ਬੱਚਿਆਂ ਲਈ ਪੰਜ ਪਿਆਰੇ ਨਾਲ ਕਿਹੜਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Guru Har Rai Ji",
+        "pa": "ਗੁਰੂ ਹਰ ਰਾਇ ਜੀ"
+      },
+      {
+        "en": "Khalsa roop",
+        "pa": "ਖਾਲਸਾ ਰੂਪ"
+      },
+      {
+        "en": "Bhai Himmat Singh Ji",
+        "pa": "ਭਾਈ ਹਿੰਮਤ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "1699 Vaisakhi",
+        "pa": "1699 ਵਿਸਾਖੀ"
+      }
+    ],
+    "correctAnswer": 2,
+    "explanation": {
+      "en": "Bhai Himmat Singh Ji is an accurate match for Panj Pyare in Sikh learning for ages 6-12.",
+      "pa": "ਭਾਈ ਹਿੰਮਤ ਸਿੰਘ ਜੀ ਪੰਜ ਪਿਆਰੇ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 74,
+    "category": "Panj Pyare",
+    "difficulty": "Medium",
+    "question": {
+      "en": "Identify the correct answer from the Panj Pyare topic.",
+      "pa": "ਪੰਜ ਪਿਆਰੇ ਵਿਸ਼ੇ ਵਿੱਚੋਂ ਸਹੀ ਜਵਾਬ ਪਛਾਣੋ।"
+    },
+    "options": [
+      {
+        "en": "Bhai Mohkam Singh Ji",
+        "pa": "ਭਾਈ ਮੋਹਕਮ ਸਿੰਘ ਜੀ"
+      },
+      {
+        "en": "Daily commitment",
+        "pa": "ਰੋਜ਼ਾਨਾ ਵਚਨਬੱਧਤਾ"
+      },
+      {
+        "en": "Kangha",
+        "pa": "ਕੰਘਾ"
+      },
+      {
+        "en": "Nishan Sahib",
+        "pa": "ਨਿਸ਼ਾਨ ਸਾਹਿਬ"
+      }
+    ],
+    "correctAnswer": 0,
+    "explanation": {
+      "en": "Bhai Mohkam Singh Ji is an accurate match for Panj Pyare in Sikh learning for ages 6-12.",
+      "pa": "ਭਾਈ ਮੋਹਕਮ ਸਿੰਘ ਜੀ ਪੰਜ ਪਿਆਰੇ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  },
+  {
+    "id": 75,
+    "category": "Panj Pyare",
+    "difficulty": "Hard",
+    "question": {
+      "en": "Which statement belongs to Panj Pyare?",
+      "pa": "ਹੇਠਾਂ ਦਿੱਤਿਆਂ ਵਿੱਚੋਂ ਕਿਹੜੀ ਗੱਲ ਪੰਜ ਪਿਆਰੇ ਨਾਲ ਸੰਬੰਧਿਤ ਹੈ?"
+    },
+    "options": [
+      {
+        "en": "Ardas together",
+        "pa": "ਇਕੱਠੇ ਅਰਦਾਸ"
+      },
+      {
+        "en": "Guru Granth Sahib Ji",
+        "pa": "ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ"
+      },
+      {
+        "en": "Kirtan Sohila",
+        "pa": "ਕੀਰਤਨ ਸੋਹਿਲਾ"
+      },
+      {
+        "en": "Bhai Sahib Singh Ji",
+        "pa": "ਭਾਈ ਸਾਹਿਬ ਸਿੰਘ ਜੀ"
+      }
+    ],
+    "correctAnswer": 3,
+    "explanation": {
+      "en": "Bhai Sahib Singh Ji is an accurate match for Panj Pyare in Sikh learning for ages 6-12.",
+      "pa": "ਭਾਈ ਸਾਹਿਬ ਸਿੰਘ ਜੀ ਪੰਜ ਪਿਆਰੇ ਨਾਲ ਸਹੀ ਤੌਰ ਤੇ ਸੰਬੰਧਿਤ ਹੈ ਅਤੇ 6-12 ਉਮਰ ਦੇ ਬੱਚਿਆਂ ਲਈ ਉਚਿਤ ਹੈ।"
+    },
+    "reference": {
+      "en": "Sri Guru Granth Sahib / Sikh History / Sikh Rehat",
+      "pa": "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ / ਸਿੱਖ ਇਤਿਹਾਸ / ਸਿੱਖ ਰਹਿਤ"
+    },
+    "points": 10,
+    "image": null
+  }
+]

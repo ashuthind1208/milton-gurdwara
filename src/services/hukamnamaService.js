@@ -1,4 +1,4 @@
-import { mockResponse } from './mockApi';
+import { serviceResponse } from './serviceResponse';
 import contentApiService from './contentApiService';
 
 const SETTINGS_KEY = 'ssm-hukamnama-settings';
@@ -485,7 +485,7 @@ const hukamnamaService = {
       throw new Error('Unable to fetch hukamnama lines for this ang at the moment. Please try again.');
     }
 
-    return mockResponse({
+    return serviceResponse({
       ...angData,
       ang: safeAng
     });
@@ -494,7 +494,7 @@ const hukamnamaService = {
     const date = toDateKey(dateValue || new Date());
     const entries = await readScheduledEntries();
     const entry = resolveDailyEntry(entries[date]);
-    return mockResponse({
+    return serviceResponse({
       date,
       entry,
       morning: entries[date]?.morning || null,
@@ -506,7 +506,7 @@ const hukamnamaService = {
     const entries = await readScheduledEntries();
     const todayEntry = entries[today]?.morning || entries[today]?.evening;
     if (todayEntry) {
-      return mockResponse(todayEntry);
+      return serviceResponse(todayEntry);
     }
 
     const settings = normalizeEntry(await readSettings());
@@ -521,14 +521,14 @@ const hukamnamaService = {
         updatedAt: settings.updatedAt || new Date().toISOString()
       };
       await writeJson(SETTINGS_KEY, normalizeEntry(nextSettings));
-      return mockResponse({ ...nextSettings, ang: settings.ang, audioUrl: settings.audioUrl || DAILY_MUKHWAK_AUDIO });
+      return serviceResponse({ ...nextSettings, ang: settings.ang, audioUrl: settings.audioUrl || DAILY_MUKHWAK_AUDIO });
     }
 
     if (settings.lines?.length) {
-      return mockResponse({ ...settings, audioUrl: settings.audioUrl || DAILY_MUKHWAK_AUDIO });
+      return serviceResponse({ ...settings, audioUrl: settings.audioUrl || DAILY_MUKHWAK_AUDIO });
     }
 
-    return mockResponse({ ...fallbackEntry, ang: settings.ang, audioUrl: settings.audioUrl || DAILY_MUKHWAK_AUDIO });
+    return serviceResponse({ ...fallbackEntry, ang: settings.ang, audioUrl: settings.audioUrl || DAILY_MUKHWAK_AUDIO });
   },
   setScheduledHukamnama: async ({ ang, date, slot }) => {
     const safeAng = Math.max(1, Number(ang) || 1);
@@ -580,7 +580,7 @@ const hukamnamaService = {
       writer: nextEntry.metadata?.writer || ''
     });
 
-    return mockResponse(nextEntry);
+    return serviceResponse(nextEntry);
   },
   setCurrentAng: async (ang) => {
     return hukamnamaService.setScheduledHukamnama({ ang, date: toDateKey(new Date()), slot: 'morning' });
@@ -634,7 +634,7 @@ const hukamnamaService = {
       writer: updatedEntry.metadata?.writer || ''
     });
 
-    return mockResponse(updatedEntry);
+    return serviceResponse(updatedEntry);
   },
   deleteScheduledHukamnama: async (dateValue) => {
     const dateKey = toDateKey(dateValue || new Date());
@@ -650,12 +650,12 @@ const hukamnamaService = {
     await writeScheduledEntries(nextEntries);
     await removeHistoryEntry(dateKey, existingEntry.slot || 'morning');
 
-    return mockResponse({ success: true, date: dateKey });
+    return serviceResponse({ success: true, date: dateKey });
   },
   getArchiveByDate: async (dateValue) => {
     const date = toDateKey(dateValue || new Date());
     const entries = await readScheduledEntries();
-    return mockResponse({
+    return serviceResponse({
       date,
       entry: resolveDailyEntry(entries[date]),
       morning: entries[date]?.morning || null,
@@ -672,7 +672,7 @@ const hukamnamaService = {
       angs: [slots?.morning?.ang, slots?.evening?.ang].filter(Boolean),
       ang: resolveDailyEntry(slots)?.ang || null
     }));
-    return mockResponse(payload);
+    return serviceResponse(payload);
   },
   getArchive: async () => {
     const entries = await readScheduledEntries();
@@ -692,15 +692,15 @@ const hukamnamaService = {
       }));
 
     if (flattened.length > 0) {
-      return mockResponse(flattened);
+      return serviceResponse(flattened);
     }
 
-    return mockResponse(await readJson(HISTORY_KEY, []));
+    return serviceResponse(await readJson(HISTORY_KEY, []));
   },
   getReadAlongAudioUrl: async (ang) => {
     const safeAng = Math.max(1, Number(ang) || 1);
     if (!READ_ALONG_ENABLED) {
-      return mockResponse({
+      return serviceResponse({
         ang: safeAng,
         url: '',
         available: false,
@@ -713,7 +713,7 @@ const hukamnamaService = {
     }
     const url = `${READ_ALONG_EXACT_BASE_URL}/gms-${safeAng}.mp3`;
 
-    return mockResponse({
+    return serviceResponse({
       ang: safeAng,
       url,
       available: Boolean(url),

@@ -5,6 +5,7 @@ export const publicNav = [
   { label: 'Gurbani Library', path: '/gurbani-library' },
   { label: 'Daily Hukamnama', path: '/hukamnama' },
   { label: 'Events', path: '/events' },
+  { label: 'Family Dashboard', path: '/family-dashboard' },
   { label: 'Seva', path: '/seva' },
   { label: 'Donation', path: '/donation' },
   { label: 'Gallery', path: '/gallery' },
@@ -30,6 +31,7 @@ export const adminNav = [
   { label: 'Advertisements', path: '/admin/advertisements' },
   { label: 'Sponsors', path: '/admin/sponsors' },
   { label: 'Events', path: '/admin/events' },
+  { label: 'Kids Learning', path: '/admin/kids-learning' },
   { label: 'Donations', path: '/admin/donations' },
   { label: 'Users', path: '/admin/users' }
 ];

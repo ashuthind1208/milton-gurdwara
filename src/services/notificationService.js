@@ -1,4 +1,4 @@
-import { mockResponse } from './mockApi';
+import { serviceResponse } from './serviceResponse';
 import contentApiService from './contentApiService';
 
 const RESOURCE = 'subscribers';
@@ -34,23 +34,23 @@ const notificationService = {
     });
 
     const created = await contentApiService.create(RESOURCE, record);
-    return mockResponse(normalizeSubscriber(created || record));
+    return serviceResponse(normalizeSubscriber(created || record));
   },
 
   getSubscribers: async () => {
     const rows = await contentApiService.list(RESOURCE);
-    return mockResponse(rows.map((item, index) => normalizeSubscriber(item, index)));
+    return serviceResponse(rows.map((item, index) => normalizeSubscriber(item, index)));
   },
 
   sendApprovalEmail: async (user) => {
     const targetEmail = String(user?.email || '').trim().toLowerCase();
     if (!targetEmail) {
-      return mockResponse({ sent: false, reason: 'missing_email' });
+      return serviceResponse({ sent: false, reason: 'missing_email' });
     }
 
     const webhookUrl = String(process.env.REACT_APP_APPROVAL_EMAIL_WEBHOOK_URL || '').trim();
     if (!webhookUrl) {
-      return mockResponse({ sent: false, reason: 'missing_webhook' });
+      return serviceResponse({ sent: false, reason: 'missing_webhook' });
     }
 
     const payload = {
@@ -69,19 +69,19 @@ const notificationService = {
       });
 
       if (!response.ok) {
-        return mockResponse({ sent: false, reason: 'webhook_error' });
+        return serviceResponse({ sent: false, reason: 'webhook_error' });
       }
 
-      return mockResponse({ sent: true });
+      return serviceResponse({ sent: true });
     } catch {
-      return mockResponse({ sent: false, reason: 'network_error' });
+      return serviceResponse({ sent: false, reason: 'network_error' });
     }
   },
 
   removeSubscriber: async (id) => {
     await contentApiService.remove(RESOURCE, id);
     const rows = await contentApiService.list(RESOURCE);
-    return mockResponse(rows.map((item, index) => normalizeSubscriber(item, index)));
+    return serviceResponse(rows.map((item, index) => normalizeSubscriber(item, index)));
   }
 };
 

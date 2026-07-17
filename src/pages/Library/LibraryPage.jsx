@@ -17,8 +17,11 @@ import Card from '../../components/ui/Card';
 import libraryService from '../../services/libraryService';
 import eventService from '../../services/eventService';
 import advertisementService from '../../services/advertisementService';
+import kidsLearningService from '../../services/kidsLearningService';
+import kidsQuizBankService from '../../services/kidsQuizBankService';
 import { getYouTubeEmbedUrl, getYouTubeThumbnail } from '../../services/videoService';
 import Button from '../../components/ui/Button';
+import { useAuth } from '../../context/AuthContext';
 
 const PAGE_SIZE = 10;
 
@@ -54,6 +57,29 @@ const getYouTubeVideoId = (url) => {
   const embedUrl = getYouTubeEmbedUrl(url);
   const match = embedUrl.match(/embed\/([A-Za-z0-9_-]{11})/);
   return match ? match[1] : '';
+};
+
+const resolveCorrectAnswerIndex = (question = {}) => {
+  const options = Array.isArray(question?.options) ? question.options : [];
+  const raw = Number(question?.correctAnswer);
+  if (Number.isFinite(raw) && raw >= 0 && raw < options.length) {
+    return raw;
+  }
+  if (Number.isFinite(raw) && raw >= 1 && raw <= options.length) {
+    return raw - 1;
+  }
+  return 0;
+};
+
+const getDifficultyRibbonClasses = (difficulty = '') => {
+  const normalized = String(difficulty || '').trim().toLowerCase();
+  if (normalized === 'hard') {
+    return 'border-rose-300 bg-rose-100 text-rose-800';
+  }
+  if (normalized === 'medium') {
+    return 'border-amber-300 bg-amber-100 text-amber-900';
+  }
+  return 'border-emerald-300 bg-emerald-100 text-emerald-800';
 };
 
 const loadYouTubeIFrameApi = (() => {
@@ -149,13 +175,26 @@ const YouTubeAutoPlayPlayer = ({ url, title, className = '' }) => {
 const LibraryPage = () => {
   const meta = useSeoMeta('Library', 'Books, PDFs, and downloadable resources for Sikh learning.');
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [physicalPage, setPhysicalPage] = useState(1);
   const [digitalPage, setDigitalPage] = useState(1);
   const [programEventsPage, setProgramEventsPage] = useState(1);
   const [issueModalBookId, setIssueModalBookId] = useState('');
   const [sessionModalId, setSessionModalId] = useState('');
   const [mediaModalId, setMediaModalId] = useState('');
-  const registrationForm = useForm({ defaultValues: { name: '', contact: '' } });
+  const [flashCardQuestionIndex, setFlashCardQuestionIndex] = useState(0);
+  const [flashCardSelectedOption, setFlashCardSelectedOption] = useState(null);
+  const [flashCardFlipped, setFlashCardFlipped] = useState(false);
+  const [quizAnsweredCount, setQuizAnsweredCount] = useState(0);
+  const [quizCorrectCount, setQuizCorrectCount] = useState(0);
+  const [quizStreak, setQuizStreak] = useState(0);
+  const [quizBestStreak, setQuizBestStreak] = useState(0);
+  const registrationDefaults = useMemo(() => ({
+    name: String(user?.name || ''),
+    email: String(user?.email || ''),
+    contact: String(user?.phone || '')
+  }), [user?.email, user?.name, user?.phone]);
+  const registrationForm = useForm({ defaultValues: { name: '', email: '', contact: '' } });
 
   const { data: libraryData } = useQuery({
     queryKey: ['library-content'],
@@ -172,12 +211,34 @@ const LibraryPage = () => {
     queryFn: () => eventService.getEvents().then((res) => res.data)
   });
 
+  const { data: kidsLearningContent } = useQuery({
+    queryKey: ['kids-learning-content-library'],
+    queryFn: () => kidsLearningService.getContent().then((res) => res.data)
+  });
+
+  const { data: quizBankQuestions = [] } = useQuery({
+    queryKey: ['kids-quiz-bank-filesystem'],
+    queryFn: () => kidsQuizBankService.getAllQuestions().then((res) => res.data)
+  });
+
   const physicalBooks = useMemo(() => libraryData?.physicalBooks || [], [libraryData]);
   const digitalResources = useMemo(() => libraryData?.digitalResources || [], [libraryData]);
   const programUpdates = useMemo(() => libraryData?.programUpdates || [], [libraryData]);
   const mediaResources = useMemo(() => libraryData?.mediaResources || [], [libraryData]);
   const libraryTopAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Library Top Banner').slice(0, 2), [ads]);
   const libraryFooterAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Library Footer Banner').slice(0, 2), [ads]);
+  const filteredFlashCardQuestions = useMemo(() => (Array.isArray(quizBankQuestions) ? quizBankQuestions : []), [quizBankQuestions]);
+  const flashCardQuestion = useMemo(() => {
+    if (!Array.isArray(filteredFlashCardQuestions) || filteredFlashCardQuestions.length === 0) {
+      return null;
+    }
+    const safeIndex = ((flashCardQuestionIndex % filteredFlashCardQuestions.length) + filteredFlashCardQuestions.length) % filteredFlashCardQuestions.length;
+    return filteredFlashCardQuestions[safeIndex];
+  }, [flashCardQuestionIndex, filteredFlashCardQuestions]);
+  const quizScoreOutOf100 = Math.min(100, quizCorrectCount * 10);
+  const quizProgressPercent = filteredFlashCardQuestions.length > 0
+    ? Math.min(100, ((Math.min(flashCardQuestionIndex, filteredFlashCardQuestions.length - 1) + 1) / filteredFlashCardQuestions.length) * 100)
+    : 0;
 
   const physicalTotalPages = Math.max(1, Math.ceil(physicalBooks.length / PAGE_SIZE));
   const digitalTotalPages = Math.max(1, Math.ceil(digitalResources.length / PAGE_SIZE));
@@ -260,9 +321,13 @@ const LibraryPage = () => {
 
   useEffect(() => {
     if (!sessionModalEntry) {
-      registrationForm.reset({ name: '', contact: '' });
+      registrationForm.reset(registrationDefaults);
     }
-  }, [sessionModalEntry, registrationForm]);
+  }, [registrationDefaults, sessionModalEntry, registrationForm]);
+
+  useEffect(() => {
+    registrationForm.reset(registrationDefaults);
+  }, [registrationDefaults, registrationForm]);
 
   useEffect(() => {
     if (programEventsPage > programEventsTotalPages) {
@@ -274,16 +339,71 @@ const LibraryPage = () => {
     mutationFn: (values) => eventService.registerForEvent({
       eventId: sessionModalEntry?.eventId,
       name: values.name,
+      email: values.email,
       contact: values.contact
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
       queryClient.invalidateQueries({ queryKey: ['admin-events'] });
-      registrationForm.reset({ name: '', contact: '' });
+      registrationForm.reset(registrationDefaults);
       setSessionModalId('');
       window.alert('Registration saved successfully.');
     }
   });
+
+  const handleQuizAnswerClick = (optionIndex) => {
+    if (!flashCardQuestion || flashCardFlipped) {
+      return;
+    }
+
+    const correctIndex = resolveCorrectAnswerIndex(flashCardQuestion);
+    const isCorrect = optionIndex === correctIndex;
+
+    setFlashCardSelectedOption(optionIndex);
+    setFlashCardFlipped(true);
+    setQuizAnsweredCount((current) => current + 1);
+    if (isCorrect) {
+      setQuizCorrectCount((current) => current + 1);
+      setQuizStreak((current) => {
+        const next = current + 1;
+        setQuizBestStreak((best) => Math.max(best, next));
+        return next;
+      });
+    } else {
+      setQuizStreak(0);
+    }
+  };
+
+  const handleNextFlashCard = () => {
+    if (!Array.isArray(filteredFlashCardQuestions) || filteredFlashCardQuestions.length === 0) {
+      return;
+    }
+    setFlashCardQuestionIndex((current) => (current + 1) % filteredFlashCardQuestions.length);
+    setFlashCardSelectedOption(null);
+    setFlashCardFlipped(false);
+  };
+
+  const handlePreviousFlashCard = () => {
+    if (!Array.isArray(filteredFlashCardQuestions) || filteredFlashCardQuestions.length === 0) {
+      return;
+    }
+    setFlashCardQuestionIndex((current) => {
+      const total = filteredFlashCardQuestions.length;
+      return (current - 1 + total) % total;
+    });
+    setFlashCardSelectedOption(null);
+    setFlashCardFlipped(false);
+  };
+
+  const handleResetQuizSession = () => {
+    setFlashCardQuestionIndex(0);
+    setFlashCardSelectedOption(null);
+    setFlashCardFlipped(false);
+    setQuizAnsweredCount(0);
+    setQuizCorrectCount(0);
+    setQuizStreak(0);
+    setQuizBestStreak(0);
+  };
 
   return (
     <div className="space-y-8">
@@ -334,6 +454,173 @@ const LibraryPage = () => {
               )}
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-sky-200 bg-gradient-to-br from-sky-50 via-amber-50 to-pink-50 p-5 shadow-sm">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h3 className="font-heading text-2xl font-semibold text-brand-blue md:text-3xl">Kids Learning Hub</h3>
+            <p className="mt-1 text-xs text-slate-600">Stories, vocabulary and interactive Sikh flashcard quiz for children.</p>
+          </div>
+          <BookOpenIcon className="h-7 w-7 text-brand-blue" />
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-2">
+          <Card className="border border-sky-200/70 bg-gradient-to-br from-sky-100 via-white to-cyan-100">
+            <h4 className="text-lg font-bold text-slate-900">Kids Learning</h4>
+            <p className="mt-2 text-sm text-slate-700">{kidsLearningContent?.intro || 'Interactive Sikh learning for children ages 6-12.'}</p>
+            {kidsLearningContent?.wordOfWeek ? (
+              <div className="mt-3 rounded-xl border border-brand-blue/20 bg-white/90 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-brand-blue">Word of the Week</p>
+                <p className="mt-1 text-lg font-black text-brand-blue">{kidsLearningContent.wordOfWeek.punjabi || '-'}</p>
+                <p className="text-sm font-semibold text-slate-700">{kidsLearningContent.wordOfWeek.transliteration || ''}</p>
+                <p className="mt-2 text-sm text-slate-700">{kidsLearningContent.wordOfWeek.englishMeaning || ''}</p>
+
+                {(Array.isArray(kidsLearningContent?.previousWordWeeks) ? kidsLearningContent.previousWordWeeks : []).length > 0 ? (
+                  <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-2 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Last 3 Weeks</p>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {(kidsLearningContent.previousWordWeeks || []).slice(0, 3).map((entry, index) => (
+                        <span key={entry.id || `word-history-${index}`} className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700">
+                          {entry.punjabi || '-'}
+                          {entry.transliteration ? <span className="ml-1 text-slate-500">({entry.transliteration})</span> : null}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </Card>
+
+          <Card className="border border-violet-200/70 bg-gradient-to-br from-violet-100 via-white to-indigo-100">
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="text-lg font-bold text-slate-900">Quiz Flashcard</h4>
+              <div className="flex items-center gap-1.5">
+                <span className="rounded-full bg-white/90 px-2.5 py-1 text-xs font-black text-violet-900 shadow-sm">Score {quizScoreOutOf100}/100</span>
+                <button
+                  type="button"
+                  onClick={handleResetQuizSession}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-violet-300 bg-white/90 text-sm font-black text-violet-900 transition hover:bg-violet-100"
+                  aria-label="Start over quiz"
+                  title="Start over"
+                >
+                  ↺
+                </button>
+              </div>
+            </div>
+            {flashCardQuestion ? (
+              <>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                  <span className="rounded-full bg-white/80 px-2 py-1 font-semibold text-slate-700">Streak: {quizStreak}</span>
+                  <span className="rounded-full bg-white/80 px-2 py-1 font-semibold text-slate-700">Best: {quizBestStreak}</span>
+                  <span className="rounded-full bg-white/80 px-2 py-1 font-semibold text-slate-700">Answered: {quizAnsweredCount}</span>
+                </div>
+
+                <div className="mt-3">
+                  <div className="mb-1 flex items-center justify-between text-[11px] font-semibold text-slate-700">
+                    <span>{Math.min(flashCardQuestionIndex + 1, filteredFlashCardQuestions.length)} / {filteredFlashCardQuestions.length}</span>
+                    <span>{Math.round(quizProgressPercent)}%</span>
+                  </div>
+                  <div className="h-2.5 overflow-hidden rounded-full bg-white/80">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{
+                        width: `${quizProgressPercent}%`,
+                        background: 'linear-gradient(90deg, #16a34a 0%, #eab308 55%, #dc2626 100%)'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-2 flex items-center justify-between gap-2 text-xs">
+                  <p className="text-slate-600">{flashCardQuestion.category}</p>
+                  <span
+                    className={`inline-flex rounded-full border px-2 py-0.5 font-black uppercase tracking-wide ${getDifficultyRibbonClasses(flashCardQuestion?.difficulty)}`}
+                    aria-label={`Difficulty ${flashCardQuestion?.difficulty || 'Easy'}`}
+                  >
+                    {flashCardQuestion?.difficulty || 'Easy'}
+                  </span>
+                </div>
+                <div className="mt-3" style={{ perspective: '1200px' }}>
+                  <div
+                    className="relative min-h-[300px] w-full transition-transform duration-500"
+                    style={{ transformStyle: 'preserve-3d', transform: flashCardFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
+                  >
+                    <div className="absolute inset-0 rounded-xl border border-violet-200 bg-white p-4 pb-6" style={{ backfaceVisibility: 'hidden' }}>
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm font-bold text-slate-900">{flashCardQuestion.question?.en || 'Question'}</p>
+                        <div className="inline-flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={handlePreviousFlashCard}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded border border-violet-300 bg-violet-50 text-xs font-black text-violet-800 transition hover:bg-violet-100"
+                            aria-label="Previous flashcard"
+                            title="Previous"
+                          >
+                            &lt;
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleNextFlashCard}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded border border-violet-300 bg-violet-50 text-xs font-black text-violet-800 transition hover:bg-violet-100"
+                            aria-label="Next flashcard"
+                            title="Next"
+                          >
+                            &gt;
+                          </button>
+                        </div>
+                      </div>
+                      <p className="mt-1 text-sm text-slate-600">{flashCardQuestion.question?.pa || ''}</p>
+                      <div className="mt-4 space-y-2">
+                        {(Array.isArray(flashCardQuestion.options) ? flashCardQuestion.options : []).map((option, optionIndex) => (
+                          <button
+                            key={`${flashCardQuestion.id}-option-${optionIndex}`}
+                            type="button"
+                            onClick={() => handleQuizAnswerClick(optionIndex)}
+                            className="block w-full rounded-lg border border-slate-300 bg-slate-50 px-2 py-1.5 text-left text-sm text-slate-700 transition hover:border-violet-400 hover:bg-violet-50"
+                          >
+                            <span className="font-semibold">{option.en}</span>
+                            <span className="ml-1 text-xs text-slate-600">({option.pa})</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="absolute inset-0 rounded-xl border border-violet-300 bg-violet-50 p-4 pb-6" style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
+                      <p className="text-sm font-black text-violet-900">Answer Revealed</p>
+                      <p className="mt-2 text-sm text-slate-800">
+                        Correct: {(flashCardQuestion.options?.[resolveCorrectAnswerIndex(flashCardQuestion)]?.en) || '-'}
+                      </p>
+                      {flashCardSelectedOption !== null ? (
+                        flashCardSelectedOption === resolveCorrectAnswerIndex(flashCardQuestion) ? (
+                          <p className="mt-2 text-xs font-bold text-emerald-700">Correct answer selected.</p>
+                        ) : (
+                          <p className="mt-2 text-xs font-bold text-rose-700">
+                            Wrong answer selected: {(flashCardQuestion.options?.[flashCardSelectedOption]?.en) || '-'}
+                          </p>
+                        )
+                      ) : null}
+                      <p className="mt-2 text-sm text-slate-700">{flashCardQuestion.explanation?.en || ''}</p>
+                      <p className="mt-1 text-sm text-slate-600">{flashCardQuestion.explanation?.pa || ''}</p>
+                      <div className="mt-3 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={handleNextFlashCard}
+                          className="rounded border border-violet-300 bg-white px-2 py-1 text-xs font-semibold text-violet-900 transition hover:bg-violet-100"
+                        >
+                          Next &gt;
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="mt-2 text-sm text-slate-500">No quiz questions available.</p>
+            )}
+          </Card>
+
         </div>
       </section>
 
@@ -595,6 +882,9 @@ const LibraryPage = () => {
                   <form className="mt-2 space-y-2.5" onSubmit={registrationForm.handleSubmit((values) => registrationMutation.mutate(values))}>
                     <label className="block text-xs font-semibold uppercase tracking-wide text-brand-blue">Name
                       <input {...registrationForm.register('name', { required: true })} className="mt-1 w-full rounded-lg border border-brand-blue/25 bg-white px-2.5 py-1.5 text-sm focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/20" />
+                    </label>
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-brand-blue">Email
+                      <input type="email" {...registrationForm.register('email', { required: true })} className="mt-1 w-full rounded-lg border border-brand-blue/25 bg-white px-2.5 py-1.5 text-sm focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/20" />
                     </label>
                     <label className="block text-xs font-semibold uppercase tracking-wide text-brand-blue">Contact
                       <input {...registrationForm.register('contact', { required: true })} className="mt-1 w-full rounded-lg border border-brand-blue/25 bg-white px-2.5 py-1.5 text-sm focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/20" />

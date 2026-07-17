@@ -58,6 +58,7 @@ const iconByPath = {
   '/admin/advertisements': MegaphoneIcon,
   '/admin/sponsors': CameraIcon,
   '/admin/events': QueueListIcon,
+  '/admin/kids-learning': BookOpenIcon,
   '/admin/donations': CurrencyDollarIcon,
   '/admin/users': UsersIcon,
   '/admin/analytics': ChartBarSquareIcon

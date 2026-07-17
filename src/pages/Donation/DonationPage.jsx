@@ -1,30 +1,41 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useMemo, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import { XMarkIcon } from '@heroicons/react/24/outline';
 import PageHero from '../../components/common/PageHero';
 import DonationForm from '../../components/forms/DonationForm';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
+import gurdwaraLogo from '../../assets/gurdwara-logo.webp';
 import donationService from '../../services/donationService';
 import advertisementService from '../../services/advertisementService';
 import { formatCurrency } from '../../utils/formatters';
 import useSeoMeta from '../../hooks/useSeoMeta';
 import Seo from '../../components/common/Seo';
 import { useAuth } from '../../context/AuthContext';
+import contentApiService from '../../services/contentApiService';
+
+const DONATION_IDENTITY_SETTING_KEY = 'settings-donation-allow-custom-name-email';
 
 const DonationPage = () => {
   const location = useLocation();
   const meta = useSeoMeta('Donation', 'Daswand contribution page with Stripe popup checkout.');
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [statusMessage, setStatusMessage] = useState('');
   const [pendingCheckout, setPendingCheckout] = useState(null);
   const [popupBlocked, setPopupBlocked] = useState(false);
   const [formResetKey, setFormResetKey] = useState(0);
+  const [selectedProgressItem, setSelectedProgressItem] = useState(null);
+  const [enlargedProgressPhoto, setEnlargedProgressPhoto] = useState('');
   const checkoutWindowRef = useRef(null);
 
   const { data: campaigns = [] } = useQuery({
     queryKey: ['campaigns'],
     queryFn: () => donationService.getCampaigns().then((res) => res.data)
+  });
+  const { data: donationIdentitySettings = { enabled: false } } = useQuery({
+    queryKey: [DONATION_IDENTITY_SETTING_KEY],
+    queryFn: () => contentApiService.getSingleton(DONATION_IDENTITY_SETTING_KEY, { enabled: false })
   });
 
   const { data: ads = [] } = useQuery({
@@ -40,6 +51,7 @@ const DonationPage = () => {
     const params = new URLSearchParams(location.search || '');
     return String(params.get('campaignId') || '').trim();
   }, [location.search]);
+  const profilePhoneMissing = !String(user?.phone || '').trim();
 
   const openStripePopup = (checkoutUrl) => {
     if (!checkoutUrl) {
@@ -88,7 +100,16 @@ const DonationPage = () => {
   };
 
   const initiateDonationMutation = useMutation({
-    mutationFn: (payload) => donationService.initiateDonation(payload),
+    mutationFn: (payload) => {
+      if (!isAuthenticated) {
+        throw new Error('Please sign in before donating.');
+      }
+      if (profilePhoneMissing) {
+        throw new Error('Please add your phone number in profile before donating.');
+      }
+
+      return donationService.initiateDonation(payload);
+    },
     onSuccess: (response) => {
       const pending = response.data;
       setPendingCheckout(pending);
@@ -156,13 +177,23 @@ const DonationPage = () => {
               <p className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">{statusMessage}</p>
             ) : null}
 
-            {openCampaigns.length === 0 ? (
+            {!isAuthenticated ? (
+              <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                Please <Link to="/login?next=/donation" className="font-bold underline">sign in</Link> to continue with donation.
+              </p>
+            ) : null}
+            {isAuthenticated && openCampaigns.length === 0 ? (
               <p className="mt-4 text-sm text-slate-600">All campaigns are currently closed.</p>
-            ) : (
+            ) : null}
+            {isAuthenticated && openCampaigns.length > 0 ? (
               <div className="mt-4">
                 <DonationForm
                   key={formResetKey}
                   onSubmit={(values) => {
+                    if (profilePhoneMissing) {
+                      setStatusMessage('Please update your profile phone number before donating.');
+                      return;
+                    }
                     setStatusMessage('');
                     const opened = openPlaceholderPopup();
                     setPopupBlocked(!opened);
@@ -172,12 +203,18 @@ const DonationPage = () => {
                   campaigns={openCampaigns}
                   user={user}
                   preferredCampaignId={preferredCampaignId}
+                  allowNameEmailEdit={Boolean(donationIdentitySettings?.enabled)}
                   submitLabel="Secure Payment"
                 />
               </div>
-            )}
+            ) : null}
+            {isAuthenticated && profilePhoneMissing ? (
+              <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                Add your phone number in profile before donating.
+              </p>
+            ) : null}
 
-            {pendingCheckout ? (
+            {isAuthenticated && pendingCheckout ? (
               <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
                 <p className="text-sm font-semibold text-slate-900">Payment ready for {formatCurrency(pendingCheckout.amount || 0)}</p>
                 <p className="mt-1 text-xs text-slate-600">Email: {pendingCheckout.donorEmail || '-'}</p>
@@ -196,15 +233,33 @@ const DonationPage = () => {
             const raised = Number.isFinite(Number(campaign.raised)) ? Math.max(0, Number(campaign.raised)) : 0;
             const target = Number.isFinite(Number(campaign.target)) ? Math.max(0, Number(campaign.target)) : 0;
             const progress = target > 0 ? Math.min((raised / target) * 100, 100) : 0;
+            const activeProgressItems = (Array.isArray(campaign.progressItems) ? campaign.progressItems : []).filter((item) => item?.isActive !== false);
             return (
               <Card key={campaign.id} className="border border-slate-200 bg-white">
                 <h3 className="font-heading text-lg font-semibold text-slate-900">{campaign.name}</h3>
                 {campaign.description ? <p className="mt-1 text-sm text-slate-600">{campaign.description}</p> : null}
-                <p className="mt-3 text-sm text-slate-700">{formatCurrency(raised)} raised of {formatCurrency(target)}</p>
+                <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Raised so far</p>
+                <p className="mt-1 text-3xl font-extrabold leading-none text-brand-blue">{formatCurrency(raised)}</p>
+                <p className="mt-1 text-sm text-slate-700">Target: {formatCurrency(target)}</p>
                 <div className="mt-2 h-2 rounded-full bg-slate-200">
                   <div className="h-2 rounded-full bg-brand-saffron" style={{ width: `${progress}%` }} />
                 </div>
                 <p className="mt-2 text-xs font-semibold text-slate-500">{progress.toFixed(1)}% complete</p>
+                {activeProgressItems.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {activeProgressItems.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setSelectedProgressItem({ campaignName: campaign.name, item })}
+                        className="inline-flex rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 transition hover:border-emerald-400 hover:bg-emerald-100"
+                        title={item.title || 'Progress update'}
+                      >
+                        {String(item.title || 'Progress update').slice(0, 25)}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
                 {campaign.isClosed ? <p className="mt-2 text-xs font-semibold text-red-600">Campaign closed</p> : null}
               </Card>
             );
@@ -233,6 +288,82 @@ const DonationPage = () => {
             ))}
           </div>
         </section>
+      ) : null}
+
+      {selectedProgressItem ? (
+        <div className="fixed inset-0 z-[122] overflow-y-auto bg-slate-900/70 px-4 py-6" onClick={() => setSelectedProgressItem(null)}>
+          <div className="mx-auto flex min-h-full max-w-3xl items-center justify-center">
+            <div className="relative w-full max-h-[90vh] overflow-y-auto rounded-2xl border border-brand-blue/20 bg-gradient-to-br from-blue-50/80 via-white to-amber-50/75 p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+              <div className="pointer-events-none absolute inset-0">
+                <img
+                  src={gurdwaraLogo}
+                  alt=""
+                  aria-hidden="true"
+                  className="absolute right-4 top-4 h-44 w-44 rounded-full opacity-[0.07]"
+                />
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Progress Detail</p>
+                  <h3 className="mt-1 font-heading text-2xl font-semibold text-slate-900">{selectedProgressItem.item.title || 'Progress Item'}</h3>
+                  <p className="mt-1 text-xs font-semibold text-slate-500">{selectedProgressItem.campaignName}</p>
+                  <span className="mt-2 inline-flex rounded-full border border-brand-blue/25 bg-blue-50 px-3 py-1 text-sm font-bold text-brand-blue">{selectedProgressItem.item.date || '-'}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedProgressItem(null)}
+                  className="rounded-full border border-brand-blue/40 bg-blue-50 p-2 text-brand-blue transition hover:border-brand-saffron hover:bg-amber-100 hover:text-amber-700"
+                  aria-label="Close progress detail modal"
+                >
+                  <XMarkIcon className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="relative z-10 mt-3 grid gap-3 text-sm text-slate-700">
+                <p>{selectedProgressItem.item.description || '-'}</p>
+              </div>
+
+              {Array.isArray(selectedProgressItem.item.photos) && selectedProgressItem.item.photos.length > 0 ? (
+                <div className="mt-4">
+                  <div className="mt-2 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                      {selectedProgressItem.item.photos.slice(0, 25).map((photoUrl, index) => (
+                        <button
+                          key={`${photoUrl}-${index}`}
+                          type="button"
+                          onClick={() => setEnlargedProgressPhoto(photoUrl)}
+                          className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-1 text-left shadow-[0_8px_18px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-brand-blue/30"
+                        >
+                          <img src={photoUrl} alt="Progress" className="h-24 w-full rounded-lg object-cover transition group-hover:scale-[1.03]" loading="lazy" />
+                        </button>
+                      ))}
+                    </div>
+                    {selectedProgressItem.item.photos.length > 25 ? <p className="mt-2 text-xs font-medium text-slate-500">Showing first 25 photos in the grid.</p> : null}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {enlargedProgressPhoto ? (
+        <div
+          className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/85 px-4 py-6"
+          onClick={() => setEnlargedProgressPhoto('')}
+        >
+          <div className="relative w-full max-w-5xl" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              onClick={() => setEnlargedProgressPhoto('')}
+              className="absolute right-3 top-3 z-10 rounded-full border border-brand-blue/40 bg-blue-50 p-2 text-brand-blue transition hover:border-brand-saffron hover:bg-amber-100 hover:text-amber-700"
+              aria-label="Close enlarged progress photo"
+            >
+              <XMarkIcon className="h-4 w-4" />
+            </button>
+            <img src={enlargedProgressPhoto} alt="Campaign progress enlarged" className="max-h-[88vh] w-full rounded-xl object-contain" />
+          </div>
+        </div>
       ) : null}
     </div>
   );

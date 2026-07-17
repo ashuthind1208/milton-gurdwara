@@ -42,11 +42,14 @@ const ensureEventsSchema = async () => {
     CREATE TABLE IF NOT EXISTS events (
       id BIGSERIAL PRIMARY KEY,
       title TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
       date TIMESTAMPTZ NOT NULL,
       end_date TIMESTAMPTZ NOT NULL,
       location TEXT NOT NULL,
       category TEXT NOT NULL,
       media_url TEXT NOT NULL DEFAULT '',
+      capacity INTEGER NOT NULL DEFAULT 0,
+      waitlist_enabled BOOLEAN NOT NULL DEFAULT TRUE,
       registrations INTEGER NOT NULL DEFAULT 0,
       active BOOLEAN NOT NULL DEFAULT TRUE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -60,13 +63,40 @@ const ensureEventsSchema = async () => {
   `);
 
   await pool.query(`
+    ALTER TABLE events
+    ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT '';
+  `);
+
+  await pool.query(`
+    ALTER TABLE events
+    ADD COLUMN IF NOT EXISTS capacity INTEGER NOT NULL DEFAULT 0;
+  `);
+
+  await pool.query(`
+    ALTER TABLE events
+    ADD COLUMN IF NOT EXISTS waitlist_enabled BOOLEAN NOT NULL DEFAULT TRUE;
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS event_registrants (
       id BIGSERIAL PRIMARY KEY,
       event_id BIGINT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
+      email TEXT NOT NULL DEFAULT '',
       contact TEXT,
+      status TEXT NOT NULL DEFAULT 'confirmed',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `);
+
+  await pool.query(`
+    ALTER TABLE event_registrants
+    ADD COLUMN IF NOT EXISTS email TEXT NOT NULL DEFAULT '';
+  `);
+
+  await pool.query(`
+    ALTER TABLE event_registrants
+    ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'confirmed';
   `);
 
   await pool.query(`
@@ -94,6 +124,14 @@ const ensureEventsSchema = async () => {
 
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_app_items_resource ON app_items(resource);
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS quiz_bank_files (
+      file_name TEXT PRIMARY KEY,
+      questions JSONB NOT NULL DEFAULT '[]'::jsonb,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
 
   await pool.query(`
@@ -491,6 +529,11 @@ const ensureEventsSchema = async () => {
       id BIGSERIAL PRIMARY KEY,
       name TEXT NOT NULL,
       description TEXT NOT NULL DEFAULT '',
+      progress_title TEXT NOT NULL DEFAULT '',
+      progress_description TEXT NOT NULL DEFAULT '',
+      progress_photos JSONB NOT NULL DEFAULT '[]'::jsonb,
+      progress_updates JSONB NOT NULL DEFAULT '[]'::jsonb,
+      progress_items JSONB NOT NULL DEFAULT '[]'::jsonb,
       raised NUMERIC(12, 2) NOT NULL DEFAULT 0,
       target NUMERIC(12, 2) NOT NULL DEFAULT 0,
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -501,6 +544,31 @@ const ensureEventsSchema = async () => {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `);
+
+  await pool.query(`
+    ALTER TABLE donation_campaigns
+    ADD COLUMN IF NOT EXISTS progress_title TEXT NOT NULL DEFAULT '';
+  `);
+
+  await pool.query(`
+    ALTER TABLE donation_campaigns
+    ADD COLUMN IF NOT EXISTS progress_description TEXT NOT NULL DEFAULT '';
+  `);
+
+  await pool.query(`
+    ALTER TABLE donation_campaigns
+    ADD COLUMN IF NOT EXISTS progress_photos JSONB NOT NULL DEFAULT '[]'::jsonb;
+  `);
+
+  await pool.query(`
+    ALTER TABLE donation_campaigns
+    ADD COLUMN IF NOT EXISTS progress_updates JSONB NOT NULL DEFAULT '[]'::jsonb;
+  `);
+
+  await pool.query(`
+    ALTER TABLE donation_campaigns
+    ADD COLUMN IF NOT EXISTS progress_items JSONB NOT NULL DEFAULT '[]'::jsonb;
   `);
 
   await pool.query(`
@@ -1561,6 +1629,77 @@ const removeItem = async (resource, id) => {
   return { success: true };
 };
 
+const listQuizBankFiles = async () => {
+  if (!pool) {
+    throw new Error('Database is not configured.');
+  }
+
+  const result = await pool.query(
+    `
+    SELECT
+      file_name,
+      COALESCE(jsonb_array_length(questions), 0) AS question_count
+    FROM quiz_bank_files
+    ORDER BY file_name ASC;
+    `
+  );
+
+  return (result.rows || []).map((row) => ({
+    fileName: String(row.file_name || ''),
+    questionCount: Number(row.question_count || 0)
+  }));
+};
+
+const getQuizBankFile = async (fileName) => {
+  if (!pool) {
+    throw new Error('Database is not configured.');
+  }
+
+  const result = await pool.query(
+    `
+    SELECT file_name, questions
+    FROM quiz_bank_files
+    WHERE file_name = $1
+    LIMIT 1;
+    `,
+    [String(fileName || '').trim()]
+  );
+
+  if (!result.rows?.[0]) {
+    return null;
+  }
+
+  return {
+    fileName: String(result.rows[0].file_name || ''),
+    questions: Array.isArray(result.rows[0].questions) ? result.rows[0].questions : []
+  };
+};
+
+const upsertQuizBankFile = async (fileName, questions = []) => {
+  if (!pool) {
+    throw new Error('Database is not configured.');
+  }
+
+  const safeFileName = String(fileName || '').trim();
+  const safeQuestions = Array.isArray(questions) ? questions : [];
+
+  const result = await pool.query(
+    `
+    INSERT INTO quiz_bank_files(file_name, questions, updated_at)
+    VALUES ($1, $2::jsonb, NOW())
+    ON CONFLICT (file_name)
+    DO UPDATE SET questions = EXCLUDED.questions, updated_at = NOW()
+    RETURNING file_name, questions;
+    `,
+    [safeFileName, JSON.stringify(safeQuestions)]
+  );
+
+  return {
+    fileName: String(result.rows?.[0]?.file_name || safeFileName),
+    questions: Array.isArray(result.rows?.[0]?.questions) ? result.rows[0].questions : safeQuestions
+  };
+};
+
 const syncRelationalMirrorsFromContentStore = async () => {
   if (!pool) {
     return;
@@ -1631,13 +1770,55 @@ const syncRelationalMirrorsFromContentStore = async () => {
   }
 };
 
+const parseJsonArrayField = (value) => {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+};
+
+const normalizeCampaignProgressItems = (value = []) => {
+  return parseJsonArrayField(value)
+    .map((item, index) => ({
+      id: String(item?.id || `progress-${Date.now()}-${index}`),
+      title: String(item?.title || '').trim(),
+      description: String(item?.description || '').trim(),
+      details: String(item?.details || '').trim(),
+      date: String(item?.date || '').trim(),
+      isActive: item?.isActive !== false,
+      photos: parseJsonArrayField(item?.photos)
+        .map((photo) => String(photo || '').trim())
+        .filter(Boolean)
+    }))
+    .filter((item) => item.title);
+};
+
 const mapCampaignRow = (row) => {
   const raised = Number(row.raised || 0);
   const target = Number(row.target || 0);
+  const progressPhotos = parseJsonArrayField(row.progress_photos);
+  const progressUpdates = parseJsonArrayField(row.progress_updates);
+  const progressItems = normalizeCampaignProgressItems(row.progress_items);
+
   return {
     id: Number(row.id),
     name: row.name,
     description: row.description || '',
+    progressTitle: row.progress_title || '',
+    progressDescription: row.progress_description || '',
+    progressPhotos: Array.isArray(progressPhotos) ? progressPhotos : [],
+    progressUpdates: Array.isArray(progressUpdates) ? progressUpdates : [],
+    progressItems,
     raised,
     target,
     isActive: row.is_active !== false,
@@ -1664,12 +1845,17 @@ const seedDonationCampaignsIfEmpty = async (seedCampaigns = []) => {
     await pool.query(
       `
       INSERT INTO donation_campaigns
-      (name, description, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
+      (name, description, progress_title, progress_description, progress_photos, progress_updates, progress_items, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key)
+      VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8, $9, $10, $11, $12, $13, $14);
       `,
       [
         String(campaign.name || '').trim(),
         String(campaign.description || '').trim(),
+        String(campaign.progressTitle || '').trim(),
+        String(campaign.progressDescription || '').trim(),
+        JSON.stringify(Array.isArray(campaign.progressPhotos) ? campaign.progressPhotos : []),
+        JSON.stringify(Array.isArray(campaign.progressUpdates) ? campaign.progressUpdates : []),
+        JSON.stringify(normalizeCampaignProgressItems(campaign.progressItems)),
         Number(campaign.raised || 0),
         Number(campaign.target || 0),
         campaign.isActive !== false,
@@ -1691,7 +1877,7 @@ const getDonationCampaigns = async () => {
 
   const result = await pool.query(
     `
-    SELECT id, name, description, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key
+    SELECT id, name, description, progress_title, progress_description, progress_photos, progress_updates, progress_items, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key
     FROM donation_campaigns
     ORDER BY created_at DESC;
     `
@@ -1708,13 +1894,18 @@ const createDonationCampaign = async (payload = {}) => {
   const result = await pool.query(
     `
     INSERT INTO donation_campaigns
-    (name, description, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    RETURNING id, name, description, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key;
+    (name, description, progress_title, progress_description, progress_photos, progress_updates, progress_items, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key)
+    VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8, $9, $10, $11, $12, $13, $14)
+    RETURNING id, name, description, progress_title, progress_description, progress_photos, progress_updates, progress_items, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key;
     `,
     [
       String(payload.name || '').trim(),
       String(payload.description || '').trim(),
+      String(payload.progressTitle || '').trim(),
+      String(payload.progressDescription || '').trim(),
+      JSON.stringify(Array.isArray(payload.progressPhotos) ? payload.progressPhotos : []),
+      JSON.stringify(Array.isArray(payload.progressUpdates) ? payload.progressUpdates : []),
+      JSON.stringify(normalizeCampaignProgressItems(payload.progressItems)),
       Number(payload.raised || 0),
       Number(payload.target || 0),
       payload.isActive !== false,
@@ -1742,6 +1933,13 @@ const updateDonationCampaign = async (id, payload = {}) => {
   const next = {
     name: payload.name ?? current.name,
     description: payload.description ?? current.description,
+    progressTitle: payload.progressTitle ?? current.progress_title,
+    progressDescription: payload.progressDescription ?? current.progress_description,
+    progressPhotos: Array.isArray(payload.progressPhotos) ? payload.progressPhotos : current.progress_photos,
+    progressUpdates: Array.isArray(payload.progressUpdates) ? payload.progressUpdates : current.progress_updates,
+    progressItems: Array.isArray(payload.progressItems)
+      ? normalizeCampaignProgressItems(payload.progressItems)
+      : normalizeCampaignProgressItems(current.progress_items),
     raised: Number(payload.raised ?? current.raised ?? 0),
     target: Number(payload.target ?? current.target ?? 0),
     isActive: typeof payload.isActive === 'boolean' ? payload.isActive : current.is_active,
@@ -1756,21 +1954,31 @@ const updateDonationCampaign = async (id, payload = {}) => {
     UPDATE donation_campaigns
     SET name = $2,
         description = $3,
-        raised = $4,
-        target = $5,
-        is_active = $6,
-        payment_provider = $7,
-        payment_link = $8,
-        stripe_buy_button_id = $9,
-        stripe_publishable_key = $10,
+        progress_title = $4,
+        progress_description = $5,
+        progress_photos = $6::jsonb,
+        progress_updates = $7::jsonb,
+        progress_items = $8::jsonb,
+        raised = $9,
+        target = $10,
+        is_active = $11,
+        payment_provider = $12,
+        payment_link = $13,
+        stripe_buy_button_id = $14,
+        stripe_publishable_key = $15,
         updated_at = NOW()
     WHERE id = $1
-    RETURNING id, name, description, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key;
+    RETURNING id, name, description, progress_title, progress_description, progress_photos, progress_updates, progress_items, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key;
     `,
     [
       id,
       String(next.name || '').trim(),
       String(next.description || '').trim(),
+      String(next.progressTitle || '').trim(),
+      String(next.progressDescription || '').trim(),
+      JSON.stringify(Array.isArray(next.progressPhotos) ? next.progressPhotos : []),
+      JSON.stringify(Array.isArray(next.progressUpdates) ? next.progressUpdates : []),
+      JSON.stringify(normalizeCampaignProgressItems(next.progressItems)),
       Number(next.raised || 0),
       Number(next.target || 0),
       next.isActive !== false,
@@ -2040,17 +2248,20 @@ const seedEventsIfEmpty = async (seedEvents = []) => {
   for (const event of seedEvents) {
     const inserted = await pool.query(
       `
-      INSERT INTO events (title, date, end_date, location, category, media_url, registrations, active)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      INSERT INTO events (title, description, date, end_date, location, category, media_url, capacity, waitlist_enabled, registrations, active)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING id;
       `,
       [
         event.title,
+        event.description || '',
         event.date,
         event.endDate || event.date,
         event.location,
         event.category,
         event.mediaUrl || '',
+        Math.max(0, Number(event.capacity || 0)),
+        event.waitlistEnabled !== false,
         Number(event.registrations || 0),
         event.active !== false
       ]
@@ -2062,13 +2273,15 @@ const seedEventsIfEmpty = async (seedEvents = []) => {
     for (const registrant of registrants) {
       await pool.query(
         `
-        INSERT INTO event_registrants (event_id, name, contact, created_at)
-        VALUES ($1, $2, $3, COALESCE($4, NOW()));
+        INSERT INTO event_registrants (event_id, name, email, contact, status, created_at)
+        VALUES ($1, $2, $3, $4, $5, COALESCE($6, NOW()));
         `,
         [
           eventId,
           registrant.name || 'Anonymous',
+          String(registrant.email || '').trim().toLowerCase(),
           registrant.contact || '',
+          String(registrant.status || 'confirmed').toLowerCase(),
           registrant.createdAt || null
         ]
       );
@@ -2078,27 +2291,56 @@ const seedEventsIfEmpty = async (seedEvents = []) => {
   return true;
 };
 
-const mapEventRow = (row, registrants = []) => ({
-  id: Number(row.id),
-  title: row.title,
-  date: row.date,
-  endDate: row.end_date,
-  location: row.location,
-  category: row.category,
-  mediaUrl: row.media_url || '',
-  registrations: Number(row.registrations || 0),
-  active: row.active !== false,
-  registrants
-});
+const isEventPast = (row = {}) => {
+  const reference = row.end_date || row.date;
+  const parsed = new Date(reference);
+  if (Number.isNaN(parsed.getTime())) {
+    return false;
+  }
+  return parsed.getTime() < Date.now();
+};
+
+const mapEventRow = (row, registrants = []) => {
+  const past = isEventPast(row);
+  const storedActive = row.active !== false;
+  const confirmedCount = registrants.filter((entry) => entry.status !== 'waitlisted').length;
+  const waitlistCount = registrants.filter((entry) => entry.status === 'waitlisted').length;
+  return {
+    id: Number(row.id),
+    title: row.title,
+    description: row.description || '',
+    date: row.date,
+    endDate: row.end_date,
+    location: row.location,
+    category: row.category,
+    mediaUrl: row.media_url || '',
+    capacity: Math.max(0, Number(row.capacity || 0)),
+    waitlistEnabled: row.waitlist_enabled !== false,
+    registrations: Number(row.registrations || confirmedCount || 0),
+    waitlistCount,
+    active: storedActive && !past,
+    registrants
+  };
+};
 
 const getEvents = async () => {
   if (!pool) {
     throw new Error('Database is not configured.');
   }
 
+  await pool.query(
+    `
+    UPDATE events
+    SET active = FALSE,
+        updated_at = NOW()
+    WHERE active = TRUE
+      AND COALESCE(end_date, date) < NOW();
+    `
+  );
+
   const eventsResult = await pool.query(
     `
-    SELECT id, title, date, end_date, location, category, media_url, registrations, active
+    SELECT id, title, description, date, end_date, location, category, media_url, capacity, waitlist_enabled, registrations, active
     FROM events
     ORDER BY date ASC;
     `
@@ -2106,7 +2348,7 @@ const getEvents = async () => {
 
   const registrantsResult = await pool.query(
     `
-    SELECT id, event_id, name, contact, created_at
+    SELECT id, event_id, name, email, contact, status, created_at
     FROM event_registrants
     ORDER BY created_at DESC;
     `
@@ -2120,11 +2362,30 @@ const getEvents = async () => {
     acc[key].push({
       id: `evt-reg-${row.id}`,
       name: row.name,
+      email: row.email || '',
       contact: row.contact || '',
+      status: String(row.status || 'confirmed').toLowerCase(),
       createdAt: row.created_at
     });
     return acc;
   }, {});
+
+  const staleActiveIds = eventsResult.rows
+    .filter((row) => row.active !== false && isEventPast(row))
+    .map((row) => Number(row.id))
+    .filter((value) => Number.isFinite(value));
+
+  if (staleActiveIds.length > 0) {
+    await pool.query(
+      `
+      UPDATE events
+      SET active = FALSE,
+          updated_at = NOW()
+      WHERE id = ANY($1::bigint[]);
+      `,
+      [staleActiveIds]
+    );
+  }
 
   return eventsResult.rows.map((row) => mapEventRow(row, registrantsByEvent[Number(row.id)] || []));
 };
@@ -2136,17 +2397,20 @@ const createEvent = async (payload) => {
 
   const result = await pool.query(
     `
-    INSERT INTO events (title, date, end_date, location, category, media_url, registrations, active)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-    RETURNING id, title, date, end_date, location, category, media_url, registrations, active;
+    INSERT INTO events (title, description, date, end_date, location, category, media_url, capacity, waitlist_enabled, registrations, active)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    RETURNING id, title, description, date, end_date, location, category, media_url, capacity, waitlist_enabled, registrations, active;
     `,
     [
       payload.title,
+      payload.description || '',
       payload.date,
       payload.endDate || payload.date,
       payload.location,
       payload.category,
       payload.mediaUrl || '',
+      Math.max(0, Number(payload.capacity || 0)),
+      payload.waitlistEnabled !== false,
       Number(payload.registrations || 0),
       payload.active !== false
     ]
@@ -2168,11 +2432,14 @@ const updateEvent = async (id, payload) => {
 
   const next = {
     title: payload.title ?? current.title,
+    description: payload.description ?? current.description ?? '',
     date: payload.date ?? current.date,
     endDate: payload.endDate ?? current.end_date,
     location: payload.location ?? current.location,
     category: payload.category ?? current.category,
     mediaUrl: payload.mediaUrl ?? current.media_url ?? '',
+    capacity: Math.max(0, Number(payload.capacity ?? current.capacity ?? 0)),
+    waitlistEnabled: typeof payload.waitlistEnabled === 'boolean' ? payload.waitlistEnabled : (current.waitlist_enabled !== false),
     registrations: Number(payload.registrations ?? current.registrations ?? 0),
     active: typeof payload.active === 'boolean' ? payload.active : current.active
   };
@@ -2181,23 +2448,26 @@ const updateEvent = async (id, payload) => {
     `
     UPDATE events
     SET title = $2,
-        date = $3,
-        end_date = $4,
-        location = $5,
-        category = $6,
-      media_url = $7,
-      registrations = $8,
-      active = $9,
+        description = $3,
+        date = $4,
+        end_date = $5,
+        location = $6,
+        category = $7,
+      media_url = $8,
+      capacity = $9,
+      waitlist_enabled = $10,
+      registrations = $11,
+      active = $12,
         updated_at = NOW()
     WHERE id = $1
-    RETURNING id, title, date, end_date, location, category, media_url, registrations, active;
+    RETURNING id, title, description, date, end_date, location, category, media_url, capacity, waitlist_enabled, registrations, active;
     `,
-    [id, next.title, next.date, next.endDate, next.location, next.category, next.mediaUrl, next.registrations, next.active]
+    [id, next.title, next.description, next.date, next.endDate, next.location, next.category, next.mediaUrl, next.capacity, next.waitlistEnabled, next.registrations, next.active]
   );
 
   const registrantsResult = await pool.query(
     `
-    SELECT id, event_id, name, contact, created_at
+    SELECT id, event_id, name, email, contact, status, created_at
     FROM event_registrants
     WHERE event_id = $1
     ORDER BY created_at DESC;
@@ -2208,7 +2478,9 @@ const updateEvent = async (id, payload) => {
   const registrants = registrantsResult.rows.map((row) => ({
     id: `evt-reg-${row.id}`,
     name: row.name,
+    email: row.email || '',
     contact: row.contact || '',
+    status: String(row.status || 'confirmed').toLowerCase(),
     createdAt: row.created_at
   }));
 
@@ -2224,28 +2496,102 @@ const removeEvent = async (id) => {
   return { success: true };
 };
 
-const registerForEvent = async ({ eventId, name, contact }) => {
+const registerForEvent = async ({ eventId, name, contact, email }) => {
   if (!pool) {
     throw new Error('Database is not configured.');
   }
 
-  await pool.query(
+  const eventResult = await pool.query(
     `
-    INSERT INTO event_registrants (event_id, name, contact)
-    VALUES ($1, $2, $3);
-    `,
-    [eventId, name || 'Anonymous', contact || '']
-  );
-
-  await pool.query(
-    `
-    UPDATE events
-    SET registrations = registrations + 1,
-        updated_at = NOW()
-    WHERE id = $1;
+    SELECT id, date, end_date, active, capacity, waitlist_enabled
+    FROM events
+    WHERE id = $1
+    LIMIT 1;
     `,
     [eventId]
   );
+
+  const event = eventResult.rows?.[0];
+  if (!event) {
+    const error = new Error('Event not found.');
+    error.status = 404;
+    throw error;
+  }
+
+  if (event.active === false || isEventPast(event)) {
+    const error = new Error('This event is no longer open for RSVP.');
+    error.status = 409;
+    throw error;
+  }
+
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const normalizedContact = String(contact || '').trim().toLowerCase();
+  const duplicateKey = normalizedEmail || normalizedContact;
+
+  if (!duplicateKey) {
+    const error = new Error('Please provide an email or contact value.');
+    error.status = 400;
+    throw error;
+  }
+
+  const duplicateResult = await pool.query(
+    `
+    SELECT id
+    FROM event_registrants
+    WHERE event_id = $1
+      AND LOWER(COALESCE(NULLIF(email, ''), contact, '')) = $2
+    LIMIT 1;
+    `,
+    [eventId, duplicateKey]
+  );
+
+  if (duplicateResult.rowCount > 0) {
+    const error = new Error('You have already registered for this event.');
+    error.status = 409;
+    throw error;
+  }
+
+  const capacity = Math.max(0, Number(event.capacity || 0));
+  const waitlistEnabled = event.waitlist_enabled !== false;
+  const confirmedCountResult = await pool.query(
+    `
+    SELECT COUNT(*)::int AS count
+    FROM event_registrants
+    WHERE event_id = $1
+      AND status = 'confirmed';
+    `,
+    [eventId]
+  );
+  const confirmedCount = Number(confirmedCountResult.rows?.[0]?.count || 0);
+  const status = capacity > 0 && confirmedCount >= capacity
+    ? (waitlistEnabled ? 'waitlisted' : '')
+    : 'confirmed';
+
+  if (!status) {
+    const error = new Error('Event capacity has been reached.');
+    error.status = 409;
+    throw error;
+  }
+
+  await pool.query(
+    `
+    INSERT INTO event_registrants (event_id, name, email, contact, status)
+    VALUES ($1, $2, $3, $4, $5);
+    `,
+    [eventId, name || 'Anonymous', normalizedEmail, String(contact || '').trim(), status]
+  );
+
+  if (status === 'confirmed') {
+    await pool.query(
+      `
+      UPDATE events
+      SET registrations = registrations + 1,
+          updated_at = NOW()
+      WHERE id = $1;
+      `,
+      [eventId]
+    );
+  }
 
   const rows = await getEvents();
   return rows.find((entry) => entry.id === Number(eventId)) || null;
@@ -2262,12 +2608,12 @@ const removeEventRegistrant = async ({ eventId, registrantId }) => {
     `
     DELETE FROM event_registrants
     WHERE id = $1 AND event_id = $2
-    RETURNING id;
+    RETURNING id, status;
     `,
     [numericRegistrantId, eventId]
   );
 
-  if (deleteResult.rowCount > 0) {
+  if (deleteResult.rowCount > 0 && deleteResult.rows[0]?.status === 'confirmed') {
     await pool.query(
       `
       UPDATE events
@@ -2277,6 +2623,34 @@ const removeEventRegistrant = async ({ eventId, registrantId }) => {
       `,
       [eventId]
     );
+
+    const promoteResult = await pool.query(
+      `
+      UPDATE event_registrants
+      SET status = 'confirmed'
+      WHERE id = (
+        SELECT id
+        FROM event_registrants
+        WHERE event_id = $1 AND status = 'waitlisted'
+        ORDER BY created_at ASC
+        LIMIT 1
+      )
+      RETURNING id;
+      `,
+      [eventId]
+    );
+
+    if (promoteResult.rowCount > 0) {
+      await pool.query(
+        `
+        UPDATE events
+        SET registrations = registrations + 1,
+            updated_at = NOW()
+        WHERE id = $1;
+        `,
+        [eventId]
+      );
+    }
   }
 
   const rows = await getEvents();
@@ -2295,6 +2669,9 @@ module.exports = {
   createItem,
   updateItem,
   removeItem,
+  listQuizBankFiles,
+  getQuizBankFile,
+  upsertQuizBankFile,
   getDonationCampaigns,
   createDonationCampaign,
   updateDonationCampaign,

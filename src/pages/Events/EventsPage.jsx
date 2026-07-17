@@ -7,7 +7,7 @@ import 'react-calendar/dist/Calendar.css';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
 import enUS from 'date-fns/locale/en-US';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import PageHero from '../../components/common/PageHero';
 import eventService from '../../services/eventService';
 import useSeoMeta from '../../hooks/useSeoMeta';
@@ -15,6 +15,10 @@ import Seo from '../../components/common/Seo';
 import Button from '../../components/ui/Button';
 import cmsService from '../../services/cmsService';
 import advertisementService from '../../services/advertisementService';
+import { useAuth } from '../../context/AuthContext';
+import contentApiService from '../../services/contentApiService';
+
+const EVENTS_IDENTITY_SETTING_KEY = 'settings-events-allow-custom-name-email';
 
 const locales = { 'en-US': enUS };
 const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales });
@@ -41,7 +45,23 @@ const EventsPage = () => {
   const [overflowEventsModal, setOverflowEventsModal] = useState({ open: false, date: null, events: [] });
   const deepLinkOpenedRef = useRef('');
   const queryClient = useQueryClient();
-  const registrationForm = useForm({ defaultValues: { name: '', contact: '' } });
+  const { user, isAuthenticated } = useAuth();
+  const registrationDefaults = useMemo(() => ({
+    name: String(user?.name || ''),
+    email: String(user?.email || ''),
+    contact: String(user?.phone || '')
+  }), [user?.email, user?.name, user?.phone]);
+  const registrationForm = useForm({ defaultValues: { name: '', email: '', contact: '' } });
+  const { data: eventsIdentitySettings = { enabled: false } } = useQuery({
+    queryKey: [EVENTS_IDENTITY_SETTING_KEY],
+    queryFn: () => contentApiService.getSingleton(EVENTS_IDENTITY_SETTING_KEY, { enabled: false })
+  });
+
+  const profilePhoneMissing = !String(user?.phone || '').trim();
+  const identityLocked = !Boolean(eventsIdentitySettings?.enabled);
+  const currentUserEmail = String(user?.email || '').trim().toLowerCase();
+  const currentUserPhone = String(user?.phone || '').trim().toLowerCase();
+  const currentUserName = String(user?.name || '').trim().toLowerCase();
   const { data: events = [] } = useQuery({ queryKey: ['events'], queryFn: () => eventService.getEvents().then((res) => res.data) });
   const { data: content } = useQuery({
     queryKey: ['page-content', 'events'],
@@ -56,23 +76,69 @@ const EventsPage = () => {
   const eventsFooterAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Events Footer Banner').slice(0, 2), [ads]);
 
   const registrationMutation = useMutation({
-    mutationFn: (values) => eventService.registerForEvent({
-      eventId: selectedEvent?.id,
-      name: values.name,
-      contact: values.contact
-    }),
-    onSuccess: () => {
+    mutationFn: (values) => {
+      if (!isAuthenticated) {
+        throw new Error('Please sign in to register for events.');
+      }
+      if (profilePhoneMissing) {
+        throw new Error('Please add your phone number in profile before registering for events.');
+      }
+
+      const inputEmail = String(values?.email || '').trim().toLowerCase();
+      const inputContact = String(values?.contact || '').trim().toLowerCase();
+      const inputName = String(values?.name || '').trim().toLowerCase();
+      const existingRegistrants = Array.isArray(selectedEvent?.registrants) ? selectedEvent.registrants : [];
+      const alreadyRegistered = existingRegistrants.some((entry) => {
+        const entryEmail = String(entry.email || '').trim().toLowerCase();
+        const entryContact = String(entry.contact || '').trim().toLowerCase();
+        const entryName = String(entry.name || '').trim().toLowerCase();
+        return (inputEmail && entryEmail === inputEmail)
+          || (inputContact && entryContact === inputContact)
+          || (inputName && entryName === inputName);
+      });
+
+      if (alreadyRegistered) {
+        throw new Error('You have already registered for this event.');
+      }
+
+      return eventService.registerForEvent({
+        eventId: selectedEvent?.id,
+        name: values.name,
+        email: values.email,
+        contact: values.contact
+      });
+    },
+    onSuccess: (updatedEvent, values) => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
       queryClient.invalidateQueries({ queryKey: ['admin-events'] });
-      registrationForm.reset({ name: '', contact: '' });
+      registrationForm.reset(registrationDefaults);
+
+      const latestRegistrant = (updatedEvent?.registrants || []).find((entry) => {
+        const entryEmail = String(entry.email || '').trim().toLowerCase();
+        const entryContact = String(entry.contact || '').trim().toLowerCase();
+        const inputEmail = String(values?.email || '').trim().toLowerCase();
+        const inputContact = String(values?.contact || '').trim().toLowerCase();
+        return (inputEmail && entryEmail === inputEmail) || (inputContact && entryContact === inputContact);
+      });
+
       setSelectedEvent(null);
+      if (latestRegistrant?.status === 'waitlisted') {
+        window.alert('Capacity is full. You were added to the waitlist.');
+        return;
+      }
+
       window.alert('Registration saved successfully.');
     }
   });
 
+  const activeEvents = useMemo(
+    () => events.filter((event) => event.active !== false),
+    [events]
+  );
+
   const filtered = useMemo(
-    () => (category === 'All' ? events : events.filter((event) => event.category === category)),
-    [events, category]
+    () => (category === 'All' ? activeEvents : activeEvents.filter((event) => event.category === category)),
+    [activeEvents, category]
   );
 
   const calendarEvents = useMemo(() => filtered.map((event) => {
@@ -85,16 +151,37 @@ const EventsPage = () => {
     return {
       id: event.id,
       title: event.title,
+      description: event.description || '',
       category: event.category,
       location: event.location,
       mediaUrl: event.mediaUrl || '',
       registrations: event.registrations,
+      capacity: Number(event.capacity || 0),
+      waitlistEnabled: event.waitlistEnabled !== false,
+      waitlistCount: Number(event.waitlistCount || 0),
+      registrants: Array.isArray(event.registrants) ? event.registrants : [],
       date: event.date,
       endDate: event.endDate,
       start: startDate,
       end: endDate
     };
   }), [filtered]);
+
+  const isAlreadyRegisteredForSelectedEvent = useMemo(() => {
+    if (!isAuthenticated || !selectedEvent) {
+      return false;
+    }
+
+    const registrants = Array.isArray(selectedEvent.registrants) ? selectedEvent.registrants : [];
+    return registrants.some((entry) => {
+      const entryEmail = String(entry.email || '').trim().toLowerCase();
+      const entryContact = String(entry.contact || '').trim().toLowerCase();
+      const entryName = String(entry.name || '').trim().toLowerCase();
+      return (currentUserEmail && (entryEmail === currentUserEmail || entryContact === currentUserEmail))
+        || (currentUserPhone && entryContact === currentUserPhone)
+        || (currentUserName && entryName === currentUserName);
+    });
+  }, [currentUserEmail, currentUserName, currentUserPhone, isAuthenticated, selectedEvent]);
 
   const selectedDateEvents = useMemo(() => {
     const selectedDay = selectedDate.toDateString();
@@ -155,6 +242,10 @@ const EventsPage = () => {
       <p className="truncate font-bold tracking-tight">{truncateEventTitle(event.title)}</p>
     </div>
   );
+
+  useEffect(() => {
+    registrationForm.reset(registrationDefaults);
+  }, [registrationDefaults, registrationForm]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search || '');
@@ -340,8 +431,9 @@ const EventsPage = () => {
       </div>
 
       {overflowEventsModal.open ? (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/45 px-4">
-          <div className="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-xl">
+        <div className="fixed inset-0 z-[90] overflow-y-auto bg-slate-900/45 px-4 py-4">
+          <div className="mx-auto flex min-h-full items-center justify-center">
+          <div className="w-full max-w-2xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl bg-white p-4 shadow-xl sm:p-5">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="font-heading text-xl font-semibold text-slate-900">All Events on {format(new Date(overflowEventsModal.date), 'EEEE, MMM d')}</h3>
@@ -366,42 +458,111 @@ const EventsPage = () => {
               ))}
             </div>
           </div>
+          </div>
         </div>
       ) : null}
 
       {selectedEvent ? (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/45 px-4">
-          <div className="w-full max-w-4xl rounded-2xl bg-white p-5 shadow-xl">
+        <div className="fixed inset-0 z-[90] overflow-y-auto bg-slate-900/45 px-4 py-4">
+          <div className="mx-auto flex min-h-full items-center justify-center">
+          <div className="w-full max-w-4xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl bg-white p-4 shadow-xl sm:p-5">
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-heading text-2xl font-semibold text-slate-900">Event Details and Registration</h3>
               <button type="button" onClick={() => setSelectedEvent(null)} className="rounded-md border border-slate-300 px-3 py-1 text-sm">Close</button>
             </div>
 
+            <div className="mt-3 border-b border-slate-200" />
+
+            <div className="mt-3 pt-2 flex flex-wrap items-center gap-2 text-sm text-slate-700">
+              <span className="inline-flex items-center gap-1 rounded-full border border-brand-blue/25 bg-brand-blue px-3 py-1 text-xs font-extrabold tracking-wide text-white shadow-sm">
+                {selectedEvent.category || 'Event'}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-100 px-3 py-1 text-xs font-bold text-indigo-900 shadow-sm">
+                <span className="font-extrabold text-indigo-900">Date:</span>
+                {new Date(selectedEvent.date).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' })}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-900 shadow-sm">
+                <span className="font-extrabold text-emerald-900">Time:</span>
+                {new Date(selectedEvent.date).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })}
+                {' - '}
+                {new Date(selectedEvent.endDate || selectedEvent.end).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900 shadow-sm">
+                <span className="font-extrabold text-amber-900">Location:</span>
+                {selectedEvent.location || 'Location TBD'}
+              </span>
+            </div>
+
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-brand-blue">{selectedEvent.category}</p>
                 <h4 className="mt-1 font-heading text-xl font-semibold text-slate-900">{selectedEvent.title}</h4>
+                <p className="mt-2 text-sm leading-relaxed text-slate-700">
+                  {selectedEvent.description || 'No description provided for this event yet.'}
+                </p>
                 {selectedEvent.mediaUrl ? <img src={selectedEvent.mediaUrl} alt={selectedEvent.title || 'Event media'} className="mt-3 h-44 w-full rounded-lg object-cover" loading="lazy" /> : null}
-                <p className="mt-2 text-sm text-slate-700">Date: {new Date(selectedEvent.date).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
-                <p className="text-sm text-slate-700">Time: {new Date(selectedEvent.date).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })}</p>
-                <p className="text-sm text-slate-700">End Time: {new Date(selectedEvent.endDate || selectedEvent.end).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })}</p>
-                <p className="text-sm text-slate-700">Location: {selectedEvent.location}</p>
-                <p className="mt-2 text-sm font-semibold text-brand-green">Registered persons: {selectedEvent.registrations || 0}</p>
               </section>
 
               <section className="rounded-xl border border-slate-200 p-4">
-                <h4 className="font-heading text-lg font-semibold text-slate-900">Register for This Event</h4>
-                <form className="mt-3 space-y-3" onSubmit={registrationForm.handleSubmit((values) => registrationMutation.mutate(values))}>
-                  <label className="text-sm">Name
-                    <input {...registrationForm.register('name', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-                  </label>
-                  <label className="text-sm">Contact
-                    <input {...registrationForm.register('contact', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-                  </label>
-                  <Button type="submit" className="w-full" disabled={registrationMutation.isPending}>{registrationMutation.isPending ? 'Saving...' : 'Save Registration'}</Button>
-                </form>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <h4 className="font-heading text-lg font-semibold text-slate-900">Register for This Event</h4>
+                  <div className="text-right text-sm font-semibold text-brand-green">
+                    <p>Total Registrations: {selectedEvent.registrations || 0}</p>
+                    {selectedEvent.capacity > 0 ? (
+                      <p className="text-xs text-slate-600">
+                        Capacity: {selectedEvent.capacity} • Spots left: {Math.max(0, selectedEvent.capacity - Number(selectedEvent.registrations || 0))}
+                      </p>
+                    ) : null}
+                    {selectedEvent.waitlistEnabled ? <p className="text-xs text-amber-700">Waitlist: {selectedEvent.waitlistCount || 0}</p> : null}
+                  </div>
+                </div>
+                {!isAuthenticated ? (
+                  <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    Please <Link to="/login?next=/events" className="font-bold underline">sign in</Link> to register for this event.
+                  </p>
+                ) : (
+                  <form className="mt-3 space-y-3" onSubmit={registrationForm.handleSubmit((values) => registrationMutation.mutate(values))}>
+                    {profilePhoneMissing ? (
+                      <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                        Add your phone number in profile before registering for any event.
+                      </p>
+                    ) : null}
+                    {isAlreadyRegisteredForSelectedEvent ? (
+                      <p className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800">
+                        You have already registered for this.
+                      </p>
+                    ) : null}
+                    <label className="text-sm">Name
+                      <input
+                        {...registrationForm.register('name', { required: true })}
+                        readOnly={identityLocked}
+                        className={`mt-1 w-full rounded-lg border border-slate-300 p-2.5 ${identityLocked ? 'bg-slate-100 font-extrabold text-base text-slate-900' : ''}`}
+                      />
+                    </label>
+                    <label className="text-sm">Email
+                      <input
+                        type="email"
+                        {...registrationForm.register('email', { required: true })}
+                        readOnly={identityLocked}
+                        className={`mt-1 w-full rounded-lg border border-slate-300 p-2.5 ${identityLocked ? 'bg-slate-100 font-extrabold text-base text-slate-900' : ''}`}
+                      />
+                    </label>
+                    <label className="text-sm">Contact
+                      <input {...registrationForm.register('contact', { required: true })} readOnly className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-100 p-2.5 text-base font-extrabold text-slate-900" />
+                    </label>
+                    <Button type="submit" className="w-full" disabled={registrationMutation.isPending || profilePhoneMissing || isAlreadyRegisteredForSelectedEvent}>
+                      {registrationMutation.isPending
+                        ? 'Saving...'
+                        : isAlreadyRegisteredForSelectedEvent
+                          ? 'You have already registered for this'
+                        : (selectedEvent.capacity > 0 && Number(selectedEvent.registrations || 0) >= selectedEvent.capacity && selectedEvent.waitlistEnabled
+                          ? 'Join Waitlist'
+                          : 'Save Registration')}
+                    </Button>
+                  </form>
+                )}
               </section>
             </div>
+          </div>
           </div>
         </div>
       ) : null}
