@@ -98,7 +98,7 @@ const buildDailySeries = ({ users, donations, events, volunteerApplications }) =
 const AdminAnalyticsPage = () => {
   const { data: users = [] } = useQuery({ queryKey: ['admin-users'], queryFn: () => userService.getUsers().then((res) => res.data) });
   const { data: donations = [] } = useQuery({ queryKey: ['admin-donations'], queryFn: () => donationService.getDonations().then((res) => res.data) });
-  const { data: events = [] } = useQuery({ queryKey: ['events'], queryFn: () => eventService.getEvents().then((res) => res.data) });
+  const { data: events = [] } = useQuery({ queryKey: ['events', 'admin'], queryFn: () => eventService.getEvents({ includeInactive: true }).then((res) => res.data) });
   const { data: volunteerApplications = [] } = useQuery({ queryKey: ['admin-volunteers'], queryFn: () => volunteerService.getApplications().then((res) => res.data) });
 
   const trend = useMemo(

@@ -165,6 +165,8 @@ const normalizeProgramUpdate = (entry = {}, index = 0) => ({
   speaker: entry.speaker || '',
   audience: entry.audience || '',
   scheduleDate: entry.scheduleDate || '',
+  scheduleStartTime: entry.scheduleStartTime || '',
+  scheduleEndTime: entry.scheduleEndTime || '',
   scheduleTime: entry.scheduleTime || '',
   location: entry.location || '',
   summary: entry.summary || '',
@@ -174,7 +176,57 @@ const normalizeProgramUpdate = (entry = {}, index = 0) => ({
   updatedAt: entry.updatedAt || new Date().toISOString()
 });
 
-const parseScheduleDateTime = (scheduleDate = '', scheduleTime = '') => {
+const normalizeTimeValue = (value = '') => {
+  const match = String(value || '').trim().match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  if (!match) {
+    return '';
+  }
+  return `${match[1]}:${match[2]}`;
+};
+
+const parseTimeLabelTo24h = (value = '') => {
+  const normalized24 = normalizeTimeValue(value);
+  if (normalized24) {
+    return normalized24;
+  }
+
+  const match = String(value || '').trim().toUpperCase().match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/);
+  if (!match) {
+    return '';
+  }
+
+  let hour = Number(match[1]);
+  const minute = Number(match[2] || '0');
+  const meridiem = match[3];
+  if (Number.isNaN(hour) || Number.isNaN(minute) || hour < 1 || hour > 12 || minute < 0 || minute > 59) {
+    return '';
+  }
+
+  if (meridiem === 'PM' && hour < 12) {
+    hour += 12;
+  }
+  if (meridiem === 'AM' && hour === 12) {
+    hour = 0;
+  }
+
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+};
+
+const addMinutesToTime = (timeValue = '', minutesToAdd = 60) => {
+  const normalized = normalizeTimeValue(timeValue);
+  if (!normalized) {
+    return '19:00';
+  }
+
+  const [hourText, minuteText] = normalized.split(':');
+  const baseMinutes = (Number(hourText) * 60) + Number(minuteText);
+  const nextMinutes = ((baseMinutes + Number(minutesToAdd || 0)) % (24 * 60) + (24 * 60)) % (24 * 60);
+  const nextHour = Math.floor(nextMinutes / 60);
+  const nextMinute = nextMinutes % 60;
+  return `${String(nextHour).padStart(2, '0')}:${String(nextMinute).padStart(2, '0')}`;
+};
+
+const parseScheduleDateTime = (scheduleDate = '', scheduleTime = '', scheduleStartTime = '', scheduleEndTime = '') => {
   const safeDate = String(scheduleDate || '').trim();
   const fallback = new Date();
 
@@ -186,35 +238,42 @@ const parseScheduleDateTime = (scheduleDate = '', scheduleTime = '') => {
     };
   }
 
-  const timeLabel = String(scheduleTime || '').trim().toUpperCase();
-  const timeMatch = timeLabel.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$/);
-  let hour = 18;
-  let minute = 0;
+  let startTime = normalizeTimeValue(scheduleStartTime);
+  let endTime = normalizeTimeValue(scheduleEndTime);
 
-  if (timeMatch) {
-    hour = Number(timeMatch[1]) || 18;
-    minute = Number(timeMatch[2] || '0') || 0;
-    const meridiem = timeMatch[3] || '';
-    if (meridiem === 'PM' && hour < 12) {
-      hour += 12;
-    }
-    if (meridiem === 'AM' && hour === 12) {
-      hour = 0;
-    }
-    if (!meridiem) {
-      hour = Math.max(0, Math.min(23, hour));
+  if (!startTime) {
+    const raw = String(scheduleTime || '').trim();
+    if (raw) {
+      const parts = raw.split(/\s*(?:-|–|to)\s*/i).filter(Boolean);
+      startTime = parseTimeLabelTo24h(parts[0] || raw);
+      if (!endTime) {
+        endTime = parseTimeLabelTo24h(parts[1] || '');
+      }
     }
   }
 
-  const startIso = new Date(`${safeDate}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`).toISOString();
-  const endIso = new Date(new Date(startIso).getTime() + 60 * 60 * 1000).toISOString();
+  if (!startTime) {
+    startTime = '18:00';
+  }
+  if (!endTime) {
+    endTime = addMinutesToTime(startTime, 60);
+  }
+
+  const startIso = new Date(`${safeDate}T${startTime}:00`).toISOString();
+  const endIso = new Date(`${safeDate}T${endTime}:00`).toISOString();
   return { startIso, endIso };
 };
 
 const toLinkedEventPayload = (entry) => {
-  const { startIso, endIso } = parseScheduleDateTime(entry.scheduleDate, entry.scheduleTime);
+  const { startIso, endIso } = parseScheduleDateTime(
+    entry.scheduleDate,
+    entry.scheduleTime,
+    entry.scheduleStartTime,
+    entry.scheduleEndTime
+  );
   return {
     title: String(entry.title || 'Library Session').trim(),
+    description: String(entry.summary || '').trim(),
     date: startIso,
     endDate: endIso,
     location: String(entry.location || 'Library Hall, Singh Sabha Milton').trim(),

@@ -102,6 +102,22 @@ const HomePage = () => {
   const previousSelectedContentTypeRef = useRef(null);
 
   const tickerItems = useMemo(() => (events.length > 0 ? events : []), [events]);
+  const tickerLoopItems = useMemo(() => {
+    if (tickerItems.length === 0) {
+      return [];
+    }
+
+    // Ensure each repeated ticker segment is long enough to avoid visible dead space.
+    const minimumCardsPerSegment = 10;
+    const repeatCount = Math.max(1, Math.ceil(minimumCardsPerSegment / tickerItems.length));
+
+    return Array.from({ length: repeatCount }, (_, repeatIndex) => (
+      tickerItems.map((event) => ({
+        ...event,
+        _tickerLoopKey: `${repeatIndex}-${event.id}`
+      }))
+    )).flat();
+  }, [tickerItems]);
   const latestArticle = useMemo(
     () => (newsArticles || []).find((article) => newsService.isLiveArticle(article)) || null,
     [newsArticles]
@@ -282,9 +298,9 @@ const HomePage = () => {
         <div className="ticker-track">
           {[0, 1].map((groupIndex) => (
             <div key={groupIndex} className="ticker-group">
-              {tickerItems.map((event) => (
+              {tickerLoopItems.map((event) => (
                 <button
-                  key={`${groupIndex}-${event.id}`}
+                  key={`${groupIndex}-${event._tickerLoopKey}`}
                   type="button"
                   className="ticker-item ticker-item-home mx-1 inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white/95 px-3 py-1 text-xs font-black uppercase tracking-wide text-slate-900 transition hover:-translate-y-0.5 hover:bg-slate-200 hover:text-slate-900"
                   onClick={() => setSelectedTickerEvent(event)}

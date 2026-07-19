@@ -9,11 +9,11 @@ import Button from '../../components/ui/Button';
 import gurdwaraLogo from '../../assets/gurdwara-logo.webp';
 import donationService from '../../services/donationService';
 import advertisementService from '../../services/advertisementService';
+import contentApiService from '../../services/contentApiService';
 import { formatCurrency } from '../../utils/formatters';
 import useSeoMeta from '../../hooks/useSeoMeta';
 import Seo from '../../components/common/Seo';
 import { useAuth } from '../../context/AuthContext';
-import contentApiService from '../../services/contentApiService';
 
 const DONATION_IDENTITY_SETTING_KEY = 'settings-donation-allow-custom-name-email';
 
@@ -51,6 +51,7 @@ const DonationPage = () => {
     const params = new URLSearchParams(location.search || '');
     return String(params.get('campaignId') || '').trim();
   }, [location.search]);
+  const allowIdentityOverride = Boolean(donationIdentitySettings?.enabled);
   const profilePhoneMissing = !String(user?.phone || '').trim();
 
   const openStripePopup = (checkoutUrl) => {
@@ -104,8 +105,12 @@ const DonationPage = () => {
       if (!isAuthenticated) {
         throw new Error('Please sign in before donating.');
       }
-      if (profilePhoneMissing) {
+      const suppliedPhone = String(payload?.donorPhone || '').trim();
+      if (!allowIdentityOverride && profilePhoneMissing) {
         throw new Error('Please add your phone number in profile before donating.');
+      }
+      if (allowIdentityOverride && !suppliedPhone) {
+        throw new Error('Please provide your phone number before donating.');
       }
 
       return donationService.initiateDonation(payload);
@@ -179,7 +184,7 @@ const DonationPage = () => {
 
             {!isAuthenticated ? (
               <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                Please <Link to="/login?next=/donation" className="font-bold underline">sign in</Link> to continue with donation.
+                Please <Link to={`/login?next=${encodeURIComponent(`${location.pathname}${location.search || ''}`)}`} state={{ from: { pathname: location.pathname, search: location.search } }} className="font-bold underline">sign in</Link> to continue with donation.
               </p>
             ) : null}
             {isAuthenticated && openCampaigns.length === 0 ? (
@@ -190,7 +195,7 @@ const DonationPage = () => {
                 <DonationForm
                   key={formResetKey}
                   onSubmit={(values) => {
-                    if (profilePhoneMissing) {
+                    if (!allowIdentityOverride && profilePhoneMissing) {
                       setStatusMessage('Please update your profile phone number before donating.');
                       return;
                     }
@@ -203,12 +208,12 @@ const DonationPage = () => {
                   campaigns={openCampaigns}
                   user={user}
                   preferredCampaignId={preferredCampaignId}
-                  allowNameEmailEdit={Boolean(donationIdentitySettings?.enabled)}
+                  showIdentityFields={allowIdentityOverride}
                   submitLabel="Secure Payment"
                 />
               </div>
             ) : null}
-            {isAuthenticated && profilePhoneMissing ? (
+            {isAuthenticated && profilePhoneMissing && !allowIdentityOverride ? (
               <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                 Add your phone number in profile before donating.
               </p>

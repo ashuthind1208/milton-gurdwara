@@ -134,7 +134,7 @@ const authService = {
       role: assignedRole,
       memberType: existingMemberType,
       authProvider: 'GOOGLE',
-      avatarUrl: avatarUrl || existingUser?.avatarUrl || existingUser?.picture || existingUser?.photoURL,
+      avatarUrl: existingUser?.avatarUrl || avatarUrl || existingUser?.picture || existingUser?.photoURL,
       phone: existingUser?.phone || '',
       address: existingUser?.address || '',
       registrationComplete: policy.registrationComplete,

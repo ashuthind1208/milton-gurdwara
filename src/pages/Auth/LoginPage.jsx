@@ -27,7 +27,8 @@ const getApprovalMessage = (user, role) => {
 };
 
 const resolvePostLoginPath = (candidatePath, role) => {
-  const safeCandidate = candidatePath && candidatePath !== '/login' ? candidatePath : '';
+  const normalizedCandidate = String(candidatePath || '').trim();
+  const safeCandidate = normalizedCandidate && normalizedCandidate !== '/login' && normalizedCandidate.startsWith('/') ? normalizedCandidate : '';
   if (safeCandidate.startsWith('/admin') && !role) {
     return '/';
   }
@@ -49,11 +50,13 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const fromPath = location.state?.from?.pathname || '';
+  const fromPathname = String(location.state?.from?.pathname || '').trim();
+  const fromSearch = String(location.state?.from?.search || '').trim();
+  const fromPath = fromPathname ? `${fromPathname}${fromSearch}` : '';
   const accessNotice = location.state?.accessNotice || '';
   const searchParams = new URLSearchParams(location.search || '');
   const modeParam = String(searchParams.get('mode') || '').toLowerCase();
-  const nextPath = searchParams.get('next') || '';
+  const nextPath = String(searchParams.get('next') || '').trim();
   const allowMockGoogleLogin = process.env.REACT_APP_ALLOW_MOCK_GOOGLE_LOGIN === 'true';
 
   const preferredPath = fromPath || nextPath;

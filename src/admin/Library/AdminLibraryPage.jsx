@@ -5,12 +5,14 @@ import { EllipsisVerticalIcon, EyeIcon, MagnifyingGlassIcon, PencilSquareIcon, T
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import libraryService from '../../services/libraryService';
+import uploadService from '../../services/uploadService';
 import { getYouTubeEmbedUrl, getYouTubeThumbnail } from '../../services/videoService';
 import { siteConfig } from '../../constants/siteConfig';
 import { downloadRegistrationCsv, downloadRegistrationPdf } from '../../utils/csvExport';
 
 const actionIconClass = 'h-4 w-4';
 const PAGE_SIZE = 10;
+const AUDIENCE_PRESETS = ['Kids (Ages 6-12)', 'Teens', 'Adults', 'Seniors', 'Families', 'Open to all', 'Youth'];
 
 const emptyPhysicalForm = {
   title: '',
@@ -35,6 +37,8 @@ const emptyProgramForm = {
   speaker: '',
   audience: '',
   scheduleDate: '',
+  scheduleStartTime: '18:00',
+  scheduleEndTime: '19:00',
   scheduleTime: '',
   location: '',
   summary: '',
@@ -87,6 +91,101 @@ const Pagination = ({ page, total, onChange }) => {
   );
 };
 
+const normalizeTimeValue = (value = '') => {
+  const match = String(value || '').trim().match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  if (!match) {
+    return '';
+  }
+  return `${match[1]}:${match[2]}`;
+};
+
+const toTwelveHourLabel = (value = '') => {
+  const normalized = normalizeTimeValue(value);
+  if (!normalized) {
+    return '';
+  }
+
+  const [hourText, minuteText] = normalized.split(':');
+  const hour = Number(hourText);
+  const meridiem = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+  return `${displayHour}:${minuteText} ${meridiem}`;
+};
+
+const parseTimeLabelTo24h = (value = '') => {
+  const normalized24 = normalizeTimeValue(value);
+  if (normalized24) {
+    return normalized24;
+  }
+
+  const match = String(value || '').trim().toUpperCase().match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/);
+  if (!match) {
+    return '';
+  }
+
+  let hour = Number(match[1]);
+  const minute = Number(match[2] || '0');
+  const meridiem = match[3];
+  if (Number.isNaN(hour) || Number.isNaN(minute) || hour < 1 || hour > 12 || minute < 0 || minute > 59) {
+    return '';
+  }
+
+  if (meridiem === 'PM' && hour < 12) {
+    hour += 12;
+  }
+  if (meridiem === 'AM' && hour === 12) {
+    hour = 0;
+  }
+
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+};
+
+const addMinutesToTime = (timeValue = '', minutesToAdd = 60) => {
+  const normalized = normalizeTimeValue(timeValue);
+  if (!normalized) {
+    return '19:00';
+  }
+
+  const [hourText, minuteText] = normalized.split(':');
+  const baseMinutes = (Number(hourText) * 60) + Number(minuteText);
+  const nextMinutes = ((baseMinutes + Number(minutesToAdd || 0)) % (24 * 60) + (24 * 60)) % (24 * 60);
+  const nextHour = Math.floor(nextMinutes / 60);
+  const nextMinute = nextMinutes % 60;
+  return `${String(nextHour).padStart(2, '0')}:${String(nextMinute).padStart(2, '0')}`;
+};
+
+const deriveProgramTimes = (entry = {}) => {
+  const directStart = normalizeTimeValue(entry?.scheduleStartTime || '');
+  const directEnd = normalizeTimeValue(entry?.scheduleEndTime || '');
+  if (directStart && directEnd) {
+    return { scheduleStartTime: directStart, scheduleEndTime: directEnd };
+  }
+
+  const raw = String(entry?.scheduleTime || '').trim();
+  if (raw) {
+    const parts = raw.split(/\s*(?:-|–|to)\s*/i).filter(Boolean);
+    const parsedStart = parseTimeLabelTo24h(parts[0] || raw);
+    const parsedEnd = parseTimeLabelTo24h(parts[1] || '');
+    if (parsedStart) {
+      return {
+        scheduleStartTime: parsedStart,
+        scheduleEndTime: parsedEnd || addMinutesToTime(parsedStart, 60)
+      };
+    }
+  }
+
+  return { scheduleStartTime: '18:00', scheduleEndTime: '19:00' };
+};
+
+const buildScheduleTimeLabel = (startTime = '', endTime = '') => {
+  const startLabel = toTwelveHourLabel(startTime);
+  const endLabel = toTwelveHourLabel(endTime);
+  if (startLabel && endLabel) {
+    return `${startLabel} - ${endLabel}`;
+  }
+  return startLabel || endLabel || '';
+};
+
 const AdminLibraryPage = () => {
   const queryClient = useQueryClient();
   const [editingPhysicalId, setEditingPhysicalId] = useState('');
@@ -102,6 +201,9 @@ const AdminLibraryPage = () => {
   const [mediaPage, setMediaPage] = useState(1);
   const [mediaModal, setMediaModal] = useState({ open: false, mode: 'add', id: '' });
   const [openPhysicalActionMenuId, setOpenPhysicalActionMenuId] = useState('');
+  const [programImageUploadPending, setProgramImageUploadPending] = useState(false);
+  const [programImageUploadProgress, setProgramImageUploadProgress] = useState(0);
+  const [programImageUploadStatus, setProgramImageUploadStatus] = useState({ type: '', message: '' });
 
   const physicalForm = useForm({ defaultValues: emptyPhysicalForm });
   const digitalForm = useForm({ defaultValues: emptyDigitalForm });
@@ -118,6 +220,23 @@ const AdminLibraryPage = () => {
   const digitalResources = useMemo(() => libraryData?.digitalResources || [], [libraryData]);
   const programUpdates = useMemo(() => libraryData?.programUpdates || [], [libraryData]);
   const mediaResources = useMemo(() => libraryData?.mediaResources || [], [libraryData]);
+  const watchedProgramAudience = programForm.watch('audience');
+
+  const audienceOptions = useMemo(() => {
+    const fromDatabase = programUpdates
+      .map((entry) => String(entry?.audience || '').trim())
+      .filter(Boolean);
+
+    return Array.from(new Set([...AUDIENCE_PRESETS, ...fromDatabase])).sort((left, right) => left.localeCompare(right));
+  }, [programUpdates]);
+
+  const selectedAudienceValue = useMemo(() => {
+    const audience = String(watchedProgramAudience || '').trim();
+    if (!audience) {
+      return '';
+    }
+    return audienceOptions.includes(audience) ? audience : '__custom__';
+  }, [audienceOptions, watchedProgramAudience]);
 
   const physicalTotalPages = Math.max(1, Math.ceil(physicalBooks.length / PAGE_SIZE));
   const digitalTotalPages = Math.max(1, Math.ceil(digitalResources.length / PAGE_SIZE));
@@ -221,24 +340,69 @@ const AdminLibraryPage = () => {
     }
 
     if (programModal.mode === 'add') {
-      programForm.reset(emptyProgramForm);
+      programForm.reset({
+        ...emptyProgramForm,
+        scheduleTime: buildScheduleTimeLabel(emptyProgramForm.scheduleStartTime, emptyProgramForm.scheduleEndTime)
+      });
+      setProgramImageUploadStatus({ type: '', message: '' });
       return;
     }
 
     if (selectedProgramUpdate) {
+      const derivedTimes = deriveProgramTimes(selectedProgramUpdate);
       programForm.reset({
         title: selectedProgramUpdate.title || '',
         speaker: selectedProgramUpdate.speaker || '',
         audience: selectedProgramUpdate.audience || '',
         scheduleDate: selectedProgramUpdate.scheduleDate || '',
-        scheduleTime: selectedProgramUpdate.scheduleTime || '',
+        scheduleStartTime: derivedTimes.scheduleStartTime,
+        scheduleEndTime: derivedTimes.scheduleEndTime,
+        scheduleTime: selectedProgramUpdate.scheduleTime || buildScheduleTimeLabel(derivedTimes.scheduleStartTime, derivedTimes.scheduleEndTime),
         location: selectedProgramUpdate.location || '',
         summary: selectedProgramUpdate.summary || '',
         imageUrl: selectedProgramUpdate.imageUrl || '',
         registrationUrl: selectedProgramUpdate.registrationUrl || '/events'
       });
+      setProgramImageUploadStatus({ type: '', message: '' });
     }
   }, [programForm, programModal, selectedProgramUpdate]);
+
+  const uploadProgramImageToForm = async (file) => {
+    if (!file) {
+      return;
+    }
+
+    setProgramImageUploadPending(true);
+    setProgramImageUploadProgress(0);
+    setProgramImageUploadStatus({ type: '', message: '' });
+
+    try {
+      const uploaded = await uploadService.uploadFile({
+        service: 'library',
+        file,
+        allowedMimeTypes: ['image/*'],
+        maxSizeMB: 15,
+        onProgress: (value) => {
+          setProgramImageUploadProgress(value);
+        }
+      });
+
+      if (!uploaded?.url) {
+        throw new Error('Upload did not return a file URL.');
+      }
+
+      programForm.setValue('imageUrl', String(uploaded.url), {
+        shouldDirty: true,
+        shouldValidate: true
+      });
+      setProgramImageUploadStatus({ type: 'success', message: 'Image uploaded successfully.' });
+    } catch (error) {
+      setProgramImageUploadStatus({ type: 'error', message: error?.message || 'Unable to upload image.' });
+    } finally {
+      setProgramImageUploadPending(false);
+      setProgramImageUploadProgress(0);
+    }
+  };
 
   const invalidateLibrary = () => queryClient.invalidateQueries({ queryKey: ['library-content'] });
 
@@ -1031,7 +1195,7 @@ const AdminLibraryPage = () => {
       {programModal.open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60" aria-hidden="true" onClick={() => setProgramModal({ open: false, mode: 'add', id: '' })} />
-          <div className="relative z-10 w-full max-w-3xl rounded-2xl bg-white p-5 shadow-2xl">
+          <div className="relative z-10 w-full max-w-4xl rounded-2xl border border-brand-blue/20 bg-gradient-to-br from-cyan-50 via-white to-amber-100 p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <h3 className="font-heading text-lg font-semibold">
                 {programModal.mode === 'add' ? 'Add Library Session' : (programModal.mode === 'edit' ? 'Edit Library Session' : 'Session Details')}
@@ -1047,43 +1211,125 @@ const AdminLibraryPage = () => {
             </div>
 
             <form
-              className="mt-4 grid gap-2.5 md:grid-cols-3"
+              className="mt-5 grid gap-3 md:grid-cols-12"
               onSubmit={programForm.handleSubmit((values) => {
+                const scheduleStartTime = normalizeTimeValue(values.scheduleStartTime) || '18:00';
+                const scheduleEndTime = normalizeTimeValue(values.scheduleEndTime) || addMinutesToTime(scheduleStartTime, 60);
+                const scheduleTime = buildScheduleTimeLabel(scheduleStartTime, scheduleEndTime);
+                const payload = {
+                  ...values,
+                  audience: String(values.audience || '').trim(),
+                  scheduleStartTime,
+                  scheduleEndTime,
+                  scheduleTime
+                };
                 if (programModal.mode === 'edit' && programModal.id) {
-                  updateProgramMutation.mutate({ id: programModal.id, values });
+                  updateProgramMutation.mutate({ id: programModal.id, values: payload });
                   return;
                 }
-                addProgramMutation.mutate(values);
+                addProgramMutation.mutate(payload);
               })}
             >
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 md:col-span-2">Title
-                <input disabled={programModal.mode === 'view'} {...programForm.register('title', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
+              <section className="md:col-span-6 rounded-xl border border-cyan-200/70 bg-white/75 p-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-brand-blue">Session Details</h4>
+                <div className="mt-2 grid gap-3">
+                  <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">Title
+                    <input disabled={programModal.mode === 'view'} {...programForm.register('title', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" />
+                  </label>
+                  <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">Audience
+                    <select
+                      disabled={programModal.mode === 'view'}
+                      value={selectedAudienceValue}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        if (value === '__custom__') {
+                          programForm.setValue('audience', '', { shouldDirty: true, shouldValidate: true });
+                          return;
+                        }
+                        programForm.setValue('audience', value, { shouldDirty: true, shouldValidate: true });
+                      }}
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                    >
+                      <option value="">Select audience</option>
+                      {audienceOptions.map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                      <option value="__custom__">+ Add New Audience</option>
+                    </select>
+                  </label>
+                  {selectedAudienceValue === '__custom__' ? (
+                    <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">New Audience Category
+                      <input
+                        disabled={programModal.mode === 'view'}
+                        value={String(watchedProgramAudience || '')}
+                        onChange={(event) => programForm.setValue('audience', event.target.value, { shouldDirty: true, shouldValidate: true })}
+                        placeholder="e.g. University Students"
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                      />
+                    </label>
+                  ) : null}
+                  <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">Image URL
+                    <input disabled={programModal.mode === 'view'} {...programForm.register('imageUrl')} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" />
+                  </label>
+                  {programModal.mode !== 'view' ? (
+                    <div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={programImageUploadPending}
+                        className="block w-full rounded-lg border border-dashed border-slate-300 bg-white p-2 text-xs"
+                        onChange={(event) => {
+                          void uploadProgramImageToForm(event.target.files?.[0]);
+                          event.target.value = '';
+                        }}
+                      />
+                      <p className="mt-1 text-xs text-slate-500">
+                        {programImageUploadPending ? `Uploading image... ${programImageUploadProgress}%` : 'Paste image URL or upload file (max 15MB).'}
+                      </p>
+                      {programImageUploadPending ? (
+                        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+                          <div className="h-full bg-brand-blue transition-all" style={{ width: `${programImageUploadProgress}%` }} />
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {programImageUploadStatus.message ? (
+                    <p className={`text-xs ${programImageUploadStatus.type === 'error' ? 'text-red-600' : 'text-emerald-700'}`}>
+                      {programImageUploadStatus.message}
+                    </p>
+                  ) : null}
+                </div>
+              </section>
+
+              <section className="md:col-span-6 rounded-xl border border-amber-200/70 bg-white/75 p-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-brand-blue">Schedule And Host</h4>
+                <div className="mt-2 grid gap-3">
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                      Date
+                      <input disabled={programModal.mode === 'view'} type="date" {...programForm.register('scheduleDate')} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" />
+                    </label>
+                    <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                      Start
+                      <input disabled={programModal.mode === 'view'} type="time" step={900} {...programForm.register('scheduleStartTime')} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" />
+                    </label>
+                    <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                      End
+                      <input disabled={programModal.mode === 'view'} type="time" step={900} {...programForm.register('scheduleEndTime')} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" />
+                    </label>
+                  </div>
+                  <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">Speaker
+                    <input disabled={programModal.mode === 'view'} {...programForm.register('speaker')} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" />
+                  </label>
+                  <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">Location
+                    <input disabled={programModal.mode === 'view'} {...programForm.register('location')} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" />
+                  </label>
+                </div>
+              </section>
+              <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-600 md:col-span-12">Summary
+                <textarea disabled={programModal.mode === 'view'} rows={6} {...programForm.register('summary')} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm leading-relaxed" />
               </label>
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Speaker
-                <input disabled={programModal.mode === 'view'} {...programForm.register('speaker')} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
-              </label>
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Audience
-                <input disabled={programModal.mode === 'view'} {...programForm.register('audience')} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
-              </label>
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Date
-                <input disabled={programModal.mode === 'view'} type="date" {...programForm.register('scheduleDate')} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
-              </label>
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Time
-                <input disabled={programModal.mode === 'view'} {...programForm.register('scheduleTime')} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
-              </label>
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 md:col-span-2">Location
-                <input disabled={programModal.mode === 'view'} {...programForm.register('location')} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
-              </label>
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Registration URL
-                <input disabled={programModal.mode === 'view'} {...programForm.register('registrationUrl')} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
-              </label>
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 md:col-span-2">Image URL
-                <input disabled={programModal.mode === 'view'} {...programForm.register('imageUrl')} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
-              </label>
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 md:col-span-3">Summary
-                <textarea disabled={programModal.mode === 'view'} rows={2} {...programForm.register('summary')} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
-              </label>
-              <div className="md:col-span-3 flex gap-2">
+              <div className="md:col-span-12 flex flex-wrap gap-2">
                 {programModal.mode === 'view' ? null : (
                   <Button type="submit" disabled={isSavingProgram}>
                     {isSavingProgram ? 'Saving...' : (programModal.mode === 'edit' ? 'Update Library Session' : 'Add Library Session')}

@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   Bars3Icon,
+  BellIcon,
   BellAlertIcon,
   ChartBarSquareIcon,
   CalendarDaysIcon,
@@ -25,6 +27,8 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import { adminNav } from '../constants/navigation';
 import { useAuth } from '../context/AuthContext';
 import gurdwaraLogo from '../assets/gurdwara-logo.webp';
+import auditService from '../services/auditService';
+import userService from '../services/userService';
 
 const FULL_ACCESS_ROLES = new Set(['Super Admin', 'Admin']);
 
@@ -39,9 +43,97 @@ const MEMBER_VISIBLE_PATHS = [
   '/admin/events'
 ];
 
+const NOTIFICATION_READ_KEY_PREFIX = 'ssm-admin-notifications-read';
+
 const getFirstName = (fullName) => {
   const tokens = String(fullName || '').trim().split(/\s+/).filter(Boolean);
   return tokens[0] || 'Member';
+};
+
+const formatActivityTime = (value) => {
+  if (!value) {
+    return 'Just now';
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return 'Just now';
+  }
+
+  const diffMs = Date.now() - parsed.getTime();
+  const diffMinutes = Math.max(1, Math.floor(diffMs / (1000 * 60)));
+  if (diffMinutes < 60) {
+    return `${diffMinutes}m ago`;
+  }
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) {
+    return `${diffHours}h ago`;
+  }
+
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) {
+    return `${diffDays}d ago`;
+  }
+
+  return parsed.toLocaleDateString();
+};
+
+const toSimpleTargetLabel = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return 'item';
+  if (normalized.includes('user')) return 'user account';
+  if (normalized.includes('event')) return 'event';
+  if (normalized.includes('donation')) return 'donation';
+  if (normalized.includes('volunteer') || normalized.includes('seva')) return 'seva application';
+  if (normalized.includes('library')) return 'library item';
+  return normalized.replace(/[_-]+/g, ' ');
+};
+
+const toSimpleActionLabel = (entry) => {
+  const action = String(entry?.action || '').trim().toLowerCase();
+  const target = toSimpleTargetLabel(entry?.targetType);
+
+  if (action.includes('create') || action.includes('add') || action.includes('register')) {
+    return `New ${target} added`;
+  }
+  if (action.includes('update') || action.includes('edit')) {
+    return `${target.charAt(0).toUpperCase()}${target.slice(1)} updated`;
+  }
+  if (action.includes('delete') || action.includes('remove')) {
+    return `${target.charAt(0).toUpperCase()}${target.slice(1)} removed`;
+  }
+  if (action.includes('approve')) {
+    return 'User approved';
+  }
+  if (action.includes('reject')) {
+    return 'User rejected';
+  }
+
+  return `${target.charAt(0).toUpperCase()}${target.slice(1)} activity`;
+};
+
+const getNotificationToneClasses = (entry, isRead) => {
+  if (isRead) {
+    return 'border-slate-200 bg-white';
+  }
+
+  if (entry.urgent) {
+    return 'border-amber-300 bg-amber-50';
+  }
+
+  if (entry.kind === 'success') {
+    return 'border-emerald-300 bg-emerald-50';
+  }
+
+  if (entry.kind === 'warning') {
+    return 'border-amber-300 bg-amber-50';
+  }
+
+  if (entry.kind === 'danger') {
+    return 'border-rose-300 bg-rose-50';
+  }
+
+  return 'border-blue-300 bg-blue-50';
 };
 
 const iconByPath = {
@@ -74,6 +166,11 @@ const AdminLayout = () => {
   const [accessDeniedNotice, setAccessDeniedNotice] = useState('');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [headerAction, setHeaderAction] = useState(null);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const notificationsDesktopRef = useRef(null);
+  const notificationsMobileRef = useRef(null);
+  const [readNotificationIds, setReadNotificationIds] = useState([]);
+  const notificationReadStorageKey = `${NOTIFICATION_READ_KEY_PREFIX}:${String(user?.email || 'guest').toLowerCase()}`;
   const firstName = getFirstName(user?.name);
   const hasFullAccess = FULL_ACCESS_ROLES.has(String(user?.role || ''));
   const visibleNav = hasFullAccess
@@ -83,6 +180,62 @@ const AdminLayout = () => {
     .sort((a, b) => b.path.length - a.path.length)
     .find((item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`));
   const pageTitle = currentNavItem?.label || (location.pathname.startsWith('/admin/analytics') ? 'Analytics and KPIs' : 'Admin');
+  const { data: auditLogs = [] } = useQuery({
+    queryKey: ['admin-audit-logs'],
+    queryFn: () => auditService.getLogs().then((res) => res.data),
+    staleTime: 30 * 1000
+  });
+  const { data: users = [] } = useQuery({
+    queryKey: ['admin-users'],
+    queryFn: () => userService.getUsers().then((res) => res.data),
+    staleTime: 30 * 1000
+  });
+  const pendingApprovals = useMemo(
+    () => users.filter((entry) => String(entry?.approvalStatus || '').toLowerCase() === 'pending').length,
+    [users]
+  );
+  const notifications = useMemo(() => {
+    const items = [];
+
+    if (pendingApprovals > 0) {
+      items.push({
+        id: 'pending-approvals',
+        title: `${pendingApprovals} member approval${pendingApprovals === 1 ? '' : 's'} waiting`,
+        meta: 'Please review new member requests.',
+        timeLabel: 'Action needed',
+        href: '/admin/users',
+        urgent: true,
+        kind: 'warning'
+      });
+    }
+
+    const recentLogs = (Array.isArray(auditLogs) ? auditLogs : []).slice(0, 7).map((entry, index) => {
+      const action = String(entry?.action || '').toLowerCase();
+      const kind = action.includes('delete') || action.includes('remove')
+        ? 'danger'
+        : action.includes('create') || action.includes('add') || action.includes('approve')
+          ? 'success'
+          : 'info';
+
+      return {
+        id: entry?.id || `audit-${index}`,
+        title: toSimpleActionLabel(entry),
+        meta: `By ${entry?.actorName || entry?.actorEmail || 'system'}`,
+        timeLabel: formatActivityTime(entry?.createdAt),
+        href: '/admin/audit-trail',
+        urgent: false,
+        kind
+      };
+    });
+
+    return [...items, ...recentLogs].slice(0, 8);
+  }, [auditLogs, pendingApprovals]);
+  const unreadNotificationCount = useMemo(
+    () => notifications.filter((entry) => !readNotificationIds.includes(entry.id)).length,
+    [notifications, readNotificationIds]
+  );
+
+  const notificationCount = unreadNotificationCount;
 
   useEffect(() => {
     const state = location.state || {};
@@ -100,10 +253,122 @@ const AdminLayout = () => {
     setMobileNavOpen(false);
   }, [location.pathname]);
 
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(notificationReadStorageKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      setReadNotificationIds(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setReadNotificationIds([]);
+    }
+  }, [notificationReadStorageKey]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(notificationReadStorageKey, JSON.stringify(readNotificationIds));
+    } catch {
+      // Ignore storage write errors.
+    }
+  }, [notificationReadStorageKey, readNotificationIds]);
+
+  useEffect(() => {
+    if (!isNotificationsOpen) {
+      return undefined;
+    }
+
+    const handlePointerDown = (event) => {
+      const inDesktop = notificationsDesktopRef.current?.contains(event.target);
+      const inMobile = notificationsMobileRef.current?.contains(event.target);
+      if (!inDesktop && !inMobile) {
+        setIsNotificationsOpen(false);
+      }
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setIsNotificationsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isNotificationsOpen]);
+
   const handleLogout = async () => {
     await logout();
     navigate('/', { replace: true });
   };
+
+  const markNotificationAsRead = (id) => {
+    if (!id) {
+      return;
+    }
+    setReadNotificationIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+  };
+
+  const markAllNotificationsAsRead = () => {
+    setReadNotificationIds(notifications.map((entry) => entry.id));
+  };
+
+  const renderNotificationsPanel = (widthClassName) => (
+    <div className={`absolute right-0 top-12 z-50 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl ${widthClassName}`}>
+      <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
+        <div>
+          <p className="text-xs font-extrabold uppercase tracking-wide text-slate-700">Notifications</p>
+          <p className="text-[10px] text-slate-500">{unreadNotificationCount} unread</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={markAllNotificationsAsRead}
+            className="text-[11px] font-semibold text-slate-600 underline underline-offset-2"
+            disabled={unreadNotificationCount === 0}
+          >
+            Mark all read
+          </button>
+          <Link to="/admin/audit-trail" onClick={() => setIsNotificationsOpen(false)} className="text-[11px] font-semibold text-brand-blue underline underline-offset-2">
+            View all
+          </Link>
+        </div>
+      </div>
+      <div className="max-h-80 overflow-y-auto p-1.5">
+        {notifications.length === 0 ? <p className="p-2 text-xs text-slate-500">No new activities.</p> : null}
+        {notifications.map((entry) => {
+          const isRead = readNotificationIds.includes(entry.id);
+          return (
+            <div key={entry.id} className={`mb-1 rounded-lg border px-2 py-1.5 ${getNotificationToneClasses(entry, isRead)}`}>
+              <div className="flex items-start justify-between gap-2">
+                <Link
+                  to={entry.href}
+                  onClick={() => {
+                    markNotificationAsRead(entry.id);
+                    setIsNotificationsOpen(false);
+                  }}
+                  className="min-w-0 flex-1"
+                >
+                  <p className="truncate text-xs font-semibold text-slate-800">{entry.title}</p>
+                  <p className="truncate text-[11px] text-slate-600">{entry.meta}</p>
+                  <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">{entry.timeLabel}</p>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => markNotificationAsRead(entry.id)}
+                  disabled={isRead}
+                  className="shrink-0 rounded-md border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isRead ? 'Read' : 'Mark read'}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950">
@@ -152,7 +417,21 @@ const AdminLayout = () => {
               {headerAction ? <div className="flex-shrink-0">{headerAction}</div> : null}
             </div>
 
-            <div className="flex items-center gap-2 lg:hidden">
+            <div className="relative flex items-center gap-2 lg:hidden" ref={notificationsMobileRef}>
+              <button
+                type="button"
+                onClick={() => setIsNotificationsOpen((prev) => !prev)}
+                className="relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700"
+                aria-label="Open admin notifications"
+                aria-expanded={isNotificationsOpen}
+              >
+                <BellIcon className="h-5 w-5" />
+                {notificationCount > 0 ? (
+                  <span className="absolute -right-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white">
+                    {notificationCount > 9 ? '9+' : notificationCount}
+                  </span>
+                ) : null}
+              </button>
               <img src={user?.avatarUrl || gurdwaraLogo} alt={user?.name || 'Profile'} className="h-9 w-9 rounded-full border border-slate-200 object-cover" />
               <button
                 type="button"
@@ -161,9 +440,27 @@ const AdminLayout = () => {
               >
                 Logout
               </button>
+
+              {isNotificationsOpen ? (
+                renderNotificationsPanel('w-[min(88vw,22rem)]')
+              ) : null}
             </div>
 
-            <div className="hidden items-center gap-3 lg:flex">
+            <div className="relative hidden items-center gap-3 lg:flex" ref={notificationsDesktopRef}>
+              <button
+                type="button"
+                onClick={() => setIsNotificationsOpen((prev) => !prev)}
+                className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 transition hover:border-brand-blue/40 hover:text-brand-blue"
+                aria-label="Open admin notifications"
+                aria-expanded={isNotificationsOpen}
+              >
+                <BellIcon className="h-5 w-5" />
+                {notificationCount > 0 ? (
+                  <span className="absolute -right-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white">
+                    {notificationCount > 9 ? '9+' : notificationCount}
+                  </span>
+                ) : null}
+              </button>
               <img src={user?.avatarUrl || gurdwaraLogo} alt={user?.name || 'Profile'} className="h-9 w-9 rounded-full border border-slate-200 object-cover" />
               <p className="text-base font-extrabold text-slate-800">{firstName}</p>
               <button
@@ -173,6 +470,10 @@ const AdminLayout = () => {
               >
                 Logout
               </button>
+
+              {isNotificationsOpen ? (
+                renderNotificationsPanel('w-[22rem]')
+              ) : null}
             </div>
           </div>
         </div>

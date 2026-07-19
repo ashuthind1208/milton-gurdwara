@@ -5,12 +5,6 @@ import contentApiService from './contentApiService';
 const OPPORTUNITIES_RESOURCE = 'seva_opportunities';
 const APPLICATIONS_RESOURCE = 'volunteer_registrations';
 
-const defaultSevaOpportunities = [
-  { id: 'op-1', sevaType: 'Langar', date: '2026-07-12', time: '10:00 AM - 1:00 PM', totalVolunteersRequired: 10, expiryDate: '2026-07-11', active: true },
-  { id: 'op-2', sevaType: 'Parking', date: '2026-07-12', time: '9:30 AM - 12:30 PM', totalVolunteersRequired: 8, expiryDate: '2026-07-11', active: true },
-  { id: 'op-3', sevaType: 'Cleaning', date: '2026-07-13', time: '6:30 PM - 8:00 PM', totalVolunteersRequired: 6, expiryDate: '2026-07-12', active: true }
-];
-
 const normalizeBoolean = (value, fallback = true) => {
   if (typeof value === 'boolean') {
     return value;
@@ -29,6 +23,25 @@ const normalizeBoolean = (value, fallback = true) => {
 
 const toIsoDate = (value) => new Date(value).toISOString().slice(0, 10);
 
+const normalizeDateKey = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return '';
+  }
+
+  const dateOnlyMatch = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (dateOnlyMatch) {
+    return dateOnlyMatch[1];
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    return '';
+  }
+
+  return parsed.toISOString().slice(0, 10);
+};
+
 const normalizeOpportunity = (item, index = 0) => ({
   id: item.id || `op-${index + 1}`,
   sevaType: item.sevaType || '',
@@ -36,6 +49,7 @@ const normalizeOpportunity = (item, index = 0) => ({
   time: item.time || '',
   totalVolunteersRequired: Math.max(1, Number(item.totalVolunteersRequired) || 10),
   expiryDate: item.expiryDate || item.date || toIsoDate(Date.now()),
+  waitlistEnabled: normalizeBoolean(item.waitlistEnabled, true),
   active: normalizeBoolean(item.active, true)
 });
 
@@ -54,13 +68,7 @@ const enrichOpportunityStatus = (item) => {
 
 const ensureDefaultOpportunities = async () => {
   const rows = await contentApiService.list(OPPORTUNITIES_RESOURCE);
-  if (rows.length > 0) {
-    return rows.map((entry, index) => normalizeOpportunity(entry, index));
-  }
-
-  await Promise.all(defaultSevaOpportunities.map((entry, index) => contentApiService.create(OPPORTUNITIES_RESOURCE, normalizeOpportunity(entry, index))));
-  const seeded = await contentApiService.list(OPPORTUNITIES_RESOURCE);
-  return seeded.map((entry, index) => normalizeOpportunity(entry, index));
+  return rows.map((entry, index) => normalizeOpportunity(entry, index));
 };
 
 const readRegistrations = async () => {
@@ -73,7 +81,19 @@ const countRegisteredForOpportunity = (opportunity, registrations) => registrati
   (!entry.opportunityId && (entry.sevaType || entry.area) === opportunity.sevaType && entry.sevaDate === opportunity.date)
 )).length;
 
+const countConfirmedForOpportunity = (opportunity, registrations) => registrations.filter((entry) => {
+  const sameOpportunity = entry.opportunityId === opportunity.id
+    || (!entry.opportunityId && (entry.sevaType || entry.area) === opportunity.sevaType && entry.sevaDate === opportunity.date);
+
+  if (!sameOpportunity) {
+    return false;
+  }
+
+  return normalizeComparableValue(entry.status) !== 'waitlisted';
+}).length;
+
 const normalizeComparableValue = (value) => String(value || '').trim().toLowerCase();
+const normalizeDigits = (value) => String(value || '').replace(/\D/g, '');
 
 const fetchJson = async (url, options = {}) => {
   const response = await fetch(url, options);
@@ -92,10 +112,12 @@ const volunteerService = {
   getSevaOpportunities: async (options = {}) => {
     const rows = await ensureDefaultOpportunities();
     const enriched = rows.map((item) => enrichOpportunityStatus(item));
+    const includeInactive = Boolean(options.includeInactive);
+    const visibilityFiltered = includeInactive ? enriched : enriched.filter((item) => item.active !== false);
     if (options.includeClosed) {
-      return serviceResponse(enriched);
+      return serviceResponse(visibilityFiltered);
     }
-    return serviceResponse(enriched.filter((item) => !item.isClosed));
+    return serviceResponse(visibilityFiltered.filter((item) => !item.isClosed));
   },
 
   createSevaOpportunity: async (payload) => {
@@ -106,6 +128,7 @@ const volunteerService = {
       time: payload.time || '',
       totalVolunteersRequired: payload.totalVolunteersRequired,
       expiryDate: payload.expiryDate,
+      waitlistEnabled: payload.waitlistEnabled,
       active: normalizeBoolean(payload.active, true)
     });
     const created = await contentApiService.create(OPPORTUNITIES_RESOURCE, record);
@@ -139,22 +162,36 @@ const volunteerService = {
       throw new Error('Registration is closed for this seva opportunity.');
     }
 
-    const registeredCount = countRegisteredForOpportunity(selectedOpportunity, allRecords);
-    if (registeredCount >= selectedOpportunity.totalVolunteersRequired) {
+    const confirmedCount = countConfirmedForOpportunity(selectedOpportunity, allRecords);
+    const isAtCapacity = confirmedCount >= selectedOpportunity.totalVolunteersRequired;
+
+    if (isAtCapacity && selectedOpportunity.waitlistEnabled === false) {
       throw new Error('Volunteer limit reached for this seva opportunity.');
     }
 
     const payloadEmail = normalizeComparableValue(payload.email);
     const payloadPhone = normalizeComparableValue(payload.phone);
-    const payloadName = normalizeComparableValue(payload.name);
+    const payloadPhoneDigits = normalizeDigits(payload.phone);
+    const canCheckByEmail = Boolean(payloadEmail);
+    const canCheckByPhone = !canCheckByEmail && Boolean(payloadPhoneDigits || payloadPhone);
+
+    if (!payloadEmail && !payloadPhoneDigits && !payloadPhone) {
+      throw new Error('Please provide at least an email or phone number.');
+    }
 
     const alreadyRegistered = allRecords.some((entry) => {
+      const selectedDateKey = normalizeDateKey(selectedOpportunity.date);
+      const selectedTimeKey = normalizeComparableValue(selectedOpportunity.time);
+      const entryDateKey = normalizeDateKey(entry.sevaDate || entry.date);
+      const entryTimeKey = normalizeComparableValue(entry.sevaTime || entry.time);
+
       const sameOpportunity =
         String(entry.opportunityId || '').trim() === String(selectedOpportunity.id || '').trim()
         || (
           !entry.opportunityId
           && normalizeComparableValue(entry.sevaType || entry.area) === normalizeComparableValue(selectedOpportunity.sevaType)
-          && String(entry.sevaDate || '').trim() === String(selectedOpportunity.date || '').trim()
+          && entryDateKey === selectedDateKey
+          && entryTimeKey === selectedTimeKey
         );
 
       if (!sameOpportunity) {
@@ -163,16 +200,28 @@ const volunteerService = {
 
       const entryEmail = normalizeComparableValue(entry.email);
       const entryPhone = normalizeComparableValue(entry.phone || entry.whatsapp);
-      const entryName = normalizeComparableValue(entry.name);
+      const entryPhoneDigits = normalizeDigits(entry.phone || entry.whatsapp);
 
-      return (payloadEmail && entryEmail === payloadEmail)
-        || (payloadPhone && entryPhone === payloadPhone)
-        || (payloadName && entryName === payloadName);
+      if (canCheckByEmail) {
+        return Boolean(payloadEmail && entryEmail && entryEmail === payloadEmail);
+      }
+
+      if (canCheckByPhone && payloadPhoneDigits && entryPhoneDigits && entryPhoneDigits === payloadPhoneDigits) {
+        return true;
+      }
+
+      if (canCheckByPhone && payloadPhone && entryPhone && entryPhone === payloadPhone) {
+        return true;
+      }
+
+      return false;
     });
 
     if (alreadyRegistered) {
       throw new Error('You have already registered for this seva opportunity.');
     }
+
+    const registrationStatus = isAtCapacity ? 'waitlisted' : 'confirmed';
 
     const record = {
       id: `vol-${Date.now()}`,
@@ -188,29 +237,39 @@ const volunteerService = {
       contactPreference: payload.contactPreference || 'Email',
       wantsEventEmails: Boolean(payload.wantsEventEmails),
       notes: payload.notes || '',
-      status: 'Pending',
+      status: registrationStatus,
       date: toIsoDate(Date.now()),
       createdAt: new Date().toISOString()
     };
 
     await contentApiService.create(APPLICATIONS_RESOURCE, record);
 
-    try {
-      await userService.upsertUserByEmail({
-        name: payload.name,
-        email: payload.email,
-        phone: payload.phone || '',
-        memberType: 'Volunteer',
-        role: 'Volunteer',
-        authProvider: 'LOCAL',
-        registrationComplete: true,
-        approvalStatus: 'pending'
-      });
-    } catch {
-      // Do not block volunteer registration if user upsert fails.
+    if (payload.isAuthenticated) {
+      try {
+        await userService.upsertUserByEmail({
+          name: payload.name,
+          email: payload.email,
+          phone: payload.phone || '',
+          memberType: 'Volunteer',
+          role: 'Volunteer',
+          authProvider: 'LOCAL',
+          registrationComplete: true,
+          approvalStatus: 'pending'
+        });
+      } catch {
+        // Do not block volunteer registration if user upsert fails.
+      }
     }
 
-    return serviceResponse({ success: true, payload: record });
+    const waitlistCount = Math.max(0, countRegisteredForOpportunity(selectedOpportunity, allRecords) - confirmedCount);
+
+    return serviceResponse({
+      success: true,
+      payload: record,
+      waitlisted: registrationStatus === 'waitlisted',
+      status: registrationStatus,
+      waitlistCount: registrationStatus === 'waitlisted' ? waitlistCount + 1 : waitlistCount
+    });
   },
 
   getApplications: async () => {
@@ -224,6 +283,11 @@ const volunteerService = {
     const updated = { ...existing, ...payload, id };
     await contentApiService.update(APPLICATIONS_RESOURCE, id, updated);
     return serviceResponse(updated);
+  },
+
+  removeApplication: async (id) => {
+    await contentApiService.remove(APPLICATIONS_RESOURCE, id);
+    return serviceResponse({ success: true });
   },
 
   sendOpportunityReminderEmails: async (opportunityId) => {

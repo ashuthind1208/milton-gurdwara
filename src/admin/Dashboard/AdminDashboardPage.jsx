@@ -98,7 +98,7 @@ const ROLE_COLORS = {
 const AdminDashboardPage = () => {
   const todayDateKey = toDateKey(new Date());
 
-  const { data: events = [] } = useQuery({ queryKey: ['events'], queryFn: () => eventService.getEvents().then((res) => res.data) });
+  const { data: events = [] } = useQuery({ queryKey: ['events', 'admin'], queryFn: () => eventService.getEvents({ includeInactive: true }).then((res) => res.data) });
   const { data: donations = [] } = useQuery({ queryKey: ['admin-donations'], queryFn: () => donationService.getDonations().then((res) => res.data) });
   const { data: campaigns = [] } = useQuery({ queryKey: ['admin-campaigns'], queryFn: () => donationService.getAllCampaigns().then((res) => res.data) });
   const { data: users = [] } = useQuery({ queryKey: ['admin-users'], queryFn: () => userService.getUsers().then((res) => res.data) });

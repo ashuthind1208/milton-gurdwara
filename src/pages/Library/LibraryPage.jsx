@@ -2,11 +2,21 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  CheckBadgeIcon,
+  ClipboardDocumentListIcon,
   CalendarDaysIcon,
+  ClockIcon,
+  EnvelopeIcon,
+  IdentificationIcon,
+  InformationCircleIcon,
+  MapPinIcon,
+  PhoneIcon,
   PlusCircleIcon,
   PlayIcon,
   QueueListIcon,
-  TicketIcon,
+  SparklesIcon,
+  UserGroupIcon,
+  UserIcon,
   XMarkIcon
 } from '@heroicons/react/24/outline';
 import { BookOpenIcon, DocumentTextIcon } from '@heroicons/react/24/solid';
@@ -24,6 +34,8 @@ import Button from '../../components/ui/Button';
 import { useAuth } from '../../context/AuthContext';
 
 const PAGE_SIZE = 10;
+
+const normalizeTextToken = (value) => String(value || '').trim().toLowerCase();
 
 const Pagination = ({ page, total, onChange }) => {
   if (total <= 1) {
@@ -175,7 +187,7 @@ const YouTubeAutoPlayPlayer = ({ url, title, className = '' }) => {
 const LibraryPage = () => {
   const meta = useSeoMeta('Library', 'Books, PDFs, and downloadable resources for Sikh learning.');
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [physicalPage, setPhysicalPage] = useState(1);
   const [digitalPage, setDigitalPage] = useState(1);
   const [programEventsPage, setProgramEventsPage] = useState(1);
@@ -195,6 +207,8 @@ const LibraryPage = () => {
     contact: String(user?.phone || '')
   }), [user?.email, user?.name, user?.phone]);
   const registrationForm = useForm({ defaultValues: { name: '', email: '', contact: '' } });
+  const watchedRegistrationEmail = registrationForm.watch('email');
+  const currentUserEmail = normalizeTextToken(user?.email);
 
   const { data: libraryData } = useQuery({
     queryKey: ['library-content'],
@@ -315,6 +329,57 @@ const LibraryPage = () => {
     return map;
   }, [events]);
 
+  const eventsById = useMemo(() => {
+    const map = new Map();
+    events.forEach((event) => {
+      map.set(Number(event.id), event);
+    });
+    return map;
+  }, [events]);
+
+  const registeredEventIdsForCurrentUser = useMemo(() => {
+    const registeredIds = new Set();
+    if (!currentUserEmail) {
+      return registeredIds;
+    }
+
+    events.forEach((event) => {
+      const eventId = Number(event.id);
+      if (!Number.isFinite(eventId)) {
+        return;
+      }
+
+      const registrants = Array.isArray(event.registrants) ? event.registrants : [];
+      const isRegistered = registrants.some((entry) => normalizeTextToken(entry?.email) === currentUserEmail);
+      if (isRegistered) {
+        registeredIds.add(eventId);
+      }
+    });
+
+    return registeredIds;
+  }, [currentUserEmail, events]);
+
+  const selectedSessionEvent = useMemo(() => {
+    if (!sessionModalEntry?.eventId) {
+      return null;
+    }
+    return eventsById.get(Number(sessionModalEntry.eventId)) || null;
+  }, [eventsById, sessionModalEntry]);
+
+  const isAlreadyRegisteredForSelectedSession = useMemo(() => {
+    if (!selectedSessionEvent) {
+      return false;
+    }
+
+    const lookupEmail = normalizeTextToken(isAuthenticated ? registrationDefaults.email : watchedRegistrationEmail);
+    if (!lookupEmail) {
+      return false;
+    }
+
+    const registrants = Array.isArray(selectedSessionEvent.registrants) ? selectedSessionEvent.registrants : [];
+    return registrants.some((entry) => normalizeTextToken(entry?.email) === lookupEmail);
+  }, [isAuthenticated, registrationDefaults.email, selectedSessionEvent, watchedRegistrationEmail]);
+
   const activeIssueRecords = useMemo(() => (
     (issueModalBook?.issueRecords || []).filter((record) => !record.returnedAt)
   ), [issueModalBook]);
@@ -336,18 +401,40 @@ const LibraryPage = () => {
   }, [programEventsPage, programEventsTotalPages]);
 
   const registrationMutation = useMutation({
-    mutationFn: (values) => eventService.registerForEvent({
-      eventId: sessionModalEntry?.eventId,
-      name: values.name,
-      email: values.email,
-      contact: values.contact
-    }),
+    mutationFn: async (values) => {
+      const eventId = Number(sessionModalEntry?.eventId);
+      if (!Number.isFinite(eventId)) {
+        throw new Error('Event link is still syncing. Please try again shortly.');
+      }
+
+      const inputEmail = normalizeTextToken(values?.email);
+      if (!inputEmail) {
+        throw new Error('Email is required to register.');
+      }
+
+      const linkedEvent = eventsById.get(eventId);
+      const existingRegistrants = Array.isArray(linkedEvent?.registrants) ? linkedEvent.registrants : [];
+      const duplicateByEmail = existingRegistrants.some((entry) => normalizeTextToken(entry?.email) === inputEmail);
+      if (duplicateByEmail) {
+        throw new Error('You have already registered for this event.');
+      }
+
+      return eventService.registerForEvent({
+        eventId,
+        name: values.name,
+        email: values.email,
+        contact: values.contact
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
       queryClient.invalidateQueries({ queryKey: ['admin-events'] });
       registrationForm.reset(registrationDefaults);
       setSessionModalId('');
       window.alert('Registration saved successfully.');
+    },
+    onError: (error) => {
+      window.alert(error?.message || 'Unable to save registration.');
     }
   });
 
@@ -662,15 +749,19 @@ const LibraryPage = () => {
                       </span>
                     </td>
                     <td className="px-3 py-2 text-center">
-                      <button
-                        type="button"
-                        onClick={() => setSessionModalId(entry.id)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-brand-blue/30 bg-blue-50 text-brand-blue transition hover:bg-blue-100"
-                        title="Open registration modal"
-                        aria-label={`Open registration modal for ${entry.title || 'library session'}`}
-                      >
-                        <TicketIcon className="h-4 w-4" />
-                      </button>
+                      {entry.eventId && registeredEventIdsForCurrentUser.has(Number(entry.eventId)) ? (
+                        <span className="text-[11px] font-semibold text-red-600">Already registered</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setSessionModalId(entry.id)}
+                          className="inline-flex items-center rounded-full border border-brand-blue/30 bg-blue-50 px-3 py-1 text-xs font-semibold text-brand-blue transition hover:bg-blue-100"
+                          title="Open registration modal"
+                          aria-label={`Open registration modal for ${entry.title || 'library session'}`}
+                        >
+                          Register
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -853,49 +944,139 @@ const LibraryPage = () => {
       {sessionModalEntry ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60" aria-hidden="true" onClick={() => setSessionModalId('')} />
-          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-brand-blue/20 bg-gradient-to-br from-blue-50 via-white to-amber-50 shadow-2xl">
+          <div className="relative z-10 w-full max-w-4xl overflow-hidden rounded-2xl border border-brand-blue/20 bg-gradient-to-br from-blue-50 via-white to-amber-50 shadow-2xl">
             {sessionModalEntry.imageUrl ? (
               <img src={sessionModalEntry.imageUrl} alt={sessionModalEntry.title || 'Library session'} className="h-56 w-full object-cover" />
             ) : null}
-            <div className="p-5">
+            <div className="p-6">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="inline-flex rounded-full bg-brand-blue/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-brand-blue">Library Session</p>
-                  <h3 className="mt-2 font-heading text-xl font-semibold text-brand-blue">{sessionModalEntry.title}</h3>
+                  <p className="inline-flex items-center gap-1 rounded-full bg-brand-blue/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-brand-blue">
+                    <SparklesIcon className="h-3.5 w-3.5" />
+                    <span>Library Session</span>
+                  </p>
+                  <h3 className="mt-2 flex items-center gap-2 font-heading text-xl font-semibold text-brand-blue">
+                    <BookOpenIcon className="h-5 w-5" />
+                    <span>{sessionModalEntry.title}</span>
+                  </h3>
                 </div>
                 <button type="button" className="rounded-md border border-brand-blue/20 bg-white/80 p-1 text-brand-blue hover:bg-brand-blue/10 hover:text-brand-blue" onClick={() => setSessionModalId('')}>
                   <XMarkIcon className="h-5 w-5" />
                 </button>
               </div>
-              <div className="mt-3 grid gap-2 rounded-xl border border-brand-blue/15 bg-white/85 p-3 text-sm text-slate-700 sm:grid-cols-2">
-                <p><span className="font-semibold text-brand-blue">Speaker:</span> {sessionModalEntry.speaker || 'Guest Speaker'}</p>
-                <p><span className="font-semibold text-brand-blue">Audience:</span> {sessionModalEntry.audience || 'Open to all'}</p>
-                <p><span className="font-semibold text-brand-blue">Date:</span> {sessionModalEntry.scheduleDate || 'TBA'}</p>
-                <p><span className="font-semibold text-brand-blue">Time:</span> {sessionModalEntry.scheduleTime || 'TBA'}</p>
-                <p className="sm:col-span-2"><span className="font-semibold text-brand-blue">Location:</span> {sessionModalEntry.location || 'Library Hall'}</p>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  <ClipboardDocumentListIcon className="h-4 w-4 text-brand-blue" />
+                  <span>Total Registrations: {selectedSessionEvent?.registrations || 0}</span>
+                </p>
+                {sessionModalEntry.eventId ? (
+                  <a
+                    href={eventService.getEventCalendarUrl(sessionModalEntry.eventId)}
+                    className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 transition hover:border-emerald-400 hover:bg-emerald-100"
+                  >
+                    <CalendarDaysIcon className="h-3.5 w-3.5" />
+                    <span>Add to Calendar</span>
+                  </a>
+                ) : null}
               </div>
-              <p className="mt-3 rounded-lg border border-brand-saffron/30 bg-amber-50/70 px-3 py-2 text-sm text-slate-700">{sessionModalEntry.summary || 'Session details will be shared soon.'}</p>
-
               {sessionModalEntry.eventId ? (
-                <section className="mt-4 rounded-xl border border-brand-blue/25 bg-gradient-to-r from-blue-50 to-sky-50 p-3">
-                  <h4 className="font-heading text-base font-semibold text-brand-blue">Register for This Session</h4>
-                  <form className="mt-2 space-y-2.5" onSubmit={registrationForm.handleSubmit((values) => registrationMutation.mutate(values))}>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-brand-blue">Name
-                      <input {...registrationForm.register('name', { required: true })} className="mt-1 w-full rounded-lg border border-brand-blue/25 bg-white px-2.5 py-1.5 text-sm focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/20" />
-                    </label>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-brand-blue">Email
-                      <input type="email" {...registrationForm.register('email', { required: true })} className="mt-1 w-full rounded-lg border border-brand-blue/25 bg-white px-2.5 py-1.5 text-sm focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/20" />
-                    </label>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-brand-blue">Contact
-                      <input {...registrationForm.register('contact', { required: true })} className="mt-1 w-full rounded-lg border border-brand-blue/25 bg-white px-2.5 py-1.5 text-sm focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/20" />
-                    </label>
-                    <Button type="submit" className="w-full" disabled={registrationMutation.isPending}>
-                      {registrationMutation.isPending ? 'Saving...' : 'Save Registration'}
-                    </Button>
-                  </form>
+                <section className="mt-5 grid gap-4 md:grid-cols-2">
+                  <article className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+                    <h4 className="flex items-center gap-2 font-heading text-lg font-semibold text-slate-900">
+                      <ClipboardDocumentListIcon className="h-5 w-5 text-brand-blue" />
+                      <span>Library Event Details</span>
+                    </h4>
+                    <p className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <span className="inline-flex items-center gap-1">
+                        <CalendarDaysIcon className="h-3.5 w-3.5" />
+                        <span>{sessionModalEntry.scheduleDate || 'TBA'}</span>
+                      </span>
+                      <span>•</span>
+                      <span className="inline-flex items-center gap-1">
+                        <ClockIcon className="h-3.5 w-3.5" />
+                        <span>{sessionModalEntry.scheduleTime || 'TBA'}</span>
+                      </span>
+                    </p>
+                    <div className="mt-2 border-b border-slate-200" />
+                    <div className="mt-3 space-y-1.5 text-sm text-slate-700">
+                      <p className="inline-flex items-center gap-1.5"><UserIcon className="h-4 w-4 text-brand-blue" /><span><span className="font-semibold text-slate-800">Speaker:</span> {sessionModalEntry.speaker || 'Guest Speaker'}</span></p>
+                      <p className="inline-flex items-center gap-1.5"><UserGroupIcon className="h-4 w-4 text-brand-blue" /><span><span className="font-semibold text-slate-800">Audience:</span> {sessionModalEntry.audience || 'Open to all'}</span></p>
+                      <p className="inline-flex items-center gap-1.5"><MapPinIcon className="h-4 w-4 text-brand-blue" /><span><span className="font-semibold text-slate-800">Location:</span> {sessionModalEntry.location || 'Library Hall'}</span></p>
+                    </div>
+                    <div className="mt-3 border-b border-slate-200" />
+                    <p className="mt-3 inline-flex items-start gap-2 text-sm leading-relaxed text-slate-700">
+                      <DocumentTextIcon className="mt-0.5 h-4 w-4 shrink-0 text-brand-blue" />
+                      <span>{sessionModalEntry.summary || 'Session details will be shared soon.'}</span>
+                    </p>
+                  </article>
+
+                  <article className="flex h-full flex-col rounded-xl border border-slate-200 p-5">
+                    <h4 className="flex items-center gap-2 font-heading text-lg font-semibold text-slate-900">
+                      <IdentificationIcon className="h-5 w-5 text-brand-blue" />
+                      <span>Person Details</span>
+                    </h4>
+                    <div className="mt-2 border-b border-slate-200" />
+                    <form className="mt-3 flex h-full flex-col" onSubmit={registrationForm.handleSubmit((values) => registrationMutation.mutate(values))}>
+                      {isAuthenticated ? <input type="hidden" {...registrationForm.register('name', { required: true })} /> : null}
+                      {isAuthenticated ? <input type="hidden" {...registrationForm.register('email', { required: true })} /> : null}
+                      {isAuthenticated ? <input type="hidden" {...registrationForm.register('contact')} /> : null}
+
+                      {isAuthenticated ? (
+                        <div className="space-y-1 text-sm text-slate-700">
+                          <p className="flex items-center gap-1.5"><UserIcon className="h-4 w-4 text-brand-blue" /><span><span className="font-semibold text-slate-800">Name:</span> {registrationDefaults.name || '-'}</span></p>
+                          <p className="flex items-center gap-1.5"><EnvelopeIcon className="h-4 w-4 text-brand-blue" /><span><span className="font-semibold text-slate-800">Email:</span> {registrationDefaults.email || '-'}</span></p>
+                          <p className="flex items-center gap-1.5"><PhoneIcon className="h-4 w-4 text-brand-blue" /><span><span className="font-semibold text-slate-800">Phone:</span> {registrationDefaults.contact || '-'}</span></p>
+                        </div>
+                      ) : (
+                        <div className="grid gap-2">
+                          <label className="text-sm font-medium text-slate-700">
+                            <span className="inline-flex items-center gap-1"><UserIcon className="h-4 w-4 text-brand-blue" />Name</span>
+                            <input
+                              {...registrationForm.register('name', { required: true })}
+                              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                              placeholder="Enter your name"
+                            />
+                          </label>
+                          <label className="text-sm font-medium text-slate-700">
+                            <span className="inline-flex items-center gap-1"><EnvelopeIcon className="h-4 w-4 text-brand-blue" />Email</span>
+                            <input
+                              type="email"
+                              {...registrationForm.register('email', { required: true })}
+                              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                              placeholder="name@example.com"
+                            />
+                          </label>
+                          <label className="text-sm font-medium text-slate-700">
+                            <span className="inline-flex items-center gap-1"><PhoneIcon className="h-4 w-4 text-brand-blue" />Contact (optional)</span>
+                            <input
+                              {...registrationForm.register('contact')}
+                              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                              placeholder="Phone number"
+                            />
+                          </label>
+                        </div>
+                      )}
+
+                      <div className="mt-auto pt-4">
+                        {isAlreadyRegisteredForSelectedSession ? (
+                          <p className="inline-flex items-center gap-1 text-xs font-semibold text-red-600"><InformationCircleIcon className="h-4 w-4" />Already registered</p>
+                        ) : null}
+
+                        {!isAlreadyRegisteredForSelectedSession ? (
+                          <Button type="submit" className="w-full" disabled={registrationMutation.isPending}>
+                            <span className="inline-flex items-center gap-1.5">
+                              <CheckBadgeIcon className="h-4 w-4" />
+                              <span>{registrationMutation.isPending ? 'Saving...' : 'Save Registration'}</span>
+                            </span>
+                          </Button>
+                        ) : null}
+                      </div>
+                    </form>
+                  </article>
                 </section>
               ) : (
-                <p className="mt-4 rounded-lg border border-brand-saffron/40 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
+                <p className="mt-4 inline-flex items-center gap-1 rounded-lg border border-brand-saffron/40 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
+                  <InformationCircleIcon className="h-4 w-4" />
                   Event link is still syncing. Please open the Events page to register.
                 </p>
               )}

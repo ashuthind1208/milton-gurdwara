@@ -4,6 +4,7 @@ import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import ReactCalendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
+import { CalendarDaysIcon } from '@heroicons/react/24/outline';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
 import enUS from 'date-fns/locale/en-US';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -17,8 +18,6 @@ import cmsService from '../../services/cmsService';
 import advertisementService from '../../services/advertisementService';
 import { useAuth } from '../../context/AuthContext';
 import contentApiService from '../../services/contentApiService';
-
-const EVENTS_IDENTITY_SETTING_KEY = 'settings-events-allow-custom-name-email';
 
 const locales = { 'en-US': enUS };
 const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales });
@@ -34,6 +33,10 @@ const categoryDotClass = {
   Workshop: 'bg-emerald-500',
   Seva: 'bg-amber-500'
 };
+
+const normalizeTextToken = (value) => String(value || '').trim().toLowerCase();
+const normalizePhoneToken = (value) => String(value || '').replace(/\D/g, '');
+const EVENTS_IDENTITY_SETTING_KEY = 'settings-events-allow-custom-name-email';
 
 const EventsPage = () => {
   const meta = useSeoMeta('Events', 'Event calendar, list view, filters, and RSVP registration for all programs.');
@@ -52,16 +55,11 @@ const EventsPage = () => {
     contact: String(user?.phone || '')
   }), [user?.email, user?.name, user?.phone]);
   const registrationForm = useForm({ defaultValues: { name: '', email: '', contact: '' } });
-  const { data: eventsIdentitySettings = { enabled: false } } = useQuery({
-    queryKey: [EVENTS_IDENTITY_SETTING_KEY],
-    queryFn: () => contentApiService.getSingleton(EVENTS_IDENTITY_SETTING_KEY, { enabled: false })
-  });
 
   const profilePhoneMissing = !String(user?.phone || '').trim();
-  const identityLocked = !Boolean(eventsIdentitySettings?.enabled);
-  const currentUserEmail = String(user?.email || '').trim().toLowerCase();
-  const currentUserPhone = String(user?.phone || '').trim().toLowerCase();
-  const currentUserName = String(user?.name || '').trim().toLowerCase();
+  const currentUserEmail = normalizeTextToken(user?.email);
+  const currentUserPhone = normalizePhoneToken(user?.phone);
+  const currentUserName = normalizeTextToken(user?.name);
   const { data: events = [] } = useQuery({ queryKey: ['events'], queryFn: () => eventService.getEvents().then((res) => res.data) });
   const { data: content } = useQuery({
     queryKey: ['page-content', 'events'],
@@ -71,30 +69,49 @@ const EventsPage = () => {
     queryKey: ['advertisements'],
     queryFn: () => advertisementService.getAds().then((res) => res.data)
   });
+  const { data: eventsIdentitySettings = { enabled: false } } = useQuery({
+    queryKey: [EVENTS_IDENTITY_SETTING_KEY],
+    queryFn: () => contentApiService.getSingleton(EVENTS_IDENTITY_SETTING_KEY, { enabled: false })
+  });
+  const { data: libraryContent = {} } = useQuery({
+    queryKey: ['library-content-events-fallback'],
+    queryFn: () => contentApiService.getSingleton('library_content', {})
+  });
+  const allowIdentityOverride = Boolean(eventsIdentitySettings?.enabled);
+
+  const librarySummaryByEventId = useMemo(() => {
+    const map = new Map();
+    const programUpdates = Array.isArray(libraryContent?.programUpdates) ? libraryContent.programUpdates : [];
+    programUpdates.forEach((entry) => {
+      const eventId = Number(entry?.eventId || 0);
+      const summary = String(entry?.summary || '').trim();
+      if (eventId > 0 && summary) {
+        map.set(eventId, summary);
+      }
+    });
+    return map;
+  }, [libraryContent]);
 
   const eventsTopAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Events Top Banner').slice(0, 2), [ads]);
   const eventsFooterAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Events Footer Banner').slice(0, 2), [ads]);
 
   const registrationMutation = useMutation({
     mutationFn: (values) => {
-      if (!isAuthenticated) {
+      if (!isAuthenticated && !allowIdentityOverride) {
         throw new Error('Please sign in to register for events.');
       }
-      if (profilePhoneMissing) {
+      if (isAuthenticated && profilePhoneMissing) {
         throw new Error('Please add your phone number in profile before registering for events.');
       }
 
       const inputEmail = String(values?.email || '').trim().toLowerCase();
       const inputContact = String(values?.contact || '').trim().toLowerCase();
-      const inputName = String(values?.name || '').trim().toLowerCase();
       const existingRegistrants = Array.isArray(selectedEvent?.registrants) ? selectedEvent.registrants : [];
       const alreadyRegistered = existingRegistrants.some((entry) => {
         const entryEmail = String(entry.email || '').trim().toLowerCase();
         const entryContact = String(entry.contact || '').trim().toLowerCase();
-        const entryName = String(entry.name || '').trim().toLowerCase();
         return (inputEmail && entryEmail === inputEmail)
-          || (inputContact && entryContact === inputContact)
-          || (inputName && entryName === inputName);
+          || (inputContact && entryContact === inputContact);
       });
 
       if (alreadyRegistered) {
@@ -106,7 +123,7 @@ const EventsPage = () => {
         name: values.name,
         email: values.email,
         contact: values.contact
-      });
+      }).then((response) => response.data);
     },
     onSuccess: (updatedEvent, values) => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
@@ -128,8 +145,49 @@ const EventsPage = () => {
       }
 
       window.alert('Registration saved successfully.');
+    },
+    onError: (error) => {
+      window.alert(error?.message || 'Unable to save this registration right now.');
     }
   });
+
+  const downloadEventCalendarFile = async (eventId) => {
+    try {
+      const { data: fileBlob } = await eventService.downloadEventCalendar(eventId);
+      const blob = fileBlob instanceof Blob ? fileBlob : new Blob([fileBlob], { type: 'text/calendar;charset=utf-8' });
+      const fileUrl = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = fileUrl;
+      anchor.download = `event-${String(eventId)}.ics`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      window.URL.revokeObjectURL(fileUrl);
+    } catch (error) {
+      window.alert(error?.message || 'Unable to download event calendar file right now.');
+    }
+  };
+
+  const selectedEventDateLabel = selectedEvent?.date
+    ? new Date(selectedEvent.date).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' })
+    : 'Date TBD';
+  const selectedEventTimeLabel = selectedEvent?.date
+    ? `${new Date(selectedEvent.date).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })} - ${new Date(selectedEvent?.endDate || selectedEvent?.end).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })}`
+    : 'Time TBD';
+  const selectedEventLoginNext = useMemo(() => {
+    const params = new URLSearchParams(location.search || '');
+    if (selectedEvent?.id) {
+      params.set('eventId', String(selectedEvent.id));
+    }
+    const queryText = params.toString();
+    return `/events${queryText ? `?${queryText}` : ''}`;
+  }, [location.search, selectedEvent?.id]);
+
+  const selectedEventCapacity = Number(selectedEvent?.capacity || 0);
+  const selectedEventConfirmedRegistrations = Number(selectedEvent?.registrations || 0);
+  const selectedEventIsFull = selectedEventCapacity > 0 && selectedEventConfirmedRegistrations >= selectedEventCapacity;
+  const selectedEventWaitlistEnabled = selectedEvent?.waitlistEnabled !== false;
+  const canRegisterForSelectedEvent = !selectedEventIsFull || selectedEventWaitlistEnabled;
 
   const activeEvents = useMemo(
     () => events.filter((event) => event.active !== false),
@@ -151,7 +209,7 @@ const EventsPage = () => {
     return {
       id: event.id,
       title: event.title,
-      description: event.description || '',
+      description: String(event.description || '').trim() || librarySummaryByEventId.get(Number(event.id)) || '',
       category: event.category,
       location: event.location,
       mediaUrl: event.mediaUrl || '',
@@ -165,23 +223,41 @@ const EventsPage = () => {
       start: startDate,
       end: endDate
     };
-  }), [filtered]);
+  }), [filtered, librarySummaryByEventId]);
+
+  const selectedEventDescription = useMemo(() => {
+    if (!selectedEvent) {
+      return '';
+    }
+    return String(selectedEvent.description || '').trim() || librarySummaryByEventId.get(Number(selectedEvent.id)) || '';
+  }, [librarySummaryByEventId, selectedEvent]);
 
   const isAlreadyRegisteredForSelectedEvent = useMemo(() => {
     if (!isAuthenticated || !selectedEvent) {
       return false;
     }
 
+    const registrationEmail = normalizeTextToken(registrationDefaults.email);
+    const registrationContactText = normalizeTextToken(registrationDefaults.contact);
+    const registrationContactPhone = normalizePhoneToken(registrationDefaults.contact);
+    const registrationName = normalizeTextToken(registrationDefaults.name);
     const registrants = Array.isArray(selectedEvent.registrants) ? selectedEvent.registrants : [];
+
     return registrants.some((entry) => {
-      const entryEmail = String(entry.email || '').trim().toLowerCase();
-      const entryContact = String(entry.contact || '').trim().toLowerCase();
-      const entryName = String(entry.name || '').trim().toLowerCase();
+      const entryEmail = normalizeTextToken(entry.email);
+      const entryContact = normalizeTextToken(entry.contact || entry.phone || entry.whatsapp);
+      const entryContactPhone = normalizePhoneToken(entry.contact || entry.phone || entry.whatsapp);
+      const entryName = normalizeTextToken(entry.name);
+
       return (currentUserEmail && (entryEmail === currentUserEmail || entryContact === currentUserEmail))
-        || (currentUserPhone && entryContact === currentUserPhone)
-        || (currentUserName && entryName === currentUserName);
+        || (registrationEmail && entryEmail === registrationEmail)
+        || (currentUserPhone && entryContactPhone && entryContactPhone === currentUserPhone)
+        || (registrationContactPhone && entryContactPhone && entryContactPhone === registrationContactPhone)
+        || (registrationContactText && entryContact === registrationContactText)
+        || (currentUserName && entryName === currentUserName)
+        || (registrationName && entryName === registrationName);
     });
-  }, [currentUserEmail, currentUserName, currentUserPhone, isAuthenticated, selectedEvent]);
+  }, [currentUserEmail, currentUserName, currentUserPhone, isAuthenticated, registrationDefaults.contact, registrationDefaults.email, registrationDefaults.name, selectedEvent]);
 
   const selectedDateEvents = useMemo(() => {
     const selectedDay = selectedDate.toDateString();
@@ -316,17 +392,6 @@ const EventsPage = () => {
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Selected Day</p>
             <p className="mt-1 text-sm font-bold text-slate-900">{format(selectedDate, 'EEEE, MMM d, yyyy')}</p>
             <p className="mt-1 text-xs text-slate-600">{selectedDateEvents.length} event{selectedDateEvents.length === 1 ? '' : 's'} found</p>
-          </div>
-
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">Calendar Subscription</p>
-            <p className="mt-1 text-xs text-emerald-900">Add all gurdwara events to your personal calendar app.</p>
-            <a
-              href={eventService.getCalendarFeedUrl()}
-              className="mt-2 inline-flex rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:border-emerald-400"
-            >
-              Download Events iCal (.ics)
-            </a>
           </div>
 
           <ReactCalendar
@@ -484,46 +549,30 @@ const EventsPage = () => {
 
             <div className="mt-3 border-b border-slate-200" />
 
-            <div className="mt-3 pt-2 flex flex-wrap items-center gap-2 text-sm text-slate-700">
+            <div className="mt-3 flex flex-wrap items-center gap-2 pt-2 text-sm text-slate-700">
               <span className="inline-flex items-center gap-1 rounded-full border border-brand-blue/25 bg-brand-blue px-3 py-1 text-xs font-extrabold tracking-wide text-white shadow-sm">
                 {selectedEvent.category || 'Event'}
               </span>
-              <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-100 px-3 py-1 text-xs font-bold text-indigo-900 shadow-sm">
-                <span className="font-extrabold text-indigo-900">Date:</span>
-                {new Date(selectedEvent.date).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' })}
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-900 shadow-sm">
-                <span className="font-extrabold text-emerald-900">Time:</span>
-                {new Date(selectedEvent.date).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })}
-                {' - '}
-                {new Date(selectedEvent.endDate || selectedEvent.end).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })}
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900 shadow-sm">
-                <span className="font-extrabold text-amber-900">Location:</span>
-                {selectedEvent.location || 'Location TBD'}
-              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  void downloadEventCalendarFile(selectedEvent.id);
+                }}
+                className="ml-auto inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-extrabold tracking-wide text-emerald-900 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-100"
+              >
+                <CalendarDaysIcon className="h-3.5 w-3.5" />
+                <span className="uppercase">Add To Calendar</span>
+              </button>
             </div>
 
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <h4 className="mt-1 font-heading text-xl font-semibold text-slate-900">{selectedEvent.title}</h4>
+                <h4 className="mt-1 truncate font-heading text-2xl font-extrabold text-slate-900" title={selectedEvent.title}>{selectedEvent.title}</h4>
+                <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{selectedEventDateLabel} • {selectedEventTimeLabel}</p>
+                <div className="mt-3 border-t border-slate-200" />
                 <p className="mt-2 text-sm leading-relaxed text-slate-700">
-                  {selectedEvent.description || 'No description provided for this event yet.'}
+                  {selectedEventDescription || 'No description provided for this event yet.'}
                 </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <a
-                    href={eventService.getEventCalendarUrl(selectedEvent.id)}
-                    className="inline-flex rounded-lg border border-brand-blue/30 bg-white px-3 py-1.5 text-xs font-semibold text-brand-blue hover:border-brand-blue/50"
-                  >
-                    Add This Event to Calendar
-                  </a>
-                  <a
-                    href={eventService.getCalendarFeedUrl()}
-                    className="inline-flex rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:border-emerald-400"
-                  >
-                    Subscribe to All Events
-                  </a>
-                </div>
                 {selectedEvent.mediaUrl ? <img src={selectedEvent.mediaUrl} alt={selectedEvent.title || 'Event media'} className="mt-3 h-44 w-full rounded-lg object-cover" loading="lazy" /> : null}
               </section>
 
@@ -537,52 +586,90 @@ const EventsPage = () => {
                         Capacity: {selectedEvent.capacity} • Spots left: {Math.max(0, selectedEvent.capacity - Number(selectedEvent.registrations || 0))}
                       </p>
                     ) : null}
-                    {selectedEvent.waitlistEnabled ? <p className="text-xs text-amber-700">Waitlist: {selectedEvent.waitlistCount || 0}</p> : null}
+                    {selectedEventIsFull ? (
+                      <p className="text-xs text-slate-600">
+                        {selectedEventWaitlistEnabled ? 'Waitlist is open' : 'Waitlist is disabled'}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
-                {!isAuthenticated ? (
+                {!isAuthenticated && !allowIdentityOverride ? (
                   <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                    Please <Link to="/login?next=/events" className="font-bold underline">sign in</Link> to register for this event.
+                    Please <Link to={`/login?next=${encodeURIComponent(selectedEventLoginNext)}`} state={{ from: { pathname: '/events', search: selectedEventLoginNext.replace('/events', '') } }} className="font-bold underline">sign in</Link> to register for this event.
                   </p>
                 ) : (
                   <form className="mt-3 space-y-3" onSubmit={registrationForm.handleSubmit((values) => registrationMutation.mutate(values))}>
-                    {profilePhoneMissing ? (
+                    {isAuthenticated ? <input type="hidden" {...registrationForm.register('name', { required: true })} /> : null}
+                    {isAuthenticated ? <input type="hidden" {...registrationForm.register('email', { required: true })} /> : null}
+                    {isAuthenticated ? <input type="hidden" {...registrationForm.register('contact', { required: true })} /> : null}
+                    {!isAuthenticated ? (
+                      <div className="grid gap-2">
+                        <label className="text-sm font-medium text-slate-700">
+                          Name
+                          <input
+                            type="text"
+                            {...registrationForm.register('name', { required: true })}
+                            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                            placeholder="Enter your name"
+                          />
+                        </label>
+                        <label className="text-sm font-medium text-slate-700">
+                          Email
+                          <input
+                            type="email"
+                            {...registrationForm.register('email', { required: true })}
+                            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                            placeholder="name@example.com"
+                          />
+                        </label>
+                        <label className="text-sm font-medium text-slate-700">
+                          Phone (optional)
+                          <input
+                            type="tel"
+                            {...registrationForm.register('contact')}
+                            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                            placeholder="Phone number"
+                          />
+                        </label>
+                      </div>
+                    ) : null}
+                    {isAuthenticated && profilePhoneMissing ? (
                       <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                         Add your phone number in profile before registering for any event.
                       </p>
                     ) : null}
                     {isAlreadyRegisteredForSelectedEvent ? (
-                      <p className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800">
-                        You have already registered for this.
+                      <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+                        You have already registered for this event.
                       </p>
                     ) : null}
-                    <label className="text-sm">Name
-                      <input
-                        {...registrationForm.register('name', { required: true })}
-                        readOnly={identityLocked}
-                        className={`mt-1 w-full rounded-lg border border-slate-300 p-2.5 ${identityLocked ? 'bg-slate-100 font-extrabold text-base text-slate-900' : ''}`}
-                      />
-                    </label>
-                    <label className="text-sm">Email
-                      <input
-                        type="email"
-                        {...registrationForm.register('email', { required: true })}
-                        readOnly={identityLocked}
-                        className={`mt-1 w-full rounded-lg border border-slate-300 p-2.5 ${identityLocked ? 'bg-slate-100 font-extrabold text-base text-slate-900' : ''}`}
-                      />
-                    </label>
-                    <label className="text-sm">Contact
-                      <input {...registrationForm.register('contact', { required: true })} readOnly className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-100 p-2.5 text-base font-extrabold text-slate-900" />
-                    </label>
-                    <Button type="submit" className="w-full" disabled={registrationMutation.isPending || profilePhoneMissing || isAlreadyRegisteredForSelectedEvent}>
-                      {registrationMutation.isPending
-                        ? 'Saving...'
-                        : isAlreadyRegisteredForSelectedEvent
-                          ? 'You have already registered for this'
-                        : (selectedEvent.capacity > 0 && Number(selectedEvent.registrations || 0) >= selectedEvent.capacity && selectedEvent.waitlistEnabled
-                          ? 'Join Waitlist'
-                          : 'Save Registration')}
-                    </Button>
+                    {!isAlreadyRegisteredForSelectedEvent && selectedEventIsFull && selectedEventWaitlistEnabled ? (
+                      <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+                        This event is full. You can still join the waitlist.
+                      </p>
+                    ) : null}
+                    {!isAlreadyRegisteredForSelectedEvent && selectedEventIsFull && !selectedEventWaitlistEnabled ? (
+                      <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+                        This event is full and waitlist is closed.
+                      </p>
+                    ) : null}
+                    {isAuthenticated ? (
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Registered As</p>
+                        <div className="mt-2 space-y-1 text-xs text-slate-700">
+                          <p><span className="font-semibold text-slate-800">Name:</span> {registrationDefaults.name || '-'}</p>
+                          <p><span className="font-semibold text-slate-800">Email:</span> {registrationDefaults.email || '-'}</p>
+                          <p><span className="font-semibold text-slate-800">Phone:</span> {registrationDefaults.contact || '-'}</p>
+                        </div>
+                      </div>
+                    ) : null}
+                    {!isAlreadyRegisteredForSelectedEvent ? (
+                      <Button type="submit" className="w-full" disabled={registrationMutation.isPending || (isAuthenticated && profilePhoneMissing) || !canRegisterForSelectedEvent}>
+                        {registrationMutation.isPending
+                          ? 'Saving...'
+                          : (selectedEventIsFull && selectedEventWaitlistEnabled ? 'Join Waitlist' : 'Save Registration')}
+                      </Button>
+                    ) : null}
                   </form>
                 )}
               </section>

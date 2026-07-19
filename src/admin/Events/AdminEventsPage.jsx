@@ -83,6 +83,20 @@ const applyDayToDateTime = (day, existingDateTime, fallbackHour = '09', fallback
   return combineDateTime(day, hour || fallbackHour, minute || fallbackMinute);
 };
 
+const truncateWords = (value, maxWords = 50) => {
+  const text = String(value || '').trim();
+  if (!text) {
+    return '-';
+  }
+
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) {
+    return text;
+  }
+
+  return `${words.slice(0, maxWords).join(' ')}...`;
+};
+
 const EventTimeField = ({ label, triggerLabel, value, onCommit, required = false }) => {
   const parsed = useMemo(() => splitDateTime(value), [value]);
   const [draftHour, setDraftHour] = useState(parsed.hour);
@@ -209,7 +223,7 @@ const AdminEventsPage = () => {
 
   const { data: events = [] } = useQuery({
     queryKey: ['admin-events'],
-    queryFn: () => eventService.getEvents().then((res) => res.data)
+    queryFn: () => eventService.getEvents({ includeInactive: true }).then((res) => res.data)
   });
   const { data: eventsIdentitySettings = { enabled: false } } = useQuery({
     queryKey: [EVENTS_IDENTITY_SETTING_KEY],
@@ -863,7 +877,7 @@ const AdminEventsPage = () => {
               <p><span className="font-semibold text-brand-blue">Category:</span> {viewEvent.category || '-'}</p>
               <p><span className="font-semibold text-brand-blue">Location:</span> {viewEvent.location || '-'}</p>
               <p><span className="font-semibold text-brand-blue">Media:</span> {viewEvent.mediaUrl ? <a href={viewEvent.mediaUrl} target="_blank" rel="noreferrer" className="text-brand-blue hover:underline">Open media</a> : '-'}</p>
-              <p className="md:col-span-2"><span className="font-semibold text-brand-blue">Description:</span> {viewEvent.description || '-'}</p>
+              <p className="md:col-span-2"><span className="font-semibold text-brand-blue">Description:</span> {truncateWords(viewEvent.description, 50)}</p>
               <p><span className="font-semibold text-brand-blue">Status:</span> {viewEvent.active === false ? 'Inactive' : 'Active'}</p>
               <p><span className="font-semibold text-brand-blue">Total Registrations:</span> {viewEvent.registrations || (viewEvent.registrants || []).length || 0}</p>
               <p><span className="font-semibold text-brand-blue">Capacity:</span> {Number(viewEvent.capacity || 0) > 0 ? Number(viewEvent.capacity) : 'Unlimited'}</p>

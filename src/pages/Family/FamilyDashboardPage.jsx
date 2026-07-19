@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
+import { ArrowDownTrayIcon, CalendarDaysIcon, HandRaisedIcon, BanknotesIcon, DocumentArrowDownIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import Seo from '../../components/common/Seo';
 import PageHero from '../../components/common/PageHero';
 import useSeoMeta from '../../hooks/useSeoMeta';
@@ -9,25 +10,31 @@ import { useAuth } from '../../context/AuthContext';
 import eventService from '../../services/eventService';
 import donationService from '../../services/donationService';
 import volunteerService from '../../services/volunteerService';
-import { downloadCsv } from '../../utils/csvExport';
+import { downloadCsv, downloadDonationInvoicePdf } from '../../utils/csvExport';
+import { siteConfig } from '../../constants/siteConfig';
 
 const FamilyDashboardPage = () => {
   const meta = useSeoMeta('Family Dashboard', 'Track your family event RSVPs, waitlists, seva applications, and donations in one view.');
   const { user, isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
   const [donationPage, setDonationPage] = useState(1);
   const donationsPerPage = 6;
+  const userDisplayName = String(user?.name || 'Member').trim() || 'Member';
+  const userAvatarUrl = String(user?.avatarUrl || user?.picture || user?.photoURL || user?.imageUrl || user?.profileImageUrl || '').trim();
 
   const email = String(user?.email || '').toLowerCase();
   const userName = String(user?.name || '').trim().toLowerCase();
+  const userPhone = String(user?.phone || '').trim().toLowerCase();
+  const userPhoneDigits = userPhone.replace(/\D/g, '');
 
   const { data: events = [] } = useQuery({
-    queryKey: ['family-dashboard-events'],
+    queryKey: ['events', 'family-dashboard'],
     queryFn: () => eventService.getEvents().then((res) => res.data),
     enabled: isAuthenticated
   });
 
   const { data: sevaApplications = [] } = useQuery({
-    queryKey: ['family-dashboard-seva'],
+    queryKey: ['admin-volunteers', 'family-dashboard'],
     queryFn: () => volunteerService.getApplications().then((res) => res.data),
     enabled: isAuthenticated
   });
@@ -56,6 +63,7 @@ const FamilyDashboardPage = () => {
         }
 
         rows.push({
+          registrantId: entry.id,
           eventId: event.id,
           eventTitle: event.title,
           eventDate: event.date,
@@ -76,10 +84,27 @@ const FamilyDashboardPage = () => {
 
     return sevaApplications.filter((entry) => {
       const entryEmail = String(entry.email || '').trim().toLowerCase();
+      const entryPhoneRaw = String(entry.phone || entry.whatsapp || '').trim().toLowerCase();
+      const entryPhoneDigits = entryPhoneRaw.replace(/\D/g, '');
       const entryName = String(entry.name || '').trim().toLowerCase();
-      return (email && entryEmail === email) || (userName && entryName === userName);
+      const hasUserIdentifier = Boolean(email || userPhoneDigits || userPhone);
+      const hasEntryIdentifier = Boolean(entryEmail || entryPhoneDigits || entryPhoneRaw);
+
+      if (email && entryEmail === email) {
+        return true;
+      }
+
+      if (userPhoneDigits && entryPhoneDigits && userPhoneDigits === entryPhoneDigits) {
+        return true;
+      }
+
+      if (userPhone && entryPhoneRaw && userPhone === entryPhoneRaw) {
+        return true;
+      }
+
+      return !hasUserIdentifier && !hasEntryIdentifier && userName && entryName === userName;
     });
-  }, [sevaApplications, isAuthenticated, email, userName]);
+  }, [sevaApplications, isAuthenticated, email, userName, userPhone, userPhoneDigits]);
 
   const familyDonations = useMemo(() => {
     if (!isAuthenticated) {
@@ -138,6 +163,45 @@ const FamilyDashboardPage = () => {
     });
   };
 
+  const handleDownloadInvoice = (entry) => {
+    void downloadDonationInvoicePdf({
+      fileName: `invoice-${entry.receiptId || entry.id}.pdf`,
+      organizationName: siteConfig.name,
+      address: siteConfig.contact.address,
+      phone: siteConfig.contact.phone,
+      donation: entry,
+      campaignDescription: ''
+    }).catch(() => null);
+  };
+
+  const removeEventRegistrationMutation = useMutation({
+    mutationFn: ({ eventId, registrantId }) => eventService.removeEventRegistrant({ eventId, registrantId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-events'] });
+    },
+    onError: (error) => {
+      window.alert(error?.message || 'Unable to remove this registration right now.');
+    }
+  });
+
+  const handleNotGoing = (entry) => {
+    if (!entry?.eventId || !entry?.registrantId) {
+      window.alert('Unable to remove this registration because details are missing.');
+      return;
+    }
+
+    const confirmed = window.confirm(`Remove your registration for ${entry.eventTitle || 'this event'}?`);
+    if (!confirmed) {
+      return;
+    }
+
+    removeEventRegistrationMutation.mutate({
+      eventId: entry.eventId,
+      registrantId: entry.registrantId
+    });
+  };
+
   const totalDonationPages = Math.max(1, Math.ceil(familyDonations.length / donationsPerPage));
   const safeDonationPage = Math.min(donationPage, totalDonationPages);
   const paginatedDonations = useMemo(() => {
@@ -164,22 +228,95 @@ const FamilyDashboardPage = () => {
     );
   }
 
+  const formatSevaDateLabel = (value) => {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return String(value || '-');
+    }
+    return format(parsed, 'EEE, MMM d yyyy');
+  };
+
+  const exportButtons = (
+    <div className="flex flex-wrap justify-end gap-2">
+      <button
+        type="button"
+        onClick={exportFamilyEventsCsv}
+        className="inline-flex items-center gap-1.5 rounded-lg bg-brand-blue px-3 py-1.5 text-xs font-bold text-white transition hover:bg-brand-saffron hover:text-brand-navy"
+      >
+        <CalendarDaysIcon className="h-3.5 w-3.5" />
+        <span>Export Events CSV</span>
+      </button>
+      <button
+        type="button"
+        onClick={exportFamilySevaCsv}
+        className="inline-flex items-center gap-1.5 rounded-lg bg-brand-blue px-3 py-1.5 text-xs font-bold text-white transition hover:bg-brand-saffron hover:text-brand-navy"
+      >
+        <HandRaisedIcon className="h-3.5 w-3.5" />
+        <span>Export Seva CSV</span>
+      </button>
+      <button
+        type="button"
+        onClick={exportFamilyDonationsCsv}
+        className="inline-flex items-center gap-1.5 rounded-lg bg-brand-blue px-3 py-1.5 text-xs font-bold text-white transition hover:bg-brand-saffron hover:text-brand-navy"
+      >
+        <BanknotesIcon className="h-3.5 w-3.5" />
+        <span>Export Donations CSV</span>
+        <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <Seo {...meta} />
-      <PageHero title="Family Dashboard" description="One place to view your RSVPs, waitlist entries, seva applications, and donation history." />
+      <PageHero
+        title="Family Dashboard"
+        description=""
+        containerClassName="w-full"
+        titleActions={exportButtons}
+      />
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-black text-brand-blue">Export Center</h2>
-            <p className="text-xs text-slate-600">Download your family records anytime for personal tracking.</p>
+      <section className="rounded-2xl border border-brand-blue/20 bg-gradient-to-r from-blue-50 via-white to-amber-50 p-4 md:p-5">
+        <div className="flex flex-wrap items-start gap-4 md:gap-5">
+          <div className="h-20 w-20 overflow-hidden rounded-2xl border-2 border-brand-saffron bg-brand-blue/10 md:h-24 md:w-24">
+            {userAvatarUrl ? (
+              <img src={userAvatarUrl} alt={userDisplayName} className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-2xl font-black text-brand-blue md:text-3xl">
+                {String(userDisplayName.charAt(0) || 'M').toUpperCase()}
+              </div>
+            )}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={exportFamilyEventsCsv} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-brand-blue/35">Export Events CSV</button>
-            <button type="button" onClick={exportFamilySevaCsv} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-brand-blue/35">Export Seva CSV</button>
-            <button type="button" onClick={exportFamilyDonationsCsv} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-brand-blue/35">Export Donations CSV</button>
+
+          <div className="min-w-[220px] flex-1">
+            <p className="text-sm font-bold uppercase tracking-widest text-brand-blue/80">Sat Sri Akal,</p>
+            <h2 className="text-2xl font-black text-slate-900 md:text-3xl">{userDisplayName}</h2>
+            <p className="mt-1 text-sm text-slate-700">
+              You currently have {familyEventRegistrations.length} event RSVP{familyEventRegistrations.length === 1 ? '' : 's'}, {familySevaApplications.length} seva application{familySevaApplications.length === 1 ? '' : 's'}, and {familyDonations.length} donation record{familyDonations.length === 1 ? '' : 's'}.
+            </p>
+            <div className="mt-3">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Quick Links</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <Link to="/events" className="rounded-lg border border-slate-200 bg-white/90 px-3 py-2 transition hover:border-brand-blue/40 hover:bg-blue-50">
+                  <p className="text-sm font-bold text-brand-blue">View Events</p>
+                  <p className="text-xs text-slate-600">Check upcoming programs and register your family.</p>
+                </Link>
+                <Link to="/seva" className="rounded-lg border border-slate-200 bg-white/90 px-3 py-2 transition hover:border-brand-blue/40 hover:bg-blue-50">
+                  <p className="text-sm font-bold text-brand-blue">Explore Seva</p>
+                  <p className="text-xs text-slate-600">Find seva opportunities and apply in a few steps.</p>
+                </Link>
+                <Link to="/donation" className="rounded-lg border border-slate-200 bg-white/90 px-3 py-2 transition hover:border-brand-blue/40 hover:bg-blue-50">
+                  <p className="text-sm font-bold text-brand-blue">Give Donation</p>
+                  <p className="text-xs text-slate-600">Support active campaigns and continue your contribution.</p>
+                </Link>
+                <Link to="/contact" className="rounded-lg border border-slate-200 bg-white/90 px-3 py-2 transition hover:border-brand-blue/40 hover:bg-blue-50">
+                  <p className="text-sm font-bold text-brand-blue">Contact Committee</p>
+                  <p className="text-xs text-slate-600">Reach out for membership, seva, or donation help.</p>
+                </Link>
+              </div>
+            </div>
           </div>
+
         </div>
       </section>
 
@@ -191,13 +328,30 @@ const FamilyDashboardPage = () => {
             <div className="mt-3 space-y-2">
               {familyEventRegistrations.map((entry, index) => (
                 <div key={`${entry.eventId}-${index}`} className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 text-sm">
-                  <p className="font-semibold text-slate-800">{entry.eventTitle}</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-semibold text-slate-800">{entry.eventTitle}</p>
+                    <button
+                      type="button"
+                      onClick={() => handleNotGoing(entry)}
+                      disabled={removeEventRegistrationMutation.isPending}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-full border border-red-300 px-2 py-0.5 text-[11px] font-semibold text-red-700 transition hover:border-red-400 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <XCircleIcon className="h-3.5 w-3.5" />
+                      <span>
+                        {removeEventRegistrationMutation.isPending && removeEventRegistrationMutation.variables?.registrantId === entry.registrantId
+                          ? 'Removing...'
+                          : 'Not Going'}
+                      </span>
+                    </button>
+                  </div>
                   <p className="text-xs text-slate-600">{entry.location || 'Location TBD'} • {format(new Date(entry.eventDate), 'EEE, MMM d yyyy, h:mm a')}</p>
-                  {entry.eventId ? (
-                    <a href={eventService.getEventCalendarUrl(entry.eventId)} className="mt-1 inline-flex text-[11px] font-semibold text-brand-blue underline underline-offset-2">
-                      Add to calendar
-                    </a>
-                  ) : null}
+                  <div className="mt-1 flex flex-wrap items-center gap-3">
+                    {entry.eventId ? (
+                      <a href={eventService.getEventCalendarUrl(entry.eventId)} className="inline-flex text-[11px] font-semibold text-brand-blue underline underline-offset-2">
+                        Add to calendar
+                      </a>
+                    ) : null}
+                  </div>
                 </div>
               ))}
               {familyEventRegistrations.length === 0 ? <p className="text-sm text-slate-500">No event registrations found for your profile yet.</p> : null}
@@ -211,7 +365,7 @@ const FamilyDashboardPage = () => {
               {familySevaApplications.map((entry) => (
                 <div key={entry.id} className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 text-sm">
                   <p className="font-semibold text-slate-800">{entry.sevaType || entry.area || 'Seva'}</p>
-                  <p className="text-xs text-slate-600">{entry.sevaDate || '-'} • {entry.sevaTime || '-'}</p>
+                  <p className="text-xs text-slate-600">{formatSevaDateLabel(entry.sevaDate || entry.date)} • {entry.sevaTime || '-'}</p>
                 </div>
               ))}
               {familySevaApplications.length === 0 ? <p className="text-sm text-slate-500">No seva applications found for your profile yet.</p> : null}
@@ -230,15 +384,28 @@ const FamilyDashboardPage = () => {
           <h2 className="text-2xl font-black text-brand-blue">Donation History</h2>
           <div className="mt-3 space-y-2">
             {paginatedDonations.map((entry) => (
-              <div key={entry.id} className="rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2 text-sm">
+              <div key={entry.id} className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-1.5 text-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-semibold text-slate-800">{entry.campaignName || 'General Donation'}</p>
                     <p className="text-xs text-slate-600">{entry.createdAt ? format(new Date(entry.createdAt), 'EEE, MMM d yyyy, h:mm a') : '-'}</p>
                   </div>
-                  <p className="text-lg font-extrabold text-emerald-700">${Number(entry.amount || 0).toFixed(2)}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-base font-extrabold text-emerald-700">${Number(entry.amount || 0).toFixed(2)}</p>
+                    <span className="inline-flex rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+                      {String(entry.paymentStatus || 'PAID')}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadInvoice(entry)}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-brand-blue/20 px-2 py-1 text-[11px] font-semibold text-brand-blue transition hover:border-brand-blue hover:bg-brand-blue hover:text-white sm:px-3 sm:text-xs"
+                      title="Download invoice PDF"
+                    >
+                      <DocumentArrowDownIcon className="h-4 w-4" />
+                      <span>Invoice</span>
+                    </button>
+                  </div>
                 </div>
-                <p className="mt-1 text-xs font-semibold text-slate-700">Status: {entry.paymentStatus || 'PAID'}</p>
               </div>
             ))}
             {familyDonations.length === 0 ? <p className="text-sm text-slate-500">No donations found for your profile yet.</p> : null}

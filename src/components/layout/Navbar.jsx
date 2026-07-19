@@ -37,6 +37,7 @@ import advertisementService from '../../services/advertisementService';
 import eventService from '../../services/eventService';
 import volunteerService from '../../services/volunteerService';
 import donationService from '../../services/donationService';
+import uploadService from '../../services/uploadService';
 import { useAuth } from '../../context/AuthContext';
 import StreamingModal from '../common/StreamingModal';
 import AudioPillPlayer from '../common/AudioPillPlayer';
@@ -316,12 +317,14 @@ const Navbar = () => {
   const [isProfilePopoverOpen, setIsProfilePopoverOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isProfileSaving, setIsProfileSaving] = useState(false);
+  const [isProfileImageUploading, setIsProfileImageUploading] = useState(false);
+  const [profileImageUploadProgress, setProfileImageUploadProgress] = useState(0);
   const [profileError, setProfileError] = useState('');
   const [profileForm, setProfileForm] = useState({
     name: '',
-    email: '',
     phone: '',
-    address: ''
+    address: '',
+    avatarUrl: ''
   });
   const [isPdfBusy, setIsPdfBusy] = useState(false);
   const [isKirtanPlaying, setIsKirtanPlaying] = useState(false);
@@ -359,21 +362,25 @@ const Navbar = () => {
   const location = useLocation();
   const userEmail = String(user?.email || '').trim().toLowerCase();
   const userName = String(user?.name || '').trim().toLowerCase();
+  const userPhone = String(user?.phone || '').trim().toLowerCase();
+  const userPhoneDigits = userPhone.replace(/\D/g, '');
   const userDisplayName = String(user?.name || '').trim() || 'Sangat Member';
   const userDisplayEmail = String(user?.email || '').trim() || 'No email available';
   const userAvatarUrl = user?.avatarUrl || user?.picture || user?.photoURL || '';
   const userInitial = userDisplayName.charAt(0).toUpperCase() || 'S';
   const profilePhoneMissing = !String(user?.phone || '').trim();
+  const approvalStatus = String(user?.approvalStatus || '').toLowerCase();
   const hasFullAccess = FULL_ACCESS_ROLES.has(String(user?.role || ''));
-  const canSeeAdminPortalButton = ADMIN_PORTAL_BUTTON_ROLES.has(String(user?.role || ''));
-  const isApprovalPending = isAuthenticated && !hasFullAccess && String(user?.approvalStatus || '') !== 'approved';
+  const canSeeAdminPortalButton = ADMIN_PORTAL_BUTTON_ROLES.has(String(user?.role || ''))
+    && (hasFullAccess || approvalStatus === 'approved');
+  const isApprovalPending = isAuthenticated && !hasFullAccess && approvalStatus !== 'approved';
   const { data: familyEvents = [] } = useQuery({
     queryKey: ['navbar-family-events'],
     queryFn: () => eventService.getEvents().then((res) => res.data),
     enabled: isAuthenticated
   });
   const { data: familySeva = [] } = useQuery({
-    queryKey: ['navbar-family-seva'],
+    queryKey: ['admin-volunteers', 'navbar'],
     queryFn: () => volunteerService.getApplications().then((res) => res.data),
     enabled: isAuthenticated
   });
@@ -702,8 +709,25 @@ const Navbar = () => {
 
     const sevaCount = familySeva.filter((entry) => {
       const entryEmail = String(entry.email || '').trim().toLowerCase();
+      const entryPhoneRaw = String(entry.phone || entry.whatsapp || '').trim().toLowerCase();
+      const entryPhoneDigits = entryPhoneRaw.replace(/\D/g, '');
       const entryName = String(entry.name || '').trim().toLowerCase();
-      return (userEmail && entryEmail === userEmail) || (userName && entryName === userName);
+      const hasUserIdentifier = Boolean(userEmail || userPhoneDigits || userPhone);
+      const hasEntryIdentifier = Boolean(entryEmail || entryPhoneDigits || entryPhoneRaw);
+
+      if (userEmail && entryEmail === userEmail) {
+        return true;
+      }
+
+      if (userPhoneDigits && entryPhoneDigits && userPhoneDigits === entryPhoneDigits) {
+        return true;
+      }
+
+      if (userPhone && entryPhoneRaw && entryPhoneRaw === userPhone) {
+        return true;
+      }
+
+      return !hasUserIdentifier && !hasEntryIdentifier && userName && entryName === userName;
     }).length;
 
     const donationTotal = familyDonations
@@ -716,7 +740,7 @@ const Navbar = () => {
       sevaCount,
       donationTotal
     };
-  }, [familyDonations, familyEvents, familySeva, isAuthenticated, userEmail, userName]);
+  }, [familyDonations, familyEvents, familySeva, isAuthenticated, userEmail, userName, userPhone, userPhoneDigits]);
 
   const handleLogout = async () => {
     setIsProfilePopoverOpen(false);
@@ -728,11 +752,12 @@ const Navbar = () => {
   const openProfileModal = () => {
     setProfileError('');
     setIsProfilePopoverOpen(false);
+    setProfileImageUploadProgress(0);
     setProfileForm({
       name: String(user?.name || ''),
-      email: String(user?.email || ''),
       phone: String(user?.phone || ''),
-      address: String(user?.address || '')
+      address: String(user?.address || ''),
+      avatarUrl: String(user?.avatarUrl || user?.picture || user?.photoURL || '')
     });
     setIsProfileModalOpen(true);
   };
@@ -741,10 +766,34 @@ const Navbar = () => {
     setProfileForm((previous) => ({ ...previous, [field]: event.target.value }));
   };
 
+  const handleProfileAvatarSelected = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    try {
+      setIsProfileImageUploading(true);
+      setProfileError('');
+      const uploaded = await uploadService.uploadFile({
+        service: 'users',
+        file,
+        allowedMimeTypes: ['image/*'],
+        maxSizeMB: 5,
+        onProgress: setProfileImageUploadProgress
+      });
+      setProfileForm((previous) => ({ ...previous, avatarUrl: String(uploaded?.url || '') }));
+    } catch (error) {
+      setProfileError(error?.message || 'Unable to upload profile image right now.');
+    } finally {
+      setIsProfileImageUploading(false);
+      event.target.value = '';
+    }
+  };
+
   const handleSaveProfile = async (event) => {
     event.preventDefault();
     const nextName = String(profileForm.name || '').trim();
-    const nextEmail = String(user?.email || profileForm.email || '').trim().toLowerCase();
     const nextPhone = String(profileForm.phone || '').trim();
 
     if (!nextName || !nextPhone) {
@@ -757,9 +806,10 @@ const Navbar = () => {
       setProfileError('');
       await updateProfile({
         name: nextName,
-        email: nextEmail,
+        email: String(user?.email || '').trim().toLowerCase(),
         phone: nextPhone,
-        address: String(profileForm.address || '').trim()
+        address: String(profileForm.address || '').trim(),
+        avatarUrl: String(profileForm.avatarUrl || '').trim()
       });
       setIsProfileModalOpen(false);
     } catch (error) {
@@ -1646,7 +1696,7 @@ const Navbar = () => {
                 </div>
               </div>
             ) : (
-              <Link to="/login?next=/family-dashboard" onClick={handleSignInClick} className="rounded-full border border-brand-saffron bg-brand-saffron px-2.5 py-0.5 text-[11px] font-bold text-brand-navy shadow-[0_6px_12px_rgba(245,166,35,0.3)] transition hover:bg-amber-300">Sign In</Link>
+              <Link to="/login" onClick={handleSignInClick} className="rounded-full border border-brand-saffron bg-brand-saffron px-2.5 py-0.5 text-[11px] font-bold text-brand-navy shadow-[0_6px_12px_rgba(245,166,35,0.3)] transition hover:bg-amber-300">Sign In</Link>
             )}
           </div>
         </div>
@@ -1657,14 +1707,29 @@ const Navbar = () => {
           <div className={`relative hidden items-center transition-[min-height,padding] duration-300 ease-in-out lg:flex ${isCompact ? 'min-h-[86px] py-2' : 'min-h-[146px] py-2'}`}>
           <Link
             to="/"
-            preventScrollReset={isCompact}
-            onClick={isCompact ? handleCompactNavClick : undefined}
-            className={`absolute top-1/2 z-20 flex -translate-y-1/2 items-center justify-center text-brand-blue transition-all duration-300 ease-in-out ${isCompact ? 'left-0 translate-x-0' : 'left-1/2 -translate-x-1/2'}`}
+            className={`absolute left-1/2 top-1/2 z-20 flex -translate-y-1/2 -translate-x-1/2 items-center justify-center text-brand-blue transition-all duration-300 ease-in-out ${isCompact ? 'pointer-events-none opacity-0 scale-[0.94]' : 'pointer-events-auto opacity-100 scale-100'}`}
+            aria-hidden={isCompact}
+            tabIndex={isCompact ? -1 : 0}
           >
             <img
               src={gurdwaraLogo}
               alt="Gurdwara Singh Sabha Milton logo"
-              className={`rounded-full border-2 border-brand-saffron object-cover shadow-[0_4px_16px_rgba(245,166,35,0.25)] transition-all duration-300 ease-in-out ${isCompact ? 'h-[4.5rem] w-[4.5rem]' : 'h-[7.7rem] w-[7.7rem]'}`}
+              className="h-[7.7rem] w-[7.7rem] rounded-full border-2 border-brand-saffron object-cover shadow-[0_4px_16px_rgba(245,166,35,0.25)] transition-all duration-300 ease-in-out"
+            />
+          </Link>
+
+          <Link
+            to="/"
+            preventScrollReset={isCompact}
+            onClick={isCompact ? handleCompactNavClick : undefined}
+            className={`absolute left-0 top-1/2 z-20 flex -translate-y-1/2 items-center justify-center text-brand-blue transition-all duration-300 ease-in-out ${isCompact ? 'pointer-events-auto opacity-100 translate-x-0 scale-100' : 'pointer-events-none opacity-0 -translate-x-2 scale-[0.92]'}`}
+            aria-hidden={!isCompact}
+            tabIndex={isCompact ? 0 : -1}
+          >
+            <img
+              src={gurdwaraLogo}
+              alt="Gurdwara Singh Sabha Milton logo"
+              className="h-[4.5rem] w-[4.5rem] rounded-full border-2 border-brand-saffron object-cover shadow-[0_4px_16px_rgba(245,166,35,0.25)] transition-all duration-300 ease-in-out"
             />
           </Link>
 
@@ -1979,13 +2044,25 @@ const Navbar = () => {
             </div>
 
             <form className="mt-4 space-y-3" onSubmit={handleSaveProfile}>
+              <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                {profileForm.avatarUrl ? (
+                  <img src={profileForm.avatarUrl} alt={profileForm.name || userDisplayName} className="h-16 w-16 rounded-full border-2 border-brand-saffron object-cover" />
+                ) : (
+                  <span className="inline-flex h-16 w-16 items-center justify-center rounded-full border-2 border-brand-saffron bg-brand-blue text-xl font-black text-white">{userInitial}</span>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-extrabold text-brand-blue">{profileForm.name || userDisplayName}</p>
+                  <p className="truncate text-xs font-semibold text-slate-500">{userDisplayEmail}</p>
+                  <label className="mt-2 inline-flex cursor-pointer rounded-full border border-brand-blue/30 bg-white px-3 py-1 text-xs font-bold text-brand-blue hover:bg-blue-50">
+                    Upload photo
+                    <input type="file" accept="image/*" className="hidden" onChange={handleProfileAvatarSelected} />
+                  </label>
+                  {isProfileImageUploading ? <p className="mt-1 text-[11px] font-semibold text-slate-500">Uploading {profileImageUploadProgress}%</p> : null}
+                </div>
+              </div>
               <label className="block text-sm font-semibold text-slate-700">
                 Name
                 <input value={profileForm.name} onChange={handleProfileFormChange('name')} required className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-extrabold text-slate-900" />
-              </label>
-              <label className="block text-sm font-semibold text-slate-700">
-                Email
-                <input value={profileForm.email} type="email" readOnly className="mt-1 w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 font-extrabold text-slate-700" />
               </label>
               <label className="block text-sm font-semibold text-slate-700">
                 Phone
@@ -1999,7 +2076,7 @@ const Navbar = () => {
               {profileError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{profileError}</p> : null}
               {profilePhoneMissing ? <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">Add a phone number to unlock event, seva, and donation registrations.</p> : null}
 
-              <button type="submit" disabled={isProfileSaving} className="w-full rounded-lg bg-brand-blue px-3 py-2 text-sm font-bold text-white disabled:opacity-60">
+              <button type="submit" disabled={isProfileSaving || isProfileImageUploading} className="w-full rounded-lg bg-brand-blue px-3 py-2 text-sm font-bold text-white disabled:opacity-60">
                 {isProfileSaving ? 'Saving...' : 'Save Profile'}
               </button>
             </form>
@@ -2022,7 +2099,7 @@ const Navbar = () => {
               Become Member
             </Link>
             <Link
-              to={isAuthenticated ? resolveLandingPathByRole(user?.role) : '/login?next=/family-dashboard'}
+              to={isAuthenticated ? resolveLandingPathByRole(user?.role) : '/login'}
               onClick={(event) => {
                 handleSignInClick(event);
                 setOpen(false);

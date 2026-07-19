@@ -1,8 +1,10 @@
 import apiClient from './apiClient';
 
 const eventService = {
-  getEvents: async () => {
-    const response = await apiClient.get('/events');
+  getEvents: async (options = {}) => {
+    const includeInactive = options?.includeInactive === true;
+    const query = includeInactive ? '?includeInactive=true' : '';
+    const response = await apiClient.get(`/events${query}`);
     return { data: response.data?.data || [] };
   },
 
@@ -39,6 +41,13 @@ const eventService = {
   getCalendarFeedUrl: () => '/api/events/calendar.ics',
 
   getEventCalendarUrl: (id) => `/api/events/${encodeURIComponent(String(id))}/calendar.ics`,
+
+  downloadEventCalendar: async (id) => {
+    const response = await apiClient.get(`/events/${encodeURIComponent(String(id))}/calendar.ics`, {
+      responseType: 'blob'
+    });
+    return { data: response.data };
+  },
 
   rsvp: async (payload) => {
     const response = await apiClient.post('/events/register', payload);
