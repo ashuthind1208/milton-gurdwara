@@ -63,10 +63,42 @@ Set these in production (frontend and backend as applicable).
   - 24h format (`HH:mm`).
 - `VOLUNTEER_REMINDER_TIME_ZONE`
   - IANA timezone (example: `America/Toronto`).
+- `EVENT_REMINDER_WEBHOOK_URL`
+  - Event reminder email webhook.
+  - If omitted, event reminders fall back to `VOLUNTEER_REMINDER_WEBHOOK_URL`.
+- `EVENT_REMINDER_SEND_TIME`
+  - 24h format (`HH:mm`) for event reminder scheduler.
+  - If omitted, uses volunteer reminder send time.
+- `EVENT_REMINDER_TIME_ZONE`
+  - IANA timezone for event reminder scheduler.
+  - If omitted, uses volunteer reminder timezone.
+- `EVENT_REMINDER_DAYS`
+  - Comma-separated day offsets before event date.
+  - Example: `7,3,1`.
 - `VOLUNTEER_REMINDER_BASE_URL`
   - Public URL for email logo/assets.
 - `VOLUNTEER_REMINDER_LOGO_URL`
   - Public image URL for reminder emails.
+
+## 3.1) Automatic Reminder Delivery (Events + Seva)
+
+Reminder emails are sent automatically by the backend scheduler when production is configured correctly.
+
+For this to work reliably in production:
+
+1. Backend must be always-on.
+   - The scheduler runs inside the Node backend process.
+   - If your platform sleeps/pauses containers, reminders can be delayed or missed.
+2. Reminder webhooks must be valid and reachable.
+   - Seva uses `VOLUNTEER_REMINDER_WEBHOOK_URL`.
+   - Events use `EVENT_REMINDER_WEBHOOK_URL` (or volunteer webhook fallback).
+3. Timezone and send-time env vars must be set to production values.
+4. Registration records must include valid recipient email addresses.
+5. Public base URL/logo env vars should point to production for branded HTML templates.
+
+Operational note:
+- If you want independent event and seva reminder destinations, set both webhook vars explicitly.
+- If you want the same destination for both, set only `VOLUNTEER_REMINDER_WEBHOOK_URL`.
 
 ### Dev-only Variables (do not use in production)
 
@@ -165,6 +197,12 @@ Run this smoke test after each production deployment:
    - QR opens correct donation URL
    - Footer image ticker renders sponsor/advertisement banners
 5. Stripe payment completes and persists donation data.
+6. Reminder automation checks:
+   - Confirm backend logs show both schedulers initialized (seva + event).
+   - Trigger manual sweeps once after deploy to verify delivery paths:
+     - `POST /api/volunteer-reminders/run`
+     - `POST /api/events/reminders/run`
+   - Confirm webhook provider receives valid `to`/`email` recipient values.
 
 ## 12) Common Pitfalls
 
@@ -176,6 +214,11 @@ Run this smoke test after each production deployment:
   - Upload storage not persistent.
 - Donations not updating board
   - Check backend API health, DB connectivity, and query polling/fallback behavior.
+- Reminder emails not sending
+  - Verify backend process is always running.
+  - Verify webhook URL env vars are present and reachable.
+  - Verify timezone/send-time env vars match intended schedule.
+  - Verify registrants include valid email addresses.
 
 ## 13) Recommended Secrets Management
 

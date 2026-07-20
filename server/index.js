@@ -59,9 +59,7 @@ const stripeWebhookSecret = String(process.env.STRIPE_WEBHOOK_SECRET || '').trim
 const stripeCurrency = String(process.env.STRIPE_CURRENCY || 'cad').toLowerCase();
 const youtubeApiKey = String(process.env.YOUTUBE_API_KEY || '').trim();
 const dataDir = path.resolve(__dirname, 'data');
-const donationsPath = path.join(dataDir, 'donations.json');
 const usersPath = path.join(dataDir, 'users.json');
-const contentStorePath = path.join(dataDir, 'content-store.json');
 const volunteerReminderLogPath = path.join(dataDir, 'volunteer-reminder-log.json');
 const eventReminderLogPath = path.join(dataDir, 'event-reminder-log.json');
 const uploadsDir = path.resolve(__dirname, 'uploads');
@@ -233,133 +231,7 @@ const seedUsers = [
   }
 ];
 
-const seedEvents = [
-  {
-    id: 1,
-    title: 'Sundar Gutka Paath Samagam',
-    date: '2026-07-12T10:00:00.000Z',
-    endDate: '2026-07-12T12:00:00.000Z',
-    location: 'Main Darbar Hall',
-    category: 'Paath',
-    registrations: 96,
-    active: true
-  },
-  {
-    id: 2,
-    title: 'Youth Kirtan Workshop',
-    date: '2026-07-18T16:00:00.000Z',
-    endDate: '2026-07-18T18:00:00.000Z',
-    location: 'Community Classroom',
-    category: 'Workshop',
-    registrations: 54,
-    active: true
-  },
-  {
-    id: 3,
-    title: 'Monthly Langar Seva Day',
-    date: '2026-07-20T09:00:00.000Z',
-    endDate: '2026-07-20T12:00:00.000Z',
-    location: 'Langar Hall',
-    category: 'Seva',
-    registrations: 122,
-    active: true
-  }
-];
-
-const seedDonationCampaigns = [
-  {
-    name: 'Langar Fund',
-    description: 'Monthly langar and seva support.',
-    progressTitle: 'Kitchen Expansion Progress',
-    progressDescription: 'Funding upgrades for stoves, prep counters, and weekly ingredient reserves to serve more sangat.',
-    progressPhotos: [],
-    progressUpdates: [
-      {
-        date: '2026-06-01',
-        title: 'Industrial Stove Ordered',
-        description: 'Vendor order confirmed for dual industrial stoves.',
-        amount: 12500
-      }
-    ],
-    progressItems: [
-      {
-        id: 'langar-kitchen-upgrade',
-        title: 'Kitchen Upgrade',
-        description: 'Upgrade kitchen equipment and prep stations.',
-        details: 'Phase 1 focuses on industrial stove replacement and prep counter modernization.',
-        date: '2026-06-01',
-        isActive: true,
-        photos: []
-      }
-    ],
-    raised: 42000,
-    target: 60000,
-    isActive: true,
-    paymentProvider: 'STRIPE',
-    paymentLink: 'https://donate.stripe.com/test_aFa28sdWJexZ11F3ZE6Ri00',
-    stripeBuyButtonId: '',
-    stripePublishableKey: ''
-  },
-  {
-    name: 'Building Fund',
-    description: 'Expansion and maintenance project support.',
-    progressTitle: 'Hall Renovation Milestones',
-    progressDescription: 'Structural, flooring, and accessibility improvements for main congregation areas.',
-    progressPhotos: [],
-    progressUpdates: [],
-    progressItems: [],
-    raised: 110000,
-    target: 250000,
-    isActive: true,
-    paymentProvider: 'PAYPAL',
-    paymentLink: '',
-    stripeBuyButtonId: '',
-    stripePublishableKey: ''
-  },
-  {
-    name: 'Education Seva',
-    description: 'Punjabi and gurmat classes for youth.',
-    progressTitle: 'Classroom Resource Rollout',
-    progressDescription: 'Books, digital displays, and learning aids for weekly youth classes.',
-    progressPhotos: [],
-    progressUpdates: [],
-    progressItems: [],
-    raised: 18000,
-    target: 30000,
-    isActive: true,
-    paymentProvider: 'STRIPE',
-    paymentLink: 'https://donate.stripe.com/test_aFa28sdWJexZ11F3ZE6Ri00',
-    stripeBuyButtonId: '',
-    stripePublishableKey: ''
-  }
-];
-
-const defaultAnalyticsMetrics = {
-  visitorsToday: 1842,
-  donationAmount: 12650,
-  eventRegistrations: 312,
-  volunteers: 88,
-  bounceRate: 34,
-  avgSession: '04:12'
-};
-
-const defaultAnalyticsTrend = [
-  { name: 'Mon', visitors: 1200, donations: 900 },
-  { name: 'Tue', visitors: 1320, donations: 1100 },
-  { name: 'Wed', visitors: 1510, donations: 1200 },
-  { name: 'Thu', visitors: 1480, donations: 980 },
-  { name: 'Fri', visitors: 1760, donations: 1520 },
-  { name: 'Sat', visitors: 2100, donations: 1900 },
-  { name: 'Sun', visitors: 2300, donations: 2050 }
-];
-
 const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
-
-let donationCampaignsFallback = seedDonationCampaigns.map((campaign, index) => ({
-  id: index + 1,
-  ...campaign
-}));
-let donationPendingFallback = [];
 
 const sendJson = (response, statusCode, payload) => {
   response.writeHead(statusCode, {
@@ -442,14 +314,8 @@ const ensureStorage = () => {
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
-  if (!fs.existsSync(donationsPath)) {
-    fs.writeFileSync(donationsPath, '[]', 'utf8');
-  }
   if (!fs.existsSync(usersPath)) {
     fs.writeFileSync(usersPath, JSON.stringify(seedUsers, null, 2), 'utf8');
-  }
-  if (!fs.existsSync(contentStorePath)) {
-    fs.writeFileSync(contentStorePath, JSON.stringify({ items: {}, singletons: {} }, null, 2), 'utf8');
   }
   if (!fs.existsSync(volunteerReminderLogPath)) {
     fs.writeFileSync(volunteerReminderLogPath, JSON.stringify({ sent: {} }, null, 2), 'utf8');
@@ -497,87 +363,6 @@ const writeEventReminderLog = (payload) => {
     sent: payload && typeof payload.sent === 'object' && payload.sent ? payload.sent : {}
   };
   fs.writeFileSync(eventReminderLogPath, JSON.stringify(next, null, 2), 'utf8');
-};
-
-const readContentStore = () => {
-  ensureStorage();
-  try {
-    const content = fs.readFileSync(contentStorePath, 'utf8');
-    const parsed = JSON.parse(content);
-    const items = parsed && typeof parsed.items === 'object' && parsed.items ? parsed.items : {};
-    const singletons = parsed && typeof parsed.singletons === 'object' && parsed.singletons ? parsed.singletons : {};
-    return { items, singletons };
-  } catch {
-    return { items: {}, singletons: {} };
-  }
-};
-
-const writeContentStore = (store) => {
-  ensureStorage();
-  const normalized = {
-    items: store && typeof store.items === 'object' && store.items ? store.items : {},
-    singletons: store && typeof store.singletons === 'object' && store.singletons ? store.singletons : {}
-  };
-  fs.writeFileSync(contentStorePath, JSON.stringify(normalized, null, 2), 'utf8');
-};
-
-const listContentItemsFallback = (resource) => {
-  const store = readContentStore();
-  const rows = store.items[resource];
-  return Array.isArray(rows) ? rows : [];
-};
-
-const createContentItemFallback = (resource, payload = {}) => {
-  const store = readContentStore();
-  const rows = Array.isArray(store.items[resource]) ? [...store.items[resource]] : [];
-  const next = {
-    ...(payload || {}),
-    id: String(payload?.id || `${resource}-${Date.now()}`)
-  };
-  rows.unshift(next);
-  store.items[resource] = rows;
-  writeContentStore(store);
-  return next;
-};
-
-const updateContentItemFallback = (resource, id, payload = {}) => {
-  const store = readContentStore();
-  const rows = Array.isArray(store.items[resource]) ? [...store.items[resource]] : [];
-  const index = rows.findIndex((row) => String(row?.id) === String(id));
-  if (index < 0) {
-    return null;
-  }
-
-  const updated = {
-    ...rows[index],
-    ...(payload || {}),
-    id: rows[index]?.id || id
-  };
-
-  rows[index] = updated;
-  store.items[resource] = rows;
-  writeContentStore(store);
-  return updated;
-};
-
-const removeContentItemFallback = (resource, id) => {
-  const store = readContentStore();
-  const rows = Array.isArray(store.items[resource]) ? store.items[resource] : [];
-  store.items[resource] = rows.filter((row) => String(row?.id) !== String(id));
-  writeContentStore(store);
-  return { success: true };
-};
-
-const getContentSingletonFallback = (resource) => {
-  const store = readContentStore();
-  return store.singletons[resource] ?? null;
-};
-
-const setContentSingletonFallback = (resource, payload) => {
-  const store = readContentStore();
-  store.singletons[resource] = payload;
-  writeContentStore(store);
-  return payload;
 };
 
 const getUtcStartOfDay = (value) => {
@@ -751,12 +536,11 @@ const appendAuditLog = async (request, details = {}) => {
       createdAt: new Date().toISOString()
     };
 
-    if (eventsDb.hasDatabaseConnection) {
-      await eventsDb.createItem('audit_logs', record);
+    if (!eventsDb.hasDatabaseConnection) {
       return;
     }
 
-    createContentItemFallback('audit_logs', record);
+    await eventsDb.createItem('audit_logs', record);
   } catch {
     // Never block request flow on audit log failures.
   }
@@ -792,9 +576,7 @@ const normalizeVolunteerRegistrationForReminder = (entry = {}) => {
 };
 
 const getSevaOpportunitiesMap = async () => {
-  const opportunityRows = eventsDb.hasDatabaseConnection
-    ? await eventsDb.listItems('seva_opportunities')
-    : listContentItemsFallback('seva_opportunities');
+  const opportunityRows = await eventsDb.listItems('seva_opportunities');
 
   return new Map(
     (Array.isArray(opportunityRows) ? opportunityRows : []).map((row) => [String(row.id || ''), row || {}])
@@ -804,9 +586,7 @@ const getSevaOpportunitiesMap = async () => {
 const getVolunteerRegistrationsForReminder = async () => {
   const opportunityMap = await getSevaOpportunitiesMap();
 
-  const rows = eventsDb.hasDatabaseConnection
-    ? await eventsDb.listItems('volunteer_registrations')
-    : listContentItemsFallback('volunteer_registrations');
+  const rows = await eventsDb.listItems('volunteer_registrations');
 
   return (Array.isArray(rows) ? rows : []).map((row) => {
     const registration = normalizeVolunteerRegistrationForReminder(row);
@@ -1134,7 +914,7 @@ const runVolunteerReminderSweep = async (options = {}) => {
 const normalizeEventRegistrantForReminder = (entry = {}, event = {}) => {
   return {
     id: String(entry.id || '').trim(),
-    email: String(entry.email || entry.contact || '').trim().toLowerCase(),
+    email: String(entry.email || '').trim().toLowerCase(),
     name: String(entry.name || 'Registrant').trim(),
     status: String(entry.status || 'confirmed').trim().toLowerCase(),
     eventId: String(event.id || '').trim(),
@@ -1144,6 +924,14 @@ const normalizeEventRegistrantForReminder = (entry = {}, event = {}) => {
     eventLocation: String(event.location || '').trim(),
     eventDescription: String(event.description || '').trim()
   };
+};
+
+const isValidEmailAddress = (value = '') => {
+  const email = String(value || '').trim().toLowerCase();
+  if (!email) {
+    return false;
+  }
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 };
 
 const getEventRegistrationsForReminder = async () => {
@@ -1162,16 +950,23 @@ const getEventRegistrationsForReminder = async () => {
 
 const buildEventReminderEmail = ({ registration, daysRemaining = null }) => {
   const eventDateLabel = formatDateTimeLabel(registration.eventDate, 'Date TBD');
+  const timeLabel = registration.eventEndDate
+    ? `${formatDateTimeLabel(registration.eventDate, eventDateLabel)} - ${formatDateTimeLabel(registration.eventEndDate, 'End TBD')}`
+    : eventDateLabel;
+  const logoSrc = volunteerReminderLogoUrl || `${volunteerReminderBaseUrl}/gurdwara-logo.webp` || embeddedVolunteerReminderLogo;
+  const greetingLine = 'ਵਾਹਿਗੁਰੂ ਜੀ ਕਾ ਖਾਲਸਾ, ਵਾਹਿਗੁਰੂ ਜੀ ਕੀ ਫਤਿਹ';
+  const recipientNameBase = String(registration.name || 'Sangat Member').trim().replace(/[.\s]+$/g, '');
+  const recipientName = `${recipientNameBase}.`;
   const registrationType = registration.status === 'waitlisted' ? 'waitlist' : 'registration';
   const subject = `Event Reminder (${daysRemaining} day${daysRemaining === 1 ? '' : 's'}): ${registration.eventTitle}`;
   const text = [
-    'Vaheguru Ji Ka Khalsa, Vaheguru Ji Ki Fateh',
+    greetingLine,
     '',
-    `Dear ${registration.name || 'Sangat Member'},`,
+    recipientName,
     '',
-    `This is your ${registrationType} reminder for the upcoming event:`,
-    `${registration.eventTitle}`,
-    `Date and Time: ${eventDateLabel}`,
+    `This is your ${registrationType} reminder for the upcoming event.`,
+    `Event: ${registration.eventTitle}`,
+    `Date and Time: ${timeLabel}`,
     `Location: ${registration.eventLocation || 'Singh Sabha Milton Gurdwara'}`,
     registration.eventDescription ? `Details: ${registration.eventDescription}` : '',
     '',
@@ -1183,21 +978,44 @@ const buildEventReminderEmail = ({ registration, daysRemaining = null }) => {
   ].filter(Boolean).join('\n');
 
   const html = `
-  <div style="background:#f8fafc;padding:24px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #dbe7f6;border-radius:12px;overflow:hidden;">
-      <tr><td style="padding:20px 24px;">
-        <p style="margin:0 0 10px;font-size:14px;color:#334155;">Vaheguru Ji Ka Khalsa, Vaheguru Ji Ki Fateh</p>
-        <h2 style="margin:0 0 12px;font-size:20px;color:#0a4d9f;">${escapeHtml(registration.eventTitle || 'Event Reminder')}</h2>
-        <p style="margin:0 0 6px;font-size:14px;"><strong>For:</strong> ${escapeHtml(registration.name || 'Sangat Member')}</p>
-        <p style="margin:0 0 6px;font-size:14px;"><strong>Date and Time:</strong> ${escapeHtml(eventDateLabel)}</p>
-        <p style="margin:0 0 6px;font-size:14px;"><strong>Location:</strong> ${escapeHtml(registration.eventLocation || 'Singh Sabha Milton Gurdwara')}</p>
-        ${registration.eventDescription ? `<p style="margin:12px 0 0;font-size:14px;line-height:1.6;color:#334155;">${escapeHtml(registration.eventDescription)}</p>` : ''}
-        <p style="margin:14px 0 0;font-size:14px;line-height:1.6;color:#334155;">
-          ${registration.status === 'waitlisted'
-            ? 'You are currently on the waitlist. If a confirmed spot opens, the team will contact you.'
-            : 'Please arrive a few minutes early so the program can begin on time.'}
-        </p>
-      </td></tr>
+  <div style="background:#f5f8fc;padding:28px 14px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:660px;margin:0 auto;background:#ffffff;border:1px solid #dbe7f6;border-radius:14px;overflow:hidden;">
+      <tr>
+        <td style="padding:28px 24px 14px;text-align:center;">
+          ${logoSrc ? `<img src="${escapeHtml(logoSrc)}" alt="${escapeHtml(volunteerReminderSiteName)} logo" width="92" height="92" style="display:block;margin:0 auto 18px;object-fit:contain;background:#ffffff;border-radius:50%;"/>` : ''}
+          <div style="font-size:18px;line-height:1.6;font-weight:700;color:#0f172a;">${escapeHtml(greetingLine)}</div>
+          <div style="margin-top:12px;font-size:16px;line-height:1.7;color:#334155;font-weight:600;">${escapeHtml(recipientName)}</div>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:0 28px 28px;">
+          <div style="font-size:15px;line-height:1.8;color:#334155;margin-bottom:14px;">This is your ${escapeHtml(registrationType)} reminder for the upcoming event.</div>
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border:1px solid #d7e3f3;border-radius:12px;overflow:hidden;background:#fbfdff;margin-bottom:16px;">
+            <tr>
+              <td style="width:34%;padding:12px 14px;background:#eef5ff;border-bottom:1px solid #d7e3f3;font-size:14px;font-weight:700;color:#0a4d9f;">Event</td>
+              <td style="padding:12px 14px;border-bottom:1px solid #d7e3f3;font-size:17px;font-weight:800;color:#0f172a;">${escapeHtml(registration.eventTitle || 'Event')}</td>
+            </tr>
+            <tr>
+              <td style="padding:12px 14px;background:#eef5ff;border-bottom:1px solid #d7e3f3;font-size:14px;font-weight:700;color:#0a4d9f;">Date and Time</td>
+              <td style="padding:12px 14px;border-bottom:1px solid #d7e3f3;font-size:17px;font-weight:800;color:#0f172a;">${escapeHtml(timeLabel)}</td>
+            </tr>
+            <tr>
+              <td style="padding:12px 14px;background:#eef5ff;border-bottom:1px solid #d7e3f3;font-size:14px;font-weight:700;color:#0a4d9f;">Location</td>
+              <td style="padding:12px 14px;border-bottom:1px solid #d7e3f3;font-size:17px;font-weight:800;color:#0f172a;">${escapeHtml(registration.eventLocation || 'Singh Sabha Milton Gurdwara')}</td>
+            </tr>
+            <tr>
+              <td style="padding:12px 14px;background:#eef5ff;font-size:14px;font-weight:700;color:#0a4d9f;">Gurdwara</td>
+              <td style="padding:12px 14px;font-size:17px;font-weight:800;color:#0f172a;">${escapeHtml(volunteerReminderSiteName)}</td>
+            </tr>
+          </table>
+          ${registration.eventDescription ? `<div style="font-size:15px;line-height:1.8;color:#334155;margin-bottom:10px;">${escapeHtml(registration.eventDescription)}</div>` : ''}
+          <div style="font-size:15px;line-height:1.8;color:#334155;">
+            ${registration.status === 'waitlisted'
+              ? 'You are currently on the waitlist. If a confirmed spot opens, the team will contact you.'
+              : 'Please arrive a little early and check in at the registration desk.'}
+          </div>
+        </td>
+      </tr>
     </table>
   </div>`;
 
@@ -1216,6 +1034,7 @@ const sendEventReminderEmail = async (registration, options = {}) => {
   const payload = {
     type: 'event-registration-reminder',
     to: registration.email,
+    email: registration.email,
     name: registration.name,
     subject: template.subject,
     message: template.text,
@@ -1282,7 +1101,7 @@ const runEventReminderSweep = async (options = {}) => {
     for (const registration of registrations) {
       processed += 1;
 
-      if (!registration.id || !registration.email || !registration.eventDate) {
+      if (!registration.id || !registration.email || !registration.eventDate || !isValidEmailAddress(registration.email)) {
         skipped += 1;
         continue;
       }
@@ -1333,9 +1152,7 @@ const runScheduledEventReminderSweep = async () => {
 };
 
 const getVolunteerRecognitionData = async () => {
-  const rows = eventsDb.hasDatabaseConnection
-    ? await eventsDb.listItems('volunteer_registrations')
-    : listContentItemsFallback('volunteer_registrations');
+  const rows = await eventsDb.listItems('volunteer_registrations');
 
   const summaryByKey = new Map();
 
@@ -1665,162 +1482,31 @@ const completeUserRegistration = (payload = {}) => {
 };
 
 const readDonations = async () => {
-  if (eventsDb.hasDatabaseConnection) {
-    return eventsDb.getDonations();
-  }
-
-  ensureStorage();
-  try {
-    const content = fs.readFileSync(donationsPath, 'utf8');
-    const parsed = JSON.parse(content);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+  return eventsDb.getDonations();
 };
 
 const upsertDonation = async (record) => {
-  if (eventsDb.hasDatabaseConnection) {
-    return eventsDb.upsertDonation(record);
-  }
-
-  const allDonations = await readDonations();
-  const matchIndex = allDonations.findIndex((entry) => (
-    String(entry.stripeSessionId || '') === String(record.stripeSessionId || '') ||
-    (
-      String(entry.gatewayTransactionId || '') &&
-      String(record.gatewayTransactionId || '') &&
-      String(entry.gatewayTransactionId) === String(record.gatewayTransactionId)
-    )
-  ));
-
-  if (matchIndex >= 0) {
-    const next = [...allDonations];
-    next[matchIndex] = {
-      ...next[matchIndex],
-      ...record
-    };
-    fs.writeFileSync(donationsPath, JSON.stringify(next, null, 2), 'utf8');
-    return next[matchIndex];
-  }
-
-  const next = [record, ...allDonations];
-  fs.writeFileSync(donationsPath, JSON.stringify(next, null, 2), 'utf8');
-  return record;
+  return eventsDb.upsertDonation(record);
 };
 
 const getDonationCampaigns = async () => {
-  if (eventsDb.hasDatabaseConnection) {
-    return eventsDb.getDonationCampaigns();
-  }
-  return donationCampaignsFallback;
-};
-
-const normalizeCampaignProgressItems = (items = []) => {
-  return (Array.isArray(items) ? items : [])
-    .map((item, index) => ({
-      id: String(item?.id || `progress-${Date.now()}-${index}`),
-      title: String(item?.title || '').trim(),
-      description: String(item?.description || '').trim(),
-      details: String(item?.details || '').trim(),
-      date: String(item?.date || '').trim(),
-      isActive: item?.isActive !== false,
-      photos: (Array.isArray(item?.photos) ? item.photos : [])
-        .map((photo) => String(photo || '').trim())
-        .filter(Boolean)
-    }))
-    .filter((item) => item.title);
-};
-
-const normalizeCampaignStoryBlocks = (items = []) => {
-  return (Array.isArray(items) ? items : [])
-    .map((item, index) => ({
-      id: String(item?.id || `story-${Date.now()}-${index}`),
-      title: String(item?.title || '').trim(),
-      summary: String(item?.summary || '').trim(),
-      quote: String(item?.quote || '').trim(),
-      beneficiary: String(item?.beneficiary || '').trim(),
-      impactMetric: String(item?.impactMetric || '').trim(),
-      imageUrl: String(item?.imageUrl || item?.image_url || '').trim(),
-      isActive: item?.isActive !== false
-    }))
-    .filter((item) => item.title || item.summary || item.quote);
+  return eventsDb.getDonationCampaigns();
 };
 
 const createDonationCampaign = async (payload) => {
-  if (eventsDb.hasDatabaseConnection) {
-    return eventsDb.createDonationCampaign(payload);
-  }
-
-  const record = {
-    id: Date.now(),
-    name: String(payload.name || '').trim(),
-    description: String(payload.description || '').trim(),
-    progressTitle: String(payload.progressTitle || '').trim(),
-    progressDescription: String(payload.progressDescription || '').trim(),
-    progressPhotos: Array.isArray(payload.progressPhotos) ? payload.progressPhotos : [],
-    progressUpdates: Array.isArray(payload.progressUpdates) ? payload.progressUpdates : [],
-    progressItems: normalizeCampaignProgressItems(payload.progressItems),
-    storyBlocks: normalizeCampaignStoryBlocks(payload.storyBlocks),
-    raised: Number(payload.raised || 0),
-    target: Number(payload.target || 0),
-    isActive: payload.isActive !== false,
-    paymentProvider: String(payload.paymentProvider || 'STRIPE').toUpperCase() === 'PAYPAL' ? 'PAYPAL' : 'STRIPE',
-    paymentLink: String(payload.paymentLink || '').trim(),
-    stripeBuyButtonId: String(payload.stripeBuyButtonId || '').trim(),
-    stripePublishableKey: String(payload.stripePublishableKey || '').trim(),
-    isClosed: Number(payload.target || 0) > 0 && Number(payload.raised || 0) >= Number(payload.target || 0)
-  };
-
-  donationCampaignsFallback = [record, ...donationCampaignsFallback];
-  return record;
+  return eventsDb.createDonationCampaign(payload);
 };
 
 const updateDonationCampaign = async (id, payload) => {
-  if (eventsDb.hasDatabaseConnection) {
-    return eventsDb.updateDonationCampaign(id, payload);
-  }
-
-  donationCampaignsFallback = donationCampaignsFallback.map((entry) => (
-    Number(entry.id) === Number(id)
-      ? {
-          ...entry,
-          ...payload,
-        progressTitle: payload.progressTitle ?? entry.progressTitle ?? '',
-        progressDescription: payload.progressDescription ?? entry.progressDescription ?? '',
-        progressPhotos: Array.isArray(payload.progressPhotos) ? payload.progressPhotos : (entry.progressPhotos || []),
-        progressUpdates: Array.isArray(payload.progressUpdates) ? payload.progressUpdates : (entry.progressUpdates || []),
-        progressItems: Array.isArray(payload.progressItems)
-          ? normalizeCampaignProgressItems(payload.progressItems)
-          : normalizeCampaignProgressItems(entry.progressItems || []),
-        storyBlocks: Array.isArray(payload.storyBlocks)
-          ? normalizeCampaignStoryBlocks(payload.storyBlocks)
-          : normalizeCampaignStoryBlocks(entry.storyBlocks || []),
-          id: entry.id,
-          isClosed: Number(payload.target ?? entry.target ?? 0) > 0 && Number(payload.raised ?? entry.raised ?? 0) >= Number(payload.target ?? entry.target ?? 0)
-        }
-      : entry
-  ));
-
-  return donationCampaignsFallback.find((entry) => Number(entry.id) === Number(id)) || null;
+  return eventsDb.updateDonationCampaign(id, payload);
 };
 
 const removeDonationCampaign = async (id) => {
-  if (eventsDb.hasDatabaseConnection) {
-    return eventsDb.removeDonationCampaign(id);
-  }
-
-  donationCampaignsFallback = donationCampaignsFallback.filter((entry) => Number(entry.id) !== Number(id));
-  donationPendingFallback = donationPendingFallback.filter((entry) => Number(entry.campaignId) !== Number(id));
-  return { success: true };
+  return eventsDb.removeDonationCampaign(id);
 };
 
 const getDonationSummary = async () => {
-  if (eventsDb.hasDatabaseConnection) {
-    return eventsDb.summarizeDonationsByCampaign();
-  }
-
-  return summarizeByCampaign(await readDonations());
+  return eventsDb.summarizeDonationsByCampaign();
 };
 
 const syncCampaignRaisedTotal = async ({ campaignId, campaignName } = {}) => {
@@ -1910,53 +1596,23 @@ const reconcilePaidPendingDonations = async () => {
 };
 
 const clearDonations = async () => {
-  if (eventsDb.hasDatabaseConnection) {
-    return eventsDb.clearDonations();
-  }
-
-  ensureStorage();
-  fs.writeFileSync(donationsPath, JSON.stringify([], null, 2), 'utf8');
-  return { success: true };
+  return eventsDb.clearDonations();
 };
 
 const getPendingDonations = async () => {
-  if (eventsDb.hasDatabaseConnection) {
-    return eventsDb.getPendingDonations();
-  }
-  return [...donationPendingFallback].sort((left, right) => {
-    const l = new Date(left.createdAt || 0).getTime();
-    const r = new Date(right.createdAt || 0).getTime();
-    return r - l;
-  });
+  return eventsDb.getPendingDonations();
 };
 
 const createPendingDonation = async (payload) => {
-  if (eventsDb.hasDatabaseConnection) {
-    return eventsDb.createPendingDonation(payload);
-  }
-  const record = {
-    ...payload,
-    id: String(payload.id || `pending-${Date.now()}`),
-    createdAt: payload.createdAt || new Date().toISOString()
-  };
-  donationPendingFallback = [record, ...donationPendingFallback];
-  return record;
+  return eventsDb.createPendingDonation(payload);
 };
 
 const removePendingDonation = async (id) => {
-  if (eventsDb.hasDatabaseConnection) {
-    return eventsDb.removePendingDonation(id);
-  }
-  donationPendingFallback = donationPendingFallback.filter((entry) => entry.id !== String(id));
-  return { success: true };
+  return eventsDb.removePendingDonation(id);
 };
 
 const clearPendingDonations = async () => {
-  if (eventsDb.hasDatabaseConnection) {
-    return eventsDb.clearPendingDonations();
-  }
-  donationPendingFallback = [];
-  return { success: true };
+  return eventsDb.clearPendingDonations();
 };
 
 const requireStripeClient = () => {
@@ -2526,17 +2182,11 @@ const server = http.createServer(async (request, response) => {
   if (requestUrl.pathname === '/api/analytics/metrics' && request.method === 'GET') {
     try {
       if (!eventsDb.hasDatabaseConnection) {
-        sendJson(response, 200, { ok: true, data: defaultAnalyticsMetrics });
-        if (typeof eventsDb.syncRelationalMirrorsFromContentStore === 'function') {
-          await eventsDb.syncRelationalMirrorsFromContentStore();
-        }
+        sendJson(response, 500, { ok: false, message: 'Database is not configured.' });
         return;
       }
 
-      let data = await eventsDb.getSingleton('analytics_metrics', null);
-      if (!data) {
-        data = await eventsDb.setSingleton('analytics_metrics', defaultAnalyticsMetrics);
-      }
+      const data = await eventsDb.getSingleton('analytics_metrics', null);
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
       sendJson(response, 500, { ok: false, message: error.message || 'Unable to fetch analytics metrics.' });
@@ -2547,14 +2197,11 @@ const server = http.createServer(async (request, response) => {
   if (requestUrl.pathname === '/api/analytics/trend' && request.method === 'GET') {
     try {
       if (!eventsDb.hasDatabaseConnection) {
-        sendJson(response, 200, { ok: true, data: defaultAnalyticsTrend });
+        sendJson(response, 500, { ok: false, message: 'Database is not configured.' });
         return;
       }
 
-      let data = await eventsDb.getSingleton('analytics_trend', null);
-      if (!Array.isArray(data)) {
-        data = await eventsDb.setSingleton('analytics_trend', defaultAnalyticsTrend);
-      }
+      const data = await eventsDb.getSingleton('analytics_trend', []);
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
       sendJson(response, 500, { ok: false, message: error.message || 'Unable to fetch analytics trend.' });
@@ -2683,9 +2330,7 @@ const server = http.createServer(async (request, response) => {
   if (contentResourceMatch && request.method === 'GET') {
     try {
       const resource = String(contentResourceMatch[1]).toLowerCase();
-      const data = eventsDb.hasDatabaseConnection
-        ? await eventsDb.listItems(resource)
-        : listContentItemsFallback(resource);
+      const data = await eventsDb.listItems(resource);
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
       sendJson(response, 500, { ok: false, message: error.message || 'Unable to fetch content list.' });
@@ -2697,9 +2342,7 @@ const server = http.createServer(async (request, response) => {
     try {
       const resource = String(contentResourceMatch[1]).toLowerCase();
       const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
-      const data = eventsDb.hasDatabaseConnection
-        ? await eventsDb.createItem(resource, body)
-        : createContentItemFallback(resource, body);
+      const data = await eventsDb.createItem(resource, body);
       if (resource !== 'audit_logs') {
         await appendAuditLog(request, {
           action: 'content.create',
@@ -2722,9 +2365,7 @@ const server = http.createServer(async (request, response) => {
       const resource = String(contentResourceIdMatch[1]).toLowerCase();
       const id = decodeURIComponent(contentResourceIdMatch[2]);
       const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
-      const data = eventsDb.hasDatabaseConnection
-        ? await eventsDb.updateItem(resource, id, body)
-        : updateContentItemFallback(resource, id, body);
+      const data = await eventsDb.updateItem(resource, id, body);
       if (resource !== 'audit_logs') {
         await appendAuditLog(request, {
           action: 'content.update',
@@ -2745,9 +2386,7 @@ const server = http.createServer(async (request, response) => {
     try {
       const resource = String(contentResourceIdMatch[1]).toLowerCase();
       const id = decodeURIComponent(contentResourceIdMatch[2]);
-      const data = eventsDb.hasDatabaseConnection
-        ? await eventsDb.removeItem(resource, id)
-        : removeContentItemFallback(resource, id);
+      const data = await eventsDb.removeItem(resource, id);
       if (resource !== 'audit_logs') {
         await appendAuditLog(request, {
           action: 'content.delete',
@@ -2767,9 +2406,7 @@ const server = http.createServer(async (request, response) => {
   if (contentSingleMatch && request.method === 'GET') {
     try {
       const resource = String(contentSingleMatch[1]).toLowerCase();
-      const data = eventsDb.hasDatabaseConnection
-        ? await eventsDb.getSingleton(resource, null)
-        : getContentSingletonFallback(resource);
+      const data = await eventsDb.getSingleton(resource, null);
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
       sendJson(response, 500, { ok: false, message: error.message || 'Unable to fetch singleton content.' });
@@ -2781,9 +2418,7 @@ const server = http.createServer(async (request, response) => {
     try {
       const resource = String(contentSingleMatch[1]).toLowerCase();
       const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
-      const data = eventsDb.hasDatabaseConnection
-        ? await eventsDb.setSingleton(resource, body)
-        : setContentSingletonFallback(resource, body);
+      const data = await eventsDb.setSingleton(resource, body);
       await appendAuditLog(request, {
         action: 'content.singleton.update',
         targetType: resource,
@@ -2801,8 +2436,12 @@ const server = http.createServer(async (request, response) => {
   if (requestUrl.pathname === '/api/events/calendar.ics' && request.method === 'GET') {
     try {
       const events = await eventsDb.getEvents();
+      const includeInactive = requestUrl.searchParams.get('includeInactive') === 'true';
+      const visibleEvents = includeInactive
+        ? (Array.isArray(events) ? events : [])
+        : (Array.isArray(events) ? events : []).filter((event) => event?.active !== false && event?.isActive !== false);
       const feed = buildEventsCalendarIcsBody(
-        (Array.isArray(events) ? events : []).filter((event) => event?.active !== false),
+        visibleEvents,
         volunteerReminderBaseUrl
       );
       response.writeHead(200, {
@@ -2849,7 +2488,11 @@ const server = http.createServer(async (request, response) => {
 
   if (requestUrl.pathname === '/api/events' && request.method === 'GET') {
     try {
-      const data = await eventsDb.getEvents();
+      const includeInactive = requestUrl.searchParams.get('includeInactive') === 'true';
+      const rows = await eventsDb.getEvents();
+      const data = includeInactive
+        ? rows
+        : (Array.isArray(rows) ? rows : []).filter((event) => event?.active !== false && event?.isActive !== false);
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
       sendJson(response, 500, {
@@ -3536,8 +3179,6 @@ const bootstrap = async () => {
   if (eventsDb.hasDatabaseConnection) {
     try {
       await eventsDb.ensureEventsSchema();
-      await eventsDb.seedEventsIfEmpty(seedEvents);
-      await eventsDb.seedDonationCampaignsIfEmpty(seedDonationCampaigns);
       console.log('Events database schema ready.');
     } catch (error) {
       console.error('Failed to initialize events database:', error.message || error);

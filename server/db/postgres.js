@@ -357,10 +357,16 @@ const ensureEventsSchema = async () => {
       seva_date DATE NOT NULL,
       seva_time TEXT NOT NULL DEFAULT '',
       total_volunteers_required INTEGER NOT NULL DEFAULT 1,
+      waitlist_enabled BOOLEAN NOT NULL DEFAULT TRUE,
       expiry_date DATE,
       active BOOLEAN NOT NULL DEFAULT TRUE,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `);
+
+  await pool.query(`
+    ALTER TABLE seva_opportunities
+    ADD COLUMN IF NOT EXISTS waitlist_enabled BOOLEAN NOT NULL DEFAULT TRUE;
   `);
 
   await pool.query(`
@@ -863,18 +869,19 @@ const mirrorItemResource = async (resource, payload) => {
   if (resource === 'seva_opportunities') {
     await pool.query(
       `
-      INSERT INTO seva_opportunities(id, seva_type, seva_date, seva_time, total_volunteers_required, expiry_date, active, updated_at)
-      VALUES ($1,$2,$3::date,$4,$5,$6::date,$7,COALESCE($8::timestamptz,NOW()))
+      INSERT INTO seva_opportunities(id, seva_type, seva_date, seva_time, total_volunteers_required, waitlist_enabled, expiry_date, active, updated_at)
+      VALUES ($1,$2,$3::date,$4,$5,$6,$7::date,$8,COALESCE($9::timestamptz,NOW()))
       ON CONFLICT (id) DO UPDATE SET
         seva_type=EXCLUDED.seva_type,
         seva_date=EXCLUDED.seva_date,
         seva_time=EXCLUDED.seva_time,
         total_volunteers_required=EXCLUDED.total_volunteers_required,
+        waitlist_enabled=EXCLUDED.waitlist_enabled,
         expiry_date=EXCLUDED.expiry_date,
         active=EXCLUDED.active,
         updated_at=NOW();
       `,
-      [item.id, item.sevaType || '', toDateValue(item.date), item.time || '', Math.max(1, Number(item.totalVolunteersRequired) || 1), toDateValue(item.expiryDate), item.active !== false, item.updatedAt || null]
+      [item.id, item.sevaType || '', toDateValue(item.date), item.time || '', Math.max(1, Number(item.totalVolunteersRequired) || 1), item.waitlistEnabled !== false, toDateValue(item.expiryDate), item.active !== false, item.updatedAt || null]
     );
     return;
   }
@@ -1478,6 +1485,82 @@ const listItems = async (resource) => {
 
   const normalizedResource = String(resource || '').trim();
 
+  if (normalizedResource === 'seva_opportunities') {
+    const result = await pool.query(
+      `
+      SELECT
+        id,
+        seva_type,
+        seva_date,
+        seva_time,
+        total_volunteers_required,
+        waitlist_enabled,
+        expiry_date,
+        active,
+        updated_at
+      FROM seva_opportunities
+      ORDER BY updated_at DESC, seva_date DESC, id ASC;
+      `
+    );
+
+    return result.rows.map((row) => ({
+      id: String(row.id || ''),
+      sevaType: row.seva_type || '',
+      date: row.seva_date || '',
+      time: row.seva_time || '',
+      totalVolunteersRequired: Number(row.total_volunteers_required || 0),
+      waitlistEnabled: row.waitlist_enabled !== false,
+      expiryDate: row.expiry_date || '',
+      active: row.active !== false,
+      updatedAt: row.updated_at || ''
+    }));
+  }
+
+  if (normalizedResource === 'volunteer_registrations') {
+    const result = await pool.query(
+      `
+      SELECT
+        id,
+        user_id,
+        opportunity_id,
+        name,
+        email,
+        phone,
+        whatsapp,
+        area,
+        seva_type,
+        seva_date,
+        seva_time,
+        contact_preference,
+        wants_event_emails,
+        notes,
+        status,
+        created_at
+      FROM volunteer_registrations
+      ORDER BY created_at DESC, id DESC;
+      `
+    );
+
+    return result.rows.map((row) => ({
+      id: String(row.id || ''),
+      userId: row.user_id || null,
+      opportunityId: row.opportunity_id || null,
+      name: row.name || '',
+      email: row.email || '',
+      phone: row.phone || '',
+      whatsapp: row.whatsapp || '',
+      area: row.area || '',
+      sevaType: row.seva_type || '',
+      sevaDate: row.seva_date || '',
+      sevaTime: row.seva_time || '',
+      contactPreference: row.contact_preference || 'Email',
+      wantsEventEmails: row.wants_event_emails === true,
+      notes: row.notes || '',
+      status: row.status || 'Pending',
+      createdAt: row.created_at || ''
+    }));
+  }
+
   const result = await pool.query(
     `
     SELECT id, payload
@@ -1853,47 +1936,6 @@ const mapCampaignRow = (row) => {
   };
 };
 
-const seedDonationCampaignsIfEmpty = async (seedCampaigns = []) => {
-  if (!pool) {
-    return false;
-  }
-
-  const result = await pool.query('SELECT COUNT(*)::int AS count FROM donation_campaigns;');
-  const count = result.rows?.[0]?.count || 0;
-  if (count > 0 || !Array.isArray(seedCampaigns) || seedCampaigns.length === 0) {
-    return false;
-  }
-
-  for (const campaign of seedCampaigns) {
-    await pool.query(
-      `
-      INSERT INTO donation_campaigns
-      (name, description, progress_title, progress_description, progress_photos, progress_updates, progress_items, story_blocks, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key)
-      VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, $14, $15);
-      `,
-      [
-        String(campaign.name || '').trim(),
-        String(campaign.description || '').trim(),
-        String(campaign.progressTitle || '').trim(),
-        String(campaign.progressDescription || '').trim(),
-        JSON.stringify(Array.isArray(campaign.progressPhotos) ? campaign.progressPhotos : []),
-        JSON.stringify(Array.isArray(campaign.progressUpdates) ? campaign.progressUpdates : []),
-        JSON.stringify(normalizeCampaignProgressItems(campaign.progressItems)),
-        JSON.stringify(normalizeCampaignStoryBlocks(campaign.storyBlocks)),
-        Number(campaign.raised || 0),
-        Number(campaign.target || 0),
-        campaign.isActive !== false,
-        String(campaign.paymentProvider || 'STRIPE').toUpperCase() === 'PAYPAL' ? 'PAYPAL' : 'STRIPE',
-        String(campaign.paymentLink || '').trim(),
-        String(campaign.stripeBuyButtonId || '').trim(),
-        String(campaign.stripePublishableKey || '').trim()
-      ]
-    );
-  }
-
-  return true;
-};
-
 const getDonationCampaigns = async () => {
   if (!pool) {
     throw new Error('Database is not configured.');
@@ -2262,63 +2304,6 @@ const clearDonations = async () => {
 
   await pool.query('DELETE FROM donations;');
   return { success: true };
-};
-
-const seedEventsIfEmpty = async (seedEvents = []) => {
-  if (!pool) {
-    return false;
-  }
-
-  const { rows } = await pool.query('SELECT COUNT(*)::int AS count FROM events');
-  const count = rows?.[0]?.count || 0;
-  if (count > 0 || seedEvents.length === 0) {
-    return false;
-  }
-
-  for (const event of seedEvents) {
-    const inserted = await pool.query(
-      `
-      INSERT INTO events (title, description, date, end_date, location, category, media_url, capacity, waitlist_enabled, registrations, active)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-      RETURNING id;
-      `,
-      [
-        event.title,
-        event.description || '',
-        event.date,
-        event.endDate || event.date,
-        event.location,
-        event.category,
-        event.mediaUrl || '',
-        Math.max(0, Number(event.capacity || 0)),
-        event.waitlistEnabled !== false,
-        Number(event.registrations || 0),
-        event.active !== false
-      ]
-    );
-
-    const eventId = inserted.rows?.[0]?.id;
-    const registrants = Array.isArray(event.registrants) ? event.registrants : [];
-
-    for (const registrant of registrants) {
-      await pool.query(
-        `
-        INSERT INTO event_registrants (event_id, name, email, contact, status, created_at)
-        VALUES ($1, $2, $3, $4, $5, COALESCE($6, NOW()));
-        `,
-        [
-          eventId,
-          registrant.name || 'Anonymous',
-          String(registrant.email || '').trim().toLowerCase(),
-          registrant.contact || '',
-          String(registrant.status || 'confirmed').toLowerCase(),
-          registrant.createdAt || null
-        ]
-      );
-    }
-  }
-
-  return true;
 };
 
 const isEventPast = (row = {}) => {
@@ -2691,8 +2676,6 @@ module.exports = {
   syncRelationalMirrorsFromContentStore,
   hasDatabaseConnection: Boolean(pool),
   ensureEventsSchema,
-  seedEventsIfEmpty,
-  seedDonationCampaignsIfEmpty,
   getSingleton,
   setSingleton,
   listItems,

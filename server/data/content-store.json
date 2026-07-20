@@ -39,35 +39,7 @@
         "updatedAt": "2026-07-10T19:28:26.017Z"
       }
     ],
-    "seva_opportunities": [
-      {
-        "id": "op-3",
-        "sevaType": "Cleaning",
-        "date": "2026-07-13",
-        "time": "6:30 PM - 8:00 PM",
-        "totalVolunteersRequired": 6,
-        "expiryDate": "2026-07-12",
-        "active": true
-      },
-      {
-        "id": "op-2",
-        "sevaType": "Parking",
-        "date": "2026-07-12",
-        "time": "9:30 AM - 12:30 PM",
-        "totalVolunteersRequired": 8,
-        "expiryDate": "2026-07-11",
-        "active": true
-      },
-      {
-        "id": "op-1",
-        "sevaType": "Langar",
-        "date": "2026-07-12",
-        "time": "10:00 AM - 1:00 PM",
-        "totalVolunteersRequired": 10,
-        "expiryDate": "2026-07-11",
-        "active": true
-      }
-    ]
+    "seva_opportunities": []
   },
   "singletons": {
     "cms_page_content": {

@@ -1,5 +1,15 @@
 # Singh Sabha Milton
 
+## Latest UX Updates (2026-07-18)
+
+Recent member-facing improvements now included in the app:
+
+1. Event registration and donation flows show signed-in identity as compact text cards instead of editable-looking textboxes.
+2. Seva volunteer registration modal is smaller, more visual, and split into Personal Details and Registration Details sections.
+3. Event detail calendar action is now presented as a pill-style action with icon treatment.
+4. Global top-ribbon sign-in returns to Home, while page-specific gated sign-in links return users to the same page after login.
+5. Profile editing now supports app-specific avatar uploads while preserving the user email as non-editable and keeping the uploaded avatar from being overwritten on future Google sign-ins.
+
 ## Donation Recording via Stripe Webhooks
 
 This project now supports webhook-based Stripe donation recording so successful payments are saved even if a donor closes the browser after checkout.
