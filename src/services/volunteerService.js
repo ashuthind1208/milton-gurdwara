@@ -1,4 +1,5 @@
 import { serviceResponse } from './serviceResponse';
+import { normalizeErrorMessage } from './publicError';
 import userService from './userService';
 import contentApiService from './contentApiService';
 
@@ -99,7 +100,10 @@ const fetchJson = async (url, options = {}) => {
   const response = await fetch(url, options);
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data?.ok === false) {
-    throw new Error(data?.message || `Request failed for ${url}`);
+    const error = new Error(normalizeErrorMessage({ response, message: data?.message }, 'Unable to complete the request right now.', 'volunteerService'));
+    error.response = response;
+    error.data = data;
+    throw error;
   }
   return data;
 };

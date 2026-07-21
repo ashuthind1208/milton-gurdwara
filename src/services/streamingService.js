@@ -59,7 +59,7 @@ const resolveYouTubeLive = async (sourceUrl) => {
     return {
       available: false,
       checkedAt: new Date().toISOString(),
-      reason: payload?.message || 'lookup_failed',
+      reason: 'lookup_failed',
       embedUrl: ''
     };
   }

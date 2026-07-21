@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { normalizeErrorMessage } from './publicError';
 
 const apiClient = axios.create({
   baseURL: '/api',
@@ -37,5 +38,13 @@ apiClient.interceptors.request.use((config) => {
 
   return config;
 });
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    error.message = normalizeErrorMessage(error, 'Unable to complete the request right now.', 'apiClient');
+    return Promise.reject(error);
+  }
+);
 
 export default apiClient;

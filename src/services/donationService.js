@@ -1,4 +1,5 @@
 import { serviceResponse } from './serviceResponse';
+import { normalizeErrorMessage } from './publicError';
 
 const LAST_PENDING_DONATION_KEY = 'ssm-donation-last-pending-id';
 
@@ -228,7 +229,10 @@ const fetchJson = async (url, options = {}) => {
   const response = await fetch(url, options);
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data?.ok === false) {
-    throw new Error(data?.message || `Request failed for ${url}`);
+    const error = new Error(normalizeErrorMessage({ response, message: data?.message }, `Unable to complete the request right now.`, 'donationService'));
+    error.response = response;
+    error.data = data;
+    throw error;
   }
   return data;
 };
@@ -420,7 +424,10 @@ const resolveStripePaymentDetails = async ({ sessionId = '', paymentIntentId = '
   });
   const data = await response.json();
   if (!response.ok || !data?.ok) {
-    throw new Error(data?.message || 'Unable to resolve Stripe payment details.');
+    const error = new Error(normalizeErrorMessage({ response, message: data?.message }, 'Unable to resolve Stripe payment details.', 'donationService'));
+    error.response = response;
+    error.data = data;
+    throw error;
   }
 
   return data.data || null;
@@ -663,7 +670,7 @@ const donationService = {
         checkoutUrl = String(session?.checkoutUrl || '');
         sessionId = String(session?.sessionId || '');
       } catch (error) {
-        throw new Error(error?.message || 'Unable to start Stripe Checkout session.');
+        throw new Error(normalizeErrorMessage(error, 'Unable to start Stripe Checkout session.', 'donationService'));
       }
     }
 

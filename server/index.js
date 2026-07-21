@@ -65,6 +65,17 @@ const eventReminderLogPath = path.join(dataDir, 'event-reminder-log.json');
 const uploadsDir = path.resolve(__dirname, 'uploads');
 const quizBankDir = path.resolve(workspaceRoot, 'public', 'quiz');
 const maxUploadBytes = 15 * 1024 * 1024;
+const uploadServiceMimePolicies = {
+  cms: ['image/*', 'video/*', 'application/pdf'],
+  events: ['image/*', 'video/*', 'application/pdf'],
+  news: ['image/*', 'video/*', 'application/pdf', 'text/plain'],
+  library: ['image/*'],
+  sponsors: ['image/*'],
+  advertisements: ['image/*'],
+  users: ['image/*'],
+  default: ['image/*']
+};
+const maxJsonBodyBytes = 2 * 1024 * 1024;
 const volunteerReminderWebhookUrl = String(
   process.env.VOLUNTEER_REMINDER_WEBHOOK_URL || process.env.REACT_APP_APPROVAL_EMAIL_WEBHOOK_URL || ''
 ).trim();
@@ -290,23 +301,601 @@ const seedUsers = [
 
 const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
 
+const publicServerErrorMessage = 'An unexpected error occurred. Please try again later.';
+
+const looksLikeInternalErrorMessage = (value) => {
+  const text = String(value || '');
+  return /\/Users\/|\/var\/|node_modules|\.js:\d+|\.ts:\d+|stack trace|syntax error|invalid input syntax|SQLSTATE|PostgreSQL|Prisma|Sequelize|ENOENT|EACCES|ECONN|relation .* does not exist|permission denied/i.test(text);
+};
+
+const sanitizeResponseMessage = (statusCode, message) => {
+  const normalizedMessage = String(message || '').trim();
+  if (!normalizedMessage) {
+    return statusCode >= 500 ? publicServerErrorMessage : '';
+  }
+
+  if (statusCode >= 500 && looksLikeInternalErrorMessage(normalizedMessage)) {
+    return publicServerErrorMessage;
+  }
+
+  return normalizedMessage;
+};
+
 const sendJson = (response, statusCode, payload) => {
+  const nextPayload = payload && typeof payload === 'object' ? { ...payload } : payload;
+  if (nextPayload && typeof nextPayload === 'object' && 'message' in nextPayload) {
+    nextPayload.message = sanitizeResponseMessage(statusCode, nextPayload.message);
+  }
+
   response.writeHead(statusCode, {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Stripe-Signature, Authorization, X-Actor-Email, X-Actor-Role, X-Actor-Name',
     'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS'
   });
-  response.end(JSON.stringify(payload));
+  response.end(JSON.stringify(nextPayload));
+};
+
+const logServerError = (error, context) => {
+  console.error(`[${context}]`, {
+    message: error?.message || 'Unknown error',
+    stack: error?.stack || '',
+    name: error?.name || 'Error',
+    status: error?.status || null,
+    statusCode: error?.statusCode || null,
+    code: error?.code || null,
+    cause: error?.cause || null
+  });
 };
 
 const readBody = async (request) => {
+  if (request.__cachedBodyBuffer) {
+    return request.__cachedBodyBuffer;
+  }
+
   const chunks = [];
   for await (const chunk of request) {
     chunks.push(Buffer.from(chunk));
   }
-  return Buffer.concat(chunks);
+  request.__cachedBodyBuffer = Buffer.concat(chunks);
+  return request.__cachedBodyBuffer;
 };
+
+class InputValidationError extends Error {
+  constructor(message, status = 400) {
+    super(message);
+    this.name = 'InputValidationError';
+    this.status = status;
+  }
+}
+
+const throwInputError = (message, status = 400) => {
+  throw new InputValidationError(message, status);
+};
+
+const isPlainObject = (value) => {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+};
+
+const assertInput = (condition, message, status = 400) => {
+  if (!condition) {
+    throwInputError(message, status);
+  }
+};
+
+const parseJsonObjectBody = async (request, options = {}) => {
+  const maxBytes = Number.isFinite(Number(options.maxBytes)) ? Number(options.maxBytes) : maxJsonBodyBytes;
+  const allowEmpty = options.allowEmpty !== false;
+  const buffer = await readBody(request);
+
+  if (buffer.length > maxBytes) {
+    throwInputError('Request body too large.', 413);
+  }
+
+  const raw = buffer.toString('utf8').trim();
+  if (!raw) {
+    return allowEmpty ? {} : throwInputError('Request body is required.');
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throwInputError('Invalid JSON payload.');
+  }
+
+  assertInput(isPlainObject(parsed), 'Request body must be a JSON object.');
+  return parsed;
+};
+
+const ensureNoUnknownKeys = (payload, allowedKeys, label = 'body') => {
+  const keySet = new Set(allowedKeys);
+  Object.keys(payload || {}).forEach((key) => {
+    if (!keySet.has(key)) {
+      throwInputError(`${label}.${key} is not allowed.`);
+    }
+  });
+};
+
+const readStringField = (payload, key, options = {}) => {
+  const value = payload?.[key];
+  const required = options.required === true;
+  const min = Number.isFinite(Number(options.min)) ? Number(options.min) : 0;
+  const max = Number.isFinite(Number(options.max)) ? Number(options.max) : 10000;
+  const pattern = options.pattern instanceof RegExp ? options.pattern : null;
+  const trim = options.trim !== false;
+
+  if (value == null || value === '') {
+    if (required) {
+      throwInputError(`${key} is required.`);
+    }
+    return '';
+  }
+
+  assertInput(typeof value === 'string', `${key} must be a string.`);
+  const normalized = trim ? value.trim() : value;
+  assertInput(normalized.length >= min, `${key} must be at least ${min} characters.`);
+  assertInput(normalized.length <= max, `${key} must be at most ${max} characters.`);
+  if (pattern) {
+    assertInput(pattern.test(normalized), `${key} has an invalid format.`);
+  }
+  return options.toLowerCase === true ? normalized.toLowerCase() : normalized;
+};
+
+const readNumberField = (payload, key, options = {}) => {
+  const value = payload?.[key];
+  const required = options.required === true;
+  if (value == null || value === '') {
+    if (required) {
+      throwInputError(`${key} is required.`);
+    }
+    return null;
+  }
+
+  assertInput(typeof value === 'number' && Number.isFinite(value), `${key} must be a finite number.`);
+  if (options.integer === true) {
+    assertInput(Number.isInteger(value), `${key} must be an integer.`);
+  }
+  if (Number.isFinite(Number(options.min))) {
+    assertInput(value >= Number(options.min), `${key} must be >= ${Number(options.min)}.`);
+  }
+  if (Number.isFinite(Number(options.max))) {
+    assertInput(value <= Number(options.max), `${key} must be <= ${Number(options.max)}.`);
+  }
+  return value;
+};
+
+const readBooleanField = (payload, key, options = {}) => {
+  const value = payload?.[key];
+  const required = options.required === true;
+  if (value == null) {
+    if (required) {
+      throwInputError(`${key} is required.`);
+    }
+    return null;
+  }
+
+  assertInput(typeof value === 'boolean', `${key} must be a boolean.`);
+  return value;
+};
+
+const readObjectField = (payload, key, options = {}) => {
+  const value = payload?.[key];
+  const required = options.required === true;
+  if (value == null) {
+    if (required) {
+      throwInputError(`${key} is required.`);
+    }
+    return null;
+  }
+
+  assertInput(isPlainObject(value), `${key} must be an object.`);
+  return value;
+};
+
+const readArrayField = (payload, key, options = {}) => {
+  const value = payload?.[key];
+  const required = options.required === true;
+  const max = Number.isFinite(Number(options.max)) ? Number(options.max) : 1000;
+  if (value == null) {
+    if (required) {
+      throwInputError(`${key} is required.`);
+    }
+    return null;
+  }
+
+  assertInput(Array.isArray(value), `${key} must be an array.`);
+  assertInput(value.length <= max, `${key} must contain at most ${max} items.`);
+  return value;
+};
+
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const simpleIdPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const mimeTypePattern = /^[a-z0-9][a-z0-9!#$&^_.+-]{0,79}\/[a-z0-9][a-z0-9!#$&^_.+-]{0,79}$/i;
+
+const readEmailField = (payload, key, options = {}) => {
+  const value = readStringField(payload, key, {
+    required: options.required === true,
+    min: 3,
+    max: 254,
+    toLowerCase: true
+  });
+  if (!value) {
+    return '';
+  }
+  assertInput(emailPattern.test(value), `${key} must be a valid email.`);
+  return value;
+};
+
+const parseNumericPathId = (rawValue, fieldName) => {
+  const value = String(rawValue || '').trim();
+  assertInput(/^\d{1,12}$/.test(value), `${fieldName} must be a numeric id.`);
+  return Number(value);
+};
+
+const parseStringPathId = (rawValue, fieldName) => {
+  const value = String(rawValue || '').trim();
+  assertInput(simpleIdPattern.test(value), `${fieldName} has an invalid format.`);
+  return value;
+};
+
+const validateGenericJsonValue = (value, fieldPath = 'body', depth = 0) => {
+  assertInput(depth <= 8, `${fieldPath} is nested too deeply.`);
+
+  if (value == null) {
+    return;
+  }
+
+  const valueType = typeof value;
+  if (valueType === 'string') {
+    assertInput(value.length <= 10000, `${fieldPath} is too long.`);
+    return;
+  }
+
+  if (valueType === 'number') {
+    assertInput(Number.isFinite(value), `${fieldPath} must be a finite number.`);
+    return;
+  }
+
+  if (valueType === 'boolean') {
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    assertInput(value.length <= 1500, `${fieldPath} has too many items.`);
+    value.forEach((entry, index) => validateGenericJsonValue(entry, `${fieldPath}[${index}]`, depth + 1));
+    return;
+  }
+
+  assertInput(isPlainObject(value), `${fieldPath} must be an object.`);
+  const keys = Object.keys(value);
+  assertInput(keys.length <= 200, `${fieldPath} contains too many properties.`);
+  keys.forEach((key) => {
+    assertInput(key.length > 0 && key.length <= 80, `${fieldPath}.${key} has an invalid key length.`);
+    assertInput(key !== '__proto__' && key !== 'constructor' && key !== 'prototype', `${fieldPath}.${key} is not allowed.`);
+    validateGenericJsonValue(value[key], `${fieldPath}.${key}`, depth + 1);
+  });
+};
+
+const parseAndValidateGenericObjectBody = async (request, options = {}) => {
+  const body = await parseJsonObjectBody(request, options);
+  validateGenericJsonValue(body, 'body');
+  return body;
+};
+
+const parsePositiveIntEnv = (envName, fallback) => {
+  const parsed = Number(process.env[envName]);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return Math.floor(parsed);
+};
+
+const parseBooleanEnv = (envName, fallback = false) => {
+  const raw = String(process.env[envName] || '').trim().toLowerCase();
+  if (!raw) {
+    return fallback;
+  }
+  return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
+};
+
+const parseCsvEnv = (envName, fallback = []) => {
+  const raw = String(process.env[envName] || '').trim();
+  if (!raw) {
+    return fallback;
+  }
+  return raw.split(',').map((item) => item.trim()).filter(Boolean);
+};
+
+const rateLimitConfig = {
+  enabled: parseBooleanEnv('RATE_LIMIT_ENABLED', true),
+  publicWindowMs: parsePositiveIntEnv('RATE_LIMIT_PUBLIC_WINDOW_MS', 60 * 1000),
+  publicMaxRequests: parsePositiveIntEnv('RATE_LIMIT_PUBLIC_MAX_REQUESTS', 180),
+  authenticatedWindowMs: parsePositiveIntEnv('RATE_LIMIT_AUTHENTICATED_WINDOW_MS', 60 * 1000),
+  authenticatedMaxRequests: parsePositiveIntEnv('RATE_LIMIT_AUTHENTICATED_MAX_REQUESTS', 600),
+  authIpWindowMs: parsePositiveIntEnv('RATE_LIMIT_AUTH_IP_WINDOW_MS', 60 * 1000),
+  authIpMaxAttempts: parsePositiveIntEnv('RATE_LIMIT_AUTH_IP_MAX_ATTEMPTS', 12),
+  authAccountWindowMs: parsePositiveIntEnv('RATE_LIMIT_AUTH_ACCOUNT_WINDOW_MS', 5 * 60 * 1000),
+  authAccountMaxAttempts: parsePositiveIntEnv('RATE_LIMIT_AUTH_ACCOUNT_MAX_ATTEMPTS', 6),
+  authBackoffBaseMs: parsePositiveIntEnv('RATE_LIMIT_AUTH_BACKOFF_BASE_MS', 1000),
+  authBackoffMaxMs: parsePositiveIntEnv('RATE_LIMIT_AUTH_BACKOFF_MAX_MS', 30 * 60 * 1000),
+  cleanupIntervalMs: parsePositiveIntEnv('RATE_LIMIT_CLEANUP_INTERVAL_MS', 5 * 60 * 1000),
+  authRouteRules: parseCsvEnv('RATE_LIMIT_AUTH_ROUTE_RULES', [
+    'POST:/api/auth/*',
+    'POST:/api/users/upsert-by-email',
+    'POST:/api/users/complete-registration',
+    'POST:/api/users',
+    'POST:/api/users/by-email',
+    'PATCH:/api/users/*/approval'
+  ])
+};
+
+const fixedWindowRateState = new Map();
+const authIpRateState = new Map();
+const authAccountRateState = new Map();
+
+const isRouteMatch = (rule, method, pathname) => {
+  const normalizedRule = String(rule || '').trim();
+  if (!normalizedRule) {
+    return false;
+  }
+
+  const dividerIndex = normalizedRule.indexOf(':');
+  if (dividerIndex < 0) {
+    return false;
+  }
+
+  const ruleMethod = normalizedRule.slice(0, dividerIndex).trim().toUpperCase() || '*';
+  const rulePath = normalizedRule.slice(dividerIndex + 1).trim();
+  if (!rulePath) {
+    return false;
+  }
+
+  if (ruleMethod !== '*' && ruleMethod !== String(method || '').toUpperCase()) {
+    return false;
+  }
+
+  if (rulePath.endsWith('*')) {
+    const prefix = rulePath.slice(0, -1);
+    return pathname.startsWith(prefix);
+  }
+
+  return pathname === rulePath;
+};
+
+const isAuthRateLimitedRoute = (method, pathname) => {
+  return rateLimitConfig.authRouteRules.some((rule) => isRouteMatch(rule, method, pathname));
+};
+
+const getCachedJsonBody = async (request) => {
+  if (request.__cachedJsonBody !== undefined) {
+    return request.__cachedJsonBody;
+  }
+
+  try {
+    const raw = (await readBody(request)).toString('utf8').trim();
+    request.__cachedJsonBody = raw ? JSON.parse(raw) : {};
+  } catch {
+    request.__cachedJsonBody = {};
+  }
+
+  return request.__cachedJsonBody;
+};
+
+const extractAccountIdentifier = async (request, requestUrl) => {
+  const body = await getCachedJsonBody(request);
+  const queryEmail = String(requestUrl?.searchParams?.get('email') || '').trim().toLowerCase();
+  const headerEmail = String(request.headers['x-actor-email'] || '').trim().toLowerCase();
+  const candidates = [
+    body?.email,
+    body?.donorEmail,
+    body?.username,
+    body?.userName,
+    body?.actorEmail,
+    body?.contact,
+    queryEmail,
+    headerEmail
+  ]
+    .map((entry) => String(entry || '').trim().toLowerCase())
+    .filter(Boolean);
+
+  return candidates[0] || 'anonymous-account';
+};
+
+const evaluateFixedWindowLimit = (stateMap, key, maxRequests, windowMs, now) => {
+  const current = stateMap.get(key);
+  if (!current || current.resetAt <= now) {
+    stateMap.set(key, {
+      count: 1,
+      resetAt: now + windowMs
+    });
+    return { limited: false, retryAfterMs: 0 };
+  }
+
+  if (current.count < maxRequests) {
+    current.count += 1;
+    stateMap.set(key, current);
+    return { limited: false, retryAfterMs: 0 };
+  }
+
+  return {
+    limited: true,
+    retryAfterMs: Math.max(1, current.resetAt - now)
+  };
+};
+
+const evaluateAuthBackoffLimit = (stateMap, key, maxAttempts, windowMs, backoffBaseMs, backoffMaxMs, now) => {
+  const current = stateMap.get(key) || {
+    count: 0,
+    windowStart: now,
+    blockedUntil: 0
+  };
+
+  if (current.blockedUntil > now) {
+    return {
+      limited: true,
+      retryAfterMs: current.blockedUntil - now
+    };
+  }
+
+  if ((now - current.windowStart) >= windowMs) {
+    current.count = 0;
+    current.windowStart = now;
+    current.blockedUntil = 0;
+  }
+
+  current.count += 1;
+  if (current.count <= maxAttempts) {
+    stateMap.set(key, current);
+    return { limited: false, retryAfterMs: 0 };
+  }
+
+  const overflow = current.count - maxAttempts;
+  const backoffMs = Math.min(backoffMaxMs, backoffBaseMs * (2 ** Math.max(0, overflow - 1)));
+  current.blockedUntil = now + backoffMs;
+  stateMap.set(key, current);
+
+  return {
+    limited: true,
+    retryAfterMs: backoffMs
+  };
+};
+
+const sendRateLimitExceeded = (response, retryAfterMs, message, scope = 'request') => {
+  const retryAfterSeconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
+  response.writeHead(429, {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Stripe-Signature, Authorization, X-Actor-Email, X-Actor-Role, X-Actor-Name',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+    'Retry-After': String(retryAfterSeconds),
+    'X-RateLimit-Scope': scope
+  });
+  response.end(JSON.stringify({
+    ok: false,
+    message,
+    retryAfterSeconds,
+    scope
+  }));
+};
+
+const enforceRateLimit = async (request, response, requestUrl) => {
+  if (!rateLimitConfig.enabled) {
+    return true;
+  }
+
+  if (String(request.method || '').toUpperCase() === 'OPTIONS') {
+    return true;
+  }
+
+  const method = String(request.method || 'GET').toUpperCase();
+  const pathname = String(requestUrl?.pathname || '/');
+  const now = Date.now();
+  const clientIp = resolveClientIp(request) || 'unknown-ip';
+  const actorEmail = String(request.headers['x-actor-email'] || '').trim().toLowerCase();
+
+  if (isAuthRateLimitedRoute(method, pathname)) {
+    const accountIdentifier = await extractAccountIdentifier(request, requestUrl);
+    const ipKey = `${method}:${pathname}:ip:${clientIp}`;
+    const accountKey = `${method}:${pathname}:account:${accountIdentifier}`;
+
+    const ipDecision = evaluateAuthBackoffLimit(
+      authIpRateState,
+      ipKey,
+      rateLimitConfig.authIpMaxAttempts,
+      rateLimitConfig.authIpWindowMs,
+      rateLimitConfig.authBackoffBaseMs,
+      rateLimitConfig.authBackoffMaxMs,
+      now
+    );
+
+    if (ipDecision.limited) {
+      sendRateLimitExceeded(response, ipDecision.retryAfterMs, 'Too many authentication attempts from this IP. Please retry later.', 'auth-ip');
+      return false;
+    }
+
+    const accountDecision = evaluateAuthBackoffLimit(
+      authAccountRateState,
+      accountKey,
+      rateLimitConfig.authAccountMaxAttempts,
+      rateLimitConfig.authAccountWindowMs,
+      rateLimitConfig.authBackoffBaseMs,
+      rateLimitConfig.authBackoffMaxMs,
+      now
+    );
+
+    if (accountDecision.limited) {
+      sendRateLimitExceeded(response, accountDecision.retryAfterMs, 'Too many authentication attempts for this account. Please retry later.', 'auth-account');
+      return false;
+    }
+
+    return true;
+  }
+
+  const isAuthenticatedAction = Boolean(actorEmail) && method !== 'GET' && method !== 'HEAD';
+  const bucketKey = isAuthenticatedAction
+    ? `${method}:${pathname}:actor:${actorEmail}`
+    : `${method}:${pathname}:ip:${clientIp}`;
+
+  const decision = evaluateFixedWindowLimit(
+    fixedWindowRateState,
+    bucketKey,
+    isAuthenticatedAction ? rateLimitConfig.authenticatedMaxRequests : rateLimitConfig.publicMaxRequests,
+    isAuthenticatedAction ? rateLimitConfig.authenticatedWindowMs : rateLimitConfig.publicWindowMs,
+    now
+  );
+
+  if (decision.limited) {
+    sendRateLimitExceeded(
+      response,
+      decision.retryAfterMs,
+      isAuthenticatedAction
+        ? 'Too many authenticated requests. Please retry shortly.'
+        : 'Too many requests. Please retry shortly.',
+      isAuthenticatedAction ? 'authenticated' : 'public'
+    );
+    return false;
+  }
+
+  return true;
+};
+
+const pruneRateLimitStates = () => {
+  const now = Date.now();
+
+  for (const [key, value] of fixedWindowRateState.entries()) {
+    if (!value || value.resetAt <= now) {
+      fixedWindowRateState.delete(key);
+    }
+  }
+
+  for (const [key, value] of authIpRateState.entries()) {
+    if (!value) {
+      authIpRateState.delete(key);
+      continue;
+    }
+    const stale = (now - value.windowStart) > (rateLimitConfig.authIpWindowMs * 2) && value.blockedUntil <= now;
+    if (stale) {
+      authIpRateState.delete(key);
+    }
+  }
+
+  for (const [key, value] of authAccountRateState.entries()) {
+    if (!value) {
+      authAccountRateState.delete(key);
+      continue;
+    }
+    const stale = (now - value.windowStart) > (rateLimitConfig.authAccountWindowMs * 2) && value.blockedUntil <= now;
+    if (stale) {
+      authAccountRateState.delete(key);
+    }
+  }
+};
+
+const rateLimitPruneTimer = setInterval(pruneRateLimitStates, rateLimitConfig.cleanupIntervalMs);
+if (typeof rateLimitPruneTimer?.unref === 'function') {
+  rateLimitPruneTimer.unref();
+}
 
 const proxyAudioStream = (request, response, targetUrlString) => {
   const targetUrl = new URL(targetUrlString);
@@ -1537,12 +2126,123 @@ const getExtensionFromMime = (mimeType) => {
   if (normalized.includes('image/jpeg')) return '.jpg';
   if (normalized.includes('image/gif')) return '.gif';
   if (normalized.includes('image/webp')) return '.webp';
-  if (normalized.includes('image/svg+xml')) return '.svg';
   if (normalized.includes('application/pdf')) return '.pdf';
   if (normalized.includes('video/mp4')) return '.mp4';
   if (normalized.includes('video/webm')) return '.webm';
   if (normalized.includes('video/quicktime')) return '.mov';
+  if (normalized.includes('text/plain')) return '.txt';
   return '';
+};
+
+const isAllowedUploadMime = (mimeType, allowedMimeTypes = []) => {
+  const normalizedMime = String(mimeType || '').toLowerCase();
+  if (!normalizedMime) {
+    return false;
+  }
+
+  if (normalizedMime === 'image/svg+xml' || normalizedMime === 'text/html' || normalizedMime === 'application/xhtml+xml') {
+    return false;
+  }
+
+  const policies = Array.isArray(allowedMimeTypes) && allowedMimeTypes.length > 0
+    ? allowedMimeTypes
+    : [];
+
+  if (policies.length === 0) {
+    return true;
+  }
+
+  return policies.some((policy) => {
+    const normalizedPolicy = String(policy || '').trim().toLowerCase();
+    if (!normalizedPolicy) {
+      return true;
+    }
+    if (normalizedPolicy.endsWith('/*')) {
+      return normalizedMime.startsWith(normalizedPolicy.slice(0, -1));
+    }
+    return normalizedMime === normalizedPolicy;
+  });
+};
+
+const detectUploadMimeType = (buffer) => {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 4) {
+    return '';
+  }
+
+  if (buffer.length >= 8
+    && buffer[0] === 0x89
+    && buffer[1] === 0x50
+    && buffer[2] === 0x4E
+    && buffer[3] === 0x47
+    && buffer[4] === 0x0D
+    && buffer[5] === 0x0A
+    && buffer[6] === 0x1A
+    && buffer[7] === 0x0A) {
+    return 'image/png';
+  }
+
+  if (buffer.length >= 3 && buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
+    return 'image/jpeg';
+  }
+
+  if (buffer.length >= 6) {
+    const header = buffer.toString('ascii', 0, 6);
+    if (header === 'GIF87a' || header === 'GIF89a') {
+      return 'image/gif';
+    }
+  }
+
+  if (buffer.length >= 12) {
+    const riff = buffer.toString('ascii', 0, 4);
+    const webp = buffer.toString('ascii', 8, 12);
+    if (riff === 'RIFF' && webp === 'WEBP') {
+      return 'image/webp';
+    }
+
+    const atomType = buffer.toString('ascii', 4, 8);
+    if (atomType === 'ftyp') {
+      const brand = buffer.toString('ascii', 8, 12).trim().toLowerCase();
+      if (brand === 'qt' || brand.startsWith('qt')) {
+        return 'video/quicktime';
+      }
+      if (brand.startsWith('mp4') || brand.startsWith('isom') || brand.startsWith('iso2') || brand.startsWith('avc1') || brand.startsWith('m4v')) {
+        return 'video/mp4';
+      }
+    }
+  }
+
+  if (buffer.length >= 4
+    && buffer[0] === 0x1A
+    && buffer[1] === 0x45
+    && buffer[2] === 0xDF
+    && buffer[3] === 0xA3) {
+    return 'video/webm';
+  }
+
+  if (buffer.length >= 5) {
+    const pdfHeader = buffer.toString('ascii', 0, 5);
+    if (pdfHeader === '%PDF-') {
+      return 'application/pdf';
+    }
+  }
+
+  const hasBinaryNull = buffer.includes(0x00);
+  if (!hasBinaryNull) {
+    const text = buffer.toString('utf8');
+    const roundTrip = Buffer.from(text, 'utf8');
+    if (roundTrip.length === buffer.length && roundTrip.equals(buffer)) {
+      return 'text/plain';
+    }
+  }
+
+  return '';
+};
+
+const getSafeUploadFileName = (originalName, mimeType) => {
+  const parsed = path.parse(sanitizeFileName(originalName || 'file'));
+  const baseName = sanitizeFileName(parsed.name || 'file');
+  const safeExtension = getExtensionFromMime(mimeType) || '';
+  return `${baseName}${safeExtension}`;
 };
 
 const extractBase64Payload = (dataUrlOrBase64 = '') => {
@@ -1878,11 +2578,7 @@ const reconcilePaidPendingDonations = async () => {
       reconciled += 1;
     } catch (error) {
       // Leave pending record untouched; it can be retried on subsequent requests.
-      console.error('[donations] reconcile failed for pending row', {
-        pendingId: pending?.id,
-        sessionId,
-        message: error?.message || 'unknown error'
-      });
+      logServerError(error, '[donations] reconcile failed for pending row');
     }
   }
 
@@ -2342,6 +3038,11 @@ const resolveYouTubeLiveVideo = async (source) => {
 const server = http.createServer(async (request, response) => {
   const requestUrl = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
 
+  const rateLimitAllowed = await enforceRateLimit(request, response, requestUrl);
+  if (!rateLimitAllowed) {
+    return;
+  }
+
   if (request.method === 'OPTIONS') {
     sendJson(response, 204, {});
     return;
@@ -2402,6 +3103,7 @@ const server = http.createServer(async (request, response) => {
         'Content-Type': getMimeTypeFromName(normalizedFilePath),
         'Content-Length': stat.size,
         'Cache-Control': 'public, max-age=604800',
+        'X-Content-Type-Options': 'nosniff',
         'Access-Control-Allow-Origin': '*'
       });
 
@@ -2422,10 +3124,19 @@ const server = http.createServer(async (request, response) => {
         return;
       }
 
-      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
-      const rawName = sanitizeFileName(body.fileName || 'upload-file');
-      const mimeType = String(body.mimeType || '').trim().toLowerCase();
-      const base64Payload = extractBase64Payload(body.dataUrl || body.base64Data || '');
+      const body = await parseJsonObjectBody(request, { maxBytes: maxUploadBytes * 2, allowEmpty: false });
+      ensureNoUnknownKeys(body, ['fileName', 'mimeType', 'dataUrl', 'base64Data']);
+
+      const rawNameField = readStringField(body, 'fileName', { max: 180 }) || 'upload-file';
+      const mimeType = readStringField(body, 'mimeType', { max: 160 }).toLowerCase();
+      if (mimeType) {
+        assertInput(mimeTypePattern.test(mimeType), 'mimeType has an invalid format.');
+      }
+      const allowedMimeTypes = uploadServiceMimePolicies[service] || uploadServiceMimePolicies.default;
+      assertInput(isAllowedUploadMime(mimeType, allowedMimeTypes), 'Unsupported file type for this upload service.');
+      const dataUrl = readStringField(body, 'dataUrl', { max: maxUploadBytes * 3 });
+      const base64Data = readStringField(body, 'base64Data', { max: maxUploadBytes * 3 });
+      const base64Payload = extractBase64Payload(dataUrl || base64Data || '');
 
       if (!base64Payload) {
         sendJson(response, 400, { ok: false, message: 'No file payload found.' });
@@ -2438,20 +3149,24 @@ const server = http.createServer(async (request, response) => {
         return;
       }
 
+      const detectedMimeType = detectUploadMimeType(fileBuffer);
+      if (!detectedMimeType) {
+        sendJson(response, 400, { ok: false, message: 'Uploaded file content is not supported.' });
+        return;
+      }
+
+      assertInput(isAllowedUploadMime(detectedMimeType, allowedMimeTypes), 'Uploaded file content is not allowed for this service.');
+      assertInput(detectedMimeType === mimeType, 'File content does not match the declared file type.');
+
       if (fileBuffer.length > maxUploadBytes) {
         sendJson(response, 413, { ok: false, message: 'File too large. Max size is 15 MB.' });
         return;
       }
 
-      let finalName = rawName;
-      const requestedExt = path.extname(rawName);
-      const inferredExt = getExtensionFromMime(mimeType);
-      if (!requestedExt && inferredExt) {
-        finalName = `${rawName}${inferredExt}`;
-      }
+      const finalName = getSafeUploadFileName(rawNameField, detectedMimeType);
 
       const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const storedFileName = `${uniqueSuffix}-${sanitizeFileName(finalName)}`;
+      const storedFileName = `${uniqueSuffix}-${finalName}`;
       const { targetDir, year, month } = buildUploadDirectory(service);
       const outputPath = path.join(targetDir, storedFileName);
       fs.writeFileSync(outputPath, fileBuffer);
@@ -2463,12 +3178,12 @@ const server = http.createServer(async (request, response) => {
           service,
           fileName: storedFileName,
           size: fileBuffer.length,
-          mimeType: mimeType || getMimeTypeFromName(storedFileName),
+          mimeType: detectedMimeType,
           url: publicUrl
         }
       });
     } catch (error) {
-      sendJson(response, 500, { ok: false, message: error.message || 'Unable to upload file.' });
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to upload file.' });
     }
     return;
   }
@@ -2603,8 +3318,12 @@ const server = http.createServer(async (request, response) => {
         return;
       }
 
-      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
-      const questions = Array.isArray(body.questions) ? body.questions : [];
+      const body = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
+      ensureNoUnknownKeys(body, ['questions']);
+      const questions = readArrayField(body, 'questions', { required: true, max: 2000 });
+      questions.forEach((entry, index) => {
+        validateGenericJsonValue(entry, `questions[${index}]`, 0);
+      });
       fs.mkdirSync(quizBankDir, { recursive: true });
       fs.writeFileSync(filePath, JSON.stringify(questions, null, 2), 'utf8');
 
@@ -2615,7 +3334,7 @@ const server = http.createServer(async (request, response) => {
 
       sendJson(response, 200, { ok: true, data: { fileName: normalizedFileName, questions } });
     } catch (error) {
-      sendJson(response, 500, { ok: false, message: error.message || 'Unable to update quiz file.' });
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to update quiz file.' });
     }
     return;
   }
@@ -2635,7 +3354,7 @@ const server = http.createServer(async (request, response) => {
   if (contentResourceMatch && request.method === 'POST') {
     try {
       const resource = String(contentResourceMatch[1]).toLowerCase();
-      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const body = await parseAndValidateGenericObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
       const data = await eventsDb.createItem(resource, body);
       if (resource !== 'audit_logs') {
         await appendAuditLog(request, {
@@ -2648,7 +3367,7 @@ const server = http.createServer(async (request, response) => {
       }
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
-      sendJson(response, 500, { ok: false, message: error.message || 'Unable to create content item.' });
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to create content item.' });
     }
     return;
   }
@@ -2657,8 +3376,8 @@ const server = http.createServer(async (request, response) => {
   if (contentResourceIdMatch && request.method === 'PATCH') {
     try {
       const resource = String(contentResourceIdMatch[1]).toLowerCase();
-      const id = decodeURIComponent(contentResourceIdMatch[2]);
-      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const id = parseStringPathId(decodeURIComponent(contentResourceIdMatch[2]), 'id');
+      const body = await parseAndValidateGenericObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
       const data = await eventsDb.updateItem(resource, id, body);
       if (resource !== 'audit_logs') {
         await appendAuditLog(request, {
@@ -2671,7 +3390,7 @@ const server = http.createServer(async (request, response) => {
       }
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
-      sendJson(response, 500, { ok: false, message: error.message || 'Unable to update content item.' });
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to update content item.' });
     }
     return;
   }
@@ -2679,7 +3398,7 @@ const server = http.createServer(async (request, response) => {
   if (contentResourceIdMatch && request.method === 'DELETE') {
     try {
       const resource = String(contentResourceIdMatch[1]).toLowerCase();
-      const id = decodeURIComponent(contentResourceIdMatch[2]);
+      const id = parseStringPathId(decodeURIComponent(contentResourceIdMatch[2]), 'id');
       const data = await eventsDb.removeItem(resource, id);
       if (resource !== 'audit_logs') {
         await appendAuditLog(request, {
@@ -2691,7 +3410,7 @@ const server = http.createServer(async (request, response) => {
       }
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
-      sendJson(response, 500, { ok: false, message: error.message || 'Unable to delete content item.' });
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to delete content item.' });
     }
     return;
   }
@@ -2711,7 +3430,7 @@ const server = http.createServer(async (request, response) => {
   if (contentSingleMatch && request.method === 'PUT') {
     try {
       const resource = String(contentSingleMatch[1]).toLowerCase();
-      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const body = await parseAndValidateGenericObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
       const data = await eventsDb.setSingleton(resource, body);
       await appendAuditLog(request, {
         action: 'content.singleton.update',
@@ -2722,7 +3441,7 @@ const server = http.createServer(async (request, response) => {
       });
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
-      sendJson(response, 500, { ok: false, message: error.message || 'Unable to update singleton content.' });
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to update singleton content.' });
     }
     return;
   }
@@ -2814,7 +3533,12 @@ const server = http.createServer(async (request, response) => {
 
   if (requestUrl.pathname === '/api/events' && request.method === 'POST') {
     try {
-      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const body = await parseAndValidateGenericObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
+      const title = readStringField(body, 'title', { required: true, min: 2, max: 180 });
+      const date = readStringField(body, 'date', { required: true, max: 64 });
+      assertInput(!Number.isNaN(new Date(date).getTime()), 'date must be a valid date string.');
+      body.title = title;
+      body.date = date;
       const data = await eventsDb.createEvent(body);
       await appendAuditLog(request, {
         action: 'event.create',
@@ -2825,7 +3549,7 @@ const server = http.createServer(async (request, response) => {
       });
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
-      sendJson(response, 500, {
+      sendJson(response, error.status || 500, {
         ok: false,
         message: error.message || 'Unable to create event in database.'
       });
@@ -2835,7 +3559,28 @@ const server = http.createServer(async (request, response) => {
 
   if (requestUrl.pathname === '/api/events/register' && request.method === 'POST') {
     try {
-      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const body = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
+      ensureNoUnknownKeys(body, ['eventId', 'name', 'email', 'contact', 'status', 'notes', 'wantsEventEmails', 'contactPreference']);
+      const eventId = readStringField(body, 'eventId', { required: true, max: 12, pattern: /^\d{1,12}$/ });
+      const name = readStringField(body, 'name', { required: true, min: 2, max: 120 });
+      const email = readEmailField(body, 'email', { required: false });
+      const contact = readStringField(body, 'contact', { max: 40 });
+      assertInput(Boolean(email || contact), 'Either email or contact is required.');
+      if (contact) {
+        assertInput(/^[0-9+()\-\s]{7,40}$/.test(contact), 'contact has an invalid format.');
+      }
+      readStringField(body, 'status', { max: 40 });
+      readStringField(body, 'notes', { max: 1000 });
+      const wantsEventEmails = readBooleanField(body, 'wantsEventEmails');
+      readStringField(body, 'contactPreference', { max: 20 });
+      body.eventId = eventId;
+      body.name = name;
+      if (email) {
+        body.email = email;
+      }
+      if (wantsEventEmails != null) {
+        body.wantsEventEmails = wantsEventEmails;
+      }
       const data = await eventsDb.registerForEvent(body);
       await appendAuditLog(request, {
         action: 'event.register',
@@ -2861,7 +3606,12 @@ const server = http.createServer(async (request, response) => {
 
   if (requestUrl.pathname === '/api/events/registrant/remove' && request.method === 'POST') {
     try {
-      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const body = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
+      ensureNoUnknownKeys(body, ['eventId', 'registrantId']);
+      const eventId = readStringField(body, 'eventId', { required: true, max: 12, pattern: /^\d{1,12}$/ });
+      const registrantId = readStringField(body, 'registrantId', { required: true, max: 128, pattern: simpleIdPattern });
+      body.eventId = eventId;
+      body.registrantId = registrantId;
       const data = await eventsDb.removeEventRegistrant(body);
       await appendAuditLog(request, {
         action: 'event.registrant.remove',
@@ -2875,7 +3625,7 @@ const server = http.createServer(async (request, response) => {
       });
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
-      sendJson(response, 500, {
+      sendJson(response, error.status || 500, {
         ok: false,
         message: error.message || 'Unable to remove event registrant.'
       });
@@ -2886,8 +3636,8 @@ const server = http.createServer(async (request, response) => {
   const eventPathMatch = requestUrl.pathname.match(/^\/api\/events\/([^/]+)$/);
   if (eventPathMatch && request.method === 'PATCH') {
     try {
-      const id = Number(decodeURIComponent(eventPathMatch[1]));
-      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const id = parseNumericPathId(decodeURIComponent(eventPathMatch[1]), 'event id');
+      const body = await parseAndValidateGenericObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
       const data = await eventsDb.updateEvent(id, body);
       await appendAuditLog(request, {
         action: 'event.update',
@@ -2898,7 +3648,7 @@ const server = http.createServer(async (request, response) => {
       });
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
-      sendJson(response, 500, {
+      sendJson(response, error.status || 500, {
         ok: false,
         message: error.message || 'Unable to update event.'
       });
@@ -2908,7 +3658,7 @@ const server = http.createServer(async (request, response) => {
 
   if (eventPathMatch && request.method === 'DELETE') {
     try {
-      const id = Number(decodeURIComponent(eventPathMatch[1]));
+      const id = parseNumericPathId(decodeURIComponent(eventPathMatch[1]), 'event id');
       const data = await eventsDb.removeEvent(id);
       await appendAuditLog(request, {
         action: 'event.delete',
@@ -2929,7 +3679,22 @@ const server = http.createServer(async (request, response) => {
   if (requestUrl.pathname === '/api/stripe/create-checkout-session' && request.method === 'POST') {
     try {
       const stripeClient = requireStripeClient();
-      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const body = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
+      ensureNoUnknownKeys(body, ['campaignName', 'pendingId', 'origin', 'amountCents', 'amount', 'donorEmail', 'campaignId', 'donorName', 'frequency', 'donationPurpose']);
+      readStringField(body, 'campaignName', { max: 160 });
+      readStringField(body, 'pendingId', { max: 120, pattern: simpleIdPattern });
+      const originInput = readStringField(body, 'origin', { max: 300 });
+      if (originInput) {
+        assertInput(/^https?:\/\//i.test(originInput), 'origin must be a valid http/https URL.');
+      }
+      const amountCents = readNumberField(body, 'amountCents', { integer: true, min: 1, max: 50000000 });
+      const amount = readNumberField(body, 'amount', { min: 0.01, max: 500000 });
+      assertInput(amountCents != null || amount != null, 'amountCents or amount is required.');
+      readEmailField(body, 'donorEmail', { required: false });
+      readNumberField(body, 'campaignId', { integer: true, min: 1, max: 1000000000 });
+      readStringField(body, 'donorName', { max: 140 });
+      readStringField(body, 'frequency', { max: 40 });
+      readStringField(body, 'donationPurpose', { max: 240 });
 
       const campaignName = String(body.campaignName || 'General Donation').trim() || 'General Donation';
       const pendingId = String(body.pendingId || `pending-${Date.now()}`);
@@ -3013,6 +3778,14 @@ const server = http.createServer(async (request, response) => {
       }
 
       if (sessionId) {
+        assertInput(/^cs_[A-Za-z0-9_]+$/.test(String(sessionId)), 'session_id has an invalid format.');
+      }
+
+      if (paymentIntentId) {
+        assertInput(/^pi_[A-Za-z0-9_]+$/.test(String(paymentIntentId)), 'payment_intent has an invalid format.');
+      }
+
+      if (sessionId) {
         const session = await stripeClient.checkout.sessions.retrieve(sessionId);
         sendJson(response, 200, {
           ok: true,
@@ -3044,7 +3817,7 @@ const server = http.createServer(async (request, response) => {
         }
       });
     } catch (error) {
-      sendJson(response, error.statusCode || 500, {
+      sendJson(response, error.status || error.statusCode || 500, {
         ok: false,
         message: error.message || 'Unable to resolve Stripe payment details.'
       });
@@ -3074,11 +3847,16 @@ const server = http.createServer(async (request, response) => {
 
   if (requestUrl.pathname === '/api/volunteer-reminders/run' && request.method === 'POST') {
     try {
-      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const body = await parseJsonObjectBody(request, { maxBytes: 64 * 1024, allowEmpty: true });
+      ensureNoUnknownKeys(body, ['force']);
+      const force = readBooleanField(body, 'force');
       const data = await runVolunteerReminderSweep({ force: body?.force === true });
+      if (force != null) {
+        data.force = force;
+      }
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
-      sendJson(response, 500, {
+      sendJson(response, error.status || 500, {
         ok: false,
         message: error.message || 'Unable to run volunteer reminders.'
       });
@@ -3088,18 +3866,20 @@ const server = http.createServer(async (request, response) => {
 
   if (requestUrl.pathname === '/api/events/reminders/run' && request.method === 'POST') {
     try {
-      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const body = await parseJsonObjectBody(request, { maxBytes: 64 * 1024, allowEmpty: true });
+      ensureNoUnknownKeys(body, ['force']);
+      const force = readBooleanField(body, 'force');
       const data = await runEventReminderSweep({ force: body?.force === true });
       await appendAuditLog(request, {
         action: 'event.reminders.run',
         targetType: 'event-reminders',
         targetId: 'scheduled',
         description: 'Executed event reminder sweep',
-        payload: { force: body?.force === true, result: data }
+        payload: { force: force === true, result: data }
       });
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
-      sendJson(response, 500, {
+      sendJson(response, error.status || 500, {
         ok: false,
         message: error.message || 'Unable to run event reminders.'
       });
@@ -3123,7 +3903,7 @@ const server = http.createServer(async (request, response) => {
   const manualReminderMatch = requestUrl.pathname.match(/^\/api\/volunteer-reminders\/opportunity\/([^/]+)\/send$/i);
   if (manualReminderMatch && request.method === 'POST') {
     try {
-      const opportunityId = decodeURIComponent(manualReminderMatch[1]);
+      const opportunityId = parseStringPathId(decodeURIComponent(manualReminderMatch[1]), 'opportunity id');
       const data = await sendManualOpportunityReminders(opportunityId);
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
@@ -3227,19 +4007,60 @@ const server = http.createServer(async (request, response) => {
 
   if (requestUrl.pathname === '/api/donations' && request.method === 'POST') {
     try {
-      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const body = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
+      ensureNoUnknownKeys(body, [
+        'id', 'receiptId', 'sourcePendingId', 'campaignId', 'campaignName', 'donorName', 'donorEmail', 'amount',
+        'frequency', 'paymentProvider', 'paymentStatus', 'gatewayTransactionId', 'stripeSessionId', 'stripeEventId',
+        'createdAt', 'emailSent', 'source', 'phone', 'address', 'donationPurpose', 'notes'
+      ]);
+      readStringField(body, 'id', { max: 160, pattern: simpleIdPattern });
+      readStringField(body, 'receiptId', { max: 160, pattern: simpleIdPattern });
+      readStringField(body, 'sourcePendingId', { max: 160, pattern: simpleIdPattern });
+      readNumberField(body, 'campaignId', { integer: true, min: 1, max: 1000000000 });
+      readStringField(body, 'campaignName', { max: 180 });
+      readStringField(body, 'donorName', { max: 140 });
+      readEmailField(body, 'donorEmail', { required: false });
+      readNumberField(body, 'amount', { required: true, min: 0.01, max: 500000 });
+      readStringField(body, 'frequency', { max: 40 });
+      readStringField(body, 'paymentProvider', { max: 40 });
+      readStringField(body, 'paymentStatus', { max: 40 });
+      readStringField(body, 'gatewayTransactionId', { max: 180 });
+      readStringField(body, 'stripeSessionId', { max: 180 });
+      readStringField(body, 'stripeEventId', { max: 180 });
+      const createdAt = readStringField(body, 'createdAt', { max: 64 });
+      if (createdAt) {
+        assertInput(!Number.isNaN(new Date(createdAt).getTime()), 'createdAt must be a valid ISO date string.');
+      }
+      readBooleanField(body, 'emailSent');
+      readStringField(body, 'source', { max: 80 });
+      readStringField(body, 'phone', { max: 40 });
+      readStringField(body, 'address', { max: 240 });
+      readStringField(body, 'donationPurpose', { max: 240 });
+      readStringField(body, 'notes', { max: 1000 });
       const data = await upsertDonation(body);
       await syncCampaignRaisedTotal({ campaignId: data?.campaignId, campaignName: data?.campaignName });
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
-      sendJson(response, 500, { ok: false, message: error.message || 'Unable to upsert donation.' });
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to upsert donation.' });
     }
     return;
   }
 
   if (requestUrl.pathname === '/api/donations/email-invoice' && request.method === 'POST') {
     try {
-      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const body = await parseJsonObjectBody(request, { maxBytes: maxUploadBytes * 2, allowEmpty: false });
+      ensureNoUnknownKeys(body, ['donation', 'campaignDescription', 'organizationName', 'address', 'phone', 'fileName', 'attachmentBase64']);
+      const donation = readObjectField(body, 'donation', { required: true });
+      ensureNoUnknownKeys(donation, ['id', 'receiptId']);
+      const donationId = readStringField(donation, 'id', { max: 160, pattern: simpleIdPattern });
+      const receiptId = readStringField(donation, 'receiptId', { max: 160, pattern: simpleIdPattern });
+      assertInput(Boolean(donationId || receiptId), 'donation.id or donation.receiptId is required.');
+      readStringField(body, 'campaignDescription', { max: 500 });
+      readStringField(body, 'organizationName', { max: 180 });
+      readStringField(body, 'address', { max: 300 });
+      readStringField(body, 'phone', { max: 40 });
+      readStringField(body, 'fileName', { max: 180, pattern: /^[A-Za-z0-9._-]+$/ });
+      readStringField(body, 'attachmentBase64', { required: true, max: maxUploadBytes * 3 });
       const data = await sendDonationInvoiceEmail(body || {});
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
@@ -3278,7 +4099,22 @@ const server = http.createServer(async (request, response) => {
 
   if (requestUrl.pathname === '/api/donation-campaigns' && request.method === 'POST') {
     try {
-      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const body = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
+      ensureNoUnknownKeys(body, ['name', 'description', 'target', 'raised', 'startDate', 'endDate', 'active', 'isActive']);
+      readStringField(body, 'name', { required: true, min: 2, max: 180 });
+      readStringField(body, 'description', { max: 1000 });
+      readNumberField(body, 'target', { min: 0, max: 500000000 });
+      readNumberField(body, 'raised', { min: 0, max: 500000000 });
+      const startDate = readStringField(body, 'startDate', { max: 64 });
+      const endDate = readStringField(body, 'endDate', { max: 64 });
+      if (startDate) {
+        assertInput(!Number.isNaN(new Date(startDate).getTime()), 'startDate must be a valid date string.');
+      }
+      if (endDate) {
+        assertInput(!Number.isNaN(new Date(endDate).getTime()), 'endDate must be a valid date string.');
+      }
+      readBooleanField(body, 'active');
+      readBooleanField(body, 'isActive');
       const data = await createDonationCampaign(body);
       await appendAuditLog(request, {
         action: 'donation.campaign.create',
@@ -3289,7 +4125,7 @@ const server = http.createServer(async (request, response) => {
       });
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
-      sendJson(response, 500, { ok: false, message: error.message || 'Unable to create donation campaign.' });
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to create donation campaign.' });
     }
     return;
   }
@@ -3297,8 +4133,23 @@ const server = http.createServer(async (request, response) => {
   const campaignIdMatch = requestUrl.pathname.match(/^\/api\/donation-campaigns\/([^/]+)$/);
   if (campaignIdMatch && request.method === 'PATCH') {
     try {
-      const id = Number(decodeURIComponent(campaignIdMatch[1]));
-      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const id = parseNumericPathId(decodeURIComponent(campaignIdMatch[1]), 'campaign id');
+      const body = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
+      ensureNoUnknownKeys(body, ['name', 'description', 'target', 'raised', 'startDate', 'endDate', 'active', 'isActive']);
+      readStringField(body, 'name', { min: 2, max: 180 });
+      readStringField(body, 'description', { max: 1000 });
+      readNumberField(body, 'target', { min: 0, max: 500000000 });
+      readNumberField(body, 'raised', { min: 0, max: 500000000 });
+      const startDate = readStringField(body, 'startDate', { max: 64 });
+      const endDate = readStringField(body, 'endDate', { max: 64 });
+      if (startDate) {
+        assertInput(!Number.isNaN(new Date(startDate).getTime()), 'startDate must be a valid date string.');
+      }
+      if (endDate) {
+        assertInput(!Number.isNaN(new Date(endDate).getTime()), 'endDate must be a valid date string.');
+      }
+      readBooleanField(body, 'active');
+      readBooleanField(body, 'isActive');
       const data = await updateDonationCampaign(id, body);
       await appendAuditLog(request, {
         action: 'donation.campaign.update',
@@ -3309,14 +4160,14 @@ const server = http.createServer(async (request, response) => {
       });
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
-      sendJson(response, 500, { ok: false, message: error.message || 'Unable to update donation campaign.' });
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to update donation campaign.' });
     }
     return;
   }
 
   if (campaignIdMatch && request.method === 'DELETE') {
     try {
-      const id = Number(decodeURIComponent(campaignIdMatch[1]));
+      const id = parseNumericPathId(decodeURIComponent(campaignIdMatch[1]), 'campaign id');
       const data = await removeDonationCampaign(id);
       await appendAuditLog(request, {
         action: 'donation.campaign.delete',
@@ -3326,7 +4177,7 @@ const server = http.createServer(async (request, response) => {
       });
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
-      sendJson(response, 500, { ok: false, message: error.message || 'Unable to remove donation campaign.' });
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to remove donation campaign.' });
     }
     return;
   }
@@ -3347,11 +4198,39 @@ const server = http.createServer(async (request, response) => {
 
   if (requestUrl.pathname === '/api/donation-pending' && request.method === 'POST') {
     try {
-      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const body = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
+      ensureNoUnknownKeys(body, [
+        'id', 'campaignId', 'campaignName', 'donorName', 'donorEmail', 'amount', 'amountCents', 'frequency', 'paymentProvider',
+        'sessionId', 'paymentIntentId', 'origin', 'donationPurpose', 'createdAt', 'metadata'
+      ]);
+      readStringField(body, 'id', { max: 160, pattern: simpleIdPattern });
+      readNumberField(body, 'campaignId', { integer: true, min: 1, max: 1000000000 });
+      readStringField(body, 'campaignName', { max: 180 });
+      readStringField(body, 'donorName', { max: 140 });
+      readEmailField(body, 'donorEmail', { required: false });
+      readNumberField(body, 'amount', { min: 0.01, max: 500000 });
+      readNumberField(body, 'amountCents', { integer: true, min: 1, max: 50000000 });
+      readStringField(body, 'frequency', { max: 40 });
+      readStringField(body, 'paymentProvider', { max: 40 });
+      readStringField(body, 'sessionId', { max: 180 });
+      readStringField(body, 'paymentIntentId', { max: 180 });
+      const origin = readStringField(body, 'origin', { max: 300 });
+      if (origin) {
+        assertInput(/^https?:\/\//i.test(origin), 'origin must be a valid http/https URL.');
+      }
+      readStringField(body, 'donationPurpose', { max: 240 });
+      const createdAt = readStringField(body, 'createdAt', { max: 64 });
+      if (createdAt) {
+        assertInput(!Number.isNaN(new Date(createdAt).getTime()), 'createdAt must be a valid ISO date string.');
+      }
+      const metadata = readObjectField(body, 'metadata');
+      if (metadata) {
+        validateGenericJsonValue(metadata, 'metadata', 0);
+      }
       const data = await createPendingDonation(body);
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
-      sendJson(response, 500, { ok: false, message: error.message || 'Unable to create pending donation.' });
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to create pending donation.' });
     }
     return;
   }
@@ -3369,11 +4248,11 @@ const server = http.createServer(async (request, response) => {
   const pendingIdMatch = requestUrl.pathname.match(/^\/api\/donation-pending\/([^/]+)$/);
   if (pendingIdMatch && request.method === 'DELETE') {
     try {
-      const id = decodeURIComponent(pendingIdMatch[1]);
+      const id = parseStringPathId(decodeURIComponent(pendingIdMatch[1]), 'pending id');
       const data = await removePendingDonation(id);
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
-      sendJson(response, 500, { ok: false, message: error.message || 'Unable to remove pending donation.' });
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to remove pending donation.' });
     }
     return;
   }
@@ -3384,14 +4263,40 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (requestUrl.pathname === '/api/users/by-email' && request.method === 'GET') {
-    const email = requestUrl.searchParams.get('email') || '';
+    const email = String(requestUrl.searchParams.get('email') || '').trim().toLowerCase();
+    if (!email || !emailPattern.test(email)) {
+      sendJson(response, 400, { ok: false, message: 'email query param must be a valid email.' });
+      return;
+    }
     sendJson(response, 200, { ok: true, data: getUserByEmail(email) });
     return;
   }
 
   if (requestUrl.pathname === '/api/users/upsert-by-email' && request.method === 'POST') {
     try {
-      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const body = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
+      ensureNoUnknownKeys(body, ['id', 'name', 'role', 'email', 'phone', 'address', 'memberType', 'authProvider', 'avatarUrl', 'picture', 'registrationComplete', 'isActive', 'approvalStatus', 'approvalUpdatedAt', 'adminPageAccess']);
+      readStringField(body, 'id', { max: 120, pattern: simpleIdPattern });
+      readStringField(body, 'name', { max: 140 });
+      readStringField(body, 'role', { max: 40 });
+      readEmailField(body, 'email', { required: true });
+      readStringField(body, 'phone', { max: 40 });
+      readStringField(body, 'address', { max: 240 });
+      readStringField(body, 'memberType', { max: 40 });
+      readStringField(body, 'authProvider', { max: 40 });
+      readStringField(body, 'avatarUrl', { max: 600 });
+      readStringField(body, 'picture', { max: 600 });
+      readBooleanField(body, 'registrationComplete');
+      readBooleanField(body, 'isActive');
+      readStringField(body, 'approvalStatus', { max: 20 });
+      readStringField(body, 'approvalUpdatedAt', { max: 64 });
+      const adminPageAccess = readArrayField(body, 'adminPageAccess', { max: 50 });
+      if (adminPageAccess) {
+        adminPageAccess.forEach((entry, index) => {
+          assertInput(typeof entry === 'string', `adminPageAccess[${index}] must be a string.`);
+          assertInput(ADMIN_PAGE_PATHS.includes(String(entry).trim()), `adminPageAccess[${index}] is not an allowed path.`);
+        });
+      }
       const data = upsertUserByEmail(body);
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
@@ -3405,7 +4310,15 @@ const server = http.createServer(async (request, response) => {
 
   if (requestUrl.pathname === '/api/users/complete-registration' && request.method === 'POST') {
     try {
-      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const body = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
+      ensureNoUnknownKeys(body, ['email', 'name', 'phone', 'address', 'role', 'memberType', 'avatarUrl']);
+      readEmailField(body, 'email', { required: true });
+      readStringField(body, 'name', { min: 2, max: 140 });
+      readStringField(body, 'phone', { max: 40 });
+      readStringField(body, 'address', { max: 240 });
+      readStringField(body, 'role', { max: 40 });
+      readStringField(body, 'memberType', { max: 40 });
+      readStringField(body, 'avatarUrl', { max: 600 });
       const data = completeUserRegistration(body);
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
@@ -3419,7 +4332,28 @@ const server = http.createServer(async (request, response) => {
 
   if (requestUrl.pathname === '/api/users' && request.method === 'POST') {
     try {
-      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const body = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
+      ensureNoUnknownKeys(body, ['id', 'name', 'role', 'email', 'phone', 'address', 'memberType', 'authProvider', 'avatarUrl', 'picture', 'registrationComplete', 'isActive', 'approvalStatus', 'adminPageAccess']);
+      readStringField(body, 'id', { max: 120, pattern: simpleIdPattern });
+      readStringField(body, 'name', { required: true, min: 2, max: 140 });
+      readStringField(body, 'role', { max: 40 });
+      readEmailField(body, 'email', { required: true });
+      readStringField(body, 'phone', { max: 40 });
+      readStringField(body, 'address', { max: 240 });
+      readStringField(body, 'memberType', { max: 40 });
+      readStringField(body, 'authProvider', { max: 40 });
+      readStringField(body, 'avatarUrl', { max: 600 });
+      readStringField(body, 'picture', { max: 600 });
+      readBooleanField(body, 'registrationComplete');
+      readBooleanField(body, 'isActive');
+      readStringField(body, 'approvalStatus', { max: 20 });
+      const adminPageAccess = readArrayField(body, 'adminPageAccess', { max: 50 });
+      if (adminPageAccess) {
+        adminPageAccess.forEach((entry, index) => {
+          assertInput(typeof entry === 'string', `adminPageAccess[${index}] must be a string.`);
+          assertInput(ADMIN_PAGE_PATHS.includes(String(entry).trim()), `adminPageAccess[${index}] is not an allowed path.`);
+        });
+      }
       const record = normalizeUser({
         ...body,
         id: body.id || `user-${Date.now()}`,
@@ -3431,7 +4365,7 @@ const server = http.createServer(async (request, response) => {
       writeUsers(next);
       sendJson(response, 200, { ok: true, data: record });
     } catch (error) {
-      sendJson(response, 500, {
+      sendJson(response, error.status || 500, {
         ok: false,
         message: error.message || 'Unable to create user.'
       });
@@ -3442,8 +4376,11 @@ const server = http.createServer(async (request, response) => {
   const approvalPathMatch = requestUrl.pathname.match(/^\/api\/users\/([^/]+)\/approval$/);
   if (approvalPathMatch && request.method === 'PATCH') {
     try {
-      const id = decodeURIComponent(approvalPathMatch[1]);
-      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const id = parseStringPathId(decodeURIComponent(approvalPathMatch[1]), 'user id');
+      const body = await parseJsonObjectBody(request, { maxBytes: 64 * 1024, allowEmpty: false });
+      ensureNoUnknownKeys(body, ['approvalStatus']);
+      const nextApprovalStatus = readStringField(body, 'approvalStatus', { required: true, max: 20, toLowerCase: true });
+      assertInput(['approved', 'pending', 'rejected'].includes(nextApprovalStatus), 'approvalStatus must be approved, pending, or rejected.');
       const approvalStatus = String(body.approvalStatus || 'pending').toLowerCase();
 
       const next = readUsers().map((user) => (
@@ -3460,7 +4397,7 @@ const server = http.createServer(async (request, response) => {
       writeUsers(next);
       sendJson(response, 200, { ok: true, data: next.find((user) => user.id === id) || null });
     } catch (error) {
-      sendJson(response, 500, {
+      sendJson(response, error.status || 500, {
         ok: false,
         message: error.message || 'Unable to update approval status.'
       });
@@ -3471,15 +4408,35 @@ const server = http.createServer(async (request, response) => {
   const userPathMatch = requestUrl.pathname.match(/^\/api\/users\/([^/]+)$/);
   if (userPathMatch && request.method === 'PATCH') {
     try {
-      const id = decodeURIComponent(userPathMatch[1]);
-      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const id = parseStringPathId(decodeURIComponent(userPathMatch[1]), 'user id');
+      const body = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
+      ensureNoUnknownKeys(body, ['name', 'role', 'email', 'phone', 'address', 'memberType', 'authProvider', 'avatarUrl', 'picture', 'registrationComplete', 'isActive', 'approvalStatus', 'adminPageAccess']);
+      readStringField(body, 'name', { min: 2, max: 140 });
+      readStringField(body, 'role', { max: 40 });
+      readEmailField(body, 'email', { required: false });
+      readStringField(body, 'phone', { max: 40 });
+      readStringField(body, 'address', { max: 240 });
+      readStringField(body, 'memberType', { max: 40 });
+      readStringField(body, 'authProvider', { max: 40 });
+      readStringField(body, 'avatarUrl', { max: 600 });
+      readStringField(body, 'picture', { max: 600 });
+      readBooleanField(body, 'registrationComplete');
+      readBooleanField(body, 'isActive');
+      readStringField(body, 'approvalStatus', { max: 20 });
+      const adminPageAccess = readArrayField(body, 'adminPageAccess', { max: 50 });
+      if (adminPageAccess) {
+        adminPageAccess.forEach((entry, index) => {
+          assertInput(typeof entry === 'string', `adminPageAccess[${index}] must be a string.`);
+          assertInput(ADMIN_PAGE_PATHS.includes(String(entry).trim()), `adminPageAccess[${index}] is not an allowed path.`);
+        });
+      }
       const next = readUsers().map((user) => (
         user.id === id ? normalizeUser({ ...user, ...body, id, createdAt: user.createdAt }) : user
       ));
       writeUsers(next);
       sendJson(response, 200, { ok: true, data: next.find((user) => user.id === id) || null });
     } catch (error) {
-      sendJson(response, 500, {
+      sendJson(response, error.status || 500, {
         ok: false,
         message: error.message || 'Unable to update user.'
       });
@@ -3488,10 +4445,17 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (userPathMatch && request.method === 'DELETE') {
-    const id = decodeURIComponent(userPathMatch[1]);
-    const next = readUsers().filter((user) => user.id !== id);
-    writeUsers(next);
-    sendJson(response, 200, { ok: true, data: { success: true } });
+    try {
+      const id = parseStringPathId(decodeURIComponent(userPathMatch[1]), 'user id');
+      const next = readUsers().filter((user) => user.id !== id);
+      writeUsers(next);
+      sendJson(response, 200, { ok: true, data: { success: true } });
+    } catch (error) {
+      sendJson(response, error.status || 500, {
+        ok: false,
+        message: error.message || 'Unable to delete user.'
+      });
+    }
     return;
   }
 
@@ -3504,7 +4468,7 @@ const bootstrap = async () => {
       await eventsDb.ensureEventsSchema();
       console.log('Events database schema ready.');
     } catch (error) {
-      console.error('Failed to initialize events database:', error.message || error);
+      logServerError(error, 'Failed to initialize events database');
     }
   } else {
     console.warn('Events database is not configured. Set DATABASE_URL to enable PostgreSQL events storage.');
@@ -3522,24 +4486,24 @@ const bootstrap = async () => {
   // Check every minute, but only send once per day after the configured local send time.
   setInterval(() => {
     runScheduledVolunteerReminderSweep().catch((error) => {
-      console.error('Volunteer reminder sweep failed:', error.message || error);
+      logServerError(error, 'Volunteer reminder sweep failed');
     });
   }, 60 * 1000);
 
   // Run one immediate scheduler check on startup in case the server starts after today's send time.
   runScheduledVolunteerReminderSweep().catch((error) => {
-    console.error('Initial volunteer reminder scheduler check failed:', error.message || error);
+    logServerError(error, 'Initial volunteer reminder scheduler check failed');
   });
 
   // Event reminders use the same minute cadence but maintain their own send window and dedupe log.
   setInterval(() => {
     runScheduledEventReminderSweep().catch((error) => {
-      console.error('Event reminder sweep failed:', error.message || error);
+      logServerError(error, 'Event reminder sweep failed');
     });
   }, 60 * 1000);
 
   runScheduledEventReminderSweep().catch((error) => {
-    console.error('Initial event reminder scheduler check failed:', error.message || error);
+    logServerError(error, 'Initial event reminder scheduler check failed');
   });
 };
 
