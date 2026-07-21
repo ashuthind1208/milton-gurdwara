@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import authService from '../services/authService';
 import userService from '../services/userService';
 
@@ -12,49 +12,55 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(() => localStorage.getItem('gurdwara_token'));
   const [loading, setLoading] = useState(false);
 
+  const persistUser = useCallback((nextUser) => {
+    setUser(nextUser);
+    if (nextUser) {
+      localStorage.setItem('gurdwara_user', JSON.stringify(nextUser));
+      return;
+    }
+    localStorage.removeItem('gurdwara_user');
+  }, []);
+
   const login = useCallback(async (payload) => {
     setLoading(true);
     try {
       const response = await authService.login(payload);
-      setUser(response.data.user);
+      persistUser(response.data.user);
       setToken(response.data.token);
-      localStorage.setItem('gurdwara_user', JSON.stringify(response.data.user));
       localStorage.setItem('gurdwara_token', response.data.token);
       return response;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [persistUser]);
 
   const loginWithGoogle = useCallback(async (payload) => {
     setLoading(true);
     try {
       const response = await authService.loginWithGoogle(payload || {});
-      setUser(response.data.user);
+      persistUser(response.data.user);
       setToken(response.data.token);
-      localStorage.setItem('gurdwara_user', JSON.stringify(response.data.user));
       localStorage.setItem('gurdwara_token', response.data.token);
       return response;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [persistUser]);
 
   const completeRegistration = useCallback(async (payload) => {
     setLoading(true);
     try {
       const response = await authService.completeRegistration(payload || {});
-      setUser(response.data.user);
+      persistUser(response.data.user);
       if (response.data.token) {
         setToken(response.data.token);
         localStorage.setItem('gurdwara_token', response.data.token);
       }
-      localStorage.setItem('gurdwara_user', JSON.stringify(response.data.user));
       return response;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [persistUser]);
 
   const updateProfile = useCallback(async (payload) => {
     if (!user?.id) {
@@ -65,21 +71,58 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await userService.updateUser(user.id, payload || {});
       const nextUser = response?.data || { ...user, ...(payload || {}) };
-      setUser(nextUser);
-      localStorage.setItem('gurdwara_user', JSON.stringify(nextUser));
+      persistUser(nextUser);
       return response;
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [persistUser, user]);
 
   const logout = useCallback(async () => {
-    await authService.logout();
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('gurdwara_user');
-    localStorage.removeItem('gurdwara_token');
-  }, []);
+    try {
+      await authService.logout();
+    } catch {
+      // Clear local auth state even if server-side logout fails.
+    } finally {
+      persistUser(null);
+      setToken(null);
+      localStorage.removeItem('gurdwara_token');
+    }
+  }, [persistUser]);
+
+  useEffect(() => {
+    const email = String(user?.email || '').trim().toLowerCase();
+    if (!token || !email) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const syncCurrentUser = async () => {
+      try {
+        const response = await userService.getUserByEmail(email);
+        const latestUser = response?.data;
+        if (!latestUser || cancelled) {
+          return;
+        }
+
+        const currentSnapshot = JSON.stringify(user || {});
+        const latestSnapshot = JSON.stringify(latestUser || {});
+        if (currentSnapshot !== latestSnapshot) {
+          persistUser(latestUser);
+        }
+      } catch {
+        // Ignore background refresh failures.
+      }
+    };
+
+    syncCurrentUser();
+    const timerId = window.setInterval(syncCurrentUser, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timerId);
+    };
+  }, [persistUser, token, user, user?.email]);
 
   const value = useMemo(
     () => ({
@@ -91,9 +134,10 @@ export const AuthProvider = ({ children }) => {
       loginWithGoogle,
       completeRegistration,
       updateProfile,
+      persistUser,
       logout
     }),
-    [user, token, loading, login, loginWithGoogle, completeRegistration, updateProfile, logout]
+    [user, token, loading, login, loginWithGoogle, completeRegistration, updateProfile, persistUser, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

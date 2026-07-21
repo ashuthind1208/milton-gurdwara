@@ -12,6 +12,7 @@ import advertisementService from '../../services/advertisementService';
 import newsService from '../../services/newsService';
 import useSeoMeta from '../../hooks/useSeoMeta';
 import Seo from '../../components/common/Seo';
+import gurdwaraLogo from '../../assets/gurdwara-logo.webp';
 
 const toDateKey = (value = new Date()) => {
   const date = value instanceof Date ? value : new Date(value);
@@ -177,7 +178,15 @@ const HomePage = () => {
   const isTodaySpecial = resolvedScheduleDay?.dateKey === todayDateKey && resolvedScheduleDay?.isSpecial !== false;
   const specialDayReason = (resolvedScheduleDay?.specialReason || resolvedScheduleDay?.highlightNoteEn || '').trim();
   const specialDayReasonPa = (resolvedScheduleDay?.specialReasonPa || resolvedScheduleDay?.highlightNotePa || '').trim();
-  const specialDayTickerText = [specialDayReason, specialDayReasonPa].filter(Boolean).join(' • ');
+  const specialDayTickerParts = useMemo(
+    () => [
+      specialDayReason ? { key: 'special-en', label: specialDayReason } : null,
+      specialDayReasonPa ? { key: 'special-pa', label: specialDayReasonPa } : null
+    ].filter(Boolean),
+    [specialDayReason, specialDayReasonPa]
+  );
+  const specialDayTickerTextVisible = specialDayTickerParts.length > 0;
+  const specialDayTickerTextClass = isTodaySpecial ? 'text-amber-50' : 'text-brand-navy';
   const hukamnamaLines = activeHukamnama?.lines || [];
   const hukamnamaMeta = activeHukamnama?.metadata || {};
   const hasDailyHukamnama = Boolean(activeHukamnama?.ang && hukamnamaLines.length > 0);
@@ -399,15 +408,25 @@ const HomePage = () => {
                 <SectionTitle title="Daily Schedule" subtitle="" />
               </div>
 
-              {isTodaySpecial && specialDayTickerText ? (
-                <div className="daily-schedule-special-ticker mt-2 w-full min-w-0 max-w-full overflow-hidden bg-brand-saffron">
+              {specialDayTickerTextVisible ? (
+                <div className={`daily-schedule-special-ticker mt-2 w-full min-w-0 max-w-full overflow-hidden border-y ${isTodaySpecial ? 'border-brand-saffron/40 bg-brand-saffron' : 'border-brand-blue/20 bg-brand-blue/10'}`}>
                   <div className="ticker-mask px-3 py-1.5">
                     <div className="ticker-track daily-schedule-special-track ticker-speed-fast ticker-no-pause">
-                      {[0, 1, 2, 3, 4, 5].map((groupIndex) => (
+                      {[0, 1].map((groupIndex) => (
                         <div key={`special-day-note-${groupIndex}`} className="ticker-group">
-                          <p className="daily-schedule-special-item inline-flex shrink-0 items-center text-sm font-extrabold text-amber-50">
-                            <span>{specialDayTickerText}</span>
-                          </p>
+                          {[0, 1, 2, 3].map((unitIndex) => (
+                            <div key={`${groupIndex}-unit-${unitIndex}`} className={`daily-schedule-special-item inline-flex shrink-0 items-center gap-1 text-sm font-extrabold ${specialDayTickerTextClass}`}>
+                              <span className="ml-4 whitespace-nowrap">{specialDayTickerParts[1]?.label || ''}</span>
+                              <span aria-hidden="true" className="inline-flex h-3 w-3 items-center justify-center text-base font-black leading-none text-black">•</span>
+                              <span className="mr-3 whitespace-nowrap">{specialDayTickerParts[0]?.label || ''}</span>
+                              <img
+                                src={gurdwaraLogo}
+                                alt=""
+                                aria-hidden="true"
+                                className="h-5 w-5 shrink-0 rounded-full object-cover"
+                              />
+                            </div>
+                          ))}
                         </div>
                       ))}
                     </div>

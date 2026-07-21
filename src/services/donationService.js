@@ -113,7 +113,7 @@ const normalizeCampaign = (campaign = {}) => {
       .filter((entry) => Boolean(entry && (entry.title || entry.summary || entry.quote))),
     raised,
     target,
-    isActive: Boolean(campaign.isActive ?? campaign.is_active ?? true),
+    isActive: isClosed ? false : Boolean(campaign.isActive ?? campaign.is_active ?? true),
     isClosed,
     paymentProvider: provider === 'PAYPAL' ? 'PAYPAL' : 'STRIPE',
     paymentLink: campaign.paymentLink || campaign.payment_link || '',
@@ -521,21 +521,33 @@ const donationService = {
   },
 
   createCampaign: async (payload) => {
+    const normalizedPayload = normalizeCampaign(payload || {});
     const response = await fetchJson('/api/donation-campaigns', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload || {})
+      body: JSON.stringify({
+        ...payload,
+        isActive: normalizedPayload.isActive,
+        raised: normalizedPayload.raised,
+        target: normalizedPayload.target
+      })
     });
-    return serviceResponse(normalizeCampaign(response.data || payload));
+    return serviceResponse(normalizeCampaign(response.data || { ...payload, isActive: normalizedPayload.isActive }));
   },
 
   updateCampaign: async (id, payload) => {
+    const normalizedPayload = normalizeCampaign({ id, ...(payload || {}) });
     const response = await fetchJson(`/api/donation-campaigns/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload || {})
+      body: JSON.stringify({
+        ...payload,
+        isActive: normalizedPayload.isActive,
+        raised: normalizedPayload.raised,
+        target: normalizedPayload.target
+      })
     });
-    return serviceResponse(normalizeCampaign(response.data || { ...payload, id }));
+    return serviceResponse(normalizeCampaign(response.data || { ...payload, id, isActive: normalizedPayload.isActive }));
   },
 
   removeCampaign: async (id) => {
@@ -548,6 +560,73 @@ const donationService = {
     pendingCache = [];
     writeLastPendingDonationId('');
     return serviceResponse({ success: true, cleared: true });
+  },
+
+  addCashDonation: async ({ campaign, amount, receiptId, donorName = '', paidAt }) => {
+    const normalizedAmount = Number(amount || 0);
+    if (!campaign?.id) {
+      throw new Error('Campaign is required.');
+    }
+    if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+      throw new Error('Amount must be greater than zero.');
+    }
+
+    const createdAt = paidAt ? new Date(`${String(paidAt)}T12:00:00`).toISOString() : new Date().toISOString();
+    const normalizedReceiptId = String(receiptId || '').trim() || `CASH-${Date.now()}`;
+
+    const donationRecord = {
+      id: `cash-${Date.now()}`,
+      receiptId: normalizedReceiptId,
+      sourcePendingId: '',
+      campaignId: Number(campaign.id),
+      campaignName: String(campaign.name || ''),
+      donorName: String(donorName || '').trim() || 'Walk-in Donor',
+      donorEmail: '',
+      amount: normalizedAmount,
+      frequency: 'one-time',
+      paymentProvider: 'CASH',
+      paymentStatus: 'PAID',
+      gatewayTransactionId: normalizedReceiptId,
+      createdAt,
+      emailSent: false,
+      source: 'admin-cash'
+    };
+
+    const response = await fetchJson('/api/donations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(donationRecord)
+    });
+
+    return serviceResponse(normalizeDonation(response.data || donationRecord));
+  },
+
+  emailDonationInvoice: async ({
+    donation,
+    campaignDescription = '',
+    organizationName = '',
+    address = '',
+    phone = '',
+    fileName = '',
+    attachmentBase64 = ''
+  }) => {
+    const payload = {
+      donation: normalizeDonation(donation || {}),
+      campaignDescription: String(campaignDescription || ''),
+      organizationName: String(organizationName || ''),
+      address: String(address || ''),
+      phone: String(phone || ''),
+      fileName: String(fileName || ''),
+      attachmentBase64: String(attachmentBase64 || '')
+    };
+
+    const response = await fetchJson('/api/donations/email-invoice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    return serviceResponse(response.data || { success: true });
   },
 
   resolveStripePaymentDetails,
@@ -728,7 +807,10 @@ const donationService = {
     await fetchJson(`/api/donation-campaigns/${encodeURIComponent(campaign.id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ raised: nextRaised })
+      body: JSON.stringify({
+        raised: nextRaised,
+        isActive: nextRaised < Number(campaign.target || 0)
+      })
     });
 
     await fetchJson(`/api/donation-pending/${encodeURIComponent(record.id)}`, { method: 'DELETE' }).catch(() => ({}));

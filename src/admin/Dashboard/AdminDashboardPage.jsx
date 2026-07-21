@@ -111,6 +111,36 @@ const AdminDashboardPage = () => {
     [users]
   );
 
+  const familyJoinKpi = useMemo(() => {
+    const now = new Date();
+    const month = now.getMonth();
+    const year = now.getFullYear();
+    const families = users.filter((entry) => String(entry.role || '').trim().toLowerCase() === 'family');
+
+    let joinedThisMonth = 0;
+    let joinedThisYear = 0;
+
+    families.forEach((entry) => {
+      const created = new Date(entry.createdAt || 0);
+      if (Number.isNaN(created.getTime())) {
+        return;
+      }
+
+      if (created.getFullYear() === year) {
+        joinedThisYear += 1;
+        if (created.getMonth() === month) {
+          joinedThisMonth += 1;
+        }
+      }
+    });
+
+    return {
+      totalFamilies: families.length,
+      joinedThisMonth,
+      joinedThisYear
+    };
+  }, [users]);
+
   const inactiveUsers = useMemo(
     () => users.filter((user) => user.isActive === false),
     [users]
@@ -371,6 +401,24 @@ const AdminDashboardPage = () => {
         <SummaryCard label="Event Registrations" value={exactEventRegistrations} sublabel={`${events.length} total events`} tone="text-brand-blue" icon={CalendarDaysIcon} href="/admin/events" />
         <SummaryCard label="Approved Users" value={approvedUsersCount} sublabel={`${pendingUsers.length} users pending`} tone="text-emerald-600" icon={UsersIcon} href="/admin/users" />
         <SummaryCard label="Volunteer Approval" value={`${volunteerApprovalRate.toFixed(0)}%`} sublabel={`${approvedVolunteerApplications} approved applications`} tone="text-violet-600" icon={UserGroupIcon} href="/admin/seva-opportunities" />
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-3">
+        <Card className="border border-brand-blue/15 bg-white/95 shadow-[0_20px_45px_-32px_rgba(15,23,42,0.5)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Family KPI</p>
+          <p className="mt-3 font-heading text-3xl font-bold text-brand-blue">{familyJoinKpi.totalFamilies}</p>
+          <p className="mt-2 text-sm text-slate-500">Total family accounts in the system</p>
+        </Card>
+        <Card className="border border-emerald-200 bg-white/95 shadow-[0_20px_45px_-32px_rgba(15,23,42,0.5)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Families Joined This Month</p>
+          <p className="mt-3 font-heading text-3xl font-bold text-emerald-700">{familyJoinKpi.joinedThisMonth}</p>
+          <p className="mt-2 text-sm text-slate-500">New family registrations this month</p>
+        </Card>
+        <Card className="border border-amber-200 bg-white/95 shadow-[0_20px_45px_-32px_rgba(15,23,42,0.5)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Families Joined This Year</p>
+          <p className="mt-3 font-heading text-3xl font-bold text-amber-700">{familyJoinKpi.joinedThisYear}</p>
+          <p className="mt-2 text-sm text-slate-500">Family registrations recorded this year</p>
+        </Card>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">

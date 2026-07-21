@@ -36,6 +36,7 @@ import { siteConfig } from '../../constants/siteConfig';
 
 const DONATIONS_PAGE_SIZE = 6;
 const PROGRESS_ITEMS_PAGE_SIZE = 10;
+const CAMPAIGN_DONORS_PAGE_SIZE = 8;
 const DONATION_IDENTITY_SETTING_KEY = 'settings-donation-allow-custom-name-email';
 const campaignDefaults = {
   name: '',
@@ -52,6 +53,14 @@ const campaignDefaults = {
   paymentLink: '',
   stripeBuyButtonId: '',
   stripePublishableKey: ''
+};
+
+const cashDonationDefaults = {
+  campaignId: '',
+  donorDetails: '',
+  amount: 0,
+  receiptId: '',
+  paidAt: new Date().toISOString().slice(0, 10)
 };
 
 const sortOptions = [
@@ -211,9 +220,7 @@ const AdminDonationsPage = () => {
   const [sortMode, setSortMode] = useState('oldest');
   const [page, setPage] = useState(1);
   const [createPhotoUploadPending, setCreatePhotoUploadPending] = useState(false);
-  const [editPhotoUploadPending, setEditPhotoUploadPending] = useState(false);
   const [createPhotoUploadProgress, setCreatePhotoUploadProgress] = useState(0);
-  const [editPhotoUploadProgress, setEditPhotoUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState({ type: 'success', message: '' });
   const [progressManagerOpen, setProgressManagerOpen] = useState(false);
   const [progressManagerCampaign, setProgressManagerCampaign] = useState(null);
@@ -223,9 +230,15 @@ const AdminDonationsPage = () => {
   const [progressItemUploadPending, setProgressItemUploadPending] = useState(false);
   const [progressItemUploadProgress, setProgressItemUploadProgress] = useState(0);
   const [progressManagerStatus, setProgressManagerStatus] = useState({ type: 'success', message: '' });
+  const [campaignDonorPage, setCampaignDonorPage] = useState(1);
+  const [campaignDonorSearchTerm, setCampaignDonorSearchTerm] = useState('');
+  const [cashDonationOpen, setCashDonationOpen] = useState(false);
+  const [invoiceEmailStatus, setInvoiceEmailStatus] = useState({ type: 'success', message: '' });
+  const [invoiceEmailSendingId, setInvoiceEmailSendingId] = useState('');
   const form = useForm({ defaultValues: campaignDefaults });
   const editForm = useForm({ defaultValues: campaignDefaults });
   const progressItemForm = useForm({ defaultValues: progressItemDefaults });
+  const cashDonationForm = useForm({ defaultValues: cashDonationDefaults });
   const { data: campaigns = [] } = useQuery({
     queryKey: ['admin-campaigns'],
     queryFn: () => donationService.getAllCampaigns().then((res) => res.data),
@@ -249,6 +262,11 @@ const AdminDonationsPage = () => {
     refetchInterval: 10000
   });
 
+  const activeCampaigns = useMemo(
+    () => campaigns.filter((campaign) => campaign?.isActive !== false),
+    [campaigns]
+  );
+
   const campaignMap = useMemo(() => campaigns.reduce((accumulator, campaign) => {
     accumulator[String(campaign.id)] = campaign;
     return accumulator;
@@ -263,6 +281,31 @@ const AdminDonationsPage = () => {
 
     return donations.filter((donation) => String(donation.campaignId) === String(viewingCampaign.id));
   }, [donations, viewingCampaign]);
+
+  const filteredCampaignDonations = useMemo(() => {
+    const query = String(campaignDonorSearchTerm || '').trim().toLowerCase();
+    if (!query) {
+      return campaignDonations;
+    }
+
+    return campaignDonations.filter((donation) => {
+      const haystack = [
+        donation.donorName,
+        donation.donorEmail,
+        donation.receiptId,
+        donation.amount,
+        donation.createdAt
+      ].map((value) => String(value || '').toLowerCase()).join(' ');
+      return haystack.includes(query);
+    });
+  }, [campaignDonations, campaignDonorSearchTerm]);
+
+  const campaignDonorTotalPages = Math.max(1, Math.ceil(filteredCampaignDonations.length / CAMPAIGN_DONORS_PAGE_SIZE));
+  const pagedCampaignDonations = useMemo(() => {
+    const safePage = Math.min(campaignDonorPage, campaignDonorTotalPages);
+    const start = (safePage - 1) * CAMPAIGN_DONORS_PAGE_SIZE;
+    return filteredCampaignDonations.slice(start, start + CAMPAIGN_DONORS_PAGE_SIZE);
+  }, [filteredCampaignDonations, campaignDonorPage, campaignDonorTotalPages]);
 
   const visibleDonations = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -324,6 +367,21 @@ const AdminDonationsPage = () => {
     }
   }, [progressManagerPage, progressManagerTotalPages]);
 
+  useEffect(() => {
+    setCampaignDonorPage(1);
+    setCampaignDonorSearchTerm('');
+  }, [viewingCampaign?.id]);
+
+  useEffect(() => {
+    setCampaignDonorPage(1);
+  }, [campaignDonorSearchTerm]);
+
+  useEffect(() => {
+    if (campaignDonorPage > campaignDonorTotalPages) {
+      setCampaignDonorPage(campaignDonorTotalPages);
+    }
+  }, [campaignDonorPage, campaignDonorTotalPages]);
+
   const createMutation = useMutation({
     mutationFn: (values) => donationService.createCampaign(toCampaignPayload(values)),
     onSuccess: () => {
@@ -375,6 +433,30 @@ const AdminDonationsPage = () => {
     }
   });
 
+  const addCashDonationMutation = useMutation({
+    mutationFn: async (values) => {
+      const campaign = campaigns.find((entry) => String(entry.id) === String(values.campaignId));
+      if (!campaign) {
+        throw new Error('Select a valid campaign.');
+      }
+
+      await donationService.addCashDonation({
+        campaign,
+        amount: Number(values.amount || 0),
+        receiptId: String(values.receiptId || '').trim(),
+        donorName: String(values.donorDetails || '').trim(),
+        paidAt: values.paidAt
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-campaigns'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-donations'] });
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+      cashDonationForm.reset(cashDonationDefaults);
+      setCashDonationOpen(false);
+    }
+  });
+
   const openEdit = (campaign) => {
     setUploadStatus({ type: 'success', message: '' });
     setEditingCampaign(campaign);
@@ -400,6 +482,11 @@ const AdminDonationsPage = () => {
     setUploadStatus({ type: 'success', message: '' });
     form.reset(campaignDefaults);
     setCreateCampaignOpen(true);
+  };
+
+  const openCashDonation = () => {
+    cashDonationForm.reset(cashDonationDefaults);
+    setCashDonationOpen(true);
   };
 
   const openProgressManager = (campaign) => {
@@ -527,6 +614,10 @@ const AdminDonationsPage = () => {
     }
   };
 
+  const selectedProgressItem = progressItemModalState.mode === 'view'
+    ? (progressItemsDraft[progressItemModalState.index] || progressItemForm.getValues())
+    : null;
+
   const appendPhotosToProgressItemForm = async (files) => {
     const selectedFiles = Array.from(files || []).filter(Boolean);
     if (selectedFiles.length === 0) {
@@ -575,25 +666,16 @@ const AdminDonationsPage = () => {
     }
   };
 
-  const appendCampaignPhotosToForm = async ({ files, mode }) => {
+  const appendCampaignPhotosToForm = async ({ files }) => {
     const selectedFiles = Array.from(files || []).filter(Boolean);
     if (selectedFiles.length === 0) {
       return;
     }
 
-    const isEditMode = mode === 'edit';
-    const targetForm = isEditMode ? editForm : form;
-
     try {
       setUploadStatus({ type: 'success', message: '' });
-
-      if (isEditMode) {
-        setEditPhotoUploadPending(true);
-        setEditPhotoUploadProgress(0);
-      } else {
-        setCreatePhotoUploadPending(true);
-        setCreatePhotoUploadProgress(0);
-      }
+      setCreatePhotoUploadPending(true);
+      setCreatePhotoUploadProgress(0);
 
       const uploadedUrls = [];
 
@@ -606,11 +688,7 @@ const AdminDonationsPage = () => {
           maxSizeMB: 15,
           onProgress: (percent) => {
             const overall = Math.round(((index + (percent / 100)) / selectedFiles.length) * 100);
-            if (isEditMode) {
-              setEditPhotoUploadProgress(overall);
-            } else {
-              setCreatePhotoUploadProgress(overall);
-            }
+            setCreatePhotoUploadProgress(overall);
           }
         });
 
@@ -624,10 +702,10 @@ const AdminDonationsPage = () => {
         throw new Error('Upload did not return file URLs.');
       }
 
-      const existingUrls = parseProgressPhotosText(targetForm.getValues('progressPhotosText') || '');
+      const existingUrls = parseProgressPhotosText(form.getValues('progressPhotosText') || '');
       const uniqueUrls = Array.from(new Set([...existingUrls, ...uploadedUrls]));
 
-      targetForm.setValue('progressPhotosText', formatProgressPhotosText(uniqueUrls), {
+      form.setValue('progressPhotosText', formatProgressPhotosText(uniqueUrls), {
         shouldDirty: true,
         shouldValidate: true
       });
@@ -639,13 +717,8 @@ const AdminDonationsPage = () => {
     } catch (error) {
       setUploadStatus({ type: 'error', message: error.message || 'Unable to upload campaign photos.' });
     } finally {
-      if (isEditMode) {
-        setEditPhotoUploadPending(false);
-        setEditPhotoUploadProgress(0);
-      } else {
-        setCreatePhotoUploadPending(false);
-        setCreatePhotoUploadProgress(0);
-      }
+      setCreatePhotoUploadPending(false);
+      setCreatePhotoUploadProgress(0);
     }
   };
 
@@ -684,37 +757,46 @@ const AdminDonationsPage = () => {
     };
 
     try {
+      setInvoiceEmailSendingId(String(entry.id || ''));
+      setInvoiceEmailStatus({ type: 'success', message: '' });
+
       const blob = await createDonationInvoicePdfBlob(payload);
-      const file = new File([blob], fileName, { type: 'application/pdf' });
-      const canShareWithFile = typeof navigator !== 'undefined'
-        && typeof navigator.share === 'function'
-        && typeof navigator.canShare === 'function'
-        && navigator.canShare({ files: [file] });
+      const attachmentBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = String(reader.result || '');
+          const content = dataUrl.includes(',') ? dataUrl.split(',')[1] : '';
+          if (!content) {
+            reject(new Error('Unable to encode invoice attachment.'));
+            return;
+          }
+          resolve(content);
+        };
+        reader.onerror = () => reject(new Error('Unable to read invoice attachment.'));
+        reader.readAsDataURL(blob);
+      });
 
-      if (canShareWithFile) {
-        await navigator.share({
-          files: [file],
-          title: `Donation Invoice ${entry.receiptId || entry.id}`,
-          text: `Please find your donation invoice attached.\nCampaign: ${entry.campaignName || '-'}`
-        });
-        return;
-      }
+      await donationService.emailDonationInvoice({
+        donation: entry,
+        campaignDescription: campaignMap[String(entry.campaignId)]?.description || '',
+        organizationName: siteConfig.name,
+        address: siteConfig.contact.address,
+        phone: siteConfig.contact.phone,
+        fileName,
+        attachmentBase64
+      });
 
-      const blobUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.setAttribute('download', fileName);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
-
-      const subject = encodeURIComponent(`Donation Invoice ${entry.receiptId || entry.id}`);
-      const body = encodeURIComponent(`Sat Sri Akal ${entry.donorName || ''},\n\nPlease find your donation invoice attached for ${entry.campaignName || 'your donation'}.\n\nThank you for your support.\n${siteConfig.name}`);
-      window.location.href = `mailto:${encodeURIComponent(donorEmail)}?subject=${subject}&body=${body}`;
-    } catch {
-      // Fallback to plain invoice download if mail/share preparation fails.
-      handleDownloadInvoice(entry);
+      setInvoiceEmailStatus({
+        type: 'success',
+        message: `Invoice emailed to ${donorEmail}.`
+      });
+    } catch (error) {
+      setInvoiceEmailStatus({
+        type: 'error',
+        message: error?.message || 'Unable to email invoice right now.'
+      });
+    } finally {
+      setInvoiceEmailSendingId('');
     }
   };
 
@@ -779,25 +861,37 @@ const AdminDonationsPage = () => {
       <Card>
         <div className="flex items-center justify-between gap-3">
           <h2 className="font-heading text-xl font-semibold">Campaigns</h2>
-          <a
-            href={donationBoardUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100"
-          >
-            <EyeIcon className="h-4 w-4" /> Go To Donation Board
-          </a>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={openCashDonation}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700 transition hover:border-amber-300 hover:bg-amber-100"
+            >
+              <BanknotesIcon className="h-4 w-4" /> Add Cash Donation
+            </button>
+            <a
+              href={donationBoardUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100"
+            >
+              <EyeIcon className="h-4 w-4" /> Go To Donation Board
+            </a>
+          </div>
+        </div>
+        <div className="mt-3">
+          <StatusAlert type={invoiceEmailStatus.type} message={invoiceEmailStatus.message} />
         </div>
         <div className="mt-4 overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
+          <table className="min-w-full table-fixed text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-gradient-to-r from-sky-50 via-blue-50 to-amber-50 text-slate-600">
-                <th className="py-2 pr-3">Campaign</th>
-                <th className="py-2 pr-3">Provider</th>
-                <th className="py-2 pr-3">Target</th>
-                <th className="py-2 pr-3">Raised</th>
-                <th className="py-2 pr-3">Status</th>
-                <th className="py-2 pr-3">Actions</th>
+                <th className="w-[28%] py-2 pr-3">Campaign</th>
+                <th className="w-[14%] py-2 pr-3">Provider</th>
+                <th className="w-[14%] py-2 pr-3">Target</th>
+                <th className="w-[14%] py-2 pr-3">Raised</th>
+                <th className="w-[14%] py-2 pr-3">Status</th>
+                <th className="w-[16%] py-2 pr-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -823,43 +917,42 @@ const AdminDonationsPage = () => {
                     </div>
                     <span className="hidden lg:inline">{campaign.name}</span>
                   </td>
-                  <td className="admin-compact-mobile-hidden py-2 pr-3">
+                  <td className="admin-compact-mobile-hidden py-2 pr-2">
                     <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${campaign.paymentProvider === 'PAYPAL' ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-800'}`}>
                       {campaign.paymentProvider === 'PAYPAL' ? <BanknotesIcon className="h-3.5 w-3.5" /> : <BuildingLibraryIcon className="h-3.5 w-3.5" />}
                       {campaign.paymentProvider}
                     </span>
                   </td>
-                  <td className="admin-compact-mobile-hidden py-2 pr-3">{formatCurrency(campaign.target)}</td>
-                  <td className="admin-compact-mobile-hidden py-2 pr-3">{formatCurrency(campaign.raised)}</td>
-                  <td className="admin-compact-mobile-hidden py-2 pr-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {campaign.isClosed ? (
-                        <span className="inline-flex rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-800">Closed</span>
-                      ) : null}
+                  <td className="admin-compact-mobile-hidden py-2 pr-2 font-medium text-slate-800">{formatCurrency(campaign.target)}</td>
+                  <td className="admin-compact-mobile-hidden py-2 pr-2 font-medium text-slate-800">{formatCurrency(campaign.raised)}</td>
+                  <td className="admin-compact-mobile-hidden py-2 pr-2">
+                    {campaign.isClosed ? (
+                      <span className="inline-flex rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-800">Closed</span>
+                    ) : (
                       <button
                         type="button"
                         onClick={() => toggleCampaignStatus(campaign)}
                         disabled={updateMutation.isPending}
-                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition ${campaign.isActive ? 'border-emerald-300 bg-emerald-100 text-emerald-800 hover:border-emerald-400' : 'border-slate-300 bg-slate-100 text-slate-700 hover:border-slate-400'} disabled:cursor-not-allowed disabled:opacity-60`}
+                        className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-semibold transition ${campaign.isActive ? 'border-emerald-300 bg-emerald-100 text-emerald-800 hover:border-emerald-400' : 'border-slate-300 bg-slate-100 text-slate-700 hover:border-slate-400'} disabled:cursor-not-allowed disabled:opacity-60`}
                       >
                         <PowerIcon className="h-3.5 w-3.5" />
                         {campaign.isActive ? 'Active' : 'Inactive'}
                       </button>
-                    </div>
+                    )}
                   </td>
-                  <td className="py-2 pr-3 text-right">
-                    <div className="flex flex-col items-end gap-1.5 lg:flex-row lg:flex-wrap lg:justify-end">
-                      <button type="button" onClick={() => openProgressManager(campaign)} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 transition hover:border-indigo-300 hover:bg-indigo-100" aria-label="Manage campaign progress" title="Manage campaign progress">
-                        <SparklesIcon className="h-4 w-4" />
+                  <td className="py-2 pr-2 text-right">
+                    <div className="flex flex-col items-end gap-1 sm:flex-row sm:flex-wrap sm:justify-end">
+                      <button type="button" onClick={() => openProgressManager(campaign)} className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 transition hover:border-indigo-300 hover:bg-indigo-100" aria-label="Manage campaign progress" title="Manage campaign progress">
+                        <SparklesIcon className="h-3.5 w-3.5" />
                       </button>
-                      <button type="button" onClick={() => setViewingCampaign(campaign)} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-sky-200 bg-sky-50 text-sky-700 transition hover:border-sky-300 hover:bg-sky-100" aria-label="View campaign">
-                        <EyeIcon className="h-4 w-4" />
+                      <button type="button" onClick={() => setViewingCampaign(campaign)} className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-sky-200 bg-sky-50 text-sky-700 transition hover:border-sky-300 hover:bg-sky-100" aria-label="View campaign">
+                        <EyeIcon className="h-3.5 w-3.5" />
                       </button>
-                      <button type="button" onClick={() => openEdit(campaign)} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 transition hover:border-amber-300 hover:bg-amber-100" aria-label="Edit campaign">
-                        <PencilSquareIcon className="h-4 w-4" />
+                      <button type="button" onClick={() => openEdit(campaign)} className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 transition hover:border-amber-300 hover:bg-amber-100" aria-label="Edit campaign">
+                        <PencilSquareIcon className="h-3.5 w-3.5" />
                       </button>
-                      <button type="button" onClick={() => deleteMutation.mutate(campaign.id)} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-700 transition hover:border-rose-300 hover:bg-rose-100" aria-label="Delete campaign">
-                        <TrashIcon className="h-4 w-4" />
+                      <button type="button" onClick={() => deleteMutation.mutate(campaign.id)} className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-700 transition hover:border-rose-300 hover:bg-rose-100" aria-label="Delete campaign">
+                        <TrashIcon className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   </td>
@@ -910,7 +1003,7 @@ const AdminDonationsPage = () => {
                       <th className="px-3 py-2">Title</th>
                       <th className="px-3 py-2">Date</th>
                       <th className="px-3 py-2">Status</th>
-                      <th className="px-3 py-2">Actions</th>
+                      <th className="px-3 py-2 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -983,64 +1076,131 @@ const AdminDonationsPage = () => {
               {progressItemModalState.open ? (
                 <div className="fixed inset-0 z-[99] overflow-y-auto bg-slate-900/55 px-4 py-6" onClick={closeProgressItemModal}>
                   <div className="mx-auto flex min-h-full items-center justify-center">
-                    <div className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl" onClick={(event) => event.stopPropagation()}>
-                      <div className="flex items-center justify-between gap-2">
-                        <h4 className="font-heading text-lg font-semibold">
+                    <div className="w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200" onClick={(event) => event.stopPropagation()}>
+                      <div className="flex items-center justify-between gap-2 rounded-t-3xl border-b border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-brand-blue px-4 py-4 text-white sm:px-6">
+                        <h4 className="font-heading text-lg font-semibold text-white">
                           {progressItemModalState.mode === 'create' ? 'Add Progress Update' : progressItemModalState.mode === 'edit' ? 'Edit Progress Update' : 'View Progress Update'}
                         </h4>
                         <button
                           type="button"
                           onClick={closeProgressItemModal}
-                          className="rounded-full border border-brand-blue/40 bg-blue-50 p-2 text-brand-blue transition hover:border-brand-saffron hover:bg-amber-100 hover:text-amber-700"
+                          className="rounded-full border border-white/20 bg-white/10 p-2 text-white transition hover:bg-white/20"
                           aria-label="Close progress update modal"
                         >
                           <XMarkIcon className="h-4 w-4" />
                         </button>
                       </div>
 
-                      <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={progressItemForm.handleSubmit(handleSaveProgressItem)}>
-                        <label className="text-sm md:col-span-2">Title
-                          <input disabled={progressItemModalState.mode === 'view'} {...progressItemForm.register('title', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
-                        </label>
-                        <label className="text-sm md:col-span-2">Date
-                          <input type="date" disabled={progressItemModalState.mode === 'view'} {...progressItemForm.register('date')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
-                        </label>
-                        <label className="text-sm md:col-span-2">Description
-                          <textarea rows={2} disabled={progressItemModalState.mode === 'view'} {...progressItemForm.register('description')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
-                        </label>
-                        <label className="text-sm md:col-span-2">Photos (one URL per line)
-                          <textarea rows={3} disabled={progressItemModalState.mode === 'view'} {...progressItemForm.register('photosText')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
-                        </label>
-                        {progressItemModalState.mode !== 'view' ? (
-                          <label className="text-sm md:col-span-2">Upload Photos (multiple)
-                            <input
-                              type="file"
-                              accept="image/*"
-                              multiple
-                              disabled={progressItemUploadPending}
-                              className="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:font-semibold"
-                              onChange={(event) => {
-                                void appendPhotosToProgressItemForm(event.target.files);
-                                event.target.value = '';
-                              }}
-                            />
-                            <p className="mt-1 text-xs text-slate-500">{progressItemUploadPending ? `Uploading photos... ${progressItemUploadProgress}%` : 'Upload one or more images (max 15MB each).'}</p>
-                            {progressItemUploadPending ? (
-                              <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
-                                <div className="h-full bg-brand-blue transition-all" style={{ width: `${progressItemUploadProgress}%` }} />
+                      {progressItemModalState.mode === 'view' ? (
+                        <div className="mt-4 space-y-4 px-4 pb-4 sm:px-6 sm:pb-6">
+                          <div className="grid gap-4 lg:grid-cols-2">
+                            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                              <div className="mt-1 space-y-3">
+                                <div>
+                                  <div className="flex justify-end gap-2">
+                                    <span className="inline-flex rounded-full border border-brand-blue/20 bg-brand-blue/10 px-3 py-1 text-xs font-semibold text-brand-blue">{selectedProgressItem?.date || 'No date'}</span>
+                                    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${selectedProgressItem?.isActive !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}>
+                                      {selectedProgressItem?.isActive !== false ? 'Active' : 'Inactive'}
+                                    </span>
+                                  </div>
+                                  <p className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Title</p>
+                                  <p className="mt-0.5 text-xl font-semibold text-slate-900 break-words">{selectedProgressItem?.title || 'Untitled progress'}</p>
+                                </div>
+                                <div className="h-px bg-slate-200" />
+                                {selectedProgressItem?.description ? (
+                                  <div>
+                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Summary</p>
+                                    <p className="mt-1 text-[11px] leading-5 text-slate-700">{selectedProgressItem.description}</p>
+                                  </div>
+                                ) : null}
+                                {selectedProgressItem?.details ? (
+                                  <div>
+                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Details</p>
+                                    <p className="mt-1 leading-6 text-slate-700">{selectedProgressItem.details}</p>
+                                  </div>
+                                ) : null}
                               </div>
-                            ) : null}
-                          </label>
-                        ) : null}
-                        <label className="flex items-center gap-2 text-sm md:col-span-2">
-                          <input type="checkbox" disabled={progressItemModalState.mode === 'view'} {...progressItemForm.register('isActive')} />
-                          Active progress item
-                        </label>
-                        <div className="md:col-span-2 flex gap-2">
-                          {progressItemModalState.mode !== 'view' ? <Button type="submit">Save Progress Item</Button> : null}
-                          <Button type="button" variant="ghost" onClick={closeProgressItemModal}>Close</Button>
+                            </div>
+
+                            <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+                              <div className="flex items-center justify-between gap-3">
+                                <div>
+                                  <p className="text-sm font-semibold text-slate-900">Image Gallery</p>
+                                  <p className="text-xs text-slate-500">Responsive grid for progress photos.</p>
+                                </div>
+                              </div>
+                              {(Array.isArray(selectedProgressItem?.photos) && selectedProgressItem.photos.length > 0) ? (
+                                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6">
+                                  {selectedProgressItem.photos.map((photoUrl, index) => (
+                                    <a
+                                      key={`${photoUrl}-${index}`}
+                                      href={photoUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="group overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm"
+                                    >
+                                      <img src={photoUrl} alt={`Progress ${index + 1}`} className="aspect-square h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]" loading="lazy" />
+                                    </a>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                                  No progress photos attached.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex justify-end">
+                            <Button type="button" variant="ghost" onClick={closeProgressItemModal}>Close</Button>
+                          </div>
                         </div>
-                      </form>
+                      ) : (
+                        <form className="mt-4 grid gap-3 px-4 pb-4 sm:px-6 sm:pb-6 md:grid-cols-2" onSubmit={progressItemForm.handleSubmit(handleSaveProgressItem)}>
+                          <label className="text-sm md:col-span-2">Title
+                            <input disabled={progressItemModalState.mode === 'view'} {...progressItemForm.register('title', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
+                          </label>
+                          <label className="text-sm md:col-span-2">Date
+                            <input type="date" disabled={progressItemModalState.mode === 'view'} {...progressItemForm.register('date')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
+                          </label>
+                          <label className="text-sm md:col-span-2">Description
+                            <textarea rows={2} disabled={progressItemModalState.mode === 'view'} {...progressItemForm.register('description')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
+                          </label>
+                          <label className="text-sm md:col-span-2">Photos (one URL per line)
+                            <textarea rows={3} disabled={progressItemModalState.mode === 'view'} {...progressItemForm.register('photosText')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
+                          </label>
+                          {progressItemModalState.mode !== 'view' ? (
+                            <label className="text-sm md:col-span-2">Upload Photos (multiple)
+                              <input
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                disabled={progressItemUploadPending}
+                                className="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:font-semibold"
+                                onChange={(event) => {
+                                  void appendPhotosToProgressItemForm(event.target.files);
+                                  event.target.value = '';
+                                }}
+                              />
+                              <p className="mt-1 text-xs text-slate-500">{progressItemUploadPending ? `Uploading photos... ${progressItemUploadProgress}%` : 'Upload one or more images (max 15MB each).'}</p>
+                              {progressItemUploadPending ? (
+                                <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+                                  <div className="h-full bg-brand-blue transition-all" style={{ width: `${progressItemUploadProgress}%` }} />
+                                </div>
+                              ) : null}
+                            </label>
+                          ) : null}
+                          <label className="flex items-center gap-2 text-sm md:col-span-2">
+                            <input type="checkbox" disabled={progressItemModalState.mode === 'view'} {...progressItemForm.register('isActive')} />
+                            Active progress item
+                          </label>
+                          <div className="md:col-span-2 h-px bg-slate-200" />
+                          <div className="md:col-span-2 flex gap-2 pt-1">
+                            {progressItemModalState.mode !== 'view' ? <Button type="submit">Save Progress Item</Button> : null}
+                            <Button type="button" variant="ghost" onClick={closeProgressItemModal}>Close</Button>
+                          </div>
+                        </form>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1088,7 +1248,7 @@ const AdminDonationsPage = () => {
                 <th className="py-1.5 pr-3">Donor</th>
                 <th className="py-1.5 pr-3">Campaign</th>
                 <th className="py-1.5 pr-3">Amount</th>
-                <th className="py-1.5 pr-3">Actions</th>
+                <th className="py-1.5 pr-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -1124,12 +1284,12 @@ const AdminDonationsPage = () => {
                       <button
                         type="button"
                         onClick={() => void handleEmailInvoice(entry)}
-                        disabled={!entry.donorEmail}
+                        disabled={!entry.donorEmail || invoiceEmailSendingId === String(entry.id || '')}
                         className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 transition hover:border-emerald-400 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 sm:px-3 sm:text-xs"
                         title={entry.donorEmail ? 'Email invoice to donor' : 'Donor email not available'}
                       >
                         <EnvelopeIcon className="h-4 w-4" />
-                        <span className="hidden sm:inline">Email Invoice</span>
+                        <span className="hidden sm:inline">{invoiceEmailSendingId === String(entry.id || '') ? 'Sending...' : 'Email Invoice'}</span>
                       </button>
                     </div>
                   </td>
@@ -1222,7 +1382,7 @@ const AdminDonationsPage = () => {
                   disabled={createPhotoUploadPending}
                   className="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:font-semibold"
                   onChange={(event) => {
-                    void appendCampaignPhotosToForm({ files: event.target.files, mode: 'create' });
+                    void appendCampaignPhotosToForm({ files: event.target.files });
                     event.target.value = '';
                   }}
                 />
@@ -1259,110 +1419,180 @@ const AdminDonationsPage = () => {
         </div>
       ) : null}
 
+      {cashDonationOpen ? (
+        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6" onClick={() => setCashDonationOpen(false)}>
+          <div className="mx-auto flex min-h-full items-center justify-center">
+            <div className="w-full max-w-xl rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200" onClick={(event) => event.stopPropagation()}>
+              <div className="flex items-start justify-between gap-3 rounded-t-3xl border-b border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-brand-blue px-4 py-4 text-white sm:px-6">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/65">Admin Entry</p>
+                  <h3 className="mt-1 font-heading text-xl font-semibold">Add Cash Donation</h3>
+                </div>
+                <button type="button" onClick={() => setCashDonationOpen(false)} className="rounded-full border border-white/20 bg-white/10 p-2 text-white transition hover:bg-white/20" aria-label="Close cash donation modal">
+                  <XMarkIcon className="h-4 w-4" />
+                </button>
+              </div>
+
+              <form
+                className="grid gap-3 px-4 py-4 sm:grid-cols-2 sm:px-6"
+                onSubmit={cashDonationForm.handleSubmit((values) => addCashDonationMutation.mutate(values))}
+              >
+                <label className="text-sm sm:col-span-2">Campaign
+                  <select {...cashDonationForm.register('campaignId', { required: true })} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue">
+                    <option value="">Select campaign</option>
+                    {activeCampaigns.map((campaign) => (
+                      <option key={campaign.id} value={String(campaign.id)}>{campaign.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-sm">Amount
+                  <input type="number" min="0" step="0.01" {...cashDonationForm.register('amount', { required: true, valueAsNumber: true, min: 0.01 })} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
+                </label>
+                <label className="text-sm">Gurdwara Receipt Number
+                  <input {...cashDonationForm.register('receiptId', { required: true })} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" placeholder="e.g. GRC-2026-0043" />
+                </label>
+                <label className="text-sm">Date
+                  <input type="date" {...cashDonationForm.register('paidAt', { required: true })} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
+                </label>
+                <label className="text-sm">Payment Mode
+                  <input value="Cash" disabled className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700" />
+                </label>
+                <label className="text-sm sm:col-span-2">Details
+                  <textarea rows={2} {...cashDonationForm.register('donorDetails')} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" placeholder="Donor details / note (optional)" />
+                </label>
+                <p className="text-xs text-slate-500 sm:col-span-2">Email is not captured for cash entries by design.</p>
+                <div className="h-px bg-slate-200 sm:col-span-2" />
+                <div className="flex gap-2 sm:col-span-2">
+                  <Button type="submit" disabled={addCashDonationMutation.isPending}>{addCashDonationMutation.isPending ? 'Saving...' : 'Save Cash Donation'}</Button>
+                  <Button type="button" variant="ghost" onClick={() => setCashDonationOpen(false)}>Cancel</Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {viewingCampaign ? (
         <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6" onClick={() => setViewingCampaign(null)}>
           <div className="mx-auto flex min-h-full items-center justify-center">
-          <div className="w-full max-w-2xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-xl" onClick={(event) => event.stopPropagation()}>
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="font-heading text-xl font-semibold">Campaign Details</h3>
-              <button type="button" onClick={() => setViewingCampaign(null)} className="rounded-full border border-brand-blue/40 bg-blue-50 p-2 text-brand-blue transition hover:border-brand-saffron hover:bg-amber-100 hover:text-amber-700" aria-label="Close campaign details modal">
+          <div className="w-full max-w-4xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-brand-blue px-4 py-4 text-white sm:px-6">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/65">Campaign Overview</p>
+                <h3 className="mt-1 font-heading text-xl font-semibold sm:text-2xl">{viewingCampaign.name}</h3>
+              </div>
+              <button type="button" onClick={() => setViewingCampaign(null)} className="rounded-full border border-white/20 bg-white/10 p-2 text-white transition hover:bg-white/20" aria-label="Close campaign details modal">
                 <XMarkIcon className="h-4 w-4" />
               </button>
             </div>
-            <div className="mt-4 grid gap-3 text-sm text-slate-700 md:grid-cols-2">
-              <p><span className="font-semibold text-slate-900">Name:</span> {viewingCampaign.name}</p>
-              <p><span className="font-semibold text-slate-900">Provider:</span> {viewingCampaign.paymentProvider}</p>
-              <p><span className="font-semibold text-slate-900">Target:</span> {formatCurrency(viewingCampaign.target)}</p>
-              <p><span className="font-semibold text-slate-900">Raised:</span> {formatCurrency(viewingCampaign.raised)}</p>
-              <p><span className="font-semibold text-slate-900">Status:</span> {viewingCampaign.isActive ? (viewingCampaign.isClosed ? 'Closed' : 'Active') : 'Inactive'}</p>
-              <p className="md:col-span-2 break-all"><span className="font-semibold text-slate-900">Checkout Link:</span> {viewingCampaign.paymentLink || '-'}</p>
-              <p className="md:col-span-2"><span className="font-semibold text-slate-900">Description:</span> {viewingCampaign.description || '-'}</p>
-              <p className="md:col-span-2"><span className="font-semibold text-slate-900">Progress Title:</span> {viewingCampaign.progressTitle || '-'}</p>
-              <p className="md:col-span-2"><span className="font-semibold text-slate-900">Progress Description:</span> {viewingCampaign.progressDescription || '-'}</p>
-            </div>
-            {(Array.isArray(viewingCampaign.storyBlocks) && viewingCampaign.storyBlocks.length > 0) ? (
-              <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
-                <p className="text-sm font-semibold text-slate-900">Story Blocks</p>
-                <div className="mt-3 space-y-2">
-                  {viewingCampaign.storyBlocks.filter((item) => item?.isActive !== false).map((item) => (
-                    <div key={item.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                      <p className="text-sm font-semibold text-slate-900">{item.title || 'Story'}</p>
-                      {item.summary ? <p className="mt-1 text-xs text-slate-700">{item.summary}</p> : null}
-                      {item.quote ? <p className="mt-1 text-xs italic text-brand-blue">"{item.quote}"</p> : null}
-                      {(item.beneficiary || item.impactMetric) ? <p className="mt-1 text-[11px] font-semibold text-slate-600">{item.beneficiary || '-'} {item.impactMetric ? `• ${item.impactMetric}` : ''}</p> : null}
+
+            <div className="grid gap-4 px-4 py-4 sm:px-6 lg:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center rounded-full border border-brand-blue/10 bg-white px-3 py-1 text-xs font-semibold text-brand-blue">{viewingCampaign.paymentProvider}</span>
+                  <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${viewingCampaign.isClosed ? 'bg-violet-100 text-violet-800' : viewingCampaign.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}>
+                    {viewingCampaign.isClosed ? 'Closed' : viewingCampaign.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Raised</p>
+                    <p className="mt-1 text-2xl font-bold text-slate-900 sm:text-3xl">{formatCurrency(viewingCampaign.raised)}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Target</p>
+                    <p className="mt-1 text-2xl font-bold text-slate-900 sm:text-3xl">{formatCurrency(viewingCampaign.target)}</p>
+                  </div>
+                </div>
+
+                <div className="my-4 h-px bg-slate-200" />
+
+                <div className="space-y-3 text-sm text-slate-700">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Campaign name</p>
+                    <p className="mt-1 font-medium text-slate-900">{viewingCampaign.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Description</p>
+                    <p className="mt-1 leading-6 text-slate-700">{viewingCampaign.description || 'No description provided.'}</p>
+                  </div>
+                </div>
+
+              </div>
+
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ring-1 ring-slate-200 sm:p-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">Campaign donations</p>
+                      <p className="text-xs text-slate-500">{filteredCampaignDonations.length} of {campaignDonations.length} donation{campaignDonations.length === 1 ? '' : 's'} shown.</p>
                     </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-            {(Array.isArray(viewingCampaign.progressPhotos) && viewingCampaign.progressPhotos.length > 0) ? (
-              <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
-                <p className="text-sm font-semibold text-slate-900">Progress Photos</p>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  {viewingCampaign.progressPhotos.map((photoUrl) => (
-                    <a
-                      key={photoUrl}
-                      href={photoUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="group overflow-hidden rounded-lg border border-slate-200"
-                    >
-                      <img src={photoUrl} alt="Campaign progress" className="h-24 w-full object-cover transition group-hover:scale-[1.03]" loading="lazy" />
-                    </a>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-            {(Array.isArray(viewingCampaign.progressUpdates) && viewingCampaign.progressUpdates.length > 0) ? (
-              <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
-                <p className="text-sm font-semibold text-slate-900">Progress Updates</p>
-                <div className="mt-3 space-y-2">
-                  {viewingCampaign.progressUpdates.map((update, updateIndex) => (
-                    <div key={`${update.date || 'update'}-${updateIndex}`} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                      <p className="text-xs font-semibold text-slate-500">{update.date || 'No date'}</p>
-                      <p className="text-sm font-semibold text-slate-900">{update.title || 'Untitled update'}</p>
-                      {update.description ? <p className="mt-0.5 text-xs text-slate-600">{update.description}</p> : null}
-                      {Number(update.amount || 0) > 0 ? <p className="mt-1 text-xs font-semibold text-emerald-700">{formatCurrency(update.amount)}</p> : null}
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" variant="ghost" onClick={handleDownloadCampaignCsv} disabled={campaignDonations.length === 0} className="px-3 py-1.5 text-xs">CSV</Button>
+                      <Button type="button" onClick={() => void handleDownloadCampaignPdf()} disabled={campaignDonations.length === 0} className="px-3 py-1.5 text-xs">PDF</Button>
                     </div>
-                  ))}
+                  </div>
+                  <label className="mt-3 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                    <MagnifyingGlassIcon className="h-3.5 w-3.5 text-slate-400" />
+                    <input
+                      value={campaignDonorSearchTerm}
+                      onChange={(event) => setCampaignDonorSearchTerm(event.target.value)}
+                      placeholder="Search donor or receipt"
+                      className="w-full bg-transparent text-xs outline-none"
+                    />
+                  </label>
+                  {filteredCampaignDonations.length > 0 ? (
+                    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50">
+                      <table className="min-w-full text-left text-xs">
+                        <thead className="sticky top-0 bg-slate-100 text-slate-500">
+                          <tr>
+                            <th className="px-3 py-2">Donor</th>
+                            <th className="px-3 py-2">Amount</th>
+                            <th className="px-3 py-2">Date</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {pagedCampaignDonations.map((donation) => (
+                            <tr key={donation.id} className="border-t border-slate-100">
+                              <td className="px-3 py-2 font-medium text-slate-800">{donation.donorName || '-'}</td>
+                              <td className="px-3 py-2 font-medium text-slate-800">{formatCurrency(donation.amount || 0)}</td>
+                              <td className="px-3 py-2 text-slate-600">{donation.createdAt ? new Date(donation.createdAt).toLocaleDateString() : '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-6 text-center text-xs text-slate-500">
+                      No donations match your search.
+                    </div>
+                  )}
+                  {filteredCampaignDonations.length > 0 ? (
+                    <div className="mt-3 flex items-center justify-between gap-2 text-xs text-slate-600">
+                      <p>Page {Math.min(campaignDonorPage, campaignDonorTotalPages)} of {campaignDonorTotalPages}</p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setCampaignDonorPage((current) => Math.max(1, current - 1))}
+                          disabled={campaignDonorPage <= 1}
+                          className="rounded-lg border border-slate-300 px-2.5 py-1 font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          Prev
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCampaignDonorPage((current) => Math.min(campaignDonorTotalPages, current + 1))}
+                          disabled={campaignDonorPage >= campaignDonorTotalPages}
+                          className="rounded-lg border border-slate-300 px-2.5 py-1 font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </div>
-            ) : null}
-            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">Campaign donor list</p>
-                  <p className="text-xs text-slate-500">{campaignDonations.length} donation{campaignDonations.length === 1 ? '' : 's'} found for this campaign.</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="ghost" onClick={handleDownloadCampaignCsv} disabled={campaignDonations.length === 0}>Download CSV</Button>
-                  <Button type="button" onClick={() => void handleDownloadCampaignPdf()} disabled={campaignDonations.length === 0}>Download PDF</Button>
-                </div>
-              </div>
-              {campaignDonations.length > 0 ? (
-                <div className="mt-4 max-h-56 overflow-auto rounded-lg border border-slate-200 bg-white">
-                  <table className="min-w-full text-left text-xs">
-                    <thead className="sticky top-0 bg-slate-100 text-slate-500">
-                      <tr>
-                        <th className="px-3 py-2">Donor</th>
-                        <th className="px-3 py-2">Email</th>
-                        <th className="px-3 py-2">Amount</th>
-                        <th className="px-3 py-2">Date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {campaignDonations.map((donation) => (
-                        <tr key={donation.id} className="border-t border-slate-100">
-                          <td className="px-3 py-2 font-medium text-slate-800">{donation.donorName || '-'}</td>
-                          <td className="px-3 py-2 text-slate-600">{donation.donorEmail || '-'}</td>
-                          <td className="px-3 py-2 font-medium text-slate-800">{formatCurrency(donation.amount || 0)}</td>
-                          <td className="px-3 py-2 text-slate-600">{donation.createdAt ? new Date(donation.createdAt).toLocaleDateString() : '-'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : null}
             </div>
           </div>
           </div>
@@ -1372,83 +1602,53 @@ const AdminDonationsPage = () => {
       {editingCampaign ? (
         <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6" onClick={() => setEditingCampaign(null)}>
           <div className="mx-auto flex min-h-full items-center justify-center">
-          <div className="w-full max-w-3xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-xl" onClick={(event) => event.stopPropagation()}>
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="font-heading text-xl font-semibold">Edit Campaign</h3>
-              <button type="button" onClick={() => setEditingCampaign(null)} className="rounded-full border border-brand-blue/40 bg-blue-50 p-2 text-brand-blue transition hover:border-brand-saffron hover:bg-amber-100 hover:text-amber-700" aria-label="Close edit campaign modal">
+          <div className="w-full max-w-3xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-brand-blue px-4 py-4 text-white sm:px-6">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/65">Campaign Update</p>
+                <h3 className="mt-1 font-heading text-xl font-semibold">Edit Campaign</h3>
+              </div>
+              <button type="button" onClick={() => setEditingCampaign(null)} className="rounded-full border border-white/20 bg-white/10 p-2 text-white transition hover:bg-white/20" aria-label="Close edit campaign modal">
                 <XMarkIcon className="h-4 w-4" />
               </button>
             </div>
-            <form className="mt-4 grid gap-3 md:grid-cols-3" onSubmit={editForm.handleSubmit((values) => updateMutation.mutate({ id: editingCampaign.id, values }))}>
+            <form className="grid gap-3 px-4 py-4 sm:grid-cols-2 sm:px-6" onSubmit={editForm.handleSubmit((values) => updateMutation.mutate({ id: editingCampaign.id, values }))}>
               <StatusAlert type={uploadStatus.type} message={uploadStatus.message} />
-              <label className="text-sm">Campaign Name
-                <input {...editForm.register('name', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              <label className="text-sm sm:col-span-2">Campaign Name
+                <input {...editForm.register('name', { required: true })} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
               </label>
               <label className="text-sm">Payment Provider
-                <select {...editForm.register('paymentProvider')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
+                <select {...editForm.register('paymentProvider')} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue">
                   <option value="STRIPE">Stripe</option>
                   <option value="PAYPAL">PayPal</option>
                 </select>
               </label>
               <label className="text-sm">Raised
-                <input type="number" min="0" step="0.01" {...editForm.register('raised', { valueAsNumber: true, min: 0 })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <input type="number" min="0" step="0.01" disabled {...editForm.register('raised', { valueAsNumber: true, min: 0 })} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 shadow-sm" />
               </label>
               <label className="text-sm">Target
-                <input type="number" min="0" step="0.01" {...editForm.register('target', { required: true, valueAsNumber: true, min: 0 })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <input type="number" min="0" step="0.01" {...editForm.register('target', { required: true, valueAsNumber: true, min: 0 })} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
               </label>
-              <label className="text-sm md:col-span-2">Description
-                <textarea rows={2} {...editForm.register('description')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              <label className="text-sm sm:col-span-2">Description
+                <textarea rows={2} {...editForm.register('description')} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
               </label>
-              <label className="text-sm md:col-span-2">Progress Title
-                <input {...editForm.register('progressTitle')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-              </label>
-              <label className="text-sm md:col-span-3">Progress Description
-                <textarea rows={2} {...editForm.register('progressDescription')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-              </label>
-              <label className="text-sm md:col-span-3">Story Blocks (one per line: title|summary|quote|beneficiary|impactMetric|imageUrl)
-                <textarea rows={4} {...editForm.register('storyBlocksText')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-              </label>
-              <label className="text-sm md:col-span-3">Progress Photos (one URL per line)
-                <textarea rows={3} {...editForm.register('progressPhotosText')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-              </label>
-              <label className="text-sm md:col-span-3">Upload Progress Photos (multiple)
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  disabled={editPhotoUploadPending}
-                  className="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:font-semibold"
-                  onChange={(event) => {
-                    void appendCampaignPhotosToForm({ files: event.target.files, mode: 'edit' });
-                    event.target.value = '';
-                  }}
-                />
-                <p className="mt-1 text-xs text-slate-500">{editPhotoUploadPending ? `Uploading photos... ${editPhotoUploadProgress}%` : 'Upload one or more images (max 15MB each). Uploaded URLs will be appended above.'}</p>
-                {editPhotoUploadPending ? (
-                  <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
-                    <div className="h-full bg-brand-blue transition-all" style={{ width: `${editPhotoUploadProgress}%` }} />
-                  </div>
-                ) : null}
-              </label>
-              <label className="text-sm md:col-span-3">Progress Updates (one per line: date|title|description|amount)
-                <textarea rows={4} {...editForm.register('progressUpdatesText')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-              </label>
-              <label className="text-sm md:col-span-2">Checkout Link (optional)
-                <input {...editForm.register('paymentLink')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              <label className="text-sm sm:col-span-2">Checkout Link (optional)
+                <input {...editForm.register('paymentLink')} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
               </label>
               <label className="text-sm">Stripe Buy Button ID (optional)
-                <input {...editForm.register('stripeBuyButtonId')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <input {...editForm.register('stripeBuyButtonId')} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
               </label>
-              <label className="text-sm md:col-span-2">Stripe Publishable Key (optional)
-                <input {...editForm.register('stripePublishableKey')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              <label className="text-sm">Stripe Publishable Key (optional)
+                <input {...editForm.register('stripePublishableKey')} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
               </label>
-              <label className="flex items-center gap-2 text-sm">
+              <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 sm:col-span-2">
                 <input type="checkbox" {...editForm.register('isActive')} />
                 Active campaign
               </label>
-              <div className="flex gap-2 md:col-span-3">
+              <div className="h-px bg-slate-200 sm:col-span-2" />
+              <div className="flex gap-2 sm:col-span-2">
                 <Button type="submit" disabled={updateMutation.isPending}>{updateMutation.isPending ? 'Saving...' : 'Save Changes'}</Button>
-                <button type="button" onClick={() => setEditingCampaign(null)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Cancel</button>
+                <button type="button" onClick={() => setEditingCampaign(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">Cancel</button>
               </div>
             </form>
           </div>

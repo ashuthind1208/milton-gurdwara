@@ -66,7 +66,7 @@
   }
 
   .ticker-speed-fast {
-    animation-duration: 18s;
+    animation-duration: 14s;
   }
 
   .daily-schedule-special-ticker {
@@ -98,8 +98,8 @@
   }
 
   .daily-schedule-special-item {
-    margin: 2px 8px;
-    padding: 3px 8px;
+    margin: 0 2px;
+    padding: 0;
   }
 
   .schedule-cell-clip {

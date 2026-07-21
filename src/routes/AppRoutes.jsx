@@ -41,13 +41,14 @@ const AdminSponsorsPage = lazy(() => import('../admin/Sponsors/AdminSponsorsPage
 const AdminEventsPage = lazy(() => import('../admin/Events/AdminEventsPage'));
 const AdminDonationsPage = lazy(() => import('../admin/Donations/AdminDonationsPage'));
 const AdminUsersPage = lazy(() => import('../admin/Users/AdminUsersPage'));
+const AdminRolesAccessPage = lazy(() => import('../admin/RolesAccess/AdminRolesAccessPage'));
 const AdminKidsLearningPage = lazy(() => import('../admin/KidsLearning/AdminKidsLearningPage'));
 const AdminAuditTrailPage = lazy(() => import('../admin/AuditTrail/AdminAuditTrailPage'));
 
 const LoadingFallback = () => <div className="py-20 text-center text-slate-600">Loading page...</div>;
 
-const FULL_ADMIN_ROLES = [userRoles.SUPER_ADMIN, userRoles.ADMIN];
-const LIMITED_ADMIN_ROLES = [userRoles.SUPER_ADMIN, userRoles.ADMIN, userRoles.MEMBER, userRoles.VOLUNTEER];
+const LIMITED_ADMIN_ROLES = [userRoles.SUPER_ADMIN, userRoles.ADMIN, userRoles.MEMBER, userRoles.VOLUNTEER, userRoles.FAMILY];
+const ROLES_ACCESS_ALLOWED_ROLES = [userRoles.SUPER_ADMIN, userRoles.ADMIN];
 
 const AppRoutes = () => {
   return (
@@ -77,31 +78,29 @@ const AppRoutes = () => {
 
         <Route path="/donation-board" element={<DonationDisplayBoardPage />} />
 
-        <Route element={<ProtectedRoute allowedRoles={FULL_ADMIN_ROLES} />}>
-          <Route element={<AdminLayout />}>
-            <Route path="/admin/cms" element={<AdminCmsPage />} />
-            <Route path="/admin/news" element={<AdminNewsPage />} />
-            <Route path="/admin/schedule" element={<AdminSchedulePage />} />
-            <Route path="/admin/langar" element={<AdminLangarPage />} />
-            <Route path="/admin/advertisements" element={<AdminAdvertisementsPage />} />
-            <Route path="/admin/sponsors" element={<AdminSponsorsPage />} />
-            <Route path="/admin/donations" element={<AdminDonationsPage />} />
-            <Route path="/admin/users" element={<AdminUsersPage />} />
-            <Route path="/admin/kids-learning" element={<AdminKidsLearningPage />} />
-            <Route path="/admin/audit-trail" element={<AdminAuditTrailPage />} />
-          </Route>
-        </Route>
-
         <Route element={<ProtectedRoute allowedRoles={LIMITED_ADMIN_ROLES} />}>
           <Route element={<AdminLayout />}>
             <Route path="/admin" element={<AdminDashboardPage />} />
+            <Route path="/admin/cms" element={<AdminCmsPage />} />
+            <Route path="/admin/news" element={<AdminNewsPage />} />
+            <Route path="/admin/schedule" element={<AdminSchedulePage />} />
             <Route path="/admin/hukamnama" element={<AdminHukamnamaPage />} />
+            <Route path="/admin/langar" element={<AdminLangarPage />} />
             <Route path="/admin/gallery" element={<AdminGalleryPage />} />
             <Route path="/admin/library" element={<AdminLibraryPage />} />
             <Route path="/admin/videos" element={<AdminVideosPage />} />
             <Route path="/admin/streaming" element={<AdminStreamingPage />} />
+            <Route path="/admin/advertisements" element={<AdminAdvertisementsPage />} />
+            <Route path="/admin/sponsors" element={<AdminSponsorsPage />} />
             <Route path="/admin/seva-opportunities" element={<AdminSevaOpportunitiesPage />} />
             <Route path="/admin/events" element={<AdminEventsPage />} />
+            <Route path="/admin/donations" element={<AdminDonationsPage />} />
+            <Route path="/admin/users" element={<AdminUsersPage />} />
+            <Route element={<ProtectedRoute allowedRoles={ROLES_ACCESS_ALLOWED_ROLES} allowAssignedAdminAccess={false} />}>
+              <Route path="/admin/roles-access" element={<AdminRolesAccessPage />} />
+            </Route>
+            <Route path="/admin/kids-learning" element={<AdminKidsLearningPage />} />
+            <Route path="/admin/audit-trail" element={<AdminAuditTrailPage />} />
           </Route>
         </Route>
 

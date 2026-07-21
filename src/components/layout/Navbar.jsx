@@ -300,7 +300,6 @@ const rightMenu = [
 ];
 
 const FULL_ACCESS_ROLES = new Set(['Super Admin', 'Admin']);
-const ADMIN_PORTAL_BUTTON_ROLES = new Set(['Super Admin', 'Admin', 'Member', 'Volunteer']);
 const PENDING_APPROVAL_MESSAGE = 'Access is pending till your status is approved by an admin.';
 
 const resolveLandingPathByRole = () => '/';
@@ -371,8 +370,11 @@ const Navbar = () => {
   const profilePhoneMissing = !String(user?.phone || '').trim();
   const approvalStatus = String(user?.approvalStatus || '').toLowerCase();
   const hasFullAccess = FULL_ACCESS_ROLES.has(String(user?.role || ''));
-  const canSeeAdminPortalButton = ADMIN_PORTAL_BUTTON_ROLES.has(String(user?.role || ''))
-    && (hasFullAccess || approvalStatus === 'approved');
+  const assignedAdminPages = Array.isArray(user?.adminPageAccess)
+    ? user.adminPageAccess.map((path) => String(path || '').trim()).filter(Boolean)
+    : [];
+  const canSeeAdminPortalButton = approvalStatus === 'approved'
+    && (hasFullAccess || assignedAdminPages.length > 0);
   const isApprovalPending = isAuthenticated && !hasFullAccess && approvalStatus !== 'approved';
   const { data: familyEvents = [] } = useQuery({
     queryKey: ['navbar-family-events'],

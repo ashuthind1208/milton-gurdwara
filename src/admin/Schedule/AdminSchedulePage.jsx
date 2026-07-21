@@ -12,12 +12,10 @@ import {
 } from '@heroicons/react/24/outline';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
-import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton';
 import cmsService from '../../services/cmsService';
 
 const HOURS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
 const MINUTES = ['00', '15', '30', '45'];
-const MERIDIEM = ['AM', 'PM'];
 const GURMUKHI_DIGITS = {
   '0': '੦',
   '1': '੧',
@@ -191,21 +189,22 @@ const entryFormDefaults = {
   titlePa: ''
 };
 
-const segmentOptions = [
-  { value: 'morning', label: 'Morning' },
-  { value: 'evening', label: 'Evening' }
-];
-
-const segmentClassMap = {
-  morning: 'bg-sky-100 text-sky-800',
-  evening: 'bg-amber-100 text-amber-800',
-  special: 'bg-rose-100 text-rose-800'
-};
-
 const statusPillClass = (isActive) => (
   isActive
-    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300'
-    : 'border-slate-300 bg-slate-100 text-slate-700 hover:border-slate-400'
+  ? 'border-green-200 bg-green-100 text-green-800 hover:bg-green-200 hover:text-green-900'
+  : 'border-red-200 bg-red-100 text-red-800 hover:bg-red-200 hover:text-red-900'
+);
+const scheduleButtonClass = 'inline-flex items-center justify-center rounded-xl border border-sky-200 bg-sky-100 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-brand-blue hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300';
+const scheduleCompactButtonClass = 'inline-flex items-center justify-center rounded-xl border border-sky-200 bg-sky-100 px-3 py-2 text-xs font-semibold text-slate-900 transition hover:bg-brand-blue hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300';
+const scheduleIconButtonClass = 'inline-flex h-8 w-8 items-center justify-center rounded-lg border border-sky-200 bg-sky-100 text-slate-900 transition hover:bg-brand-blue hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300';
+
+const scheduleTransparentIconButtonClass = 'inline-flex h-7 w-7 items-center justify-center rounded-md bg-transparent text-slate-900 transition hover:bg-transparent hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300';
+const scheduleDeleteIconButtonClass = 'inline-flex h-7 w-7 items-center justify-center rounded-md bg-transparent text-red-600 transition hover:bg-transparent hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300';
+
+const slotAddButtonClass = (tone) => (
+  tone === 'sky'
+    ? 'inline-flex items-center justify-center rounded-xl border border-[#065985] bg-[#065985] px-3 py-2 text-[11px] font-semibold text-slate-900 transition hover:bg-[#065985] hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300'
+    : 'inline-flex items-center justify-center rounded-xl border border-[#92400D] bg-[#92400D] px-3 py-2 text-[11px] font-semibold text-amber-50 transition hover:bg-[#92400D] hover:text-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300'
 );
 
 const sortEntries = (entries = []) => entries
@@ -215,15 +214,15 @@ const sortEntries = (entries = []) => entries
 
 const AdminSchedulePage = () => {
   const queryClient = useQueryClient();
-  const todayDateKey = toDateKey(new Date());
   const currentYear = new Date().getFullYear();
+  const todayDateKey = toDateKey(new Date());
   const [selectedDateKey, setSelectedDateKey] = useState(toDateKey(new Date()));
   const [quickDateKey, setQuickDateKey] = useState(toDateKey(new Date()));
   const [yearFilter, setYearFilter] = useState(currentYear);
   const [dayFilter, setDayFilter] = useState('');
   const [page, setPage] = useState(1);
   const [dayModal, setDayModal] = useState({ open: false, mode: 'view' });
-  const [entryModal, setEntryModal] = useState({ open: false, mode: 'create', entryId: null });
+  const [entryModal, setEntryModal] = useState({ open: false, mode: 'create', entryId: null, segment: 'morning' });
   const [dayMeta, setDayMeta] = useState({ isSpecial: false, specialReason: '', specialReasonPa: '' });
   const form = useForm({ defaultValues: entryFormDefaults });
 
@@ -310,7 +309,7 @@ const AdminSchedulePage = () => {
   });
 
   const closeEntryModal = () => {
-    setEntryModal({ open: false, mode: 'create', entryId: null });
+    setEntryModal({ open: false, mode: 'create', entryId: null, segment: 'morning' });
   };
 
   const closeDayModal = () => {
@@ -331,9 +330,9 @@ const AdminSchedulePage = () => {
     setDayModal({ open: true, mode });
   };
 
-  const openCreateModal = () => {
-    form.reset({ ...entryFormDefaults });
-    setEntryModal({ open: true, mode: 'create', entryId: null });
+  const openCreateModal = (segment = 'morning') => {
+    form.reset({ ...entryFormDefaults, segment });
+    setEntryModal({ open: true, mode: 'create', entryId: null, segment });
   };
 
   const openEditModal = (entry) => {
@@ -345,10 +344,10 @@ const AdminSchedulePage = () => {
       titlePa: entry.titlePa || '',
       isActive: entry.isActive !== false
     });
-    setEntryModal({ open: true, mode: 'edit', entryId: entry.id });
+    setEntryModal({ open: true, mode: 'edit', entryId: entry.id, segment: entry.segment || 'morning' });
   };
 
-  const rows = selectedDay.entries || [];
+  const rows = useMemo(() => (Array.isArray(selectedDay.entries) ? selectedDay.entries : []), [selectedDay.entries]);
   const isSelectedDayPast = isPastDateKey(selectedDateKey);
   const isDayModalReadOnly = dayModal.mode === 'view' || isSelectedDayPast;
 
@@ -358,7 +357,7 @@ const AdminSchedulePage = () => {
       : null;
 
     const nextPayload = {
-      segment: values.segment,
+      segment: entryModal.segment || existingEntry?.segment || values.segment || 'morning',
       timeEn: buildTimeRange(values),
       timePa: buildPunjabiTimeRange(values),
       titleEn: values.titleEn,
@@ -398,6 +397,9 @@ const AdminSchedulePage = () => {
     )));
     saveDayMutation.mutate({ nextEntries, meta: dayMeta });
   };
+
+  const morningEntries = useMemo(() => rows.filter((entry) => (entry.segment || 'morning') === 'morning'), [rows]);
+  const eveningEntries = useMemo(() => rows.filter((entry) => (entry.segment || 'morning') !== 'morning'), [rows]);
 
   const yearRows = useMemo(() => {
     const dateKeys = getYearDateKeys(yearFilter);
@@ -459,15 +461,15 @@ const AdminSchedulePage = () => {
             </label>
             <Button
               type="button"
-              variant="ghost"
-              className="h-11 rounded-xl px-4"
+              variant="primary"
+              className="h-11 rounded-xl px-4 text-slate-900 hover:bg-brand-saffron hover:text-slate-900"
               onClick={() => openDayModal(quickDateKey, 'view')}
             >
               View Day
             </Button>
             <Button
               type="button"
-              className="h-11 rounded-xl px-4"
+              className="h-11 rounded-xl px-4 text-slate-900 hover:bg-brand-saffron hover:text-slate-900"
               onClick={() => openDayModal(quickDateKey, 'edit')}
             >
               Edit Day
@@ -506,8 +508,8 @@ const AdminSchedulePage = () => {
             </label>
             <Button
               type="button"
-              variant="ghost"
-              className="h-11 rounded-xl px-4"
+              variant="primary"
+              className="h-11 rounded-xl px-4 text-white hover:bg-brand-saffron hover:text-slate-900"
               onClick={() => {
                 setYearFilter(currentYear);
                 setDayFilter('');
@@ -553,7 +555,7 @@ const AdminSchedulePage = () => {
                       <button
                         type="button"
                         onClick={() => openDayModal(row.dateKey, 'view')}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100"
+                        className={scheduleIconButtonClass}
                         aria-label={`View ${row.dateKey}`}
                       >
                         <EyeIcon className="h-4 w-4" />
@@ -562,7 +564,7 @@ const AdminSchedulePage = () => {
                         type="button"
                         onClick={() => openDayModal(row.dateKey, 'edit')}
                         disabled={row.isPast}
-                        className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border ${row.isPast ? 'cursor-not-allowed border-slate-200 text-slate-400' : 'border-blue-200 text-blue-700 hover:bg-blue-50'}`}
+                        className={`${scheduleIconButtonClass} ${row.isPast ? 'cursor-not-allowed opacity-50' : ''}`}
                         aria-label={`Edit ${row.dateKey}`}
                       >
                         {row.isPast ? <LockClosedIcon className="h-4 w-4" /> : <PencilSquareIcon className="h-4 w-4" />}
@@ -583,8 +585,8 @@ const AdminSchedulePage = () => {
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-slate-500">Showing {(safePage - 1) * pageSize + 1}-{Math.min(safePage * pageSize, filteredYearRows.length)} of {filteredYearRows.length}</p>
           <div className="flex gap-2">
-            <Button type="button" variant="ghost" onClick={() => setPage((prev) => Math.max(1, prev - 1))} disabled={safePage === 1}>Previous</Button>
-            <Button type="button" variant="ghost" onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))} disabled={safePage === totalPages}>Next</Button>
+            <Button type="button" onClick={() => setPage((prev) => Math.max(1, prev - 1))} disabled={safePage === 1} className={`${scheduleCompactButtonClass} ${safePage === 1 ? 'cursor-not-allowed opacity-50' : ''}`}>Previous</Button>
+            <Button type="button" onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))} disabled={safePage === totalPages} className={`${scheduleCompactButtonClass} ${safePage === totalPages ? 'cursor-not-allowed opacity-50' : ''}`}>Next</Button>
           </div>
         </div>
       </Card>
@@ -592,7 +594,7 @@ const AdminSchedulePage = () => {
       {dayModal.open ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/50" onClick={closeDayModal} aria-hidden="true" />
-          <div className="relative z-10 max-h-[calc(100vh-2rem)] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
+          <div className="relative z-10 max-h-[calc(100vh-2rem)] w-full max-w-7xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h3 className="font-heading text-lg font-semibold">{formatDateLabel(selectedDateKey)}</h3>
@@ -608,125 +610,143 @@ const AdminSchedulePage = () => {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button type="button" onClick={closeDayModal} className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700" aria-label="Close day modal">
+                {!isDayModalReadOnly && selectedDateKey !== 'default' ? (
+                  <Button
+                    type="button"
+                    onClick={() => removeDayMutation.mutate()}
+                    disabled={removeDayMutation.isPending}
+                    className="h-8 rounded-lg border border-[#065985] bg-[#065985] px-3 text-xs font-semibold text-slate-900 hover:bg-[#065985] hover:text-slate-900"
+                  >
+                    {removeDayMutation.isPending ? 'Resetting...' : 'Reset To Default'}
+                  </Button>
+                ) : null}
+                <button type="button" onClick={closeDayModal} className="rounded-md bg-sky-100 p-1.5 text-slate-900 hover:bg-brand-blue hover:text-white" aria-label="Close day modal">
                   <XMarkIcon className="h-5 w-5" />
                 </button>
               </div>
             </div>
 
-            {!isDayModalReadOnly && selectedDateKey !== 'default' ? (
-              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/60 p-3">
-                <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-800">
-                  <input
-                    type="checkbox"
-                    checked={dayMeta.isSpecial}
-                    onChange={(event) => setDayMeta((prev) => ({ ...prev, isSpecial: event.target.checked }))}
-                  />
-                  Mark this day as special
-                </label>
-                <div className="mt-3 grid gap-3 md:grid-cols-2">
-                  <label className="block text-sm font-medium text-slate-700">
-                    Special Day Message (English)
-                    <textarea
-                      rows={2}
-                      value={dayMeta.specialReason}
-                      onChange={(event) => setDayMeta((prev) => ({ ...prev, specialReason: event.target.value }))}
-                      placeholder="Example: Gurpurab today, special kirtan and langar schedule."
-                      className="mt-1 w-full rounded-lg border border-slate-300 p-2.5"
-                    />
-                  </label>
-                  <label className="block text-sm font-medium text-slate-700">
-                    Special Day Message (Punjabi)
-                    <textarea
-                      rows={2}
-                      value={dayMeta.specialReasonPa}
-                      onChange={(event) => setDayMeta((prev) => ({ ...prev, specialReasonPa: event.target.value }))}
-                      placeholder="ਉਦਾਹਰਨ: ਅੱਜ ਗੁਰਪੁਰਬ ਹੈ, ਵਿਸ਼ੇਸ਼ ਕੀਰਤਨ ਅਤੇ ਲੰਗਰ ਸਮਾਂ।"
-                      className="mt-1 w-full rounded-lg border border-slate-300 p-2.5"
-                    />
-                  </label>
-                </div>
-              </div>
-            ) : null}
+            <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_1.15fr]">
+              {!isDayModalReadOnly && selectedDateKey !== 'default' ? (
+                <section className="rounded-xl border border-amber-200 bg-amber-50/60 p-3 shadow-sm">
+                  <div className="grid gap-3">
+                    <label className="block text-sm font-medium text-slate-700">
+                      Special Day Message (English)
+                      <textarea
+                        rows={4}
+                        value={dayMeta.specialReason}
+                        onChange={(event) => setDayMeta((prev) => ({ ...prev, specialReason: event.target.value }))}
+                        placeholder="Example: Gurpurab today, special kirtan and langar schedule."
+                        className="mt-1 w-full rounded-lg border border-slate-300 p-2.5"
+                      />
+                    </label>
+                    <label className="block text-sm font-medium text-slate-700">
+                      Special Day Message (Punjabi)
+                      <textarea
+                        rows={4}
+                        value={dayMeta.specialReasonPa}
+                        onChange={(event) => setDayMeta((prev) => ({ ...prev, specialReasonPa: event.target.value }))}
+                        placeholder="ਉਦਾਹਰਨ: ਅੱਜ ਗੁਰਪੁਰਬ ਹੈ, ਵਿਸ਼ੇਸ਼ ਕੀਰਤਨ ਅਤੇ ਲੰਗਰ ਸਮਾਂ।"
+                        className="mt-1 w-full rounded-lg border border-slate-300 p-2.5"
+                      />
+                    </label>
 
-            {!isDayModalReadOnly ? (
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <AdminHeaderActionButton label="Add Event" onClick={openCreateModal} className="px-3" />
-                {selectedDateKey !== 'default' ? (
-                  <Button type="button" variant="ghost" onClick={() => removeDayMutation.mutate()} disabled={removeDayMutation.isPending} className="h-8 px-3 text-xs">Reset To Default</Button>
-                ) : null}
-                <Button
-                  type="button"
-                  onClick={() => saveDayMutation.mutate({ nextEntries: rows, meta: dayMeta })}
-                  disabled={saveDayMutation.isPending}
-                  className="h-8 bg-brand-blue px-3 text-xs text-white hover:bg-blue-800"
-                >
-                  {saveDayMutation.isPending ? 'Saving...' : 'Save Day Details'}
-                </Button>
-              </div>
-            ) : null}
+                    <div className="flex flex-wrap items-center justify-between gap-3 px-1 py-1">
+                      <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-800">
+                        <input
+                          type="checkbox"
+                          checked={dayMeta.isSpecial}
+                          onChange={(event) => setDayMeta((prev) => ({ ...prev, isSpecial: event.target.checked }))}
+                        />
+                        Mark this day as special
+                      </label>
+                      <Button
+                        type="button"
+                        onClick={() => saveDayMutation.mutate({ nextEntries: rows, meta: dayMeta })}
+                        disabled={saveDayMutation.isPending}
+                        className="h-8 rounded-xl border border-[#92400D] bg-[#92400D] px-3 text-xs font-semibold text-amber-50 hover:bg-[#92400D] hover:text-amber-50"
+                      >
+                        {saveDayMutation.isPending ? 'Saving...' : 'Save Day Details'}
+                      </Button>
+                    </div>
+                  </div>
+                </section>
+              ) : null}
 
-            <div className="mt-4 overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead className="border-b border-slate-200 text-slate-500">
-                  <tr>
-                    <th className="py-2 pr-3">Time</th>
-                    <th className="py-2 pr-3">Content</th>
-                    <th className="py-2 pr-3">Section</th>
-                    <th className="py-2 pr-3">Status</th>
-                    <th className="py-2 pr-3">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((entry) => (
-                    <tr key={entry.id} className="border-b border-slate-100 align-top">
-                      <td className="py-3 pr-3 font-semibold text-slate-900">{entry.timeEn || '-'}</td>
-                      <td className="py-3 pr-3 text-slate-700">{entry.titleEn || '-'}</td>
-                      <td className="py-3 pr-3">
-                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${segmentClassMap[entry.segment] || segmentClassMap.morning}`}>{entry.segment}</span>
-                      </td>
-                      <td className="py-3 pr-3">
-                        <button
+              <div className="space-y-4">
+                {[
+                  { title: 'Morning', segment: 'morning', entries: morningEntries, tone: 'sky' },
+                  { title: 'Evening', segment: 'evening', entries: eveningEntries, tone: 'amber' }
+                ].map((group) => (
+                  <article key={group.segment} className={`overflow-hidden rounded-2xl border ${group.tone === 'sky' ? 'border-sky-200' : 'border-amber-200'} bg-white shadow-sm`}>
+                    <div className={`flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2 ${group.tone === 'sky' ? 'border-sky-200 bg-sky-50' : 'border-amber-200 bg-amber-50'}`}>
+                      <div>
+                        <p className={`text-xs font-semibold uppercase tracking-wide ${group.tone === 'sky' ? 'text-sky-800' : 'text-amber-800'}`}>{group.title}</p>
+                        <p className="text-[11px] text-slate-500">{group.entries.length} event{group.entries.length === 1 ? '' : 's'}</p>
+                      </div>
+                      {!isDayModalReadOnly ? (
+                        <Button
                           type="button"
-                          disabled={isDayModalReadOnly}
-                          onClick={() => handleToggleActive(entry)}
-                          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition ${statusPillClass(entry.isActive !== false)} ${isDayModalReadOnly ? 'cursor-not-allowed opacity-60' : ''}`}
+                          onClick={() => openCreateModal(group.segment)}
+                          className={slotAddButtonClass(group.tone)}
                         >
-                          {entry.isActive === false ? <XCircleIcon className="h-3.5 w-3.5" /> : <CheckCircleIcon className="h-3.5 w-3.5" />}
-                          {entry.isActive === false ? 'Inactive' : 'Active'}
-                        </button>
-                      </td>
-                      <td className="py-3 pr-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <button
-                            type="button"
-                            disabled={isDayModalReadOnly}
-                            onClick={() => openEditModal(entry)}
-                            className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border ${isDayModalReadOnly ? 'cursor-not-allowed border-slate-200 text-slate-400' : 'border-blue-200 text-blue-700 hover:bg-blue-50'}`}
-                            aria-label="Edit row"
-                          >
-                            <PencilSquareIcon className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            disabled={isDayModalReadOnly}
-                            onClick={() => handleDeleteEntry(entry.id)}
-                            className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border ${isDayModalReadOnly ? 'cursor-not-allowed border-slate-200 text-slate-400' : 'border-rose-200 text-rose-700 hover:bg-rose-50'}`}
-                            aria-label="Delete row"
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </button>
+                          Add Event
+                        </Button>
+                      ) : null}
+                    </div>
+                    <div className="divide-y divide-slate-100">
+                      {group.entries.length === 0 ? (
+                        <p className="px-3 py-4 text-sm text-slate-500">No {group.title.toLowerCase()} events yet.</p>
+                      ) : group.entries.map((entry) => (
+                        <div
+                          key={entry.id}
+                          className={`grid gap-2 px-3 py-2 text-xs ${entry.isCurrent ? 'bg-brand-blue/10' : entry.isHighlighted ? 'bg-blue-50/70' : 'bg-white'} ${entry.isActive === false ? 'opacity-50' : ''} md:grid-cols-[120px_minmax(0,1fr)_auto] md:items-center`}
+                        >
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold leading-snug text-slate-900 md:whitespace-nowrap">{entry.timeEn || 'Time TBD'}</p>
+                            {entry.timePa ? <p className="mt-0.5 text-[11px] font-medium leading-snug text-slate-500 md:whitespace-nowrap">{entry.timePa}</p> : null}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate text-xs font-semibold text-slate-900 md:whitespace-nowrap">{entry.titleEn || 'Untitled schedule item'}</p>
+                            {entry.titlePa ? <p className="mt-0.5 truncate text-[11px] text-brand-blue md:whitespace-nowrap">{entry.titlePa}</p> : null}
+                            {entry.noteEn ? <p className="mt-0.5 truncate text-[11px] text-slate-600 md:whitespace-nowrap">{entry.noteEn}</p> : null}
+                            {entry.notePa ? <p className="mt-0.5 truncate text-[11px] text-slate-500 md:whitespace-nowrap">{entry.notePa}</p> : null}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                            <button
+                              type="button"
+                              disabled={isDayModalReadOnly}
+                              onClick={() => handleToggleActive(entry)}
+                              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition ${statusPillClass(entry.isActive !== false)} ${isDayModalReadOnly ? 'cursor-not-allowed opacity-60' : ''}`}
+                            >
+                              {entry.isActive === false ? <XCircleIcon className="h-3.5 w-3.5" /> : <CheckCircleIcon className="h-3.5 w-3.5" />}
+                              {entry.isActive === false ? 'Inactive' : 'Active'}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isDayModalReadOnly}
+                              onClick={() => openEditModal(entry)}
+                              className={`${scheduleTransparentIconButtonClass} ${isDayModalReadOnly ? 'cursor-not-allowed opacity-50' : ''}`}
+                              aria-label="Edit row"
+                            >
+                              <PencilSquareIcon className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isDayModalReadOnly}
+                              onClick={() => handleDeleteEntry(entry.id)}
+                              className={`${scheduleDeleteIconButtonClass} ${isDayModalReadOnly ? 'cursor-not-allowed opacity-50' : ''}`}
+                              aria-label="Delete row"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          </div>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {rows.length === 0 ? (
-                    <tr>
-                      <td className="py-4 text-center text-slate-500" colSpan={5}>No schedule rows for this day yet.</td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
+                      ))}
+                    </div>
+                  </article>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -735,59 +755,67 @@ const AdminSchedulePage = () => {
       {entryModal.open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/50" onClick={closeEntryModal} aria-hidden="true" />
-          <div className="relative z-10 max-h-[calc(100vh-2rem)] w-full max-w-3xl overflow-y-auto rounded-2xl border border-brand-blue/20 bg-gradient-to-br from-blue-50 via-white to-amber-50 p-5 shadow-2xl">
+          <div className="relative z-10 max-h-[calc(100vh-2rem)] w-full max-w-5xl overflow-y-auto rounded-2xl border border-brand-blue/20 bg-gradient-to-br from-blue-50 via-white to-amber-50 p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
-              <h3 className="font-heading text-xl font-extrabold text-brand-blue">{entryModal.mode === 'edit' ? 'Edit Event' : 'Add Event'}</h3>
-              <button type="button" onClick={closeEntryModal} className="rounded-md border border-amber-200 bg-white p-1 text-amber-700 hover:bg-amber-50 hover:text-amber-800" aria-label="Close add row modal">
+              <div>
+                <h3 className="font-heading text-xl font-extrabold text-brand-blue">{entryModal.mode === 'edit' ? 'Edit Event' : 'Add Event'}</h3>
+                <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{entryModal.segment === 'evening' ? 'Evening slot' : 'Morning slot'}</p>
+              </div>
+              <button type="button" onClick={closeEntryModal} className="rounded-md bg-brand-blue p-1.5 text-slate-900 hover:bg-brand-saffron hover:text-slate-900" aria-label="Close add row modal">
                 <XMarkIcon className="h-5 w-5" />
               </button>
             </div>
-            <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={form.handleSubmit(handleSaveEntry)}>
-              <label className="text-sm">Section
-                <select {...form.register('segment')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
-                  {segmentOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </select>
-              </label>
-
-              <div className="rounded-xl border border-brand-blue/20 bg-white/80 p-3 md:col-span-2">
+            <form className="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]" onSubmit={form.handleSubmit(handleSaveEntry)}>
+              <div className="rounded-xl border border-brand-blue/20 bg-white/85 p-3 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Time Slot</p>
-                <div className="mt-2 space-y-2">
-                  <div className="grid gap-2 md:grid-cols-[auto_1fr_1fr_1fr] md:items-center">
+                <div className="mt-3 space-y-3">
+                  <input type="hidden" {...form.register('startMeridiem')} value={entryModal.segment === 'evening' ? 'PM' : 'AM'} />
+                  <input type="hidden" {...form.register('endMeridiem')} value={entryModal.segment === 'evening' ? 'PM' : 'AM'} />
+                  <div className="grid gap-2 sm:grid-cols-[52px_1fr_1fr_1fr] sm:items-center">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Start</p>
-                    <select {...form.register('startHour')} className="rounded-lg border border-slate-300 p-2.5">
+                    <select {...form.register('startHour')} className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs">
                       {HOURS.map((hour) => <option key={`start-hour-${hour}`} value={hour}>{hour}</option>)}
                     </select>
-                    <select {...form.register('startMinute')} className="rounded-lg border border-slate-300 p-2.5">
+                    <select {...form.register('startMinute')} className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs">
                       {MINUTES.map((minute) => <option key={`start-minute-${minute}`} value={minute}>{minute}</option>)}
                     </select>
-                    <select {...form.register('startMeridiem')} className="rounded-lg border border-slate-300 p-2.5">
-                      {MERIDIEM.map((value) => <option key={`start-meridiem-${value}`} value={value}>{value}</option>)}
-                    </select>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-center text-xs font-semibold text-slate-500">
+                      {entryModal.segment === 'evening' ? 'PM' : 'AM'}
+                    </div>
                   </div>
-                  <div className="grid gap-2 md:grid-cols-[auto_1fr_1fr_1fr] md:items-center">
+                  <div className="grid gap-2 sm:grid-cols-[52px_1fr_1fr_1fr] sm:items-center">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">End</p>
-                    <select {...form.register('endHour')} className="rounded-lg border border-slate-300 p-2.5">
+                    <select {...form.register('endHour')} className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs">
                       {HOURS.map((hour) => <option key={`end-hour-${hour}`} value={hour}>{hour}</option>)}
                     </select>
-                    <select {...form.register('endMinute')} className="rounded-lg border border-slate-300 p-2.5">
+                    <select {...form.register('endMinute')} className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs">
                       {MINUTES.map((minute) => <option key={`end-minute-${minute}`} value={minute}>{minute}</option>)}
                     </select>
-                    <select {...form.register('endMeridiem')} className="rounded-lg border border-slate-300 p-2.5">
-                      {MERIDIEM.map((value) => <option key={`end-meridiem-${value}`} value={value}>{value}</option>)}
-                    </select>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-center text-xs font-semibold text-slate-500">
+                      {entryModal.segment === 'evening' ? 'PM' : 'AM'}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <label className="text-sm">Content (English)
-                <input {...form.register('titleEn', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-              </label>
-              <label className="text-sm">Content (Punjabi)
-                <input {...form.register('titlePa')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-              </label>
-              <div className="md:col-span-2 flex gap-2">
-                <Button type="submit" disabled={saveDayMutation.isPending} className="bg-brand-blue text-white hover:bg-blue-800">{saveDayMutation.isPending ? 'Saving...' : 'Save Event'}</Button>
-                <Button type="button" variant="ghost" onClick={closeEntryModal}>Cancel</Button>
+              <div className="rounded-xl border border-amber-200 bg-white/85 p-3 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Content</p>
+                <div className="mt-3 grid gap-3">
+                  <label className="text-sm">Content (English)
+                    <textarea {...form.register('titleEn', { required: true })} rows={3} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                  </label>
+                  <label className="text-sm">Content (Punjabi)
+                    <textarea {...form.register('titlePa')} rows={3} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                  </label>
+                  <div className="flex justify-end gap-2 pt-1">
+                    <Button type="button" onClick={closeEntryModal} className={`${scheduleCompactButtonClass} h-9 px-4 text-xs !text-slate-900 hover:!bg-sky-100 hover:!text-slate-900`}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={saveDayMutation.isPending} className={`${scheduleButtonClass} h-9 px-4 text-xs !text-slate-900 hover:!bg-sky-100 hover:!text-slate-900`}>
+                      {saveDayMutation.isPending ? 'Saving...' : 'Save Event'}
+                    </Button>
+                  </div>
+                </div>
               </div>
             </form>
           </div>

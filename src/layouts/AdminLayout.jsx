@@ -3,6 +3,8 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { useQuery } from '@tanstack/react-query';
 import {
   Bars3Icon,
+  ArrowTopRightOnSquareIcon,
+  PowerIcon,
   BellIcon,
   BellAlertIcon,
   ChartBarSquareIcon,
@@ -31,17 +33,6 @@ import auditService from '../services/auditService';
 import userService from '../services/userService';
 
 const FULL_ACCESS_ROLES = new Set(['Super Admin', 'Admin']);
-
-const MEMBER_VISIBLE_PATHS = [
-  '/admin',
-  '/admin/hukamnama',
-  '/admin/seva-opportunities',
-  '/admin/gallery',
-  '/admin/library',
-  '/admin/videos',
-  '/admin/streaming',
-  '/admin/events'
-];
 
 const NOTIFICATION_READ_KEY_PREFIX = 'ssm-admin-notifications-read';
 
@@ -154,6 +145,7 @@ const iconByPath = {
   '/admin/kids-learning': BookOpenIcon,
   '/admin/donations': CurrencyDollarIcon,
   '/admin/audit-trail': BellAlertIcon,
+  '/admin/roles-access': QueueListIcon,
   '/admin/users': UsersIcon,
   '/admin/analytics': ChartBarSquareIcon
 };
@@ -167,19 +159,11 @@ const AdminLayout = () => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [headerAction, setHeaderAction] = useState(null);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const notificationsDesktopRef = useRef(null);
   const notificationsMobileRef = useRef(null);
   const [readNotificationIds, setReadNotificationIds] = useState([]);
   const notificationReadStorageKey = `${NOTIFICATION_READ_KEY_PREFIX}:${String(user?.email || 'guest').toLowerCase()}`;
-  const firstName = getFirstName(user?.name);
-  const hasFullAccess = FULL_ACCESS_ROLES.has(String(user?.role || ''));
-  const visibleNav = hasFullAccess
-    ? adminNav
-    : adminNav.filter((item) => MEMBER_VISIBLE_PATHS.includes(item.path));
-  const currentNavItem = [...adminNav]
-    .sort((a, b) => b.path.length - a.path.length)
-    .find((item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`));
-  const pageTitle = currentNavItem?.label || (location.pathname.startsWith('/admin/analytics') ? 'Analytics and KPIs' : 'Admin');
   const { data: auditLogs = [] } = useQuery({
     queryKey: ['admin-audit-logs'],
     queryFn: () => auditService.getLogs().then((res) => res.data),
@@ -188,8 +172,42 @@ const AdminLayout = () => {
   const { data: users = [] } = useQuery({
     queryKey: ['admin-users'],
     queryFn: () => userService.getUsers().then((res) => res.data),
-    staleTime: 30 * 1000
+    staleTime: 10 * 1000,
+    refetchInterval: 5 * 1000,
+    refetchIntervalInBackground: true
   });
+  const effectiveUser = useMemo(() => {
+    const currentEmail = String(user?.email || '').trim().toLowerCase();
+    if (!currentEmail) {
+      return user || null;
+    }
+
+    const matched = users.find((entry) => String(entry?.email || '').trim().toLowerCase() === currentEmail);
+    return matched || user || null;
+  }, [user, users]);
+  const firstName = getFirstName(effectiveUser?.name);
+  const hasFullAccess = FULL_ACCESS_ROLES.has(String(effectiveUser?.role || ''));
+  const assignedAdminPages = useMemo(
+    () => (Array.isArray(effectiveUser?.adminPageAccess) ? effectiveUser.adminPageAccess.map((path) => String(path || '').trim()).filter(Boolean) : []),
+    [effectiveUser?.adminPageAccess]
+  );
+  const limitedAccessPaths = useMemo(() => {
+    const normalized = [...new Set(assignedAdminPages)];
+    if (normalized.includes('/admin')) {
+      return normalized;
+    }
+    if (normalized.length === 0) {
+      return ['/admin'];
+    }
+    return ['/admin', ...normalized];
+  }, [assignedAdminPages]);
+  const visibleNav = hasFullAccess
+    ? adminNav
+    : adminNav.filter((item) => limitedAccessPaths.includes(item.path));
+  const currentNavItem = [...adminNav]
+    .sort((a, b) => b.path.length - a.path.length)
+    .find((item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`));
+  const pageTitle = currentNavItem?.label || (location.pathname.startsWith('/admin/analytics') ? 'Analytics and KPIs' : 'Admin');
   const pendingApprovals = useMemo(
     () => users.filter((entry) => String(entry?.approvalStatus || '').toLowerCase() === 'pending').length,
     [users]
@@ -228,8 +246,13 @@ const AdminLayout = () => {
       };
     });
 
-    return [...items, ...recentLogs].slice(0, 8);
-  }, [auditLogs, pendingApprovals]);
+    const combined = [...items, ...recentLogs];
+    if (hasFullAccess) {
+      return combined.slice(0, 8);
+    }
+
+    return combined.filter((entry) => !entry.href || limitedAccessPaths.includes(entry.href)).slice(0, 8);
+  }, [auditLogs, hasFullAccess, limitedAccessPaths, pendingApprovals]);
   const unreadNotificationCount = useMemo(
     () => notifications.filter((entry) => !readNotificationIds.includes(entry.id)).length,
     [notifications, readNotificationIds]
@@ -243,7 +266,7 @@ const AdminLayout = () => {
       return;
     }
 
-    const message = 'You are not allowed to access that section. Please contact an admin or super admin for access.';
+    const message = "You don't have the right permissions for this page. Please check with admin.";
     setAccessDeniedNotice(message);
     setAccessDeniedModalOpen(true);
     navigate(location.pathname, { replace: true, state: {} });
@@ -252,6 +275,30 @@ const AdminLayout = () => {
   useEffect(() => {
     setMobileNavOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (hasFullAccess) {
+      return;
+    }
+
+    const isAllowed = limitedAccessPaths.some((path) => (
+      path === '/admin'
+        ? location.pathname === '/admin'
+        : (location.pathname === path || location.pathname.startsWith(`${path}/`))
+    ));
+
+    if (isAllowed) {
+      return;
+    }
+
+    navigate('/admin', {
+      replace: true,
+      state: {
+        accessDenied: true,
+        deniedPath: location.pathname
+      }
+    });
+  }, [hasFullAccess, limitedAccessPaths, location.pathname, navigate]);
 
   useEffect(() => {
     try {
@@ -299,8 +346,35 @@ const AdminLayout = () => {
   }, [isNotificationsOpen]);
 
   const handleLogout = async () => {
-    await logout();
+    if (isLoggingOut) {
+      return;
+    }
+
+    try {
+      window.sessionStorage.setItem('ssm_admin_logout_in_progress', '1');
+      window.sessionStorage.setItem('ssm_skip_login_auto_once', '1');
+    } catch {
+      // Ignore storage errors and continue logout flow.
+    }
+
+    setIsLoggingOut(true);
     navigate('/', { replace: true });
+
+    try {
+      try {
+        await logout();
+      } catch {
+        // Continue redirect flow even if the API call fails.
+      }
+    } catch {
+      // Ignore and keep user on public home.
+    } finally {
+      try {
+        window.sessionStorage.removeItem('ssm_admin_logout_in_progress');
+      } catch {
+        // Ignore storage errors.
+      }
+    }
   };
 
   const markNotificationAsRead = (id) => {
@@ -372,8 +446,8 @@ const AdminLayout = () => {
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950">
-      <div className="grid grid-cols-1 lg:grid-cols-[270px_1fr]">
-      <aside className="hidden border-r border-slate-800 bg-slate-950 p-4 text-slate-100 lg:block">
+      <div className="grid grid-cols-1 lg:min-h-screen lg:grid-cols-[270px_1fr]">
+      <aside className="hidden border-r border-slate-800 bg-slate-950 p-4 text-slate-100 lg:sticky lg:top-0 lg:block lg:h-screen lg:overflow-y-auto lg:self-start">
         <p className="flex items-center gap-2 font-heading text-xl font-bold text-white">
           <img src={gurdwaraLogo} alt="Singh Sabha logo" className="h-8 w-8 rounded-full border border-brand-saffron/70 object-cover" />
           Admin Portal
@@ -413,11 +487,11 @@ const AdminLayout = () => {
               >
                 <Bars3Icon className="h-5 w-5" />
               </button>
-              <h1 className="font-heading text-2xl font-bold leading-tight text-slate-900 sm:text-3xl">{pageTitle}</h1>
+              <h1 className="min-w-0 truncate font-heading text-xl font-bold leading-tight text-slate-900 sm:text-3xl">{pageTitle}</h1>
               {headerAction ? <div className="flex-shrink-0">{headerAction}</div> : null}
             </div>
 
-            <div className="relative flex items-center gap-2 lg:hidden" ref={notificationsMobileRef}>
+            <div className="relative flex flex-shrink-0 items-center gap-1.5 lg:hidden" ref={notificationsMobileRef}>
               <button
                 type="button"
                 onClick={() => setIsNotificationsOpen((prev) => !prev)}
@@ -432,13 +506,24 @@ const AdminLayout = () => {
                   </span>
                 ) : null}
               </button>
-              <img src={user?.avatarUrl || gurdwaraLogo} alt={user?.name || 'Profile'} className="h-9 w-9 rounded-full border border-slate-200 object-cover" />
+              <img src={effectiveUser?.avatarUrl || gurdwaraLogo} alt={effectiveUser?.name || 'Profile'} className="h-9 w-9 rounded-full border border-slate-200 object-cover" />
+              <Link
+                to="/"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700"
+                aria-label="Go to website"
+                title="Go to website"
+              >
+                <ArrowTopRightOnSquareIcon className="h-5 w-5 stroke-2" />
+              </Link>
               <button
                 type="button"
                 onClick={handleLogout}
-                className="text-sm font-semibold text-slate-700 underline underline-offset-4"
+                disabled={isLoggingOut}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                aria-label="Logout"
+                title="Logout"
               >
-                Logout
+                <PowerIcon className="h-5 w-5 stroke-2" />
               </button>
 
               {isNotificationsOpen ? (
@@ -461,11 +546,18 @@ const AdminLayout = () => {
                   </span>
                 ) : null}
               </button>
-              <img src={user?.avatarUrl || gurdwaraLogo} alt={user?.name || 'Profile'} className="h-9 w-9 rounded-full border border-slate-200 object-cover" />
+              <img src={effectiveUser?.avatarUrl || gurdwaraLogo} alt={effectiveUser?.name || 'Profile'} className="h-9 w-9 rounded-full border border-slate-200 object-cover" />
               <p className="text-base font-extrabold text-slate-800">{firstName}</p>
+              <Link
+                to="/"
+                className="text-sm font-semibold text-slate-700 underline underline-offset-4"
+              >
+                Go to Website
+              </Link>
               <button
                 type="button"
                 onClick={handleLogout}
+                disabled={isLoggingOut}
                 className="text-sm font-semibold text-slate-700 underline underline-offset-4"
               >
                 Logout
@@ -483,7 +575,7 @@ const AdminLayout = () => {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4" role="dialog" aria-modal="true" aria-live="assertive">
             <div className="w-full max-w-md rounded-2xl border border-rose-300 bg-white p-5 shadow-2xl">
               <h2 className="text-lg font-bold text-rose-800">Access Restricted</h2>
-              <p className="mt-2 text-sm leading-relaxed text-slate-700">{accessDeniedNotice || 'You are not allowed to access that section. Please contact an admin or super admin for access.'}</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-700">{accessDeniedNotice || "You don't have the right permissions for this page. Please check with admin."}</p>
               <div className="mt-5 flex justify-end">
                 <button
                   type="button"
@@ -546,6 +638,20 @@ const AdminLayout = () => {
               ))}
             </nav>
           </aside>
+        </div>
+      ) : null}
+
+      {isLoggingOut ? (
+        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-slate-950/65 px-4" role="status" aria-live="assertive" aria-label="Logging out">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-2xl">
+            <img
+              src={gurdwaraLogo}
+              alt="Singh Sabha logo"
+              className="mx-auto h-16 w-16 rounded-full border border-brand-saffron/70 object-cover"
+            />
+            <div className="mx-auto mt-4 h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-brand-blue" />
+            <p className="mt-4 text-sm font-semibold text-slate-800">You are currently being logged out, please wait.</p>
+          </div>
         </div>
       ) : null}
     </div>

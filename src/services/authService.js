@@ -1,6 +1,7 @@
 import { serviceResponse } from './serviceResponse';
 import { userRoles } from '../constants/siteConfig';
 import userService from './userService';
+import apiClient from './apiClient';
 
 const getAdminEmails = () => {
   const configured = process.env.REACT_APP_ADMIN_EMAILS || '';
@@ -202,7 +203,10 @@ const authService = {
       return sanitized;
     }
   },
-  logout: async () => serviceResponse({ success: true }),
+  logout: async () => {
+    const response = await apiClient.post('/auth/logout', {});
+    return serviceResponse(response.data?.data || { success: true });
+  },
   me: async () => serviceResponse({ user: getPersistedUser() })
 };
 

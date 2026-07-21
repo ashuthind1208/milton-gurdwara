@@ -76,6 +76,9 @@ const volunteerReminderSendTimeRaw = String(process.env.VOLUNTEER_REMINDER_SEND_
 const volunteerReminderTimeZone = String(process.env.VOLUNTEER_REMINDER_TIME_ZONE || 'America/Toronto').trim() || 'America/Toronto';
 const volunteerReminderDays = [10, 5, 2, 1];
 const eventReminderWebhookUrl = String(process.env.EVENT_REMINDER_WEBHOOK_URL || volunteerReminderWebhookUrl || '').trim();
+const donationInvoiceWebhookUrl = String(
+  process.env.DONATION_INVOICE_WEBHOOK_URL || process.env.DONATION_EMAIL_WEBHOOK_URL || volunteerReminderWebhookUrl || ''
+).trim();
 const eventReminderSendTimeRaw = String(process.env.EVENT_REMINDER_SEND_TIME || volunteerReminderSendTimeRaw || '09:00').trim();
 const eventReminderTimeZone = String(process.env.EVENT_REMINDER_TIME_ZONE || volunteerReminderTimeZone || 'America/Toronto').trim() || 'America/Toronto';
 const eventReminderDays = String(process.env.EVENT_REMINDER_DAYS || '7,3,1')
@@ -212,6 +215,60 @@ const buildLogoDataUri = () => {
 };
 
 const embeddedVolunteerReminderLogo = buildLogoDataUri();
+const ADMIN_PAGE_PATHS = [
+  '/admin',
+  '/admin/cms',
+  '/admin/news',
+  '/admin/schedule',
+  '/admin/hukamnama',
+  '/admin/langar',
+  '/admin/seva-opportunities',
+  '/admin/gallery',
+  '/admin/library',
+  '/admin/videos',
+  '/admin/streaming',
+  '/admin/advertisements',
+  '/admin/sponsors',
+  '/admin/events',
+  '/admin/kids-learning',
+  '/admin/donations',
+  '/admin/audit-trail',
+  '/admin/users'
+];
+
+const MEMBER_ALLOWED_ADMIN_PAGE_PATHS = [
+  '/admin',
+  '/admin/hukamnama',
+  '/admin/seva-opportunities',
+  '/admin/gallery',
+  '/admin/library',
+  '/admin/videos',
+  '/admin/streaming',
+  '/admin/events'
+];
+const VOLUNTEER_ALLOWED_ADMIN_PAGE_PATHS = [
+  '/admin',
+  '/admin/seva-opportunities',
+  '/admin/gallery',
+  '/admin/videos',
+  '/admin/events'
+];
+
+const getDefaultAdminPageAccessForRole = (role) => {
+  if (role === 'Super Admin' || role === 'Admin') {
+    return [...ADMIN_PAGE_PATHS];
+  }
+
+  if (role === 'Member') {
+    return [...MEMBER_ALLOWED_ADMIN_PAGE_PATHS];
+  }
+
+  if (role === 'Volunteer') {
+    return [...VOLUNTEER_ALLOWED_ADMIN_PAGE_PATHS];
+  }
+
+  return [];
+};
 
 const seedUsers = [
   {
@@ -1070,6 +1127,229 @@ const sendEventReminderEmail = async (registration, options = {}) => {
   }
 };
 
+const buildDonationInvoiceEmail = ({ donation = {}, organizationName = '', campaignDescription = '' }) => {
+  const donorName = String(donation.donorName || 'Sangat Member').trim();
+  const donorEmail = String(donation.donorEmail || '').trim().toLowerCase();
+  const receiptId = String(donation.receiptId || donation.id || '').trim();
+  const campaignName = String(donation.campaignName || '').trim() || 'Donation Campaign';
+  const amountValue = Number(donation.amount);
+  const amountText = Number.isFinite(amountValue) ? `$${amountValue.toFixed(2)}` : '-';
+  const donationDateLabel = donation.createdAt
+    ? new Date(donation.createdAt).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' })
+    : new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' });
+  const siteName = String(organizationName || volunteerReminderSiteName || 'Singh Sabha Milton Gurdwara').trim();
+  const purposeText = String(campaignDescription || '').trim() || `Support for ${campaignName}`;
+  const subject = `Donation Invoice ${receiptId || campaignName} - Thank You`;
+
+  const text = [
+    `Sat Sri Akal ${donorName},`,
+    '',
+    'Thank you for your generous donation. We are grateful for your support.',
+    '',
+    `Campaign: ${campaignName}`,
+    `Purpose: ${purposeText}`,
+    `Amount: ${amountText}`,
+    `Date: ${donationDateLabel}`,
+    receiptId ? `Receipt/Invoice No: ${receiptId}` : '',
+    '',
+    'Please find your donation invoice attached to this email.',
+    '',
+    `With gratitude,`,
+    siteName
+  ].filter(Boolean).join('\n');
+
+  const safeName = escapeHtml(donorName || 'Sangat Member');
+  const html = `
+  <div style="background:#f5f8fc;padding:28px 14px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:660px;margin:0 auto;background:#ffffff;border:1px solid #dbe7f6;border-radius:14px;overflow:hidden;">
+      <tr>
+        <td style="padding:28px 24px 18px;text-align:left;">
+          <div style="font-size:20px;line-height:1.4;font-weight:800;color:#0f172a;">Thank You for Your Donation</div>
+          <div style="margin-top:10px;font-size:15px;line-height:1.8;color:#334155;">Sat Sri Akal ${safeName},</div>
+          <div style="margin-top:8px;font-size:15px;line-height:1.8;color:#334155;">Thank you for your generous donation. We are grateful for your support.</div>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:0 24px 24px;">
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border:1px solid #d7e3f3;border-radius:12px;overflow:hidden;background:#fbfdff;">
+            <tr>
+              <td style="width:34%;padding:12px 14px;background:#eef5ff;border-bottom:1px solid #d7e3f3;font-size:14px;font-weight:700;color:#0a4d9f;">Campaign</td>
+              <td style="padding:12px 14px;border-bottom:1px solid #d7e3f3;font-size:16px;font-weight:700;color:#0f172a;">${escapeHtml(campaignName)}</td>
+            </tr>
+            <tr>
+              <td style="padding:12px 14px;background:#eef5ff;border-bottom:1px solid #d7e3f3;font-size:14px;font-weight:700;color:#0a4d9f;">Purpose</td>
+              <td style="padding:12px 14px;border-bottom:1px solid #d7e3f3;font-size:15px;color:#0f172a;">${escapeHtml(purposeText)}</td>
+            </tr>
+            <tr>
+              <td style="padding:12px 14px;background:#eef5ff;border-bottom:1px solid #d7e3f3;font-size:14px;font-weight:700;color:#0a4d9f;">Amount</td>
+              <td style="padding:12px 14px;border-bottom:1px solid #d7e3f3;font-size:16px;font-weight:700;color:#0f172a;">${escapeHtml(amountText)}</td>
+            </tr>
+            <tr>
+              <td style="padding:12px 14px;background:#eef5ff;border-bottom:1px solid #d7e3f3;font-size:14px;font-weight:700;color:#0a4d9f;">Date</td>
+              <td style="padding:12px 14px;border-bottom:1px solid #d7e3f3;font-size:15px;color:#0f172a;">${escapeHtml(donationDateLabel)}</td>
+            </tr>
+            <tr>
+              <td style="padding:12px 14px;background:#eef5ff;font-size:14px;font-weight:700;color:#0a4d9f;">Receipt/Invoice</td>
+              <td style="padding:12px 14px;font-size:15px;color:#0f172a;">${escapeHtml(receiptId || '-')}</td>
+            </tr>
+          </table>
+          <div style="margin-top:14px;font-size:15px;line-height:1.8;color:#334155;">Please find your donation invoice attached to this email.</div>
+          <div style="margin-top:10px;font-size:15px;line-height:1.8;color:#334155;">With gratitude,<br/>${escapeHtml(siteName)}</div>
+        </td>
+      </tr>
+    </table>
+  </div>`;
+
+  return { donorEmail, donorName, subject, text, html, receiptId, campaignName, amountText, donationDateLabel };
+};
+
+const sendDonationInvoiceEmail = async ({
+  donation = {},
+  campaignDescription = '',
+  organizationName = '',
+  address = '',
+  phone = '',
+  fileName = '',
+  attachmentBase64 = ''
+} = {}) => {
+  if (!donationInvoiceWebhookUrl) {
+    const error = new Error('Donation email webhook is not configured.');
+    error.status = 503;
+    throw error;
+  }
+
+  if (!eventsDb.hasDatabaseConnection) {
+    const error = new Error('Database is not configured. Donation invoice emails require PostgreSQL data.');
+    error.status = 503;
+    throw error;
+  }
+
+  const requestedId = String(donation?.id || '').trim();
+  const requestedReceiptId = String(donation?.receiptId || '').trim();
+  if (!requestedId && !requestedReceiptId) {
+    const error = new Error('Donation id or receiptId is required.');
+    error.status = 400;
+    throw error;
+  }
+
+  const persistedDonations = await eventsDb.getDonations();
+  const persistedDonation = (Array.isArray(persistedDonations) ? persistedDonations : []).find((entry) => {
+    const entryId = String(entry?.id || '').trim();
+    const entryReceiptId = String(entry?.receiptId || '').trim();
+    return (requestedId && entryId === requestedId) || (requestedReceiptId && entryReceiptId === requestedReceiptId);
+  });
+
+  if (!persistedDonation) {
+    const error = new Error('Donation record not found in database.');
+    error.status = 404;
+    throw error;
+  }
+
+  const normalizedAttachment = String(attachmentBase64 || '').trim();
+  if (!normalizedAttachment) {
+    const error = new Error('Invoice attachment is required.');
+    error.status = 400;
+    throw error;
+  }
+
+  let attachmentBuffer = null;
+  try {
+    attachmentBuffer = Buffer.from(normalizedAttachment, 'base64');
+  } catch {
+    attachmentBuffer = null;
+  }
+
+  if (!attachmentBuffer || !attachmentBuffer.length || String(attachmentBuffer.slice(0, 4)) !== '%PDF') {
+    const error = new Error('Invalid PDF attachment payload.');
+    error.status = 400;
+    throw error;
+  }
+
+  const canonicalAttachmentBase64 = attachmentBuffer.toString('base64');
+
+  const template = buildDonationInvoiceEmail({
+    donation: persistedDonation,
+    organizationName,
+    campaignDescription
+  });
+
+  if (!isValidEmailAddress(template.donorEmail)) {
+    const error = new Error('Valid donor email is required.');
+    error.status = 400;
+    throw error;
+  }
+
+  const normalizedFileName = String(fileName || '').trim() || `invoice-${template.receiptId || Date.now()}.pdf`;
+  const attachmentDataUrl = `data:application/pdf;base64,${canonicalAttachmentBase64}`;
+  const normalizedAttachmentPayload = {
+    filename: normalizedFileName,
+    contentType: 'application/pdf',
+    content: canonicalAttachmentBase64,
+    encoding: 'base64',
+    disposition: 'attachment'
+  };
+
+  const payload = {
+    type: 'donation-invoice',
+    to: template.donorEmail,
+    email: template.donorEmail,
+    name: template.donorName,
+    subject: template.subject,
+    message: template.text,
+    text: template.text,
+    html: template.html,
+    bodyHtml: template.html,
+    bodyText: template.text,
+    templateType: 'html',
+    attachments: [normalizedAttachmentPayload],
+    invoicePdfFileName: normalizedFileName,
+    invoicePdfDataUrl: attachmentDataUrl,
+    metadata: {
+      campaignName: template.campaignName,
+      amount: template.amountText,
+      donationDate: template.donationDateLabel,
+      receiptId: template.receiptId,
+      organizationName: String(organizationName || volunteerReminderSiteName || '').trim(),
+      address: String(address || '').trim(),
+      phone: String(phone || '').trim()
+    },
+    sentAt: new Date().toISOString()
+  };
+
+  try {
+    const response = await fetch(donationInvoiceWebhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const upstreamBody = await response.text().catch(() => '');
+      const snippet = String(upstreamBody || '').trim().slice(0, 240);
+      const message = snippet
+        ? `Donation invoice email service returned ${response.status}: ${snippet}`
+        : `Donation invoice email service returned ${response.status}.`;
+      const error = new Error(message);
+      error.status = 502;
+      throw error;
+    }
+
+    return {
+      sent: true,
+      to: template.donorEmail,
+      subject: template.subject,
+      fileName: normalizedFileName
+    };
+  } catch (error) {
+    if (error?.status) {
+      throw error;
+    }
+    const wrapped = new Error('Unable to send donation invoice email right now.');
+    wrapped.status = 502;
+    throw wrapped;
+  }
+};
+
 const shouldRunEventReminderSweep = (date = new Date()) => {
   const nowParts = getDatePartsInTimeZone(date, eventReminderTimeZone);
   const todayDateKey = toDateKeyFromParts(nowParts);
@@ -1342,7 +1622,7 @@ const normalizeUser = (user = {}) => {
     if (!raw) {
       return 'Member';
     }
-    return 'Member';
+    return String(value || '').trim() || 'Member';
   };
 
   const resolveMemberType = (role, fallback) => {
@@ -1367,6 +1647,10 @@ const normalizeUser = (user = {}) => {
   const approvalStatus = String(
     user.approvalStatus || (memberType === 'Admin' ? 'approved' : 'pending')
   ).toLowerCase();
+  const hasExplicitAdminPageAccess = Array.isArray(user.adminPageAccess);
+  const adminPageAccess = hasExplicitAdminPageAccess
+    ? [...new Set(user.adminPageAccess.map((path) => String(path || '').trim()).filter((path) => ADMIN_PAGE_PATHS.includes(path)))]
+    : getDefaultAdminPageAccessForRole(role);
 
   return {
     id: String(user.id || `user-${Date.now()}`),
@@ -1378,6 +1662,7 @@ const normalizeUser = (user = {}) => {
     memberType,
     authProvider: String(user.authProvider || 'LOCAL').trim() || 'LOCAL',
     avatarUrl: String(user.avatarUrl || user.picture || '').trim(),
+    adminPageAccess: adminPageAccess.length > 0 ? adminPageAccess : getDefaultAdminPageAccessForRole(role),
     registrationComplete: Boolean(user.registrationComplete),
     isActive: user.isActive !== false,
     approvalStatus,
@@ -1429,9 +1714,18 @@ const upsertUserByEmail = (payload = {}) => {
   }
 
   const existing = users[index];
+  const hasAdminPageAccessInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'adminPageAccess');
+  const hasApprovalInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'approvalStatus');
+  const hasRoleInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'role');
+  const roleChanged = hasRoleInPayload && normalizeUser({ role: payload.role }).role !== existing.role;
+  const nextAdminPageAccess = hasAdminPageAccessInPayload
+    ? normalized.adminPageAccess
+    : (roleChanged ? undefined : existing.adminPageAccess);
   const updated = {
     ...existing,
     ...normalized,
+    approvalStatus: hasApprovalInPayload ? normalized.approvalStatus : existing.approvalStatus,
+    adminPageAccess: hasAdminPageAccessInPayload ? normalized.adminPageAccess : normalizeUser({ ...existing, role: normalized.role, adminPageAccess: nextAdminPageAccess }).adminPageAccess,
     id: existing.id,
     createdAt: existing.createdAt,
     updatedAt: new Date().toISOString()
@@ -2435,6 +2729,21 @@ const server = http.createServer(async (request, response) => {
 
   if (requestUrl.pathname === '/api/events/calendar.ics' && request.method === 'GET') {
     try {
+
+  if (requestUrl.pathname === '/api/auth/logout' && request.method === 'POST') {
+    try {
+      await appendAuditLog(request, {
+        action: 'auth.logout',
+        targetType: 'session',
+        targetId: getRequestActor(request).email || 'current-user',
+        description: 'User logged out'
+      });
+      sendJson(response, 200, { ok: true, data: { success: true } });
+    } catch (error) {
+      sendJson(response, 500, { ok: false, message: error.message || 'Unable to log out.' });
+    }
+    return;
+  }
       const events = await eventsDb.getEvents();
       const includeInactive = requestUrl.searchParams.get('includeInactive') === 'true';
       const visibleEvents = includeInactive
@@ -2928,6 +3237,20 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (requestUrl.pathname === '/api/donations/email-invoice' && request.method === 'POST') {
+    try {
+      const body = JSON.parse((await readBody(request)).toString('utf8') || '{}');
+      const data = await sendDonationInvoiceEmail(body || {});
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, error.status || 500, {
+        ok: false,
+        message: error.message || 'Unable to send donation invoice email.'
+      });
+    }
+    return;
+  }
+
   if (requestUrl.pathname === '/api/donations' && request.method === 'DELETE') {
     try {
       const data = await clearDonations();
@@ -3101,7 +3424,7 @@ const server = http.createServer(async (request, response) => {
         ...body,
         id: body.id || `user-${Date.now()}`,
         isActive: body.isActive !== false,
-        approvalStatus: body.approvalStatus || 'approved',
+        approvalStatus: body.approvalStatus || 'pending',
         approvalUpdatedAt: new Date().toISOString()
       });
       const next = [record, ...readUsers()];

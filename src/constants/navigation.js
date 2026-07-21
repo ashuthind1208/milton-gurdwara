@@ -34,5 +34,6 @@ export const adminNav = [
   { label: 'Kids Learning', path: '/admin/kids-learning' },
   { label: 'Donations', path: '/admin/donations' },
   { label: 'Audit Trail', path: '/admin/audit-trail' },
+  { label: 'Roles and Access', path: '/admin/roles-access' },
   { label: 'Users', path: '/admin/users' }
 ];

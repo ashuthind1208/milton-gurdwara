@@ -286,6 +286,16 @@ const LoginPage = () => {
       return;
     }
 
+    try {
+      const skipOnce = window.sessionStorage.getItem('ssm_skip_login_auto_once') === '1';
+      if (skipOnce) {
+        window.sessionStorage.removeItem('ssm_skip_login_auto_once');
+        return;
+      }
+    } catch {
+      // Ignore storage read errors and continue with default behavior.
+    }
+
     const hasOAuthToken = (window.location.hash || '').includes('access_token=');
     if (hasOAuthToken || autoOAuthTriggered) {
       return;
