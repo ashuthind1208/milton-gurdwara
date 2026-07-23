@@ -470,6 +470,15 @@ const removeHistoryEntry = async (date, slot = 'morning') => {
   await writeJson(HISTORY_KEY, nextHistory);
 };
 
+const runHistoryWriteSafely = async (action) => {
+  try {
+    await action();
+  } catch (error) {
+    // History is only a secondary log and should not fail primary hukamnama operations.
+    console.warn('[hukamnamaService] History sync skipped after primary save.', error);
+  }
+};
+
 const hukamnamaService = {
   getReadAlongConfig: () => ({
     enabled: READ_ALONG_ENABLED,
@@ -569,7 +578,7 @@ const hukamnamaService = {
       await writeJson(SETTINGS_KEY, normalizeEntry(nextEntry));
     }
 
-    await writeHistory({
+    await runHistoryWriteSafely(() => writeHistory({
       ang: safeAng,
       date: dateKey,
       slot: normalizedSlot,
@@ -578,7 +587,7 @@ const hukamnamaService = {
       translation: nextEntry.lines[0]?.translationEnglish || '',
       raag: nextEntry.metadata?.raag || '',
       writer: nextEntry.metadata?.writer || ''
-    });
+    }));
 
     return serviceResponse(nextEntry);
   },
@@ -623,7 +632,7 @@ const hukamnamaService = {
       await writeJson(SETTINGS_KEY, normalizeEntry(updatedEntry));
     }
 
-    await writeHistory({
+    await runHistoryWriteSafely(() => writeHistory({
       ang: safeAng,
       date: dateKey,
       slot: updatedEntry.slot || 'morning',
@@ -632,7 +641,7 @@ const hukamnamaService = {
       translation: updatedEntry.lines[0]?.translationEnglish || '',
       raag: updatedEntry.metadata?.raag || '',
       writer: updatedEntry.metadata?.writer || ''
-    });
+    }));
 
     return serviceResponse(updatedEntry);
   },
@@ -648,7 +657,7 @@ const hukamnamaService = {
     const nextEntries = { ...entries };
     delete nextEntries[dateKey];
     await writeScheduledEntries(nextEntries);
-    await removeHistoryEntry(dateKey, existingEntry.slot || 'morning');
+    await runHistoryWriteSafely(() => removeHistoryEntry(dateKey, existingEntry.slot || 'morning'));
 
     return serviceResponse({ success: true, date: dateKey });
   },

@@ -97,6 +97,24 @@ const truncateWords = (value, maxWords = 50) => {
   return `${words.slice(0, maxWords).join(' ')}...`;
 };
 
+const formatTimeLabel = (value) => {
+  const parsed = value ? new Date(value) : null;
+  if (!parsed || Number.isNaN(parsed.getTime())) {
+    return '-';
+  }
+  return parsed.toLocaleTimeString('en-CA', {
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
+const splitMediaUrls = (value) => String(value || '')
+  .split(/[\n,]+/)
+  .map((entry) => entry.trim())
+  .filter(Boolean);
+
+const isImageMediaUrl = (value) => String(value || '').match(/\.(jpg|jpeg|png|gif|webp|avif)(\?.*)?$/i);
+
 const EventTimeField = ({ label, triggerLabel, value, onCommit, required = false }) => {
   const parsed = useMemo(() => splitDateTime(value), [value]);
   const [draftHour, setDraftHour] = useState(parsed.hour);
@@ -208,6 +226,7 @@ const AdminEventsPage = () => {
   const [editUploadProgress, setEditUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState({ type: 'success', message: '' });
   const [viewRegistrantsPage, setViewRegistrantsPage] = useState(1);
+  const [registrantSearch, setRegistrantSearch] = useState('');
   const [openActionMenuId, setOpenActionMenuId] = useState('');
 
   const createForm = useForm({ defaultValues: defaultForm });
@@ -273,11 +292,11 @@ const AdminEventsPage = () => {
 
   const removeRegistrantMutation = useMutation({
     mutationFn: ({ eventId, registrantId }) => eventService.removeEventRegistrant({ eventId, registrantId }),
-    onSuccess: (updatedEvent) => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['admin-events'] });
       queryClient.invalidateQueries({ queryKey: ['events'] });
-      if (updatedEvent?.id) {
-        setViewEvent(updatedEvent);
+      if (result?.data?.id) {
+        setViewEvent(result.data);
       }
     }
   });
@@ -418,15 +437,40 @@ const AdminEventsPage = () => {
   };
 
   const registrants = useMemo(() => viewEvent?.registrants || [], [viewEvent]);
-  const registrantsTotalPages = Math.max(1, Math.ceil(registrants.length / VIEW_REGISTRANTS_PAGE_SIZE));
+  const normalizedRegistrantSearch = registrantSearch.trim().toLowerCase();
+  const filteredRegistrants = useMemo(() => {
+    if (!normalizedRegistrantSearch) {
+      return registrants;
+    }
+
+    return registrants.filter((entry) => {
+      const name = String(entry?.name || '').toLowerCase();
+      const contact = String(entry?.contact || '').toLowerCase();
+      const status = String(entry?.status || 'confirmed').toLowerCase();
+      return name.includes(normalizedRegistrantSearch)
+        || contact.includes(normalizedRegistrantSearch)
+        || status.includes(normalizedRegistrantSearch);
+    });
+  }, [registrants, normalizedRegistrantSearch]);
+  const registrantsTotalPages = Math.max(1, Math.ceil(filteredRegistrants.length / VIEW_REGISTRANTS_PAGE_SIZE));
   const visibleRegistrants = useMemo(() => {
     const start = (viewRegistrantsPage - 1) * VIEW_REGISTRANTS_PAGE_SIZE;
-    return registrants.slice(start, start + VIEW_REGISTRANTS_PAGE_SIZE);
-  }, [registrants, viewRegistrantsPage]);
+    return filteredRegistrants.slice(start, start + VIEW_REGISTRANTS_PAGE_SIZE);
+  }, [filteredRegistrants, viewRegistrantsPage]);
+  const viewMediaUrls = useMemo(() => splitMediaUrls(viewEvent?.mediaUrl), [viewEvent?.mediaUrl]);
+  const viewImageMediaUrls = useMemo(() => viewMediaUrls.filter((entry) => isImageMediaUrl(entry)), [viewMediaUrls]);
+  const viewOtherMediaUrls = useMemo(() => viewMediaUrls.filter((entry) => !isImageMediaUrl(entry)), [viewMediaUrls]);
+  const eventCapacity = Number(viewEvent?.capacity || 0);
+  const registrationSummary = eventCapacity > 0 ? `${registrants.length}/${eventCapacity}` : `${registrants.length}/∞`;
 
   useEffect(() => {
     setViewRegistrantsPage(1);
+    setRegistrantSearch('');
   }, [viewEvent?.id]);
+
+  useEffect(() => {
+    setViewRegistrantsPage(1);
+  }, [normalizedRegistrantSearch]);
 
   useEffect(() => {
     if (viewRegistrantsPage > registrantsTotalPages) {
@@ -734,9 +778,6 @@ const AdminEventsPage = () => {
                   </div>
                 ) : null}
               </label>
-              <label className="text-sm">Expected Registrations
-                <input type="number" min="0" {...createForm.register('registrations')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-              </label>
               <label className="text-sm">Capacity (0 = unlimited)
                 <input type="number" min="0" {...createForm.register('capacity', { valueAsNumber: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
@@ -864,82 +905,145 @@ const AdminEventsPage = () => {
       ) : null}
 
       {viewEvent ? (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/45 px-4">
-          <div className="w-full max-w-3xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-2xl border border-brand-blue/20 bg-gradient-to-br from-blue-50 via-white to-amber-50 p-5 shadow-xl">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="font-heading text-3xl font-extrabold text-brand-blue">Event Details</h3>
-              <button type="button" className="rounded-md border border-slate-300 px-2 py-1 text-sm" onClick={closeModals}>Close</button>
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-6xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-3xl border border-slate-200 bg-white shadow-[0_30px_100px_-35px_rgba(15,23,42,0.75)]">
+            <div className="flex items-start justify-between gap-3 bg-[linear-gradient(115deg,#0b4ea2_0%,#1e3a8a_48%,#0f172a_100%)] px-5 py-4 text-white sm:px-6">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">Admin Event View</p>
+                <h3 className="mt-1 font-heading text-2xl font-bold leading-tight text-white">{viewEvent.title || 'Event Details'}</h3>
+              </div>
+              <button
+                type="button"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/25 bg-white/10 text-lg leading-none text-white transition hover:bg-white/20"
+                onClick={closeModals}
+                aria-label="Close event details"
+              >
+                ×
+              </button>
             </div>
-            <div className="mt-4 grid gap-2 rounded-xl border border-brand-blue/15 bg-white/80 p-4 text-sm text-slate-700 md:grid-cols-2">
-              <p><span className="font-semibold text-brand-blue">Title:</span> {viewEvent.title || '-'}</p>
-              <p><span className="font-semibold text-brand-blue">Date:</span> {formatDate(viewEvent.date)}</p>
-              <p><span className="font-semibold text-brand-blue">End Date:</span> {formatDate(viewEvent.endDate || plusOneHour(viewEvent.date))}</p>
-              <p><span className="font-semibold text-brand-blue">Category:</span> {viewEvent.category || '-'}</p>
-              <p><span className="font-semibold text-brand-blue">Location:</span> {viewEvent.location || '-'}</p>
-              <p><span className="font-semibold text-brand-blue">Media:</span> {viewEvent.mediaUrl ? <a href={viewEvent.mediaUrl} target="_blank" rel="noreferrer" className="text-brand-blue hover:underline">Open media</a> : '-'}</p>
-              <p className="md:col-span-2"><span className="font-semibold text-brand-blue">Description:</span> {truncateWords(viewEvent.description, 50)}</p>
-              <p><span className="font-semibold text-brand-blue">Status:</span> {viewEvent.active === false ? 'Inactive' : 'Active'}</p>
-              <p><span className="font-semibold text-brand-blue">Total Registrations:</span> {viewEvent.registrations || (viewEvent.registrants || []).length || 0}</p>
-              <p><span className="font-semibold text-brand-blue">Capacity:</span> {Number(viewEvent.capacity || 0) > 0 ? Number(viewEvent.capacity) : 'Unlimited'}</p>
-              <p><span className="font-semibold text-brand-blue">Waitlist:</span> {viewEvent.waitlistEnabled === false ? 'Disabled' : `Enabled (${Number(viewEvent.waitlistCount || 0)})`}</p>
-            </div>
-            <div className="mt-4 rounded-xl border border-slate-200 bg-white/90 p-3">
-              <h4 className="text-sm font-semibold uppercase tracking-wide text-brand-blue">Registrants</h4>
-              {(viewEvent.registrants || []).length === 0 ? (
-                <p className="mt-2 text-sm text-slate-500">No registrations captured yet.</p>
-              ) : (
-                <>
-                  <div className="mt-2 overflow-x-auto">
-                    <table className="min-w-full text-left text-sm">
-                      <thead>
-                        <tr className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                          <th className="px-3 py-2">Name</th>
-                          <th className="px-3 py-2">Contact</th>
-                          <th className="px-3 py-2">Status</th>
-                          <th className="px-3 py-2 text-right">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {visibleRegistrants.map((entry) => (
-                          <tr key={entry.id} className="border-b border-slate-100 last:border-b-0">
-                            <td className="px-3 py-2 font-medium text-slate-800">{entry.name || 'Anonymous'}</td>
-                            <td className="px-3 py-2 text-slate-700">{entry.contact || 'No contact provided'}</td>
-                            <td className="px-3 py-2 text-slate-700">{entry.status || 'confirmed'}</td>
-                            <td className="px-3 py-2 text-right">
-                              <button
-                                type="button"
-                                onClick={() => removeRegistrantMutation.mutate({ eventId: viewEvent.id, registrantId: entry.id })}
-                                className="rounded-md border border-red-200 px-2 py-0.5 text-xs font-semibold text-red-700"
-                              >
-                                Remove
-                              </button>
-                            </td>
-                          </tr>
+
+            <div className="grid gap-4 p-4 sm:p-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.35fr)]">
+              <div className="space-y-4 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 text-sm text-slate-700">
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-2.5 py-2">
+                  <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-900">Start Date: {formatDate(viewEvent.date)}</span>
+                  <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-900">Start Time: {formatTimeLabel(viewEvent.date)}</span>
+                  <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-900">End Date: {formatDate(viewEvent.endDate || plusOneHour(viewEvent.date))}</span>
+                  <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-900">End Time: {formatTimeLabel(viewEvent.endDate || plusOneHour(viewEvent.date))}</span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-100 bg-amber-50 px-2.5 py-2">
+                  <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900">Status: {viewEvent.active === false ? 'Inactive' : 'Active'}</span>
+                  <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900">Category: {viewEvent.category || 'General'}</span>
+                  <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900">Location: {viewEvent.location || 'Location TBD'}</span>
+                </div>
+
+                {viewMediaUrls.length > 0 ? (
+                  <div className="border-t border-slate-200 pt-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Gallery</p>
+                    {viewImageMediaUrls.length > 0 ? (
+                      <div className={`mt-2 grid gap-2 ${viewImageMediaUrls.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                        {viewImageMediaUrls.map((url, index) => (
+                          <a key={`${url}-${index}`} href={url} target="_blank" rel="noreferrer" className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                            <img src={url} alt={`${viewEvent.title || 'Event'} media ${index + 1}`} className="h-44 w-full object-cover" loading="lazy" />
+                          </a>
                         ))}
-                      </tbody>
-                    </table>
+                      </div>
+                    ) : null}
+                    {viewOtherMediaUrls.length > 0 ? (
+                      <div className="mt-2 rounded-xl border border-slate-200 bg-white p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Attachments</p>
+                        <div className="mt-1.5 flex flex-col gap-1">
+                          {viewOtherMediaUrls.map((url, index) => (
+                            <a key={`${url}-${index}`} href={url} target="_blank" rel="noreferrer" className="text-sm font-semibold text-brand-blue hover:underline">Open media {index + 1}</a>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
-                  <div className="mt-3 flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-40"
-                      disabled={viewRegistrantsPage <= 1}
-                      onClick={() => setViewRegistrantsPage((prev) => prev - 1)}
-                    >
-                      Prev
-                    </button>
-                    <span className="text-xs font-semibold text-slate-600">Page {viewRegistrantsPage} of {registrantsTotalPages}</span>
-                    <button
-                      type="button"
-                      className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-40"
-                      disabled={viewRegistrantsPage >= registrantsTotalPages}
-                      onClick={() => setViewRegistrantsPage((prev) => prev + 1)}
-                    >
-                      Next
-                    </button>
+                ) : null}
+
+                <div className="border-t border-slate-200 pt-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Description</p>
+                  <p className="mt-1.5 text-sm leading-6 text-slate-700">{truncateWords(viewEvent.description, 80)}</p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h4 className="text-sm font-semibold uppercase tracking-wide text-brand-blue">Registrants <span className="ml-1 align-middle text-[11px] font-bold text-slate-500">{registrationSummary}</span></h4>
+                    <p className="text-xs text-slate-500">Manage participants for this event.</p>
                   </div>
-                </>
-              )}
+                  <input
+                    type="search"
+                    value={registrantSearch}
+                    onChange={(event) => setRegistrantSearch(event.target.value)}
+                    placeholder="Search name, contact, or status"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-700 outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 sm:w-72"
+                  />
+                </div>
+
+                {registrants.length === 0 ? (
+                  <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-sm text-slate-500">No registrations captured yet.</p>
+                ) : filteredRegistrants.length === 0 ? (
+                  <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-sm text-slate-500">No registrants match your search.</p>
+                ) : (
+                  <>
+                    <div className="mt-3 overflow-x-auto rounded-xl border border-slate-200">
+                      <table className="min-w-full text-left text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                            <th className="px-3 py-2">Name</th>
+                            <th className="px-3 py-2">Contact</th>
+                            <th className="px-3 py-2">Status</th>
+                            <th className="px-3 py-2 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {visibleRegistrants.map((entry, index) => (
+                            <tr key={entry.id} className={`border-b border-slate-100 last:border-b-0 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
+                              <td className="px-3 py-2 font-medium text-slate-800">{entry.name || 'Anonymous'}</td>
+                              <td className="px-3 py-2 text-slate-700">{entry.contact || 'No contact provided'}</td>
+                              <td className="px-3 py-2 text-slate-700">{entry.status || 'confirmed'}</td>
+                              <td className="px-3 py-2 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => removeRegistrantMutation.mutate({ eventId: viewEvent.id, registrantId: entry.id })}
+                                  className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-50"
+                                >
+                                  Remove
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <p className="text-xs text-slate-600">Showing {visibleRegistrants.length} of {filteredRegistrants.length} matched</p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-40"
+                          disabled={viewRegistrantsPage <= 1}
+                          onClick={() => setViewRegistrantsPage((prev) => prev - 1)}
+                        >
+                          Prev
+                        </button>
+                        <span className="text-xs font-semibold text-slate-600">Page {viewRegistrantsPage} of {registrantsTotalPages}</span>
+                        <button
+                          type="button"
+                          className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-40"
+                          disabled={viewRegistrantsPage >= registrantsTotalPages}
+                          onClick={() => setViewRegistrantsPage((prev) => prev + 1)}
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>

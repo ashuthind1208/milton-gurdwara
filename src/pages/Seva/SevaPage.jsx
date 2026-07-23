@@ -17,6 +17,7 @@ import useSeoMeta from '../../hooks/useSeoMeta';
 import Seo from '../../components/common/Seo';
 import { useAuth } from '../../context/AuthContext';
 import contentApiService from '../../services/contentApiService';
+import PhoneNumberRequiredNotice from '../../components/common/PhoneNumberRequiredNotice';
 
 const SEVA_IDENTITY_SETTING_KEY = 'settings-seva-allow-custom-name-email';
 const SEVA_PAGE_SIZE = 9;
@@ -424,6 +425,7 @@ const SevaPage = () => {
   return (
     <div className="space-y-6">
       <Seo {...meta} />
+      {isAuthenticated && profilePhoneMissing ? <PhoneNumberRequiredNotice activityLabel="seva registrations" /> : null}
 
       <section className="py-2">
         <div className="flex flex-wrap items-start justify-between gap-3">

@@ -92,28 +92,43 @@ export const downloadRegistrationPdf = async ({
 }) => {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
   const logoDataUrl = await loadLogoDataUrl();
+  const generatedOn = new Date().toLocaleString();
+
+  doc.setFillColor(...LOGO_BLUE_RGB);
+  doc.rect(0, 0, pageWidth, 98, 'F');
 
   if (logoDataUrl) {
-    doc.addImage(logoDataUrl, 'PNG', 40, 30, 54, 54);
+    doc.addImage(logoDataUrl, 'PNG', 34, 22, 54, 54);
   }
 
+  doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(15);
-  doc.text(organizationName || 'Gurdwara', 104, 52);
+  doc.setFontSize(16);
+  doc.text(organizationName || 'Gurdwara', 102, 42);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
-  doc.text('Volunteer Registration Sheet', 104, 70);
-
   doc.setFontSize(10);
-  doc.text(`Service: ${serviceName || '-'}`, 40, 104);
-  doc.text(`Date: ${serviceDate || '-'}`, pageWidth / 2, 104);
-  doc.text(`Time: ${serviceTime || '-'}`, 40, 120);
-  doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, 120);
+  doc.text('Volunteer Registration Sheet', 102, 58);
+  doc.text(`Service: ${serviceName || '-'}`, 102, 72);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.text('Registration List', pageWidth - 40, 42, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text(`Total Registrations: ${rows.length}`, pageWidth - 40, 60, { align: 'right' });
+  doc.text(`Generated: ${generatedOn}`, pageWidth - 40, 74, { align: 'right' });
+
+  doc.setTextColor(15, 23, 42);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text(`Date: ${serviceDate || '-'}`, 40, 114);
+  doc.text(`Time: ${serviceTime || '-'}`, pageWidth / 2, 114);
 
   autoTable(doc, {
-    startY: 138,
+    startY: 126,
     head: [headers],
     body: rows,
     styles: {
@@ -128,6 +143,11 @@ export const downloadRegistrationPdf = async ({
     theme: 'grid',
     margin: { left: 40, right: 40 }
   });
+
+  const finalY = doc.lastAutoTable?.finalY || 260;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text('This report compiles all registrations captured for the selected service.', 40, Math.min(finalY + 20, pageHeight - 34));
 
   doc.save(fileName || 'registrations.pdf');
 };

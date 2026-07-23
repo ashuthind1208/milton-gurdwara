@@ -7,6 +7,7 @@ import {
   EllipsisVerticalIcon,
   EnvelopeIcon,
   EyeIcon,
+  XMarkIcon,
   PencilSquareIcon,
   TrashIcon
 } from '@heroicons/react/24/outline';
@@ -332,6 +333,13 @@ const AdminSevaOpportunitiesPage = () => {
 
   const opportunityActionButtonClass = 'inline-flex h-8 w-8 items-center justify-center rounded-md border transition';
   const opportunityActionIconClass = 'h-4 w-4';
+  const modalShellClass = 'w-full max-w-3xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-[1.5rem] border border-slate-200 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.18)]';
+  const modalHeaderClass = 'flex items-start justify-between gap-3 border-b border-slate-200/80 bg-gradient-to-r from-slate-950 via-slate-900 to-brand-blue px-5 py-4 text-white sm:px-6';
+  const modalBodyClass = 'px-5 py-5 sm:px-6';
+  const slimInputClass = 'mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm leading-5 shadow-sm outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/15';
+  const slimSelectClass = 'mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm leading-5 shadow-sm outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/15';
+  const modalLabelClass = 'text-sm font-semibold text-slate-700';
+  const sectionCardClass = 'rounded-2xl border border-slate-200 bg-slate-50/90 p-4';
 
   useEffect(() => {
     setHeaderAction(
@@ -576,58 +584,63 @@ const AdminSevaOpportunitiesPage = () => {
       </Card>
 
       {createOpen ? (
-        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6">
+        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-950/55 px-4 py-6 backdrop-blur-[2px] sm:px-6">
           <div className="mx-auto flex min-h-full items-center justify-center">
-          <div className="w-full max-w-2xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="font-heading text-xl font-semibold">Add Seva Opportunity</h3>
-              <button type="button" onClick={closeModals} className="rounded-md border border-slate-300 px-2 py-1 text-sm">Close</button>
+          <div className={modalShellClass}>
+            <div className={modalHeaderClass}>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/65">Seva Opportunities</p>
+                <h3 className="mt-1 font-heading text-xl font-semibold sm:text-2xl">Add Seva Opportunity</h3>
+              </div>
+              <button type="button" onClick={closeModals} className="rounded-full border border-white/20 bg-white/10 p-2 text-white transition hover:bg-white/20" aria-label="Close create seva modal">
+                <XMarkIcon className="h-4 w-4" />
+              </button>
             </div>
-            <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={createForm.handleSubmit((values) => createMutation.mutate(toOpportunityPayload(values)))}>
-              <label className="text-sm">Seva Type
-                <input {...createForm.register('sevaType', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+            <form className={`${modalBodyClass} grid gap-3 md:grid-cols-2`} onSubmit={createForm.handleSubmit((values) => createMutation.mutate(toOpportunityPayload(values)))}>
+              <label className={modalLabelClass}>Seva Type
+                <input {...createForm.register('sevaType', { required: true })} className={slimInputClass} />
               </label>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 md:col-span-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Start Date and Time</p>
-                <div className="mt-2 grid gap-2 md:grid-cols-4">
-                  <label className="text-sm md:col-span-2">Date
-                    <input type="date" {...createForm.register('date', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2" />
+              <div className={`${sectionCardClass} md:col-span-2`}>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Start Date and Time</p>
+                <div className="mt-3 grid gap-3 md:grid-cols-4">
+                  <label className={`${modalLabelClass} md:col-span-2`}>Date
+                    <input type="date" {...createForm.register('date', { required: true })} className={`${slimInputClass} p-2.5`} />
                   </label>
-                  <label className="text-sm">Start
-                    <div className="mt-1 grid grid-cols-2 gap-1">
-                      <select {...createForm.register('startHour')} className="w-full rounded-lg border border-slate-300 p-2">
+                  <label className={modalLabelClass}>Start
+                    <div className="mt-1 grid grid-cols-2 gap-2">
+                      <select {...createForm.register('startHour')} className={slimSelectClass}>
                         {hourOptions.map((hour) => <option key={`create-start-hour-${hour}`} value={hour}>{hour}</option>)}
                       </select>
-                      <select {...createForm.register('startMinute')} className="w-full rounded-lg border border-slate-300 p-2">
+                      <select {...createForm.register('startMinute')} className={slimSelectClass}>
                         {quarterMinuteOptions.map((minute) => <option key={`create-start-minute-${minute}`} value={minute}>{minute}</option>)}
                       </select>
                     </div>
                   </label>
-                  <label className="text-sm">End
-                    <div className="mt-1 grid grid-cols-2 gap-1">
-                      <select {...createForm.register('endHour')} className="w-full rounded-lg border border-slate-300 p-2">
+                  <label className={modalLabelClass}>End
+                    <div className="mt-1 grid grid-cols-2 gap-2">
+                      <select {...createForm.register('endHour')} className={slimSelectClass}>
                         {hourOptions.map((hour) => <option key={`create-end-hour-${hour}`} value={hour}>{hour}</option>)}
                       </select>
-                      <select {...createForm.register('endMinute')} className="w-full rounded-lg border border-slate-300 p-2">
+                      <select {...createForm.register('endMinute')} className={slimSelectClass}>
                         {quarterMinuteOptions.map((minute) => <option key={`create-end-minute-${minute}`} value={minute}>{minute}</option>)}
                       </select>
                     </div>
                   </label>
                 </div>
               </div>
-              <label className="text-sm">Total Volunteers Required
-                <input type="number" min="1" {...createForm.register('totalVolunteersRequired', { valueAsNumber: true, min: 1 })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              <label className={modalLabelClass}>Total Volunteers Required
+                <input type="number" min="1" {...createForm.register('totalVolunteersRequired', { valueAsNumber: true, min: 1 })} className={slimInputClass} />
               </label>
-              <label className="text-sm">Expiry Date
-                <input type="date" {...createForm.register('expiryDate', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              <label className={modalLabelClass}>Expiry Date
+                <input type="date" {...createForm.register('expiryDate', { required: true })} className={slimInputClass} />
               </label>
-              <label className="text-sm flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 mt-6">
+              <label className="mt-1 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-700 md:col-span-2">
                 <input type="checkbox" {...createForm.register('waitlistEnabled')} />
                 <span>Enable Waitlist</span>
               </label>
-              <div className="md:col-span-2 flex gap-2">
-                <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? 'Saving...' : 'Create Opportunity'}</Button>
+              <div className="md:col-span-2 flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
                 <Button type="button" variant="ghost" onClick={closeModals}>Cancel</Button>
+                <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? 'Saving...' : 'Create Opportunity'}</Button>
               </div>
             </form>
           </div>
@@ -636,41 +649,72 @@ const AdminSevaOpportunitiesPage = () => {
       ) : null}
 
       {viewOpportunity ? (
-        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6">
+        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-950/55 px-4 py-6 backdrop-blur-[2px] sm:px-6">
           <div className="mx-auto flex min-h-full items-center justify-center">
-          <div className="w-full max-w-2xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="font-heading text-xl font-semibold">Opportunity Details</h3>
-              <button type="button" onClick={closeModals} className="rounded-md border border-slate-300 px-2 py-1 text-sm">Close</button>
+          <div className={modalShellClass}>
+            <div className={modalHeaderClass}>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/65">Seva Opportunity</p>
+                <h3 className="mt-1 font-heading text-xl font-semibold sm:text-2xl">Opportunity Details</h3>
+              </div>
+              <button type="button" onClick={closeModals} className="rounded-full border border-white/20 bg-white/10 p-2 text-white transition hover:bg-white/20" aria-label="Close seva details modal">
+                <XMarkIcon className="h-4 w-4" />
+              </button>
             </div>
-            <div className="mt-4 grid gap-2 text-sm text-slate-700 md:grid-cols-2">
-              <p><span className="font-semibold">Seva Type:</span> {viewOpportunity.sevaType || '-'}</p>
-              <p><span className="font-semibold">Date:</span> {formatDisplayDate(viewOpportunity.date)}</p>
-              <p><span className="font-semibold">Time:</span> {viewOpportunity.time || '-'}</p>
-              <p><span className="font-semibold">Expiry:</span> {formatDisplayDate(viewOpportunity.expiryDate)}</p>
-              <p><span className="font-semibold">Status:</span> {viewOpportunity.status === 'closed' ? 'Closed' : viewOpportunity.active ? 'Active' : 'Inactive'}</p>
-              <p><span className="font-semibold">Volunteers:</span> {selectedVolunteers.length}/{viewOpportunity.totalVolunteersRequired || 10}</p>
-              <p><span className="font-semibold">Waitlist:</span> {viewOpportunity.waitlistEnabled === false ? 'Disabled' : 'Enabled'}</p>
-            </div>
-            <div className="mt-4 max-h-64 space-y-2 overflow-y-auto pr-1">
-              {selectedVolunteers.length === 0 ? (
-                <p className="text-sm text-slate-500">No volunteers registered for this opportunity yet.</p>
-              ) : selectedVolunteers.map((entry) => (
-                <div key={entry.id} className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">{entry.name || '-'}</p>
-                    <p className="text-xs text-slate-600">{entry.phone || 'No phone'} • {entry.email || 'No email'}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeVolunteerMutation.mutate(entry.id)}
-                    disabled={removeVolunteerMutation.isPending}
-                    className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Remove
-                  </button>
+            <div className={`${modalBodyClass} space-y-4`}>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Seva Type</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">{viewOpportunity.sevaType || '-'}</p>
                 </div>
-              ))}
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Status</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">{viewOpportunity.status === 'closed' ? 'Closed' : viewOpportunity.active ? 'Active' : 'Inactive'}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Date</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">{formatDisplayDate(viewOpportunity.date)}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Time</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">{viewOpportunity.time || '-'}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Expiry</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">{formatDisplayDate(viewOpportunity.expiryDate)}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Volunteers</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">{selectedVolunteers.length}/{viewOpportunity.totalVolunteersRequired || 10}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm md:col-span-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Waitlist</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">{viewOpportunity.waitlistEnabled === false ? 'Disabled' : 'Enabled'}</p>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Registered Volunteers</p>
+                <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
+                  {selectedVolunteers.length === 0 ? (
+                    <p className="text-sm text-slate-500">No volunteers registered for this opportunity yet.</p>
+                  ) : selectedVolunteers.map((entry) => (
+                    <div key={entry.id} className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-800">{entry.name || '-'}</p>
+                        <p className="text-xs text-slate-600">{entry.phone || 'No phone'} • {entry.email || 'No email'}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeVolunteerMutation.mutate(entry.id)}
+                        disabled={removeVolunteerMutation.isPending}
+                        className="rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
           </div>
@@ -678,58 +722,63 @@ const AdminSevaOpportunitiesPage = () => {
       ) : null}
 
       {editing ? (
-        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6">
+        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-950/55 px-4 py-6 backdrop-blur-[2px] sm:px-6">
           <div className="mx-auto flex min-h-full items-center justify-center">
-          <div className="w-full max-w-2xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="font-heading text-xl font-semibold">Edit Seva Opportunity</h3>
-              <button type="button" onClick={closeModals} className="rounded-md border border-slate-300 px-2 py-1 text-sm">Close</button>
+          <div className={modalShellClass}>
+            <div className={modalHeaderClass}>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/65">Seva Opportunities</p>
+                <h3 className="mt-1 font-heading text-xl font-semibold sm:text-2xl">Edit Seva Opportunity</h3>
+              </div>
+              <button type="button" onClick={closeModals} className="rounded-full border border-white/20 bg-white/10 p-2 text-white transition hover:bg-white/20" aria-label="Close edit seva modal">
+                <XMarkIcon className="h-4 w-4" />
+              </button>
             </div>
-            <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={editForm.handleSubmit((values) => updateMutation.mutate({ id: editing.id, values: toOpportunityPayload(values) }))}>
-              <label className="text-sm">Seva Type
-                <input {...editForm.register('sevaType', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+            <form className={`${modalBodyClass} grid gap-3 md:grid-cols-2`} onSubmit={editForm.handleSubmit((values) => updateMutation.mutate({ id: editing.id, values: toOpportunityPayload(values) }))}>
+              <label className={modalLabelClass}>Seva Type
+                <input {...editForm.register('sevaType', { required: true })} className={slimInputClass} />
               </label>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 md:col-span-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Start Date and Time</p>
-                <div className="mt-2 grid gap-2 md:grid-cols-4">
-                  <label className="text-sm md:col-span-2">Date
-                    <input type="date" {...editForm.register('date', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2" />
+              <div className={`${sectionCardClass} md:col-span-2`}>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Start Date and Time</p>
+                <div className="mt-3 grid gap-3 md:grid-cols-4">
+                  <label className={`${modalLabelClass} md:col-span-2`}>Date
+                    <input type="date" {...editForm.register('date', { required: true })} className={`${slimInputClass} p-2.5`} />
                   </label>
-                  <label className="text-sm">Start
-                    <div className="mt-1 grid grid-cols-2 gap-1">
-                      <select {...editForm.register('startHour')} className="w-full rounded-lg border border-slate-300 p-2">
+                  <label className={modalLabelClass}>Start
+                    <div className="mt-1 grid grid-cols-2 gap-2">
+                      <select {...editForm.register('startHour')} className={slimSelectClass}>
                         {hourOptions.map((hour) => <option key={`edit-start-hour-${hour}`} value={hour}>{hour}</option>)}
                       </select>
-                      <select {...editForm.register('startMinute')} className="w-full rounded-lg border border-slate-300 p-2">
+                      <select {...editForm.register('startMinute')} className={slimSelectClass}>
                         {quarterMinuteOptions.map((minute) => <option key={`edit-start-minute-${minute}`} value={minute}>{minute}</option>)}
                       </select>
                     </div>
                   </label>
-                  <label className="text-sm">End
-                    <div className="mt-1 grid grid-cols-2 gap-1">
-                      <select {...editForm.register('endHour')} className="w-full rounded-lg border border-slate-300 p-2">
+                  <label className={modalLabelClass}>End
+                    <div className="mt-1 grid grid-cols-2 gap-2">
+                      <select {...editForm.register('endHour')} className={slimSelectClass}>
                         {hourOptions.map((hour) => <option key={`edit-end-hour-${hour}`} value={hour}>{hour}</option>)}
                       </select>
-                      <select {...editForm.register('endMinute')} className="w-full rounded-lg border border-slate-300 p-2">
+                      <select {...editForm.register('endMinute')} className={slimSelectClass}>
                         {quarterMinuteOptions.map((minute) => <option key={`edit-end-minute-${minute}`} value={minute}>{minute}</option>)}
                       </select>
                     </div>
                   </label>
                 </div>
               </div>
-              <label className="text-sm">Total Volunteers Required
-                <input type="number" min="1" {...editForm.register('totalVolunteersRequired', { valueAsNumber: true, min: 1 })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              <label className={modalLabelClass}>Total Volunteers Required
+                <input type="number" min="1" {...editForm.register('totalVolunteersRequired', { valueAsNumber: true, min: 1 })} className={slimInputClass} />
               </label>
-              <label className="text-sm">Expiry Date
-                <input type="date" {...editForm.register('expiryDate', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              <label className={modalLabelClass}>Expiry Date
+                <input type="date" {...editForm.register('expiryDate', { required: true })} className={slimInputClass} />
               </label>
-              <label className="text-sm flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 mt-6">
+              <label className="mt-1 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-700 md:col-span-2">
                 <input type="checkbox" {...editForm.register('waitlistEnabled')} />
                 <span>Enable Waitlist</span>
               </label>
-              <div className="md:col-span-2 flex gap-2">
-                <Button type="submit" disabled={updateMutation.isPending}>{updateMutation.isPending ? 'Saving...' : 'Save Changes'}</Button>
+              <div className="md:col-span-2 flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
                 <Button type="button" variant="ghost" onClick={closeModals}>Cancel</Button>
+                <Button type="submit" disabled={updateMutation.isPending}>{updateMutation.isPending ? 'Saving...' : 'Save Changes'}</Button>
               </div>
             </form>
           </div>

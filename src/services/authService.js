@@ -95,6 +95,9 @@ const authService = {
       throw new Error('Email is required for login.');
     }
     const existingUser = await userService.getUserByEmail(resolvedEmail).then((res) => res.data);
+    if (existingUser && existingUser.isActive === false) {
+      throw new Error('Admin has marked your account inactive. Please contact admin for access.');
+    }
     const policy = resolveAuthPolicy({ email: resolvedEmail, intent: 'signin', existingUser });
     const assignedRole = policy.role;
     const persisted = await userService.upsertUserByEmail({
@@ -125,6 +128,9 @@ const authService = {
       throw new Error('Email is required for Google login.');
     }
     const existingUser = await userService.getUserByEmail(resolvedEmail).then((res) => res.data);
+    if (existingUser && existingUser.isActive === false) {
+      throw new Error('Admin has marked your account inactive. Please contact admin for access.');
+    }
     const policy = resolveAuthPolicy({ email: resolvedEmail, intent, existingUser });
     const assignedRole = policy.role;
     const existingMemberType = resolveMemberType(assignedRole);

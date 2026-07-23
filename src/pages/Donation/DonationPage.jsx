@@ -14,6 +14,7 @@ import { formatCurrency } from '../../utils/formatters';
 import useSeoMeta from '../../hooks/useSeoMeta';
 import Seo from '../../components/common/Seo';
 import { useAuth } from '../../context/AuthContext';
+import PhoneNumberRequiredNotice from '../../components/common/PhoneNumberRequiredNotice';
 
 const DONATION_IDENTITY_SETTING_KEY = 'settings-donation-allow-custom-name-email';
 
@@ -148,6 +149,7 @@ const DonationPage = () => {
         title="Daswand | Donation"
         description="Support the sangat through daswand. Fill details once, then pay securely with Stripe popup checkout."
       />
+      {isAuthenticated && profilePhoneMissing ? <PhoneNumberRequiredNotice activityLabel="donations" /> : null}
 
       {donationTopAds.length > 0 ? (
         <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">

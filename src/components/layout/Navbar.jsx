@@ -370,11 +370,12 @@ const Navbar = () => {
   const profilePhoneMissing = !String(user?.phone || '').trim();
   const approvalStatus = String(user?.approvalStatus || '').toLowerCase();
   const hasFullAccess = FULL_ACCESS_ROLES.has(String(user?.role || ''));
+  const userRole = String(user?.role || '').trim();
   const assignedAdminPages = Array.isArray(user?.adminPageAccess)
     ? user.adminPageAccess.map((path) => String(path || '').trim()).filter(Boolean)
     : [];
   const canSeeAdminPortalButton = approvalStatus === 'approved'
-    && (hasFullAccess || assignedAdminPages.length > 0);
+    && (hasFullAccess || assignedAdminPages.length > 0 || userRole !== 'Family');
   const isApprovalPending = isAuthenticated && !hasFullAccess && approvalStatus !== 'approved';
   const { data: familyEvents = [] } = useQuery({
     queryKey: ['navbar-family-events'],

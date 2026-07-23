@@ -31,6 +31,12 @@ export const logErrorDetails = (scope, error, extra = {}) => {
 
 export const normalizeErrorMessage = (error, fallbackMessage, scope = 'request') => {
   const status = error?.response?.status || error?.status || error?.statusCode || 500;
+  const serverMessage = String(error?.response?.data?.message || '').trim();
   logErrorDetails(scope, error, { status });
+
+  if (Number(status) === 409 && serverMessage && serverMessage.length <= 220) {
+    return serverMessage;
+  }
+
   return getGenericErrorMessage(status, fallbackMessage);
 };

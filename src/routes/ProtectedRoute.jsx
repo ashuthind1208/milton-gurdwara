@@ -6,6 +6,8 @@ const ProtectedRoute = ({ allowedRoles = [], allowAssignedAdminAccess = true }) 
   const location = useLocation();
   const parentOutletContext = useOutletContext();
   const isAdminRoute = location.pathname === '/admin' || location.pathname.startsWith('/admin/');
+  const isUserActive = user?.isActive !== false;
+  const isUserApproved = String(user?.approvalStatus || 'approved').trim().toLowerCase() === 'approved';
   const assignedAdminPages = Array.isArray(user?.adminPageAccess)
     ? user.adminPageAccess.map((path) => String(path || '').trim()).filter(Boolean)
     : [];
@@ -14,17 +16,28 @@ const ProtectedRoute = ({ allowedRoles = [], allowAssignedAdminAccess = true }) 
   if (!isAuthenticated) {
     if (isAdminRoute) {
       let adminLogoutInProgress = false;
+      let forcedLogoutReason = '';
       try {
         adminLogoutInProgress = window.sessionStorage.getItem('ssm_admin_logout_in_progress') === '1';
+        forcedLogoutReason = String(
+          window.sessionStorage.getItem('ssm_forced_logout_reason')
+          || window.localStorage.getItem('ssm_forced_logout_reason')
+          || ''
+        ).trim();
         if (adminLogoutInProgress) {
           window.sessionStorage.removeItem('ssm_admin_logout_in_progress');
         }
+        if (forcedLogoutReason) {
+          window.sessionStorage.removeItem('ssm_forced_logout_reason');
+          window.localStorage.removeItem('ssm_forced_logout_reason');
+        }
       } catch {
         adminLogoutInProgress = false;
+        forcedLogoutReason = '';
       }
 
-      if (adminLogoutInProgress) {
-        return <Navigate to="/" replace />;
+      if (adminLogoutInProgress || forcedLogoutReason === 'account_inactive') {
+        return <Navigate to="/" state={{ from: location, accessNotice: 'account_inactive' }} replace />;
       }
 
       const next = `${location.pathname}${location.search || ''}`;
@@ -32,6 +45,17 @@ const ProtectedRoute = ({ allowedRoles = [], allowAssignedAdminAccess = true }) 
     }
 
     return <Navigate to="/" state={{ from: location }} replace />;
+  }
+
+  if (!isUserActive || !isUserApproved) {
+    if (isAdminRoute) {
+      try {
+        window.sessionStorage.setItem('ssm_admin_logout_in_progress', '1');
+      } catch {
+        // Ignore storage write failures.
+      }
+    }
+    return <Navigate to="/" state={{ from: location, accessNotice: 'account_inactive' }} replace />;
   }
 
   if (allowedRoles.length > 0 && !allowedRoles.includes(user?.role)) {

@@ -234,22 +234,42 @@ const AdminHukamnamaPage = () => {
                 <label className="text-sm">Ang
                   <input type="number" min="1" max="1430" {...form.register('ang', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
                 </label>
-                <button
-                  type="button"
-                  onClick={() => previewMutation.mutate(form.getValues('ang'))}
-                  className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold"
-                >
-                  {previewMutation.isPending ? 'Loading...' : 'Load Preview'}
-                </button>
-                <div className="flex gap-2">
-                  <Button type="submit" className="whitespace-nowrap" disabled={addMutation.isPending}>{addMutation.isPending ? 'Saving...' : 'Submit'}</Button>
-                  <button type="button" onClick={() => setAddModalOpen(false)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Cancel</button>
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => previewMutation.mutate(form.getValues('ang'))}
+                    disabled={previewMutation.isPending}
+                    className="rounded-lg border border-brand-saffron/50 bg-brand-saffron/10 px-3 py-1.5 text-xs font-semibold text-slate-900 transition hover:bg-brand-saffron/20 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {previewMutation.isPending ? 'Loading...' : 'Load Preview'}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={addMutation.isPending}
+                    className="rounded-lg border border-brand-blue bg-brand-blue px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-blue/90 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {addMutation.isPending ? 'Saving...' : 'Submit'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAddModalOpen(false)}
+                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
 
               <div className="rounded-lg bg-slate-50 p-4">
-                <p className="text-sm font-semibold text-slate-700">Preview</p>
-                {!previewData ? (
+                <p className="text-sm font-bold text-slate-800">Hukamnama Preview</p>
+                {previewMutation.isPending ? (
+                  <div className="mt-4 grid min-h-[220px] place-items-center text-center">
+                    <div className="space-y-3">
+                      <span className="mx-auto inline-block h-10 w-10 animate-spin rounded-full border-[3px] border-brand-blue/20 border-t-brand-blue" />
+                      <p className="text-base font-bold text-brand-blue">Fetching divine verses for your selected Ang...</p>
+                    </div>
+                  </div>
+                ) : !previewData ? (
                   <p className="mt-2 text-sm text-slate-500">Load preview to verify the selected ang before submitting.</p>
                 ) : (
                   <div className="mt-2 space-y-2">

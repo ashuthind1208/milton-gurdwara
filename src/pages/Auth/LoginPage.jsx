@@ -59,6 +59,14 @@ const LoginPage = () => {
   const nextPath = String(searchParams.get('next') || '').trim();
   const allowMockGoogleLogin = process.env.REACT_APP_ALLOW_MOCK_GOOGLE_LOGIN === 'true';
 
+  useEffect(() => {
+    try {
+      window.sessionStorage.removeItem('ssm_admin_logout_in_progress');
+    } catch {
+      // Ignore storage errors.
+    }
+  }, []);
+
   const preferredPath = fromPath || nextPath;
   const effectivePreferredPath = preferredPath;
 
@@ -128,6 +136,10 @@ const LoginPage = () => {
   useEffect(() => {
     if (accessNotice === 'approval_pending') {
       setNotice(PENDING_APPROVAL_NOTICE);
+      return;
+    }
+    if (accessNotice === 'account_inactive') {
+      setError('Your account has been marked inactive by admin. Please contact admin for access.');
       return;
     }
     if (accessNotice === 'registration_rejected') {
@@ -215,7 +227,7 @@ const LoginPage = () => {
         navigate(resolvePostLoginPath(callbackPreferredPath, role), { replace: true });
       } catch (err) {
         if (!cancelled) {
-          setError('Google sign-in failed. Please try again.');
+          setError(String(err?.message || 'Google sign-in failed. Please try again.'));
         }
       }
     };
@@ -230,6 +242,12 @@ const LoginPage = () => {
   const handleGoogleSignIn = useCallback(async (intent = 'signin') => {
     setError('');
     setNotice('');
+
+    try {
+      window.sessionStorage.removeItem('ssm_admin_logout_in_progress');
+    } catch {
+      // Ignore storage errors.
+    }
 
     const oauthUrl = authService.getGoogleOAuthUrl();
     if (oauthUrl) {
@@ -277,12 +295,16 @@ const LoginPage = () => {
 
       navigate(resolvePostLoginPath(effectivePreferredPath, role), { replace: true });
     } catch (err) {
-      setError('Google sign-in failed. Please try again.');
+      setError(String(err?.message || 'Google sign-in failed. Please try again.'));
     }
   }, [allowMockGoogleLogin, effectivePreferredPath, loginWithGoogle, navigate, persistAuthIntent]);
 
   useEffect(() => {
     if (isAuthenticated) {
+      return;
+    }
+
+    if (accessNotice === 'account_inactive') {
       return;
     }
 
@@ -304,7 +326,7 @@ const LoginPage = () => {
     const intent = modeParam === 'join' ? 'signup' : 'signin';
     setAutoOAuthTriggered(true);
     handleGoogleSignIn(intent);
-  }, [autoOAuthTriggered, handleGoogleSignIn, isAuthenticated, modeParam]);
+  }, [accessNotice, autoOAuthTriggered, handleGoogleSignIn, isAuthenticated, modeParam]);
 
   return (
     <div className="space-y-8">

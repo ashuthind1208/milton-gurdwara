@@ -21,6 +21,23 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('gurdwara_user');
   }, []);
 
+  const clearAuthState = useCallback(() => {
+    persistUser(null);
+    setToken(null);
+    localStorage.removeItem('gurdwara_token');
+  }, [persistUser]);
+
+  const markForcedInactiveLogout = useCallback(() => {
+    try {
+      window.sessionStorage.setItem('ssm_admin_logout_in_progress', '1');
+      window.sessionStorage.setItem('ssm_forced_logout_reason', 'account_inactive');
+      window.localStorage.setItem('ssm_forced_logout_reason', 'account_inactive');
+      window.sessionStorage.setItem('ssm_skip_login_auto_once', '1');
+    } catch {
+      // Ignore storage write failures.
+    }
+  }, []);
+
   const login = useCallback(async (payload) => {
     setLoading(true);
     try {
@@ -28,6 +45,11 @@ export const AuthProvider = ({ children }) => {
       persistUser(response.data.user);
       setToken(response.data.token);
       localStorage.setItem('gurdwara_token', response.data.token);
+      try {
+        window.sessionStorage.removeItem('ssm_admin_logout_in_progress');
+      } catch {
+        // Ignore storage errors.
+      }
       return response;
     } finally {
       setLoading(false);
@@ -41,6 +63,11 @@ export const AuthProvider = ({ children }) => {
       persistUser(response.data.user);
       setToken(response.data.token);
       localStorage.setItem('gurdwara_token', response.data.token);
+      try {
+        window.sessionStorage.removeItem('ssm_admin_logout_in_progress');
+      } catch {
+        // Ignore storage errors.
+      }
       return response;
     } finally {
       setLoading(false);
@@ -55,6 +82,11 @@ export const AuthProvider = ({ children }) => {
       if (response.data.token) {
         setToken(response.data.token);
         localStorage.setItem('gurdwara_token', response.data.token);
+      }
+      try {
+        window.sessionStorage.removeItem('ssm_admin_logout_in_progress');
+      } catch {
+        // Ignore storage errors.
       }
       return response;
     } finally {
@@ -84,11 +116,9 @@ export const AuthProvider = ({ children }) => {
     } catch {
       // Clear local auth state even if server-side logout fails.
     } finally {
-      persistUser(null);
-      setToken(null);
-      localStorage.removeItem('gurdwara_token');
+      clearAuthState();
     }
-  }, [persistUser]);
+  }, [clearAuthState]);
 
   useEffect(() => {
     const email = String(user?.email || '').trim().toLowerCase();
@@ -101,8 +131,21 @@ export const AuthProvider = ({ children }) => {
     const syncCurrentUser = async () => {
       try {
         const response = await userService.getUserByEmail(email);
-        const latestUser = response?.data;
-        if (!latestUser || cancelled) {
+        if (cancelled) {
+          return;
+        }
+
+        const latestUser = response?.data || null;
+        if (!latestUser) {
+          markForcedInactiveLogout();
+          clearAuthState();
+          return;
+        }
+
+        const isActive = latestUser.isActive !== false;
+        if (!isActive) {
+          markForcedInactiveLogout();
+          clearAuthState();
           return;
         }
 
@@ -117,12 +160,12 @@ export const AuthProvider = ({ children }) => {
     };
 
     syncCurrentUser();
-    const timerId = window.setInterval(syncCurrentUser, 5000);
+    const timerId = window.setInterval(syncCurrentUser, 2000);
     return () => {
       cancelled = true;
       window.clearInterval(timerId);
     };
-  }, [persistUser, token, user, user?.email]);
+  }, [clearAuthState, markForcedInactiveLogout, persistUser, token, user, user?.email]);
 
   const value = useMemo(
     () => ({

@@ -2,7 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { EyeIcon, PencilSquareIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import {
+  CheckCircleIcon,
+  ClockIcon,
+  EyeIcon,
+  PencilSquareIcon,
+  Squares2X2Icon,
+  TrashIcon,
+  XCircleIcon,
+  XMarkIcon
+} from '@heroicons/react/24/outline';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton';
@@ -14,6 +23,13 @@ import notificationService from '../../services/notificationService';
 import uploadService from '../../services/uploadService';
 
 const FILTERS = ['All', 'Pending', 'Approved', 'Rejected'];
+
+const filterIconMap = {
+  All: Squares2X2Icon,
+  Pending: ClockIcon,
+  Approved: CheckCircleIcon,
+  Rejected: XCircleIcon
+};
 
 const statusClassMap = {
   approved: 'border border-emerald-200 bg-emerald-50 text-emerald-700',
@@ -114,6 +130,8 @@ const AdminUsersPage = () => {
   const [editUserId, setEditUserId] = useState('');
   const [createUserOpen, setCreateUserOpen] = useState(false);
   const [approvalNotice, setApprovalNotice] = useState('');
+  const [removeBlockedMessage, setRemoveBlockedMessage] = useState('');
+  const [showDeleteActions, setShowDeleteActions] = useState(false);
   const [editAvatarUrl, setEditAvatarUrl] = useState('');
   const [isEditImageUploading, setIsEditImageUploading] = useState(false);
   const [editImageUploadProgress, setEditImageUploadProgress] = useState(0);
@@ -234,6 +252,11 @@ const AdminUsersPage = () => {
       if (editUserId === id) {
         setEditUserId('');
       }
+      setRemoveBlockedMessage('');
+    },
+    onError: (error) => {
+      const message = String(error?.message || '').trim();
+      setRemoveBlockedMessage(message || 'User could not be deleted right now.');
     }
   });
 
@@ -398,17 +421,38 @@ const AdminUsersPage = () => {
           <p className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">{approvalNotice}</p>
         ) : null}
 
-        <div className="mb-4 flex flex-wrap gap-2">
-          {FILTERS.map((filter) => (
-            <button
-              key={filter}
-              type="button"
-              onClick={() => setActiveFilter(filter)}
-              className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${activeFilter === filter ? 'bg-brand-blue text-white' : 'border border-slate-300 text-slate-700 hover:bg-slate-50'}`}
-            >
-              {filter}
-            </button>
-          ))}
+        <div className="mb-4 flex items-center gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pb-1">
+            {FILTERS.map((filter) => {
+              const Icon = filterIconMap[filter] || Squares2X2Icon;
+              const isActive = activeFilter === filter;
+              return (
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => setActiveFilter(filter)}
+                  className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border p-0 shadow-sm transition sm:h-auto sm:w-auto sm:gap-2 sm:rounded-full sm:px-3 sm:py-1.5 ${isActive ? 'border-blue-600 bg-blue-600 text-blue-50' : 'border-blue-200 bg-white text-blue-700 hover:bg-blue-50'}`}
+                  aria-label={`Filter ${filter}`}
+                  title={`Filter ${filter}`}
+                >
+                  <Icon className="h-4 w-4 stroke-2" />
+                  <span className="hidden sm:inline">{filter}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowDeleteActions((prev) => !prev)}
+            className={`ml-auto inline-flex h-9 w-9 items-center justify-center rounded-full border p-0 text-sm font-semibold transition sm:h-auto sm:w-auto sm:gap-2 sm:px-3 sm:py-1.5 ${showDeleteActions ? 'border-red-300 bg-red-100 text-red-900' : 'border-blue-200 bg-white text-blue-700 hover:bg-blue-50'}`}
+            aria-pressed={showDeleteActions}
+            title="Toggle delete icons"
+            aria-label={showDeleteActions ? 'Hide delete icons' : 'Show delete icons'}
+          >
+            <TrashIcon className="h-4 w-4 stroke-2" />
+            <span className="hidden sm:inline">{showDeleteActions ? 'Hide Delete Icons' : 'Show Delete Icons'}</span>
+          </button>
         </div>
 
         <div className="mb-4 lg:hidden">
@@ -524,15 +568,17 @@ const AdminUsersPage = () => {
                         >
                           <PencilSquareIcon className={actionIconClass} />
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => removeMutation.mutate(user.id)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-700 transition hover:bg-red-50"
-                          aria-label="Delete user"
-                          title="Delete"
-                        >
-                          <TrashIcon className={actionIconClass} />
-                        </button>
+                        {showDeleteActions ? (
+                          <button
+                            type="button"
+                            onClick={() => removeMutation.mutate(user.id)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-700 transition hover:bg-red-50"
+                            aria-label="Delete user"
+                            title="Delete"
+                          >
+                            <TrashIcon className={actionIconClass} />
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -599,15 +645,17 @@ const AdminUsersPage = () => {
                     >
                       <PencilSquareIcon className={actionIconClass} />
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => removeMutation.mutate(user.id)}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-700 transition hover:bg-red-50"
-                      aria-label="Delete user"
-                      title="Delete"
-                    >
-                      <TrashIcon className={actionIconClass} />
-                    </button>
+                    {showDeleteActions ? (
+                      <button
+                        type="button"
+                        onClick={() => removeMutation.mutate(user.id)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-700 transition hover:bg-red-50"
+                        aria-label="Delete user"
+                        title="Delete"
+                      >
+                        <TrashIcon className={actionIconClass} />
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -910,6 +958,31 @@ const AdminUsersPage = () => {
                 <Button type="submit" disabled={editMutation.isPending || isEditImageUploading}>{editMutation.isPending ? 'Saving...' : 'Save Changes'}</Button>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {removeBlockedMessage ? (
+        <div className="fixed inset-0 z-[55] flex items-center justify-center bg-slate-900/55 px-4" onClick={() => setRemoveBlockedMessage('')}>
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-700">Action Required</p>
+                <h3 className="mt-1 font-heading text-xl font-semibold text-slate-900">User linked with Event or Seva</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRemoveBlockedMessage('')}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 text-slate-600 hover:bg-slate-100"
+                aria-label="Close message"
+              >
+                <XMarkIcon className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="mt-3 text-sm leading-6 text-slate-700">{removeBlockedMessage}</p>
+            <div className="mt-4 flex justify-end">
+              <Button type="button" onClick={() => setRemoveBlockedMessage('')}>Understood</Button>
+            </div>
           </div>
         </div>
       ) : null}

@@ -24,12 +24,14 @@ const eventService = {
   },
 
   registerForEvent: async ({ eventId, name, contact, email }) => {
-    const response = await apiClient.post('/events/register', { eventId, name, contact, email });
+    const normalizedEventId = String(eventId || '').trim();
+    const response = await apiClient.post('/events/register', { eventId: normalizedEventId, name, contact, email });
     return { data: response.data?.data };
   },
 
   removeEventRegistrant: async ({ eventId, registrantId }) => {
-    const response = await apiClient.post('/events/registrant/remove', { eventId, registrantId });
+    const normalizedEventId = String(eventId || '').trim();
+    const response = await apiClient.post('/events/registrant/remove', { eventId: normalizedEventId, registrantId });
     return { data: response.data?.data };
   },
 
@@ -50,7 +52,11 @@ const eventService = {
   },
 
   rsvp: async (payload) => {
-    const response = await apiClient.post('/events/register', payload);
+    const normalizedPayload = {
+      ...(payload || {}),
+      eventId: String(payload?.eventId || '').trim()
+    };
+    const response = await apiClient.post('/events/register', normalizedPayload);
     return { data: response.data?.data };
   }
 };

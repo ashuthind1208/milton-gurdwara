@@ -2316,7 +2316,6 @@ const isEventPast = (row = {}) => {
 };
 
 const mapEventRow = (row, registrants = []) => {
-  const past = isEventPast(row);
   const storedActive = row.active !== false;
   const confirmedCount = registrants.filter((entry) => entry.status !== 'waitlisted').length;
   const waitlistCount = registrants.filter((entry) => entry.status === 'waitlisted').length;
@@ -2333,7 +2332,7 @@ const mapEventRow = (row, registrants = []) => {
     waitlistEnabled: row.waitlist_enabled !== false,
     registrations: Number(row.registrations || confirmedCount || 0),
     waitlistCount,
-    active: storedActive && !past,
+    active: storedActive,
     registrants
   };
 };
@@ -2342,16 +2341,6 @@ const getEvents = async () => {
   if (!pool) {
     throw new Error('Database is not configured.');
   }
-
-  await pool.query(
-    `
-    UPDATE events
-    SET active = FALSE,
-        updated_at = NOW()
-    WHERE active = TRUE
-      AND COALESCE(end_date, date) < NOW();
-    `
-  );
 
   const eventsResult = await pool.query(
     `
@@ -2384,23 +2373,6 @@ const getEvents = async () => {
     });
     return acc;
   }, {});
-
-  const staleActiveIds = eventsResult.rows
-    .filter((row) => row.active !== false && isEventPast(row))
-    .map((row) => Number(row.id))
-    .filter((value) => Number.isFinite(value));
-
-  if (staleActiveIds.length > 0) {
-    await pool.query(
-      `
-      UPDATE events
-      SET active = FALSE,
-          updated_at = NOW()
-      WHERE id = ANY($1::bigint[]);
-      `,
-      [staleActiveIds]
-    );
-  }
 
   return eventsResult.rows.map((row) => mapEventRow(row, registrantsByEvent[Number(row.id)] || []));
 };
@@ -2533,7 +2505,7 @@ const registerForEvent = async ({ eventId, name, contact, email }) => {
     throw error;
   }
 
-  if (event.active === false || isEventPast(event)) {
+  if (event.active === false) {
     const error = new Error('This event is no longer open for RSVP.');
     error.status = 409;
     throw error;
@@ -2672,6 +2644,251 @@ const removeEventRegistrant = async ({ eventId, registrantId }) => {
   return rows.find((entry) => entry.id === Number(eventId)) || null;
 };
 
+const normalizeComparableContact = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+
+const getUserRegistrationDependencies = async ({ userId, email, contact, name }) => {
+  if (!pool) {
+    return {
+      eventRegistrations: [],
+      sevaRegistrations: []
+    };
+  }
+
+  const normalizedUserId = String(userId || '').trim();
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const normalizedContact = normalizeComparableContact(contact);
+  const normalizedName = String(name || '').trim().toLowerCase();
+  if (!normalizedUserId && !normalizedEmail && !normalizedContact && !normalizedName) {
+    return {
+      eventRegistrations: [],
+      sevaRegistrations: []
+    };
+  }
+
+  const eventResult = await pool.query(
+    `
+    SELECT
+      er.id,
+      er.event_id,
+      er.name,
+      er.email,
+      er.status,
+      e.title,
+      e.date
+    FROM event_registrants er
+    LEFT JOIN events e ON e.id = er.event_id
+    WHERE ($1 <> '' AND LOWER(COALESCE(er.email, '')) = $1)
+       OR ($1 <> '' AND LOWER(COALESCE(er.contact, '')) = $1)
+       OR ($2 <> '' AND REGEXP_REPLACE(LOWER(COALESCE(er.contact, '')), '[^a-z0-9]', '', 'g') = $2)
+       OR ($3 <> '' AND LOWER(COALESCE(er.name, '')) = $3)
+    ORDER BY e.date DESC NULLS LAST, er.id DESC;
+    `,
+     [normalizedEmail, normalizedContact, normalizedName]
+  );
+
+  const sevaResult = await pool.query(
+    `
+    SELECT
+      vr.id,
+      vr.user_id,
+      vr.opportunity_id,
+      vr.name,
+      vr.email,
+      vr.seva_type,
+      vr.seva_date,
+      vr.status
+    FROM volunteer_registrations vr
+    WHERE ($1 <> '' AND COALESCE(vr.user_id, '') = $1)
+       OR ($2 <> '' AND LOWER(COALESCE(vr.email, '')) = $2)
+       OR ($3 <> '' AND REGEXP_REPLACE(LOWER(COALESCE(vr.phone, '')), '[^a-z0-9]', '', 'g') = $3)
+       OR ($4 <> '' AND LOWER(COALESCE(vr.name, '')) = $4)
+    ORDER BY vr.seva_date DESC NULLS LAST, vr.id DESC;
+    `,
+     [normalizedUserId, normalizedEmail, normalizedContact, normalizedName]
+  );
+
+  return {
+    eventRegistrations: eventResult.rows.map((row) => ({
+      id: `evt-reg-${row.id}`,
+      eventId: row.event_id == null ? null : Number(row.event_id),
+      eventTitle: row.title || '',
+      eventDate: row.date || '',
+      name: row.name || '',
+      email: row.email || '',
+      status: String(row.status || 'confirmed').toLowerCase()
+    })),
+    sevaRegistrations: sevaResult.rows.map((row) => ({
+      id: String(row.id || ''),
+      userId: row.user_id || null,
+      opportunityId: row.opportunity_id || null,
+      name: row.name || '',
+      email: row.email || '',
+      sevaType: row.seva_type || '',
+      sevaDate: row.seva_date || '',
+      status: String(row.status || 'pending').toLowerCase()
+    }))
+  };
+};
+
+const markUserRegistrationsDormant = async ({ userId, email, contact }) => {
+  if (!pool) {
+    return {
+      eventDormantCount: 0,
+      sevaDormantCount: 0
+    };
+  }
+
+  const normalizedUserId = String(userId || '').trim();
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const normalizedContact = normalizeComparableContact(contact);
+  if (!normalizedUserId && !normalizedEmail && !normalizedContact) {
+    return {
+      eventDormantCount: 0,
+      sevaDormantCount: 0
+    };
+  }
+
+  const eventDormantResult = await pool.query(
+    `
+    WITH touched AS (
+      UPDATE event_registrants
+      SET status = 'dormant'
+      WHERE (
+        ($1 <> '' AND LOWER(COALESCE(email, '')) = $1)
+        OR ($2 <> '' AND REGEXP_REPLACE(LOWER(COALESCE(contact, '')), '[^a-z0-9]', '', 'g') = $2)
+      )
+        AND LOWER(COALESCE(status, '')) NOT IN ('dormant', 'cancelled')
+      RETURNING event_id
+    ),
+    recalc AS (
+      SELECT
+        e.id AS event_id,
+        COALESCE(SUM(CASE WHEN LOWER(COALESCE(r.status, '')) = 'confirmed' THEN 1 ELSE 0 END), 0)::int AS confirmed_count
+      FROM events e
+      LEFT JOIN event_registrants r ON r.event_id = e.id
+      WHERE e.id IN (SELECT DISTINCT event_id FROM touched)
+      GROUP BY e.id
+    )
+    UPDATE events e
+    SET registrations = recalc.confirmed_count,
+        updated_at = NOW()
+    FROM recalc
+    WHERE e.id = recalc.event_id;
+    `,
+    [normalizedEmail, normalizedContact]
+  );
+
+  const sevaDormantResult = await pool.query(
+    `
+    UPDATE volunteer_registrations
+    SET status = 'dormant'
+    WHERE (($1 <> '' AND COALESCE(user_id, '') = $1)
+        OR ($2 <> '' AND LOWER(COALESCE(email, '')) = $2)
+        OR ($3 <> '' AND REGEXP_REPLACE(LOWER(COALESCE(phone, '')), '[^a-z0-9]', '', 'g') = $3))
+      AND LOWER(COALESCE(status, '')) NOT IN ('dormant', 'cancelled', 'rejected');
+    `,
+    [normalizedUserId, normalizedEmail, normalizedContact]
+  );
+
+  return {
+    eventDormantCount: Number(eventDormantResult.rowCount || 0),
+    sevaDormantCount: Number(sevaDormantResult.rowCount || 0)
+  };
+};
+
+const purgeUserRegistrations = async ({ userId, email, contact, name }) => {
+  if (!pool) {
+    return {
+      removedEventRegistrations: 0,
+      removedSevaRegistrations: 0,
+      touchedEvents: 0
+    };
+  }
+
+  const normalizedUserId = String(userId || '').trim();
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const normalizedContact = normalizeComparableContact(contact);
+  const normalizedName = String(name || '').trim().toLowerCase();
+
+  if (!normalizedUserId && !normalizedEmail && !normalizedContact && !normalizedName) {
+    return {
+      removedEventRegistrations: 0,
+      removedSevaRegistrations: 0,
+      touchedEvents: 0
+    };
+  }
+
+  const removedEventResult = await pool.query(
+    `
+    DELETE FROM event_registrants
+    WHERE ($1 <> '' AND LOWER(COALESCE(email, '')) = $1)
+       OR ($1 <> '' AND LOWER(COALESCE(contact, '')) = $1)
+       OR ($2 <> '' AND REGEXP_REPLACE(LOWER(COALESCE(contact, '')), '[^a-z0-9]', '', 'g') = $2)
+       OR ($3 <> '' AND LOWER(COALESCE(name, '')) = $3)
+    RETURNING event_id;
+    `,
+    [normalizedEmail, normalizedContact, normalizedName]
+  );
+
+  const touchedEventIds = [...new Set((removedEventResult.rows || [])
+    .map((row) => Number(row.event_id))
+    .filter((id) => Number.isFinite(id) && id > 0))];
+
+  if (touchedEventIds.length > 0) {
+    await pool.query(
+      `
+      UPDATE events e
+      SET registrations = COALESCE(stats.confirmed_count, 0),
+          updated_at = NOW()
+      FROM (
+        SELECT
+          event_id,
+          COUNT(*)::int AS confirmed_count
+        FROM event_registrants
+        WHERE event_id = ANY($1::bigint[])
+          AND LOWER(COALESCE(status, 'confirmed')) = 'confirmed'
+        GROUP BY event_id
+      ) stats
+      WHERE e.id = stats.event_id;
+      `,
+      [touchedEventIds]
+    );
+
+    await pool.query(
+      `
+      UPDATE events
+      SET registrations = 0,
+          updated_at = NOW()
+      WHERE id = ANY($1::bigint[])
+        AND id NOT IN (
+          SELECT DISTINCT event_id
+          FROM event_registrants
+          WHERE event_id = ANY($1::bigint[])
+            AND LOWER(COALESCE(status, 'confirmed')) = 'confirmed'
+        );
+      `,
+      [touchedEventIds]
+    );
+  }
+
+  const removedSevaResult = await pool.query(
+    `
+    DELETE FROM volunteer_registrations
+    WHERE ($1 <> '' AND COALESCE(user_id, '') = $1)
+       OR ($2 <> '' AND LOWER(COALESCE(email, '')) = $2)
+       OR ($3 <> '' AND REGEXP_REPLACE(LOWER(COALESCE(phone, '')), '[^a-z0-9]', '', 'g') = $3)
+       OR ($4 <> '' AND LOWER(COALESCE(name, '')) = $4)
+    RETURNING id;
+    `,
+    [normalizedUserId, normalizedEmail, normalizedContact, normalizedName]
+  );
+
+  return {
+    removedEventRegistrations: Number(removedEventResult.rowCount || 0),
+    removedSevaRegistrations: Number(removedSevaResult.rowCount || 0),
+    touchedEvents: touchedEventIds.length
+  };
+};
 module.exports = {
   syncRelationalMirrorsFromContentStore,
   hasDatabaseConnection: Boolean(pool),
@@ -2702,5 +2919,8 @@ module.exports = {
   updateEvent,
   removeEvent,
   registerForEvent,
-  removeEventRegistrant
+  removeEventRegistrant,
+  getUserRegistrationDependencies,
+  markUserRegistrationsDormant,
+  purgeUserRegistrations
 };

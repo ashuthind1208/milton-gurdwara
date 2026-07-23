@@ -18,6 +18,7 @@ import cmsService from '../../services/cmsService';
 import advertisementService from '../../services/advertisementService';
 import { useAuth } from '../../context/AuthContext';
 import contentApiService from '../../services/contentApiService';
+import PhoneNumberRequiredNotice from '../../components/common/PhoneNumberRequiredNotice';
 
 const locales = { 'en-US': enUS };
 const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales });
@@ -352,6 +353,7 @@ const EventsPage = () => {
     <div className="space-y-8">
       <Seo {...meta} />
       <PageHero title={content?.heroTitle ?? 'Events and Registrations'} description={content?.heroDescription ?? 'Switch between calendar and list views, filter by category, and RSVP online.'} />
+      {isAuthenticated && profilePhoneMissing ? <PhoneNumberRequiredNotice activityLabel="event registrations" /> : null}
       {content?.mediaUrl ? <img src={content.mediaUrl} alt="Events banner" className="h-56 w-full rounded-xl object-cover" loading="lazy" /> : null}
       {eventsTopAds.length > 0 ? (
         <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">

@@ -30,11 +30,20 @@ import { adminNav } from '../constants/navigation';
 import { useAuth } from '../context/AuthContext';
 import gurdwaraLogo from '../assets/gurdwara-logo.webp';
 import auditService from '../services/auditService';
+import contentApiService from '../services/contentApiService';
 import userService from '../services/userService';
 
 const FULL_ACCESS_ROLES = new Set(['Super Admin', 'Admin']);
 
-const NOTIFICATION_READ_KEY_PREFIX = 'ssm-admin-notifications-read';
+const NOTIFICATION_READ_REMOTE_PREFIX = 'admin_notification_reads';
+
+const normalizeNotificationReadIds = (value) => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return [...new Set(value.map((id) => String(id || '').trim()).filter(Boolean))];
+};
 
 const getFirstName = (fullName) => {
   const tokens = String(fullName || '').trim().split(/\s+/).filter(Boolean);
@@ -103,28 +112,265 @@ const toSimpleActionLabel = (entry) => {
   return `${target.charAt(0).toUpperCase()}${target.slice(1)} activity`;
 };
 
+const adminPageByTargetType = {
+  user: '/admin/users',
+  users: '/admin/users',
+  role: '/admin/roles-access',
+  roles: '/admin/roles-access',
+  event: '/admin/events',
+  events: '/admin/events',
+  donation: '/admin/donations',
+  donations: '/admin/donations',
+  campaign: '/admin/donations',
+  volunteer: '/admin/seva-opportunities',
+  seva: '/admin/seva-opportunities',
+  gallery: '/admin/gallery',
+  library: '/admin/library',
+  video: '/admin/videos',
+  stream: '/admin/streaming',
+  cms: '/admin/cms',
+  hukamnama: '/admin/hukamnama',
+  schedule: '/admin/schedule',
+  sponsor: '/admin/sponsors',
+  advertisement: '/admin/advertisements',
+  kids: '/admin/kids-learning',
+  langar: '/admin/langar'
+};
+
+const toNotificationHrefFromPath = (value = '') => {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return '';
+  }
+
+  if (!raw.startsWith('/admin') && raw.startsWith('/api/')) {
+    if (raw.includes('/events')) return '/admin/events';
+    if (raw.includes('/donation')) return '/admin/donations';
+    if (raw.includes('/volunteer') || raw.includes('/seva')) return '/admin/seva-opportunities';
+    if (raw.includes('/users')) return '/admin/users';
+    if (raw.includes('/roles')) return '/admin/roles-access';
+    if (raw.includes('/news')) return '/admin/news';
+    if (raw.includes('/gallery')) return '/admin/gallery';
+    if (raw.includes('/library')) return '/admin/library';
+    if (raw.includes('/videos')) return '/admin/videos';
+    if (raw.includes('/streaming')) return '/admin/streaming';
+    if (raw.includes('/cms')) return '/admin/cms';
+    if (raw.includes('/hukamnama')) return '/admin/hukamnama';
+    if (raw.includes('/schedule')) return '/admin/schedule';
+    if (raw.includes('/sponsors')) return '/admin/sponsors';
+    if (raw.includes('/advertisements')) return '/admin/advertisements';
+  }
+
+  if (!raw.startsWith('/admin')) {
+    return '';
+  }
+
+  for (let index = 0; index < adminNav.length; index += 1) {
+    const itemPath = String(adminNav[index]?.path || '').trim();
+    if (!itemPath || itemPath === '/admin') {
+      continue;
+    }
+    if (raw === itemPath || raw.startsWith(`${itemPath}/`)) {
+      return itemPath;
+    }
+  }
+
+  return raw === '/admin' ? '/admin' : '';
+};
+
+const toNotificationHref = (entry) => {
+  const pathMatch = toNotificationHrefFromPath(entry?.path);
+  if (pathMatch) {
+    return pathMatch;
+  }
+
+  const normalizedTargetType = String(entry?.targetType || '').trim().toLowerCase();
+  for (const [needle, pagePath] of Object.entries(adminPageByTargetType)) {
+    if (normalizedTargetType.includes(needle)) {
+      return pagePath;
+    }
+  }
+
+  return '';
+};
+
+const toNotificationPageLabel = (path = '') => {
+  const normalized = String(path || '').trim();
+  const matched = adminNav.find((item) => item.path === normalized);
+  if (matched?.label) {
+    return matched.label;
+  }
+  if (!normalized || normalized === '/admin/audit-trail') {
+    return 'Audit Trail';
+  }
+  if (normalized === '/admin') {
+    return 'Dashboard';
+  }
+  const suffix = normalized.replace('/admin/', '').replace(/[-_]+/g, ' ').trim();
+  return suffix ? suffix.charAt(0).toUpperCase() + suffix.slice(1) : 'Admin';
+};
+
+const toNotificationDetail = (entry) => {
+  const description = String(entry?.description || '').trim();
+  if (description) {
+    return description;
+  }
+
+  const targetType = toSimpleTargetLabel(entry?.targetType);
+  const targetId = String(entry?.targetId || '').trim();
+  if (targetId) {
+    return `${targetType} ID: ${targetId}`;
+  }
+
+  return `Activity recorded for ${targetType}.`;
+};
+
+const toAuditPayload = (entry) => {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+  if (!entry.payload || typeof entry.payload !== 'object' || Array.isArray(entry.payload)) {
+    return null;
+  }
+  return entry.payload;
+};
+
+const toNotificationItemTitle = (entry) => {
+  const payload = toAuditPayload(entry);
+  const directCandidates = [
+    payload?.title,
+    payload?.name,
+    payload?.eventTitle,
+    payload?.eventName,
+    payload?.campaignName,
+    payload?.campaign,
+    payload?.sevaType,
+    payload?.folderName,
+    payload?.headline,
+    payload?.pageName,
+    payload?.videoTitle,
+    payload?.streamTitle,
+    payload?.donorName,
+    payload?.userName,
+    payload?.fullName
+  ];
+
+  for (let index = 0; index < directCandidates.length; index += 1) {
+    const value = String(directCandidates[index] || '').trim();
+    if (value) {
+      return value.slice(0, 100);
+    }
+  }
+
+  const description = String(entry?.description || '').trim();
+  if (description) {
+    const createdUpdatedDeletedMatch = description.match(/(?:created|updated|deleted)\s+\w+\s+(.+)/i);
+    if (createdUpdatedDeletedMatch?.[1]) {
+      const candidate = createdUpdatedDeletedMatch[1].trim();
+      if (candidate && !/^\d+$/.test(candidate)) {
+        return candidate.slice(0, 100);
+      }
+    }
+  }
+
+  return '';
+};
+
+const toNotificationChangeSummary = (entry) => {
+  const action = String(entry?.action || '').trim().toLowerCase();
+  const target = toNotificationAffectedItem(entry);
+  let verb = 'changed';
+  if (action.includes('create') || action.includes('add') || action.includes('register')) {
+    verb = 'added';
+  } else if (action.includes('update') || action.includes('edit')) {
+    verb = 'updated';
+  } else if (action.includes('delete') || action.includes('remove')) {
+    verb = 'deleted';
+  } else if (action.includes('approve')) {
+    verb = 'approved';
+  } else if (action.includes('reject')) {
+    verb = 'rejected';
+  }
+  return `${target} was ${verb}.`;
+};
+
+const toNotificationAffectedItem = (entry) => {
+  const itemTitle = toNotificationItemTitle(entry);
+  if (itemTitle) {
+    return itemTitle;
+  }
+
+  const target = toSimpleTargetLabel(entry?.targetType);
+  const targetId = String(entry?.targetId || '').trim();
+  const description = String(entry?.description || '').trim();
+  if (targetId) {
+    return `${target} #${targetId}`;
+  }
+  if (description) {
+    const parts = description.split(/[:.-]/).map((token) => token.trim()).filter(Boolean);
+    if (parts[0]) {
+      return `${target} (${parts[0].slice(0, 70)})`;
+    }
+  }
+  return target;
+};
+
+const toStableAuditNotificationId = (entry, index) => {
+  const directId = String(entry?.id || '').trim();
+  if (directId) {
+    return directId;
+  }
+
+  const createdAt = String(entry?.createdAt || '').trim();
+  const action = String(entry?.action || '').trim().toLowerCase();
+  const targetType = String(entry?.targetType || '').trim().toLowerCase();
+  const targetId = String(entry?.targetId || '').trim().toLowerCase();
+  const actorEmail = String(entry?.actorEmail || '').trim().toLowerCase();
+  const path = String(entry?.path || '').trim().toLowerCase();
+  const description = String(entry?.description || '').trim().toLowerCase();
+
+  const stableBase = [createdAt, action, targetType, targetId, actorEmail, path, description]
+    .filter(Boolean)
+    .join('|');
+
+  if (stableBase) {
+    return `audit-fallback-${stableBase}`;
+  }
+
+  return `audit-index-${index}`;
+};
+
+const notificationToneByPath = {
+  '/admin': 'border-slate-300 bg-gradient-to-r from-slate-100 to-white',
+  '/admin/users': 'border-indigo-300 bg-gradient-to-r from-indigo-100 to-white',
+  '/admin/events': 'border-sky-300 bg-gradient-to-r from-sky-100 to-white',
+  '/admin/donations': 'border-emerald-300 bg-gradient-to-r from-emerald-100 to-white',
+  '/admin/seva-opportunities': 'border-violet-300 bg-gradient-to-r from-violet-100 to-white',
+  '/admin/library': 'border-cyan-300 bg-gradient-to-r from-cyan-100 to-white',
+  '/admin/news': 'border-amber-300 bg-gradient-to-r from-amber-100 to-white',
+  '/admin/gallery': 'border-pink-300 bg-gradient-to-r from-pink-100 to-white',
+  '/admin/videos': 'border-red-300 bg-gradient-to-r from-red-100 to-white',
+  '/admin/streaming': 'border-teal-300 bg-gradient-to-r from-teal-100 to-white',
+  '/admin/cms': 'border-lime-300 bg-gradient-to-r from-lime-100 to-white',
+  '/admin/hukamnama': 'border-fuchsia-300 bg-gradient-to-r from-fuchsia-100 to-white',
+  '/admin/langar': 'border-orange-300 bg-gradient-to-r from-orange-100 to-white',
+  '/admin/sponsors': 'border-rose-300 bg-gradient-to-r from-rose-100 to-white',
+  '/admin/advertisements': 'border-yellow-300 bg-gradient-to-r from-yellow-100 to-white',
+  '/admin/roles-access': 'border-purple-300 bg-gradient-to-r from-purple-100 to-white',
+  '/admin/analytics': 'border-blue-300 bg-gradient-to-r from-blue-100 to-white',
+  '/admin/audit-trail': 'border-slate-300 bg-gradient-to-r from-slate-100 to-white'
+};
+
 const getNotificationToneClasses = (entry, isRead) => {
   if (isRead) {
-    return 'border-slate-200 bg-white';
+    return 'border-slate-200 bg-gradient-to-r from-white to-slate-50';
   }
 
   if (entry.urgent) {
-    return 'border-amber-300 bg-amber-50';
+    return 'border-amber-300 bg-gradient-to-r from-amber-100 to-orange-50';
   }
 
-  if (entry.kind === 'success') {
-    return 'border-emerald-300 bg-emerald-50';
-  }
-
-  if (entry.kind === 'warning') {
-    return 'border-amber-300 bg-amber-50';
-  }
-
-  if (entry.kind === 'danger') {
-    return 'border-rose-300 bg-rose-50';
-  }
-
-  return 'border-blue-300 bg-blue-50';
+  return notificationToneByPath[entry.pagePath] || 'border-blue-300 bg-gradient-to-r from-blue-100 to-sky-50';
 };
 
 const iconByPath = {
@@ -162,14 +408,28 @@ const AdminLayout = () => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const notificationsDesktopRef = useRef(null);
   const notificationsMobileRef = useRef(null);
+  const forcedLogoutRef = useRef(false);
+  const hasHydratedNotificationReadsRef = useRef(false);
+  const skipNextNotificationPersistKeyRef = useRef('');
   const [readNotificationIds, setReadNotificationIds] = useState([]);
-  const notificationReadStorageKey = `${NOTIFICATION_READ_KEY_PREFIX}:${String(user?.email || 'guest').toLowerCase()}`;
+  const notificationReadRemoteKey = useMemo(() => {
+    const normalizedEmail = String(user?.email || 'guest')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    return `${NOTIFICATION_READ_REMOTE_PREFIX}_${normalizedEmail || 'guest'}`;
+  }, [user?.email]);
   const { data: auditLogs = [] } = useQuery({
     queryKey: ['admin-audit-logs'],
     queryFn: () => auditService.getLogs().then((res) => res.data),
-    staleTime: 30 * 1000
+    staleTime: 5 * 1000,
+    refetchInterval: 5 * 1000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true
   });
-  const { data: users = [] } = useQuery({
+  const { data: users = [], isFetched: areUsersFetched } = useQuery({
     queryKey: ['admin-users'],
     queryFn: () => userService.getUsers().then((res) => res.data),
     staleTime: 10 * 1000,
@@ -219,9 +479,13 @@ const AdminLayout = () => {
       items.push({
         id: 'pending-approvals',
         title: `${pendingApprovals} member approval${pendingApprovals === 1 ? '' : 's'} waiting`,
-        meta: 'Please review new member requests.',
+        meta: 'System',
+        detail: 'Open Users and approve or reject pending profiles.',
         timeLabel: 'Action needed',
         href: '/admin/users',
+        pagePath: '/admin/users',
+        pageLabel: 'Users',
+        actorLabel: 'System',
         urgent: true,
         kind: 'warning'
       });
@@ -229,6 +493,7 @@ const AdminLayout = () => {
 
     const recentLogs = (Array.isArray(auditLogs) ? auditLogs : []).slice(0, 7).map((entry, index) => {
       const action = String(entry?.action || '').toLowerCase();
+      const destinationPath = toNotificationHref(entry);
       const kind = action.includes('delete') || action.includes('remove')
         ? 'danger'
         : action.includes('create') || action.includes('add') || action.includes('approve')
@@ -236,11 +501,17 @@ const AdminLayout = () => {
           : 'info';
 
       return {
-        id: entry?.id || `audit-${index}`,
+        id: toStableAuditNotificationId(entry, index),
         title: toSimpleActionLabel(entry),
-        meta: `By ${entry?.actorName || entry?.actorEmail || 'system'}`,
+        meta: `${entry?.actorName || entry?.actorEmail || 'System'}${entry?.actorRole ? ` • ${entry.actorRole}` : ''}`,
+        detail: toNotificationDetail(entry),
+        changeSummary: toNotificationChangeSummary(entry),
+        affectedItem: toNotificationAffectedItem(entry),
         timeLabel: formatActivityTime(entry?.createdAt),
-        href: '/admin/audit-trail',
+        href: destinationPath,
+        pagePath: destinationPath,
+        pageLabel: toNotificationPageLabel(destinationPath),
+        actorLabel: entry?.actorName || entry?.actorEmail || 'System',
         urgent: false,
         kind
       };
@@ -248,10 +519,10 @@ const AdminLayout = () => {
 
     const combined = [...items, ...recentLogs];
     if (hasFullAccess) {
-      return combined.slice(0, 8);
+      return combined.filter((entry) => entry.href).slice(0, 8);
     }
 
-    return combined.filter((entry) => !entry.href || limitedAccessPaths.includes(entry.href)).slice(0, 8);
+    return combined.filter((entry) => entry.href && limitedAccessPaths.includes(entry.href)).slice(0, 8);
   }, [auditLogs, hasFullAccess, limitedAccessPaths, pendingApprovals]);
   const unreadNotificationCount = useMemo(
     () => notifications.filter((entry) => !readNotificationIds.includes(entry.id)).length,
@@ -301,22 +572,87 @@ const AdminLayout = () => {
   }, [hasFullAccess, limitedAccessPaths, location.pathname, navigate]);
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(notificationReadStorageKey);
-      const parsed = raw ? JSON.parse(raw) : [];
-      setReadNotificationIds(Array.isArray(parsed) ? parsed : []);
-    } catch {
-      setReadNotificationIds([]);
+    if (forcedLogoutRef.current) {
+      return;
     }
-  }, [notificationReadStorageKey]);
+
+    if (!areUsersFetched) {
+      return;
+    }
+
+    const currentEmail = String(user?.email || '').trim().toLowerCase();
+    if (!currentEmail) {
+      return;
+    }
+
+    const hasUserRecord = users.some((entry) => String(entry?.email || '').trim().toLowerCase() === currentEmail);
+    const isInactive = effectiveUser?.isActive === false;
+    const isApproved = String(effectiveUser?.approvalStatus || 'approved').trim().toLowerCase() === 'approved';
+    const accessRevoked = !hasUserRecord || isInactive || !isApproved;
+
+    if (!accessRevoked) {
+      return;
+    }
+
+    forcedLogoutRef.current = true;
+    try {
+      window.sessionStorage.setItem('ssm_admin_logout_in_progress', '1');
+    } catch {
+      // Ignore storage write failures.
+    }
+
+    Promise.resolve(logout()).finally(() => {
+      navigate('/', { replace: true, state: { accessNotice: 'account_inactive' } });
+    });
+  }, [areUsersFetched, effectiveUser?.approvalStatus, effectiveUser?.isActive, logout, navigate, user?.email, users]);
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(notificationReadStorageKey, JSON.stringify(readNotificationIds));
-    } catch {
-      // Ignore storage write errors.
+    hasHydratedNotificationReadsRef.current = false;
+    let cancelled = false;
+
+    const hydrateNotificationReads = async () => {
+      let nextReadIds = [];
+      try {
+        const remote = await contentApiService.getSingleton(notificationReadRemoteKey, null);
+        const remoteReadIds = normalizeNotificationReadIds(remote?.readIds || remote?.ids || remote);
+        nextReadIds = remoteReadIds;
+      } catch {
+        // Ignore remote read failures and keep empty fallback.
+      }
+
+      if (cancelled) {
+        return;
+      }
+
+      setReadNotificationIds(nextReadIds);
+      skipNextNotificationPersistKeyRef.current = notificationReadRemoteKey;
+      hasHydratedNotificationReadsRef.current = true;
+    };
+
+    void hydrateNotificationReads();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [notificationReadRemoteKey]);
+
+  useEffect(() => {
+    if (!hasHydratedNotificationReadsRef.current) {
+      return;
     }
-  }, [notificationReadStorageKey, readNotificationIds]);
+
+    if (skipNextNotificationPersistKeyRef.current === notificationReadRemoteKey) {
+      skipNextNotificationPersistKeyRef.current = '';
+      return;
+    }
+
+    void contentApiService.setSingleton(notificationReadRemoteKey, {
+      readIds: normalizeNotificationReadIds(readNotificationIds),
+      updatedAt: new Date().toISOString()
+    }).catch(() => {
+      // Ignore remote sync failures.
+    });
+  }, [notificationReadRemoteKey, readNotificationIds]);
 
   useEffect(() => {
     if (!isNotificationsOpen) {
@@ -390,31 +726,38 @@ const AdminLayout = () => {
 
   const renderNotificationsPanel = (widthClassName) => (
     <div className={`absolute right-0 top-12 z-50 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl ${widthClassName}`}>
-      <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
+        <div className="flex items-center justify-between border-b border-slate-700/40 bg-gradient-to-r from-slate-950 via-slate-900 to-brand-blue px-3 py-2 text-white">
         <div>
-          <p className="text-xs font-extrabold uppercase tracking-wide text-slate-700">Notifications</p>
-          <p className="text-[10px] text-slate-500">{unreadNotificationCount} unread</p>
+            <p className="text-xs font-extrabold uppercase tracking-wide text-white">Notifications</p>
+            <p className="text-[10px] text-slate-200">{unreadNotificationCount} unread</p>
         </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={markAllNotificationsAsRead}
-            className="text-[11px] font-semibold text-slate-600 underline underline-offset-2"
+              className="text-[11px] font-semibold text-slate-100 underline underline-offset-2 disabled:opacity-50"
             disabled={unreadNotificationCount === 0}
           >
             Mark all read
           </button>
-          <Link to="/admin/audit-trail" onClick={() => setIsNotificationsOpen(false)} className="text-[11px] font-semibold text-brand-blue underline underline-offset-2">
+            <Link to="/admin/audit-trail" onClick={() => setIsNotificationsOpen(false)} className="text-[11px] font-semibold text-white underline underline-offset-2">
             View all
           </Link>
         </div>
       </div>
-      <div className="max-h-80 overflow-y-auto p-1.5">
+      <div className="max-h-80 overflow-y-auto p-1">
         {notifications.length === 0 ? <p className="p-2 text-xs text-slate-500">No new activities.</p> : null}
         {notifications.map((entry) => {
           const isRead = readNotificationIds.includes(entry.id);
+          const NotificationIcon = iconByPath[entry.pagePath] || BellAlertIcon;
           return (
-            <div key={entry.id} className={`mb-1 rounded-lg border px-2 py-1.5 ${getNotificationToneClasses(entry, isRead)}`}>
+            <div
+              key={entry.id}
+              onMouseEnter={() => markNotificationAsRead(entry.id)}
+              onFocus={() => markNotificationAsRead(entry.id)}
+              className={`group relative mb-1 overflow-hidden rounded-xl border px-2.5 py-2 transition hover:shadow-md ${getNotificationToneClasses(entry, isRead)}`}
+            >
+              <span className="absolute inset-y-0 left-0 w-1 bg-slate-900/20" aria-hidden="true" />
               <div className="flex items-start justify-between gap-2">
                 <Link
                   to={entry.href}
@@ -424,15 +767,21 @@ const AdminLayout = () => {
                   }}
                   className="min-w-0 flex-1"
                 >
-                  <p className="truncate text-xs font-semibold text-slate-800">{entry.title}</p>
-                  <p className="truncate text-[11px] text-slate-600">{entry.meta}</p>
-                  <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">{entry.timeLabel}</p>
+                  <div className="flex items-center gap-1.5">
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300/80 bg-white/85 text-slate-700">
+                      <NotificationIcon className="h-3 w-3" />
+                    </span>
+                    <span className="rounded-full border border-slate-300/70 bg-white/80 px-1.5 py-[1px] text-[9px] font-bold uppercase tracking-wide text-slate-600">{entry.pageLabel || 'Admin'}</span>
+                    <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-slate-500">{entry.timeLabel}</p>
+                  </div>
+                  <p className="mt-1 truncate text-xs font-semibold text-slate-800">{entry.title}</p>
+                  <p className="truncate text-[10px] text-slate-600">By {entry.meta || entry.actorLabel || 'System'}</p>
                 </Link>
                 <button
                   type="button"
                   onClick={() => markNotificationAsRead(entry.id)}
                   disabled={isRead}
-                  className="shrink-0 rounded-md border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="shrink-0 rounded border border-slate-300 bg-white px-1 py-0.5 text-[9px] font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isRead ? 'Read' : 'Mark read'}
                 </button>

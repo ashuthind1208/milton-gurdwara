@@ -3378,7 +3378,27 @@ const server = http.createServer(async (request, response) => {
       const resource = String(contentResourceIdMatch[1]).toLowerCase();
       const id = parseStringPathId(decodeURIComponent(contentResourceIdMatch[2]), 'id');
       const body = await parseAndValidateGenericObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
+      const existingUsers = resource === 'users' ? await eventsDb.listItems('users') : null;
+      const existingUser = Array.isArray(existingUsers) ? existingUsers.find((entry) => String(entry?.id || '') === String(id)) : null;
       const data = await eventsDb.updateItem(resource, id, body);
+
+      if (resource === 'users' && eventsDb.hasDatabaseConnection) {
+        const mergedUser = {
+          ...(existingUser || {}),
+          ...(data || {}),
+          ...(body || {}),
+          id: String(id)
+        };
+        const becameInactive = (existingUser?.isActive !== false) && (mergedUser?.isActive === false);
+        if (becameInactive) {
+          await eventsDb.markUserRegistrationsDormant({
+            userId: mergedUser.id,
+            email: mergedUser.email,
+            contact: mergedUser.phone
+          });
+        }
+      }
+
       if (resource !== 'audit_logs') {
         await appendAuditLog(request, {
           action: 'content.update',
@@ -3399,6 +3419,20 @@ const server = http.createServer(async (request, response) => {
     try {
       const resource = String(contentResourceIdMatch[1]).toLowerCase();
       const id = parseStringPathId(decodeURIComponent(contentResourceIdMatch[2]), 'id');
+
+      if (resource === 'users' && eventsDb.hasDatabaseConnection) {
+        const users = await eventsDb.listItems('users');
+        const targetUser = Array.isArray(users) ? users.find((entry) => String(entry?.id || '') === String(id)) : null;
+        if (targetUser) {
+          await eventsDb.purgeUserRegistrations({
+            userId: targetUser.id,
+            email: targetUser.email,
+            contact: targetUser.phone,
+            name: targetUser.name
+          });
+        }
+      }
+
       const data = await eventsDb.removeItem(resource, id);
       if (resource !== 'audit_logs') {
         await appendAuditLog(request, {
@@ -3410,7 +3444,11 @@ const server = http.createServer(async (request, response) => {
       }
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
-      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to delete content item.' });
+      sendJson(response, error.status || 500, {
+        ok: false,
+        message: error.message || 'Unable to delete content item.',
+        details: error.details || null
+      });
     }
     return;
   }
@@ -4100,9 +4138,15 @@ const server = http.createServer(async (request, response) => {
   if (requestUrl.pathname === '/api/donation-campaigns' && request.method === 'POST') {
     try {
       const body = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
-      ensureNoUnknownKeys(body, ['name', 'description', 'target', 'raised', 'startDate', 'endDate', 'active', 'isActive']);
+      ensureNoUnknownKeys(body, [
+        'name', 'description', 'target', 'raised', 'startDate', 'endDate', 'active', 'isActive',
+        'progressTitle', 'progressDescription', 'progressPhotos', 'progressUpdates', 'progressItems', 'storyBlocks',
+        'paymentProvider', 'paymentLink', 'stripeBuyButtonId', 'stripePublishableKey'
+      ]);
       readStringField(body, 'name', { required: true, min: 2, max: 180 });
       readStringField(body, 'description', { max: 1000 });
+      readStringField(body, 'progressTitle', { max: 180 });
+      readStringField(body, 'progressDescription', { max: 5000 });
       readNumberField(body, 'target', { min: 0, max: 500000000 });
       readNumberField(body, 'raised', { min: 0, max: 500000000 });
       const startDate = readStringField(body, 'startDate', { max: 64 });
@@ -4113,6 +4157,42 @@ const server = http.createServer(async (request, response) => {
       if (endDate) {
         assertInput(!Number.isNaN(new Date(endDate).getTime()), 'endDate must be a valid date string.');
       }
+      const progressPhotos = readArrayField(body, 'progressPhotos', { max: 200 });
+      if (progressPhotos) {
+        progressPhotos.forEach((entry, index) => {
+          assertInput(typeof entry === 'string', `progressPhotos[${index}] must be a string.`);
+          assertInput(String(entry).trim().length <= 1200, `progressPhotos[${index}] must be at most 1200 characters.`);
+        });
+      }
+      const progressUpdates = readArrayField(body, 'progressUpdates', { max: 200 });
+      if (progressUpdates) {
+        progressUpdates.forEach((entry, index) => {
+          validateGenericJsonValue(entry, `progressUpdates[${index}]`, 0);
+        });
+      }
+      const progressItems = readArrayField(body, 'progressItems', { max: 500 });
+      if (progressItems) {
+        progressItems.forEach((entry, index) => {
+          validateGenericJsonValue(entry, `progressItems[${index}]`, 0);
+        });
+      }
+      const storyBlocks = readArrayField(body, 'storyBlocks', { max: 500 });
+      if (storyBlocks) {
+        storyBlocks.forEach((entry, index) => {
+          validateGenericJsonValue(entry, `storyBlocks[${index}]`, 0);
+        });
+      }
+      const paymentProviderRaw = readStringField(body, 'paymentProvider', { max: 20 });
+      const paymentProvider = String(paymentProviderRaw || '').trim().toUpperCase();
+      if (paymentProvider) {
+        assertInput(['STRIPE', 'PAYPAL'].includes(paymentProvider), 'paymentProvider must be STRIPE or PAYPAL.');
+      }
+      const paymentLink = readStringField(body, 'paymentLink', { max: 1200 });
+      if (paymentLink) {
+        assertInput(/^https?:\/\//i.test(paymentLink), 'paymentLink must be a valid http/https URL.');
+      }
+      readStringField(body, 'stripeBuyButtonId', { max: 180 });
+      readStringField(body, 'stripePublishableKey', { max: 240 });
       readBooleanField(body, 'active');
       readBooleanField(body, 'isActive');
       const data = await createDonationCampaign(body);
@@ -4135,9 +4215,15 @@ const server = http.createServer(async (request, response) => {
     try {
       const id = parseNumericPathId(decodeURIComponent(campaignIdMatch[1]), 'campaign id');
       const body = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
-      ensureNoUnknownKeys(body, ['name', 'description', 'target', 'raised', 'startDate', 'endDate', 'active', 'isActive']);
+      ensureNoUnknownKeys(body, [
+        'name', 'description', 'target', 'raised', 'startDate', 'endDate', 'active', 'isActive',
+        'progressTitle', 'progressDescription', 'progressPhotos', 'progressUpdates', 'progressItems', 'storyBlocks',
+        'paymentProvider', 'paymentLink', 'stripeBuyButtonId', 'stripePublishableKey'
+      ]);
       readStringField(body, 'name', { min: 2, max: 180 });
       readStringField(body, 'description', { max: 1000 });
+      readStringField(body, 'progressTitle', { max: 180 });
+      readStringField(body, 'progressDescription', { max: 5000 });
       readNumberField(body, 'target', { min: 0, max: 500000000 });
       readNumberField(body, 'raised', { min: 0, max: 500000000 });
       const startDate = readStringField(body, 'startDate', { max: 64 });
@@ -4148,6 +4234,42 @@ const server = http.createServer(async (request, response) => {
       if (endDate) {
         assertInput(!Number.isNaN(new Date(endDate).getTime()), 'endDate must be a valid date string.');
       }
+      const progressPhotos = readArrayField(body, 'progressPhotos', { max: 200 });
+      if (progressPhotos) {
+        progressPhotos.forEach((entry, index) => {
+          assertInput(typeof entry === 'string', `progressPhotos[${index}] must be a string.`);
+          assertInput(String(entry).trim().length <= 1200, `progressPhotos[${index}] must be at most 1200 characters.`);
+        });
+      }
+      const progressUpdates = readArrayField(body, 'progressUpdates', { max: 200 });
+      if (progressUpdates) {
+        progressUpdates.forEach((entry, index) => {
+          validateGenericJsonValue(entry, `progressUpdates[${index}]`, 0);
+        });
+      }
+      const progressItems = readArrayField(body, 'progressItems', { max: 500 });
+      if (progressItems) {
+        progressItems.forEach((entry, index) => {
+          validateGenericJsonValue(entry, `progressItems[${index}]`, 0);
+        });
+      }
+      const storyBlocks = readArrayField(body, 'storyBlocks', { max: 500 });
+      if (storyBlocks) {
+        storyBlocks.forEach((entry, index) => {
+          validateGenericJsonValue(entry, `storyBlocks[${index}]`, 0);
+        });
+      }
+      const paymentProviderRaw = readStringField(body, 'paymentProvider', { max: 20 });
+      const paymentProvider = String(paymentProviderRaw || '').trim().toUpperCase();
+      if (paymentProvider) {
+        assertInput(['STRIPE', 'PAYPAL'].includes(paymentProvider), 'paymentProvider must be STRIPE or PAYPAL.');
+      }
+      const paymentLink = readStringField(body, 'paymentLink', { max: 1200 });
+      if (paymentLink) {
+        assertInput(/^https?:\/\//i.test(paymentLink), 'paymentLink must be a valid http/https URL.');
+      }
+      readStringField(body, 'stripeBuyButtonId', { max: 180 });
+      readStringField(body, 'stripePublishableKey', { max: 240 });
       readBooleanField(body, 'active');
       readBooleanField(body, 'isActive');
       const data = await updateDonationCampaign(id, body);
@@ -4430,11 +4552,25 @@ const server = http.createServer(async (request, response) => {
           assertInput(ADMIN_PAGE_PATHS.includes(String(entry).trim()), `adminPageAccess[${index}] is not an allowed path.`);
         });
       }
-      const next = readUsers().map((user) => (
+      const users = readUsers();
+      const targetUser = users.find((user) => user.id === id) || null;
+      assertInput(Boolean(targetUser), 'User not found.');
+
+      const next = users.map((user) => (
         user.id === id ? normalizeUser({ ...user, ...body, id, createdAt: user.createdAt }) : user
       ));
+      const updatedUser = next.find((user) => user.id === id) || null;
+
+      if (targetUser?.isActive !== false && updatedUser?.isActive === false && eventsDb.hasDatabaseConnection) {
+        await eventsDb.markUserRegistrationsDormant({
+          userId: updatedUser.id,
+          email: updatedUser.email,
+          contact: updatedUser.phone
+        });
+      }
+
       writeUsers(next);
-      sendJson(response, 200, { ok: true, data: next.find((user) => user.id === id) || null });
+      sendJson(response, 200, { ok: true, data: updatedUser });
     } catch (error) {
       sendJson(response, error.status || 500, {
         ok: false,
@@ -4447,13 +4583,27 @@ const server = http.createServer(async (request, response) => {
   if (userPathMatch && request.method === 'DELETE') {
     try {
       const id = parseStringPathId(decodeURIComponent(userPathMatch[1]), 'user id');
+      const users = readUsers();
+      const targetUser = users.find((user) => user.id === id) || null;
+      assertInput(Boolean(targetUser), 'User not found.');
+
+      if (eventsDb.hasDatabaseConnection) {
+        await eventsDb.purgeUserRegistrations({
+          userId: targetUser.id,
+          email: targetUser.email,
+          contact: targetUser.phone,
+          name: targetUser.name
+        });
+      }
+
       const next = readUsers().filter((user) => user.id !== id);
       writeUsers(next);
       sendJson(response, 200, { ok: true, data: { success: true } });
     } catch (error) {
       sendJson(response, error.status || 500, {
         ok: false,
-        message: error.message || 'Unable to delete user.'
+        message: error.message || 'Unable to delete user.',
+        details: error.details || null
       });
     }
     return;
