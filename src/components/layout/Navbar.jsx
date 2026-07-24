@@ -124,6 +124,94 @@ const formatCompactDonationTotal = (value) => {
   return `$${amount.toFixed(2)}`;
 };
 
+const toDateKey = (value) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return '';
+  }
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const parseTimeTokenToMinutes = (token) => {
+  const raw = String(token || '').trim().toLowerCase();
+  if (!raw) {
+    return null;
+  }
+
+  const match = raw.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i);
+  if (!match) {
+    return null;
+  }
+
+  let hour = Number(match[1]);
+  const minute = Number(match[2] || '0');
+  const meridiem = String(match[3] || '').toLowerCase();
+
+  if (!Number.isFinite(hour) || !Number.isFinite(minute) || minute < 0 || minute > 59) {
+    return null;
+  }
+
+  if (meridiem) {
+    if (hour < 1 || hour > 12) {
+      return null;
+    }
+    if (meridiem === 'am') {
+      hour = hour % 12;
+    } else {
+      hour = (hour % 12) + 12;
+    }
+  } else if (hour > 23) {
+    return null;
+  }
+
+  return hour * 60 + minute;
+};
+
+const extractRangeEndMinutes = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return null;
+  }
+
+  const parts = raw.split(/\s*-\s*/);
+  if (parts.length < 2) {
+    return null;
+  }
+
+  const endRaw = parts[parts.length - 1] || '';
+  const startRaw = parts[0] || '';
+  const endHasMeridiem = /\b(am|pm)\b/i.test(endRaw);
+  const startMeridiemMatch = startRaw.match(/\b(am|pm)\b/i);
+  const normalizedEnd = endHasMeridiem || !startMeridiemMatch
+    ? endRaw
+    : `${endRaw} ${startMeridiemMatch[1]}`;
+
+  return parseTimeTokenToMinutes(normalizedEnd);
+};
+
+const nowLocalMinutes = () => {
+  const now = new Date();
+  return (now.getHours() * 60) + now.getMinutes();
+};
+
+const isEventAvailable = (event, now = Date.now()) => {
+  const endStamp = Number.isNaN(new Date(event?.endDate || event?.end).getTime())
+    ? null
+    : new Date(event?.endDate || event?.end).getTime();
+  const startStamp = Number.isNaN(new Date(event?.date).getTime()) ? null : new Date(event?.date).getTime();
+  const referenceStamp = Number.isFinite(endStamp) ? endStamp : startStamp;
+
+  if (!Number.isFinite(referenceStamp)) {
+    return true;
+  }
+
+  return referenceStamp >= now;
+};
+
 const toBase64FromArrayBuffer = (buffer) => {
   const bytes = new Uint8Array(buffer);
   let binary = '';
@@ -374,9 +462,9 @@ const Navbar = () => {
   const assignedAdminPages = Array.isArray(user?.adminPageAccess)
     ? user.adminPageAccess.map((path) => String(path || '').trim()).filter(Boolean)
     : [];
-  const canSeeAdminPortalButton = approvalStatus === 'approved'
-    && (hasFullAccess || assignedAdminPages.length > 0 || userRole !== 'Family');
-  const isApprovalPending = isAuthenticated && !hasFullAccess && approvalStatus !== 'approved';
+  const hasRoleBasedAdminAccess = hasFullAccess || assignedAdminPages.length > 0;
+  const canSeeAdminPortalButton = hasRoleBasedAdminAccess;
+  const isApprovalPending = isAuthenticated && !hasRoleBasedAdminAccess && userRole !== 'Family' && approvalStatus !== 'approved';
   const { data: familyEvents = [] } = useQuery({
     queryKey: ['navbar-family-events'],
     queryFn: () => eventService.getEvents().then((res) => res.data),
@@ -385,6 +473,11 @@ const Navbar = () => {
   const { data: familySeva = [] } = useQuery({
     queryKey: ['admin-volunteers', 'navbar'],
     queryFn: () => volunteerService.getApplications().then((res) => res.data),
+    enabled: isAuthenticated
+  });
+  const { data: familySevaOpportunities = [] } = useQuery({
+    queryKey: ['seva-opportunities', 'navbar', 'all-statuses'],
+    queryFn: () => volunteerService.getSevaOpportunities({ includeInactive: true, includeClosed: true }).then((res) => res.data),
     enabled: isAuthenticated
   });
   const { data: familyDonations = [] } = useQuery({
@@ -681,6 +774,74 @@ const Navbar = () => {
     () => upcomingObservances.find((entry) => entry.date === todayIso) || null,
     [todayIso, upcomingObservances]
   );
+  const visibleFamilyEvents = useMemo(() => {
+    if (!isAuthenticated) {
+      return [];
+    }
+
+    const now = Date.now();
+    return familyEvents.filter((event) => event?.active !== false && isEventAvailable(event, now));
+  }, [familyEvents, isAuthenticated]);
+  const visibleFamilySeva = useMemo(() => {
+    if (!isAuthenticated) {
+      return [];
+    }
+
+    const todayDateKey = toDateKey(Date.now());
+    const opportunitiesById = new Map(
+      familySevaOpportunities.map((item) => [String(item?.id || ''), item])
+    );
+
+    return familySeva.filter((entry) => {
+      const entryEmail = String(entry.email || '').trim().toLowerCase();
+      const entryPhoneRaw = String(entry.phone || entry.whatsapp || '').trim().toLowerCase();
+      const entryPhoneDigits = entryPhoneRaw.replace(/\D/g, '');
+      const entryName = String(entry.name || '').trim().toLowerCase();
+      const hasUserIdentifier = Boolean(userEmail || userPhoneDigits || userPhone);
+      const hasEntryIdentifier = Boolean(entryEmail || entryPhoneDigits || entryPhoneRaw);
+
+      let belongsToUser = false;
+
+      if (userEmail && entryEmail === userEmail) {
+        belongsToUser = true;
+      }
+
+      if (!belongsToUser && userPhoneDigits && entryPhoneDigits && userPhoneDigits === entryPhoneDigits) {
+        belongsToUser = true;
+      }
+
+      if (!belongsToUser && userPhone && entryPhoneRaw && entryPhoneRaw === userPhone) {
+        belongsToUser = true;
+      }
+
+      if (!belongsToUser) {
+        belongsToUser = !hasUserIdentifier && !hasEntryIdentifier && userName && entryName === userName;
+      }
+
+      if (!belongsToUser) {
+        return false;
+      }
+
+      const linkedOpportunity = opportunitiesById.get(String(entry.opportunityId || ''));
+      if (linkedOpportunity) {
+        return linkedOpportunity.isClosed !== true && linkedOpportunity.active !== false;
+      }
+
+      const sevaDateKey = toDateKey(entry.sevaDate || entry.date);
+      if (!sevaDateKey) {
+        return true;
+      }
+
+      if (sevaDateKey === todayDateKey) {
+        const endMinutes = extractRangeEndMinutes(entry.sevaTime || entry.time);
+        if (Number.isFinite(endMinutes) && nowLocalMinutes() > endMinutes) {
+          return false;
+        }
+      }
+
+      return sevaDateKey >= todayDateKey;
+    });
+  }, [familySeva, familySevaOpportunities, isAuthenticated, userEmail, userName, userPhone, userPhoneDigits]);
   const familySummary = useMemo(() => {
     if (!isAuthenticated) {
       return {
@@ -693,7 +854,7 @@ const Navbar = () => {
 
     let eventCount = 0;
     let waitlistCount = 0;
-    familyEvents.forEach((event) => {
+    visibleFamilyEvents.forEach((event) => {
       const registrants = Array.isArray(event.registrants) ? event.registrants : [];
       registrants.forEach((entry) => {
         const entryName = String(entry.name || '').trim().toLowerCase();
@@ -710,28 +871,7 @@ const Navbar = () => {
       });
     });
 
-    const sevaCount = familySeva.filter((entry) => {
-      const entryEmail = String(entry.email || '').trim().toLowerCase();
-      const entryPhoneRaw = String(entry.phone || entry.whatsapp || '').trim().toLowerCase();
-      const entryPhoneDigits = entryPhoneRaw.replace(/\D/g, '');
-      const entryName = String(entry.name || '').trim().toLowerCase();
-      const hasUserIdentifier = Boolean(userEmail || userPhoneDigits || userPhone);
-      const hasEntryIdentifier = Boolean(entryEmail || entryPhoneDigits || entryPhoneRaw);
-
-      if (userEmail && entryEmail === userEmail) {
-        return true;
-      }
-
-      if (userPhoneDigits && entryPhoneDigits && userPhoneDigits === entryPhoneDigits) {
-        return true;
-      }
-
-      if (userPhone && entryPhoneRaw && entryPhoneRaw === userPhone) {
-        return true;
-      }
-
-      return !hasUserIdentifier && !hasEntryIdentifier && userName && entryName === userName;
-    }).length;
+    const sevaCount = visibleFamilySeva.length;
 
     const donationTotal = familyDonations
       .filter((entry) => String(entry.donorEmail || '').trim().toLowerCase() === userEmail)
@@ -743,7 +883,7 @@ const Navbar = () => {
       sevaCount,
       donationTotal
     };
-  }, [familyDonations, familyEvents, familySeva, isAuthenticated, userEmail, userName, userPhone, userPhoneDigits]);
+  }, [familyDonations, isAuthenticated, userEmail, visibleFamilyEvents, visibleFamilySeva]);
 
   const handleLogout = async () => {
     setIsProfilePopoverOpen(false);

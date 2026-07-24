@@ -236,9 +236,18 @@ const userService = {
     const roleDefinitions = await getRoleDefinitions();
     const normalized = normalizeUser(payload, roleDefinitions);
     const existing = await findUserByEmail(normalized.email);
+    const hasNameInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'name');
+    const hasPhoneInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'phone');
+    const hasAddressInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'address');
+    const hasAuthProviderInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'authProvider');
+    const hasAvatarUrlInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'avatarUrl');
     const hasAdminPageAccessInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'adminPageAccess');
     const hasRoleInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'role');
-    const roleChanged = hasRoleInPayload && normalizeRole(payload.role) !== normalizeRole(existing?.role);
+    const hasMemberTypeInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'memberType');
+    const hasApprovalStatusInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'approvalStatus');
+    const hasRegistrationCompleteInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'registrationComplete');
+    const nextRole = hasRoleInPayload ? normalizeRole(payload.role) : normalizeRole(existing?.role || normalized.role);
+    const roleChanged = hasRoleInPayload && nextRole !== normalizeRole(existing?.role);
     const nextAdminPageAccess = hasAdminPageAccessInPayload
       ? normalized.adminPageAccess
       : (roleChanged ? undefined : existing?.adminPageAccess);
@@ -254,7 +263,16 @@ const userService = {
     const updated = await contentApiService.update(RESOURCE, existing.id, {
       ...existing,
       ...normalized,
-      adminPageAccess: resolveRoleAdminPageAccess(normalized.role, nextAdminPageAccess, roleDefinitions),
+      name: hasNameInPayload ? normalized.name : existing.name,
+      phone: hasPhoneInPayload ? normalized.phone : existing.phone,
+      address: hasAddressInPayload ? normalized.address : existing.address,
+      authProvider: hasAuthProviderInPayload ? normalized.authProvider : existing.authProvider,
+      avatarUrl: hasAvatarUrlInPayload ? normalized.avatarUrl : existing.avatarUrl,
+      role: nextRole,
+      memberType: hasMemberTypeInPayload ? normalized.memberType : existing.memberType,
+      approvalStatus: hasApprovalStatusInPayload ? normalized.approvalStatus : existing.approvalStatus,
+      registrationComplete: hasRegistrationCompleteInPayload ? normalized.registrationComplete : existing.registrationComplete,
+      adminPageAccess: resolveRoleAdminPageAccess(nextRole, nextAdminPageAccess, roleDefinitions),
       id: existing.id,
       createdAt: existing.createdAt,
       updatedAt: new Date().toISOString()

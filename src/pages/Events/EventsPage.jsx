@@ -39,6 +39,24 @@ const normalizeTextToken = (value) => String(value || '').trim().toLowerCase();
 const normalizePhoneToken = (value) => String(value || '').replace(/\D/g, '');
 const EVENTS_IDENTITY_SETTING_KEY = 'settings-events-allow-custom-name-email';
 
+const toEventTimestamp = (value) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return parsed.getTime();
+};
+
+const isEventAvailable = (event, now = Date.now()) => {
+  const endStamp = toEventTimestamp(event?.endDate || event?.end);
+  const startStamp = toEventTimestamp(event?.date);
+  const referenceStamp = Number.isFinite(endStamp) ? endStamp : startStamp;
+  if (!Number.isFinite(referenceStamp)) {
+    return true;
+  }
+  return referenceStamp >= now;
+};
+
 const EventsPage = () => {
   const meta = useSeoMeta('Events', 'Event calendar, list view, filters, and RSVP registration for all programs.');
   const location = useLocation();
@@ -119,6 +137,10 @@ const EventsPage = () => {
         throw new Error('You have already registered for this event.');
       }
 
+      if (!isEventAvailable(selectedEvent)) {
+        throw new Error('This event is no longer available for registration.');
+      }
+
       return eventService.registerForEvent({
         eventId: selectedEvent?.id,
         name: values.name,
@@ -188,12 +210,13 @@ const EventsPage = () => {
   const selectedEventConfirmedRegistrations = Number(selectedEvent?.registrations || 0);
   const selectedEventIsFull = selectedEventCapacity > 0 && selectedEventConfirmedRegistrations >= selectedEventCapacity;
   const selectedEventWaitlistEnabled = selectedEvent?.waitlistEnabled !== false;
-  const canRegisterForSelectedEvent = !selectedEventIsFull || selectedEventWaitlistEnabled;
+  const isSelectedEventAvailable = Boolean(selectedEvent) && isEventAvailable(selectedEvent);
+  const canRegisterForSelectedEvent = isSelectedEventAvailable && (!selectedEventIsFull || selectedEventWaitlistEnabled);
 
-  const activeEvents = useMemo(
-    () => events.filter((event) => event.active !== false),
-    [events]
-  );
+  const activeEvents = useMemo(() => {
+    const now = Date.now();
+    return events.filter((event) => event.active !== false && isEventAvailable(event, now));
+  }, [events]);
 
   const filtered = useMemo(
     () => (category === 'All' ? activeEvents : activeEvents.filter((event) => event.category === category)),
@@ -645,12 +668,17 @@ const EventsPage = () => {
                         You have already registered for this event.
                       </p>
                     ) : null}
-                    {!isAlreadyRegisteredForSelectedEvent && selectedEventIsFull && selectedEventWaitlistEnabled ? (
+                    {!isAlreadyRegisteredForSelectedEvent && !isSelectedEventAvailable ? (
+                      <p className="rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700">
+                        Registration is closed because this event date has passed.
+                      </p>
+                    ) : null}
+                    {!isAlreadyRegisteredForSelectedEvent && isSelectedEventAvailable && selectedEventIsFull && selectedEventWaitlistEnabled ? (
                       <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
                         This event is full. You can still join the waitlist.
                       </p>
                     ) : null}
-                    {!isAlreadyRegisteredForSelectedEvent && selectedEventIsFull && !selectedEventWaitlistEnabled ? (
+                    {!isAlreadyRegisteredForSelectedEvent && isSelectedEventAvailable && selectedEventIsFull && !selectedEventWaitlistEnabled ? (
                       <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
                         This event is full and waitlist is closed.
                       </p>

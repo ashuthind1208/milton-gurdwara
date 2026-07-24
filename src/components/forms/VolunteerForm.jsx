@@ -8,6 +8,7 @@ const VolunteerForm = ({
   onSubmit,
   options = [],
   disableSubmit = false,
+  isSubmitting = false,
   initialValues = {},
   lockedOpportunity = null,
   showIdentityFields = false,
@@ -43,7 +44,7 @@ const VolunteerForm = ({
     : 'Date TBD';
   const lockedOpportunityTimeLabel = lockedOpportunity?.time || 'Time TBD';
   const alreadyRegistered = Boolean(selectedOption?.alreadyRegistered || selectedOption?.disabled);
-  const submitDisabled = disableSubmit || options.length === 0 || alreadyRegistered;
+  const submitDisabled = disableSubmit || isSubmitting || options.length === 0 || alreadyRegistered;
 
   useEffect(() => {
     reset({
@@ -172,7 +173,7 @@ const VolunteerForm = ({
       {alreadyRegistered ? (
         <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">You have already registered for this seva.</p>
       ) : null}
-      {!alreadyRegistered ? <Button type="submit" className="w-full" disabled={submitDisabled}>{disableSubmit || options.length === 0 ? 'Registration Closed' : submitLabel}</Button> : null}
+      {!alreadyRegistered ? <Button type="submit" className="w-full" disabled={submitDisabled}>{disableSubmit || options.length === 0 ? 'Registration Closed' : (isSubmitting ? 'Submitting...' : submitLabel)}</Button> : null}
     </form>
   );
 };

@@ -22,7 +22,17 @@ const normalizeBoolean = (value, fallback = true) => {
   return fallback;
 };
 
-const toIsoDate = (value) => new Date(value).toISOString().slice(0, 10);
+const toIsoDate = (value) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return '';
+  }
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 const normalizeDateKey = (value) => {
   const raw = String(value || '').trim();
@@ -43,6 +53,68 @@ const normalizeDateKey = (value) => {
   return parsed.toISOString().slice(0, 10);
 };
 
+const parseTimeTokenToMinutes = (token) => {
+  const raw = String(token || '').trim().toLowerCase();
+  if (!raw) {
+    return null;
+  }
+
+  const match = raw.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i);
+  if (!match) {
+    return null;
+  }
+
+  let hour = Number(match[1]);
+  const minute = Number(match[2] || '0');
+  const meridiem = String(match[3] || '').toLowerCase();
+
+  if (!Number.isFinite(hour) || !Number.isFinite(minute) || minute < 0 || minute > 59) {
+    return null;
+  }
+
+  if (meridiem) {
+    if (hour < 1 || hour > 12) {
+      return null;
+    }
+    if (meridiem === 'am') {
+      hour = hour % 12;
+    } else {
+      hour = (hour % 12) + 12;
+    }
+  } else if (hour > 23) {
+    return null;
+  }
+
+  return hour * 60 + minute;
+};
+
+const extractRangeEndMinutes = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return null;
+  }
+
+  const parts = raw.split(/\s*-\s*/);
+  if (parts.length < 2) {
+    return null;
+  }
+
+  const endRaw = parts[parts.length - 1] || '';
+  const startRaw = parts[0] || '';
+  const endHasMeridiem = /\b(am|pm)\b/i.test(endRaw);
+  const startMeridiemMatch = startRaw.match(/\b(am|pm)\b/i);
+  const normalizedEnd = endHasMeridiem || !startMeridiemMatch
+    ? endRaw
+    : `${endRaw} ${startMeridiemMatch[1]}`;
+
+  return parseTimeTokenToMinutes(normalizedEnd);
+};
+
+const nowLocalMinutes = () => {
+  const now = new Date();
+  return (now.getHours() * 60) + now.getMinutes();
+};
+
 const normalizeOpportunity = (item, index = 0) => ({
   id: item.id || `op-${index + 1}`,
   sevaType: item.sevaType || '',
@@ -54,11 +126,28 @@ const normalizeOpportunity = (item, index = 0) => ({
   active: normalizeBoolean(item.active, true)
 });
 
+const isOpportunityClosedByDate = (item, todayDateKey = toIsoDate(Date.now())) => {
+  const normalizedDate = normalizeDateKey(item?.date);
+  const normalizedExpiryDate = normalizeDateKey(item?.expiryDate);
+  const isPastDate = Boolean(normalizedDate) && normalizedDate < todayDateKey;
+  const isExpired = Boolean(normalizedExpiryDate) && normalizedExpiryDate < todayDateKey;
+  if (isPastDate || isExpired) {
+    return true;
+  }
+
+  if (normalizedDate && normalizedDate === todayDateKey) {
+    const endMinutes = extractRangeEndMinutes(item?.time);
+    if (Number.isFinite(endMinutes) && nowLocalMinutes() > endMinutes) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
 const enrichOpportunityStatus = (item) => {
   const today = toIsoDate(Date.now());
-  const isPastDate = Boolean(item?.date) && item.date < today;
-  const isExpired = Boolean(item?.expiryDate) && item.expiryDate < today;
-  const isClosed = isPastDate || isExpired;
+  const isClosed = isOpportunityClosedByDate(item, today);
 
   return {
     ...item,
@@ -162,7 +251,7 @@ const volunteerService = {
     }
 
     const today = toIsoDate(Date.now());
-    if (selectedOpportunity.expiryDate && selectedOpportunity.expiryDate < today) {
+    if (isOpportunityClosedByDate(selectedOpportunity, today)) {
       throw new Error('Registration is closed for this seva opportunity.');
     }
 
@@ -254,11 +343,7 @@ const volunteerService = {
           name: payload.name,
           email: payload.email,
           phone: payload.phone || '',
-          memberType: 'Volunteer',
-          role: 'Volunteer',
-          authProvider: 'LOCAL',
-          registrationComplete: true,
-          approvalStatus: 'pending'
+          registrationComplete: true
         });
       } catch {
         // Do not block volunteer registration if user upsert fails.

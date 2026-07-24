@@ -1,17 +1,23 @@
 import { Navigate, Outlet, useLocation, useOutletContext } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
+const FULL_ACCESS_ROLES = new Set(['Super Admin', 'Admin']);
+
 const ProtectedRoute = ({ allowedRoles = [], allowAssignedAdminAccess = true }) => {
   const { isAuthenticated, user } = useAuth();
   const location = useLocation();
   const parentOutletContext = useOutletContext();
   const isAdminRoute = location.pathname === '/admin' || location.pathname.startsWith('/admin/');
   const isUserActive = user?.isActive !== false;
-  const isUserApproved = String(user?.approvalStatus || 'approved').trim().toLowerCase() === 'approved';
+  const hasFullAccessRole = FULL_ACCESS_ROLES.has(String(user?.role || ''));
   const assignedAdminPages = Array.isArray(user?.adminPageAccess)
     ? user.adminPageAccess.map((path) => String(path || '').trim()).filter(Boolean)
     : [];
   const hasAssignedAdminAccess = assignedAdminPages.length > 0;
+  const hasRoleBasedAdminAccess = hasFullAccessRole || hasAssignedAdminAccess;
+  const isUserApproved = hasRoleBasedAdminAccess
+    ? true
+    : String(user?.approvalStatus || 'approved').trim().toLowerCase() === 'approved';
 
   if (!isAuthenticated) {
     if (isAdminRoute) {

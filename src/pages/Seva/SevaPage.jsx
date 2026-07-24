@@ -118,6 +118,7 @@ const SevaPage = () => {
   const [searchText, setSearchText] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
+  const [isSubmittingRegistration, setIsSubmittingRegistration] = useState(false);
   const profilePhoneMissing = !String(user?.phone || '').trim();
   const currentUserEmail = String(user?.email || '').trim().toLowerCase();
   const currentUserPhone = String(user?.phone || '').trim().toLowerCase();
@@ -151,6 +152,10 @@ const SevaPage = () => {
   const sevaFooterAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Seva Footer Banner').slice(0, 2), [ads]);
 
   const onSubmit = async (payload) => {
+    if (isSubmittingRegistration) {
+      return;
+    }
+
     if (!isAuthenticated && !allowIdentityOverride) {
       window.alert('Please sign in before registering for seva.');
       return;
@@ -160,6 +165,7 @@ const SevaPage = () => {
       return;
     }
 
+    setIsSubmittingRegistration(true);
     try {
       const response = await volunteerService.apply({ ...payload, isAuthenticated });
       await Promise.all([
@@ -176,6 +182,8 @@ const SevaPage = () => {
       window.alert('Thank you for registering for seva.');
     } catch (error) {
       window.alert(error?.message || 'Unable to register for seva right now.');
+    } finally {
+      setIsSubmittingRegistration(false);
     }
   };
 
@@ -661,6 +669,7 @@ const SevaPage = () => {
                   alreadyRegistered: false
                 }] : selectableOptions}
                 disableSubmit={!activeRegisterOpportunity}
+                isSubmitting={isSubmittingRegistration}
                 lockedOpportunity={activeRegisterOpportunity ? {
                   id: activeRegisterOpportunity.id,
                   sevaType: activeRegisterOpportunity.sevaType,

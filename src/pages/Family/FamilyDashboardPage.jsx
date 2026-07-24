@@ -13,6 +13,91 @@ import volunteerService from '../../services/volunteerService';
 import { downloadCsv, downloadDonationInvoicePdf } from '../../utils/csvExport';
 import { siteConfig } from '../../constants/siteConfig';
 
+const toDateKey = (value) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return '';
+  }
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const parseTimeTokenToMinutes = (token) => {
+  const raw = String(token || '').trim().toLowerCase();
+  if (!raw) {
+    return null;
+  }
+
+  const match = raw.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i);
+  if (!match) {
+    return null;
+  }
+
+  let hour = Number(match[1]);
+  const minute = Number(match[2] || '0');
+  const meridiem = String(match[3] || '').toLowerCase();
+
+  if (!Number.isFinite(hour) || !Number.isFinite(minute) || minute < 0 || minute > 59) {
+    return null;
+  }
+
+  if (meridiem) {
+    if (hour < 1 || hour > 12) {
+      return null;
+    }
+    if (meridiem === 'am') {
+      hour = hour % 12;
+    } else {
+      hour = (hour % 12) + 12;
+    }
+  } else if (hour > 23) {
+    return null;
+  }
+
+  return hour * 60 + minute;
+};
+
+const extractRangeEndMinutes = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return null;
+  }
+
+  const parts = raw.split(/\s*-\s*/);
+  if (parts.length < 2) {
+    return null;
+  }
+
+  const endRaw = parts[parts.length - 1] || '';
+  const startRaw = parts[0] || '';
+  const endHasMeridiem = /\b(am|pm)\b/i.test(endRaw);
+  const startMeridiemMatch = startRaw.match(/\b(am|pm)\b/i);
+  const normalizedEnd = endHasMeridiem || !startMeridiemMatch
+    ? endRaw
+    : `${endRaw} ${startMeridiemMatch[1]}`;
+
+  return parseTimeTokenToMinutes(normalizedEnd);
+};
+
+const nowLocalMinutes = () => {
+  const now = new Date();
+  return (now.getHours() * 60) + now.getMinutes();
+};
+
+const isEventAvailable = (event, now = Date.now()) => {
+  const endStamp = Number.isNaN(new Date(event?.endDate || event?.end).getTime())
+    ? null
+    : new Date(event?.endDate || event?.end).getTime();
+  const startStamp = Number.isNaN(new Date(event?.date).getTime()) ? null : new Date(event?.date).getTime();
+  const referenceStamp = Number.isFinite(endStamp) ? endStamp : startStamp;
+  if (!Number.isFinite(referenceStamp)) {
+    return true;
+  }
+  return referenceStamp >= now;
+};
+
 const FamilyDashboardPage = () => {
   const meta = useSeoMeta('Family Dashboard', 'Track your family event RSVPs, waitlists, seva applications, and donations in one view.');
   const { user, isAuthenticated } = useAuth();
@@ -39,6 +124,12 @@ const FamilyDashboardPage = () => {
     enabled: isAuthenticated
   });
 
+  const { data: allSevaOpportunities = [] } = useQuery({
+    queryKey: ['seva-opportunities', 'family-dashboard', 'all-statuses'],
+    queryFn: () => volunteerService.getSevaOpportunities({ includeInactive: true, includeClosed: true }).then((res) => res.data),
+    enabled: isAuthenticated
+  });
+
   const { data: donations = [] } = useQuery({
     queryKey: ['family-dashboard-donations'],
     queryFn: () => donationService.getDonations().then((res) => res.data),
@@ -50,8 +141,13 @@ const FamilyDashboardPage = () => {
       return [];
     }
 
+    const now = Date.now();
     const rows = [];
     events.forEach((event) => {
+      if (!isEventAvailable(event, now)) {
+        return;
+      }
+
       const registrants = Array.isArray(event.registrants) ? event.registrants : [];
       registrants.forEach((entry) => {
         const entryName = String(entry.name || '').trim().toLowerCase();
@@ -82,6 +178,11 @@ const FamilyDashboardPage = () => {
       return [];
     }
 
+    const todayDateKey = toDateKey(Date.now());
+    const opportunitiesById = new Map(
+      allSevaOpportunities.map((item) => [String(item?.id || ''), item])
+    );
+
     return sevaApplications.filter((entry) => {
       const entryEmail = String(entry.email || '').trim().toLowerCase();
       const entryPhoneRaw = String(entry.phone || entry.whatsapp || '').trim().toLowerCase();
@@ -90,21 +191,48 @@ const FamilyDashboardPage = () => {
       const hasUserIdentifier = Boolean(email || userPhoneDigits || userPhone);
       const hasEntryIdentifier = Boolean(entryEmail || entryPhoneDigits || entryPhoneRaw);
 
+      let belongsToUser = false;
+
       if (email && entryEmail === email) {
+        belongsToUser = true;
+      }
+
+      if (!belongsToUser && userPhoneDigits && entryPhoneDigits && userPhoneDigits === entryPhoneDigits) {
+        belongsToUser = true;
+      }
+
+      if (!belongsToUser && userPhone && entryPhoneRaw && userPhone === entryPhoneRaw) {
+        belongsToUser = true;
+      }
+
+      if (!belongsToUser) {
+        belongsToUser = !hasUserIdentifier && !hasEntryIdentifier && userName && entryName === userName;
+      }
+
+      if (!belongsToUser) {
+        return false;
+      }
+
+      const linkedOpportunity = opportunitiesById.get(String(entry.opportunityId || ''));
+      if (linkedOpportunity) {
+        return !linkedOpportunity.isClosed && linkedOpportunity.active !== false;
+      }
+
+      const sevaDateKey = toDateKey(entry.sevaDate || entry.date);
+      if (!sevaDateKey) {
         return true;
       }
 
-      if (userPhoneDigits && entryPhoneDigits && userPhoneDigits === entryPhoneDigits) {
-        return true;
+      if (sevaDateKey === todayDateKey) {
+        const endMinutes = extractRangeEndMinutes(entry.sevaTime || entry.time);
+        if (Number.isFinite(endMinutes) && nowLocalMinutes() > endMinutes) {
+          return false;
+        }
       }
 
-      if (userPhone && entryPhoneRaw && userPhone === entryPhoneRaw) {
-        return true;
-      }
-
-      return !hasUserIdentifier && !hasEntryIdentifier && userName && entryName === userName;
+      return sevaDateKey >= todayDateKey;
     });
-  }, [sevaApplications, isAuthenticated, email, userName, userPhone, userPhoneDigits]);
+  }, [sevaApplications, isAuthenticated, email, userName, userPhone, userPhoneDigits, allSevaOpportunities]);
 
   const familyDonations = useMemo(() => {
     if (!isAuthenticated) {
@@ -185,6 +313,20 @@ const FamilyDashboardPage = () => {
     }
   });
 
+  const removeSevaApplicationMutation = useMutation({
+    mutationFn: ({ id }) => volunteerService.removeApplication(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-volunteers'] });
+      queryClient.invalidateQueries({ queryKey: ['family-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['seva-opportunities'] });
+      queryClient.invalidateQueries({ queryKey: ['navbar-family-events'] });
+      queryClient.invalidateQueries({ queryKey: ['navbar-family-donations'] });
+    },
+    onError: (error) => {
+      window.alert(error?.message || 'Unable to remove this seva application right now.');
+    }
+  });
+
   const handleNotGoing = (entry) => {
     if (!entry?.eventId || !entry?.registrantId) {
       window.alert('Unable to remove this registration because details are missing.');
@@ -200,6 +342,20 @@ const FamilyDashboardPage = () => {
       eventId: entry.eventId,
       registrantId: entry.registrantId
     });
+  };
+
+  const handleNotAttendingSeva = (entry) => {
+    if (!entry?.id) {
+      window.alert('Unable to remove this seva application because details are missing.');
+      return;
+    }
+
+    const confirmed = window.confirm(`Remove your seva application for ${entry.sevaType || entry.area || 'this opportunity'}?`);
+    if (!confirmed) {
+      return;
+    }
+
+    removeSevaApplicationMutation.mutate({ id: entry.id });
   };
 
   const totalDonationPages = Math.max(1, Math.ceil(familyDonations.length / donationsPerPage));
@@ -364,8 +520,25 @@ const FamilyDashboardPage = () => {
             <div className="mt-3 space-y-2">
               {familySevaApplications.map((entry) => (
                 <div key={entry.id} className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 text-sm">
-                  <p className="font-semibold text-slate-800">{entry.sevaType || entry.area || 'Seva'}</p>
-                  <p className="text-xs text-slate-600">{formatSevaDateLabel(entry.sevaDate || entry.date)} • {entry.sevaTime || '-'}</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-semibold text-slate-800">{entry.sevaType || entry.area || 'Seva'}</p>
+                      <p className="text-xs text-slate-600">{formatSevaDateLabel(entry.sevaDate || entry.date)} • {entry.sevaTime || '-'}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleNotAttendingSeva(entry)}
+                      disabled={removeSevaApplicationMutation.isPending}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-full border border-red-300 px-2 py-0.5 text-[11px] font-semibold text-red-700 transition hover:border-red-400 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <XCircleIcon className="h-3.5 w-3.5" />
+                      <span>
+                        {removeSevaApplicationMutation.isPending && removeSevaApplicationMutation.variables?.id === entry.id
+                          ? 'Removing...'
+                          : 'Not Attending'}
+                      </span>
+                    </button>
+                  </div>
                 </div>
               ))}
               {familySevaApplications.length === 0 ? <p className="text-sm text-slate-500">No seva applications found for your profile yet.</p> : null}

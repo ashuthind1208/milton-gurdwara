@@ -451,6 +451,7 @@ const AdminLayout = () => {
     () => (Array.isArray(effectiveUser?.adminPageAccess) ? effectiveUser.adminPageAccess.map((path) => String(path || '').trim()).filter(Boolean) : []),
     [effectiveUser?.adminPageAccess]
   );
+  const hasRoleBasedAdminAccess = hasFullAccess || assignedAdminPages.length > 0;
   const limitedAccessPaths = useMemo(() => {
     const normalized = [...new Set(assignedAdminPages)];
     if (normalized.includes('/admin')) {
@@ -587,8 +588,12 @@ const AdminLayout = () => {
 
     const hasUserRecord = users.some((entry) => String(entry?.email || '').trim().toLowerCase() === currentEmail);
     const isInactive = effectiveUser?.isActive === false;
-    const isApproved = String(effectiveUser?.approvalStatus || 'approved').trim().toLowerCase() === 'approved';
-    const accessRevoked = !hasUserRecord || isInactive || !isApproved;
+    const isApproved = hasRoleBasedAdminAccess
+      ? true
+      : String(effectiveUser?.approvalStatus || 'approved').trim().toLowerCase() === 'approved';
+    const accessRevoked = hasRoleBasedAdminAccess
+      ? isInactive
+      : (!hasUserRecord || isInactive || !isApproved);
 
     if (!accessRevoked) {
       return;
@@ -604,7 +609,7 @@ const AdminLayout = () => {
     Promise.resolve(logout()).finally(() => {
       navigate('/', { replace: true, state: { accessNotice: 'account_inactive' } });
     });
-  }, [areUsersFetched, effectiveUser?.approvalStatus, effectiveUser?.isActive, logout, navigate, user?.email, users]);
+  }, [areUsersFetched, effectiveUser?.approvalStatus, effectiveUser?.isActive, hasRoleBasedAdminAccess, logout, navigate, user?.email, users]);
 
   useEffect(() => {
     hasHydratedNotificationReadsRef.current = false;

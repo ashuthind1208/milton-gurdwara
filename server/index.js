@@ -4323,7 +4323,7 @@ const server = http.createServer(async (request, response) => {
       const body = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
       ensureNoUnknownKeys(body, [
         'id', 'campaignId', 'campaignName', 'donorName', 'donorEmail', 'amount', 'amountCents', 'frequency', 'paymentProvider',
-        'sessionId', 'paymentIntentId', 'origin', 'donationPurpose', 'createdAt', 'metadata'
+        'sessionId', 'paymentIntentId', 'checkoutUrl', 'origin', 'donationPurpose', 'createdAt', 'metadata'
       ]);
       readStringField(body, 'id', { max: 160, pattern: simpleIdPattern });
       readNumberField(body, 'campaignId', { integer: true, min: 1, max: 1000000000 });
@@ -4336,6 +4336,10 @@ const server = http.createServer(async (request, response) => {
       readStringField(body, 'paymentProvider', { max: 40 });
       readStringField(body, 'sessionId', { max: 180 });
       readStringField(body, 'paymentIntentId', { max: 180 });
+      const checkoutUrl = readStringField(body, 'checkoutUrl', { max: 2000 });
+      if (checkoutUrl) {
+        assertInput(/^https?:\/\//i.test(checkoutUrl), 'checkoutUrl must be a valid http/https URL.');
+      }
       const origin = readStringField(body, 'origin', { max: 300 });
       if (origin) {
         assertInput(/^https?:\/\//i.test(origin), 'origin must be a valid http/https URL.');
