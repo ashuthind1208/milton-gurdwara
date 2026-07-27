@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const https = require('https');
+const { spawn } = require('child_process');
 const { URL } = require('url');
 const Stripe = require('stripe');
 const crypto = require('crypto');
@@ -43,6 +44,43 @@ loadEnvFile(path.join(workspaceRoot, '.env.local'));
 
 const eventsDb = require('./db/postgres');
 
+const API_VERSION = '2026-07-27.phase2';
+const API_STARTUP_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const PHASE2_TRANSLITERATION_VARIANTS = {
+  gurdwara: ['gurudwara', 'gurdawara'],
+  gurudwara: ['gurdwara', 'gurdawara'],
+  seva: ['sewa'],
+  sewa: ['seva'],
+  waheguru: ['vaheguru'],
+  vaheguru: ['waheguru'],
+  gurbani: ['gurubani'],
+  gurubani: ['gurbani'],
+  langar: ['lungar'],
+  lungar: ['langar'],
+  nanakshahi: ['nanak shahi']
+};
+
+const buildPhase2SearchVariants = (query) => {
+  const trimmed = String(query || '').trim().toLowerCase();
+  if (!trimmed) {
+    return [];
+  }
+
+  const variants = new Set([trimmed]);
+  const tokens = trimmed.split(/\s+/).filter(Boolean);
+
+  tokens.forEach((token) => {
+    const replacements = PHASE2_TRANSLITERATION_VARIANTS[token] || [];
+    replacements.forEach((candidate) => {
+      variants.add(tokens.map((part) => (part === token ? candidate : part)).join(' '));
+      variants.add(candidate);
+    });
+  });
+
+  return Array.from(variants).slice(0, 5);
+};
+
 const resolveServerPort = () => {
   const preferred = Number(process.env.STRIPE_API_PORT || process.env.SERVER_PORT || 4242);
   if (Number.isFinite(preferred) && preferred > 0) {
@@ -76,8 +114,9 @@ const uploadServiceMimePolicies = {
   default: ['image/*']
 };
 const maxJsonBodyBytes = 2 * 1024 * 1024;
+const internalMailRelayUrl = String(process.env.INTERNAL_MAIL_RELAY_URL || `http://127.0.0.1:${port}/api/internal/mail-relay`).trim();
 const volunteerReminderWebhookUrl = String(
-  process.env.VOLUNTEER_REMINDER_WEBHOOK_URL || process.env.REACT_APP_APPROVAL_EMAIL_WEBHOOK_URL || ''
+  process.env.VOLUNTEER_REMINDER_WEBHOOK_URL || process.env.REACT_APP_APPROVAL_EMAIL_WEBHOOK_URL || internalMailRelayUrl
 ).trim();
 const volunteerReminderLogoUrl = String(process.env.VOLUNTEER_REMINDER_LOGO_URL || '').trim();
 const volunteerReminderSiteName = String(process.env.VOLUNTEER_REMINDER_ORG_NAME || 'Singh Sabha Milton Gurdwara').trim();
@@ -86,9 +125,9 @@ const volunteerReminderHtmlTemplateEnabled = String(process.env.VOLUNTEER_REMIND
 const volunteerReminderSendTimeRaw = String(process.env.VOLUNTEER_REMINDER_SEND_TIME || '09:00').trim();
 const volunteerReminderTimeZone = String(process.env.VOLUNTEER_REMINDER_TIME_ZONE || 'America/Toronto').trim() || 'America/Toronto';
 const volunteerReminderDays = [10, 5, 2, 1];
-const eventReminderWebhookUrl = String(process.env.EVENT_REMINDER_WEBHOOK_URL || volunteerReminderWebhookUrl || '').trim();
+const eventReminderWebhookUrl = String(process.env.EVENT_REMINDER_WEBHOOK_URL || volunteerReminderWebhookUrl || internalMailRelayUrl).trim();
 const donationInvoiceWebhookUrl = String(
-  process.env.DONATION_INVOICE_WEBHOOK_URL || process.env.DONATION_EMAIL_WEBHOOK_URL || volunteerReminderWebhookUrl || ''
+  process.env.DONATION_INVOICE_WEBHOOK_URL || process.env.DONATION_EMAIL_WEBHOOK_URL || volunteerReminderWebhookUrl || internalMailRelayUrl
 ).trim();
 const eventReminderSendTimeRaw = String(process.env.EVENT_REMINDER_SEND_TIME || volunteerReminderSendTimeRaw || '09:00').trim();
 const eventReminderTimeZone = String(process.env.EVENT_REMINDER_TIME_ZONE || volunteerReminderTimeZone || 'America/Toronto').trim() || 'America/Toronto';
@@ -96,6 +135,7 @@ const eventReminderDays = String(process.env.EVENT_REMINDER_DAYS || '7,3,1')
   .split(',')
   .map((value) => Number(String(value || '').trim()))
   .filter((value) => Number.isFinite(value) && value >= 0);
+const localMailFromAddress = String(process.env.LOCAL_MAIL_FROM || 'no-reply@singhsabhamilton.local').trim() || 'no-reply@singhsabhamilton.local';
 let volunteerReminderSweepRunning = false;
 let volunteerReminderLastRunDateKey = '';
 let eventReminderSweepRunning = false;
@@ -243,6 +283,7 @@ const ADMIN_PAGE_PATHS = [
   '/admin/events',
   '/admin/kids-learning',
   '/admin/donations',
+  '/admin/newsletter',
   '/admin/audit-trail',
   '/admin/users'
 ];
@@ -406,6 +447,205 @@ const parseJsonObjectBody = async (request, options = {}) => {
 
   assertInput(isPlainObject(parsed), 'Request body must be a JSON object.');
   return parsed;
+};
+
+const isLoopbackAddress = (value = '') => {
+  const normalized = String(value || '').trim();
+  if (!normalized) {
+    return false;
+  }
+  if (normalized === '127.0.0.1' || normalized === '::1' || normalized === '::ffff:127.0.0.1') {
+    return true;
+  }
+  return normalized.startsWith('::ffff:127.');
+};
+
+const sanitizeHeaderValue = (value = '') => {
+  return String(value || '').replace(/[\r\n]+/g, ' ').trim();
+};
+
+const decodeDataUrlBase64 = (value = '') => {
+  const text = String(value || '').trim();
+  if (!text) {
+    return '';
+  }
+  const match = text.match(/^data:[^;]+;base64,(.+)$/i);
+  if (!match) {
+    return '';
+  }
+  return String(match[1] || '').trim();
+};
+
+const encodeMimeBase64 = (value = '') => {
+  const content = Buffer.from(String(value || ''), 'utf8').toString('base64');
+  return content.replace(/(.{76})/g, '$1\r\n');
+};
+
+const normalizeRecipientList = (payload = {}) => {
+  const list = [];
+
+  const pushIfEmail = (candidate) => {
+    const email = String(candidate || '').trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return;
+    }
+    if (!list.includes(email)) {
+      list.push(email);
+    }
+  };
+
+  const toField = String(payload.to || payload.email || payload.primaryRecipient || '').trim();
+  if (toField) {
+    toField.split(',').forEach((entry) => pushIfEmail(entry));
+  }
+
+  const toList = Array.isArray(payload.toList) ? payload.toList : [];
+  toList.forEach((entry) => pushIfEmail(entry));
+
+  const recipientEmails = Array.isArray(payload.recipientEmails) ? payload.recipientEmails : [];
+  recipientEmails.forEach((entry) => pushIfEmail(entry));
+
+  const recipients = Array.isArray(payload.recipients) ? payload.recipients : [];
+  recipients.forEach((entry) => pushIfEmail(entry));
+
+  return list;
+};
+
+const normalizeAttachmentList = (payload = {}) => {
+  const attachments = [];
+  const raw = Array.isArray(payload.attachments) ? payload.attachments : [];
+
+  raw.forEach((entry, index) => {
+    const fileName = sanitizeHeaderValue(entry?.filename || `attachment-${index + 1}.bin`) || `attachment-${index + 1}.bin`;
+    const contentType = sanitizeHeaderValue(entry?.contentType || 'application/octet-stream') || 'application/octet-stream';
+    const directBase64 = String(entry?.content || '').trim();
+    const dataUrlBase64 = decodeDataUrlBase64(entry?.dataUrl || entry?.url || '');
+    const base64 = directBase64 || dataUrlBase64;
+    if (!base64) {
+      return;
+    }
+    attachments.push({
+      filename: fileName,
+      contentType,
+      contentBase64: base64.replace(/\s+/g, '')
+    });
+  });
+
+  const invoiceName = sanitizeHeaderValue(payload.invoicePdfFileName || 'invoice.pdf') || 'invoice.pdf';
+  const invoiceData = decodeDataUrlBase64(payload.invoicePdfDataUrl || '');
+  if (invoiceData) {
+    const exists = attachments.some((entry) => String(entry.filename || '').toLowerCase() === String(invoiceName || '').toLowerCase());
+    if (!exists) {
+      attachments.push({
+        filename: invoiceName,
+        contentType: 'application/pdf',
+        contentBase64: invoiceData.replace(/\s+/g, '')
+      });
+    }
+  }
+
+  return attachments;
+};
+
+const buildMimeEmail = ({ from, toList, subject, textBody, htmlBody, attachments = [] }) => {
+  const safeFrom = sanitizeHeaderValue(from || 'no-reply@singhsabhamilton.local') || 'no-reply@singhsabhamilton.local';
+  const safeSubject = sanitizeHeaderValue(subject || 'Notification');
+  const safeTo = toList.map((entry) => sanitizeHeaderValue(entry)).filter(Boolean).join(', ');
+  const plainText = String(textBody || '').trim() || 'Notification from Singh Sabha Milton.';
+  const html = String(htmlBody || '').trim();
+
+  const headers = [
+    `From: ${safeFrom}`,
+    `To: ${safeTo}`,
+    `Subject: ${safeSubject}`,
+    'MIME-Version: 1.0'
+  ];
+
+  const altBoundary = `alt_${crypto.randomBytes(8).toString('hex')}`;
+  const mixBoundary = `mix_${crypto.randomBytes(8).toString('hex')}`;
+
+  const plainPart = [
+    `--${altBoundary}`,
+    'Content-Type: text/plain; charset=UTF-8',
+    'Content-Transfer-Encoding: base64',
+    '',
+    encodeMimeBase64(plainText)
+  ].join('\r\n');
+
+  const htmlPart = html
+    ? [
+      `--${altBoundary}`,
+      'Content-Type: text/html; charset=UTF-8',
+      'Content-Transfer-Encoding: base64',
+      '',
+      encodeMimeBase64(html)
+    ].join('\r\n')
+    : '';
+
+  const alternativeBody = [
+    plainPart,
+    htmlPart,
+    `--${altBoundary}--`
+  ].filter(Boolean).join('\r\n');
+
+  if (attachments.length === 0) {
+    headers.push(`Content-Type: multipart/alternative; boundary="${altBoundary}"`);
+    return `${headers.join('\r\n')}\r\n\r\n${alternativeBody}\r\n`;
+  }
+
+  headers.push(`Content-Type: multipart/mixed; boundary="${mixBoundary}"`);
+
+  const attachmentParts = attachments.map((entry) => {
+    const safeName = sanitizeHeaderValue(entry.filename || 'attachment.bin') || 'attachment.bin';
+    const safeType = sanitizeHeaderValue(entry.contentType || 'application/octet-stream') || 'application/octet-stream';
+    const encoded = String(entry.contentBase64 || '').replace(/\s+/g, '').replace(/(.{76})/g, '$1\r\n');
+    return [
+      `--${mixBoundary}`,
+      `Content-Type: ${safeType}; name="${safeName}"`,
+      `Content-Disposition: attachment; filename="${safeName}"`,
+      'Content-Transfer-Encoding: base64',
+      '',
+      encoded
+    ].join('\r\n');
+  });
+
+  const message = [
+    headers.join('\r\n'),
+    '',
+    `--${mixBoundary}`,
+    `Content-Type: multipart/alternative; boundary="${altBoundary}"`,
+    '',
+    alternativeBody,
+    ...attachmentParts,
+    `--${mixBoundary}--`,
+    ''
+  ].join('\r\n');
+
+  return message;
+};
+
+const sendViaLocalSendmail = async ({ from, toList, subject, textBody, htmlBody, attachments }) => {
+  const message = buildMimeEmail({ from, toList, subject, textBody, htmlBody, attachments });
+
+  await new Promise((resolve, reject) => {
+    const child = spawn('/usr/sbin/sendmail', ['-t', '-oi']);
+    let stderr = '';
+
+    child.on('error', (error) => reject(error));
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString('utf8');
+    });
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(stderr.trim() || `sendmail exited with code ${code}`));
+    });
+
+    child.stdin.write(message, 'utf8');
+    child.stdin.end();
+  });
 };
 
 const ensureNoUnknownKeys = (payload, allowedKeys, label = 'body') => {
@@ -3053,8 +3293,67 @@ const server = http.createServer(async (request, response) => {
       ok: true,
       stripeConfigured: Boolean(stripeSecretKey),
       webhookConfigured: Boolean(stripeWebhookSecret),
-      eventsDatabaseConfigured: eventsDb.hasDatabaseConnection
+      eventsDatabaseConfigured: eventsDb.hasDatabaseConnection,
+      apiVersion: API_VERSION,
+      startupId: API_STARTUP_ID,
+      serverPort: port
     });
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/internal/mail-relay' && request.method === 'POST') {
+    const remoteAddress = String(request.socket?.remoteAddress || '').trim();
+    if (!isLoopbackAddress(remoteAddress)) {
+      sendJson(response, 403, {
+        ok: false,
+        message: 'Mail relay only accepts local requests.'
+      });
+      return;
+    }
+
+    try {
+      const payload = await parseJsonObjectBody(request);
+      const relayPayload = isPlainObject(payload.body) ? payload.body : payload;
+      const recipients = normalizeRecipientList(relayPayload);
+      if (recipients.length === 0) {
+        sendJson(response, 400, {
+          ok: false,
+          message: 'Recipient address required.'
+        });
+        return;
+      }
+
+      const subject = sanitizeHeaderValue(relayPayload.subject || relayPayload.title || 'Singh Sabha Milton Notification')
+        || 'Singh Sabha Milton Notification';
+      const htmlBody = String(relayPayload.html || relayPayload.bodyHtml || relayPayload.content || relayPayload.message || '').trim();
+      const textBody = String(relayPayload.text || relayPayload.bodyText || relayPayload.message || '').trim();
+      const attachments = normalizeAttachmentList(relayPayload);
+
+      await sendViaLocalSendmail({
+        from: localMailFromAddress,
+        toList: recipients,
+        subject,
+        textBody,
+        htmlBody,
+        attachments
+      });
+
+      sendJson(response, 200, {
+        ok: true,
+        sent: true,
+        provider: 'local-sendmail',
+        recipients: recipients.length,
+        hasAttachments: attachments.length > 0,
+        type: String(relayPayload.type || '').trim() || 'generic'
+      });
+    } catch (error) {
+      logServerError(error, 'mail-relay');
+      sendJson(response, 502, {
+        ok: false,
+        sent: false,
+        message: error?.message || 'Unable to send relay email.'
+      });
+    }
     return;
   }
 
@@ -3480,6 +3779,144 @@ const server = http.createServer(async (request, response) => {
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
       sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to update singleton content.' });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/search/fulltext' && request.method === 'GET') {
+    try {
+      if (!eventsDb.hasDatabaseConnection) {
+        sendJson(response, 503, {
+          ok: false,
+          message: 'Search backend is unavailable because database is not configured.'
+        });
+        return;
+      }
+
+      const rawQuery = String(requestUrl.searchParams.get('q') || '').trim();
+      const rawLimit = Number(requestUrl.searchParams.get('limit') || 12);
+      const limit = Number.isFinite(rawLimit) ? Math.min(25, Math.max(1, Math.floor(rawLimit))) : 12;
+      const rawScope = String(requestUrl.searchParams.get('scope') || 'public').trim().toLowerCase();
+      const scope = rawScope === 'admin' ? 'admin' : 'public';
+
+      if (rawQuery.length < 2) {
+        sendJson(response, 200, { ok: true, data: [], metadata: { variants: [], minChars: 2 } });
+        return;
+      }
+
+      const variants = buildPhase2SearchVariants(rawQuery);
+      const resultsByKey = new Map();
+
+      const batches = await Promise.all(
+        variants.map((variant) => eventsDb.searchPublicContent(variant, { limit: Math.max(20, limit * 2), scope }))
+      );
+
+      batches.forEach((rows, variantIndex) => {
+        (Array.isArray(rows) ? rows : []).forEach((row) => {
+          const key = `${row.type}:${row.id}`;
+          const existing = resultsByKey.get(key);
+          if (!existing || Number(row.score || 0) > Number(existing.score || 0)) {
+            resultsByKey.set(key, {
+              ...row,
+              matchedVariant: variants[variantIndex] || rawQuery
+            });
+          }
+        });
+      });
+
+      const data = Array.from(resultsByKey.values())
+        .sort((left, right) => {
+          const scoreDelta = Number(right.score || 0) - Number(left.score || 0);
+          if (scoreDelta !== 0) {
+            return scoreDelta;
+          }
+          return new Date(right.updatedAt || 0).getTime() - new Date(left.updatedAt || 0).getTime();
+        })
+        .slice(0, limit);
+
+      sendJson(response, 200, {
+        ok: true,
+        data,
+        metadata: {
+          variants,
+          source: 'postgres_full_text',
+          scope,
+          count: data.length
+        }
+      });
+    } catch (error) {
+      sendJson(response, 500, {
+        ok: false,
+        message: error.message || 'Unable to run full-text search.'
+      });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/phase2/channels-config' && request.method === 'GET') {
+    try {
+      const defaults = {
+        whatsAppOptInEnabled: false,
+        whatsAppJoinLink: '',
+        kioskModeEnabled: false,
+        kioskHomeRoute: '/',
+        kioskInactivityTimeoutSeconds: 90
+      };
+      const data = await eventsDb.getSingleton('phase2_channels_config', defaults);
+      sendJson(response, 200, { ok: true, data: data || defaults });
+    } catch (error) {
+      sendJson(response, 500, {
+        ok: false,
+        message: error.message || 'Unable to fetch Phase 2 channel config.'
+      });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/phase2/channels-config' && request.method === 'PUT') {
+    try {
+      const body = await parseAndValidateGenericObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
+      ensureNoUnknownKeys(body, [
+        'whatsAppOptInEnabled',
+        'whatsAppJoinLink',
+        'kioskModeEnabled',
+        'kioskHomeRoute',
+        'kioskInactivityTimeoutSeconds'
+      ]);
+
+      const whatsAppOptInEnabled = readBooleanField(body, 'whatsAppOptInEnabled');
+      const whatsAppJoinLink = readStringField(body, 'whatsAppJoinLink', { max: 300 });
+      const kioskModeEnabled = readBooleanField(body, 'kioskModeEnabled');
+      const kioskHomeRoute = readStringField(body, 'kioskHomeRoute', { max: 120 }) || '/';
+      const kioskInactivityTimeoutSeconds = Number(body.kioskInactivityTimeoutSeconds);
+      assertInput(
+        Number.isFinite(kioskInactivityTimeoutSeconds) && kioskInactivityTimeoutSeconds >= 15 && kioskInactivityTimeoutSeconds <= 1800,
+        'kioskInactivityTimeoutSeconds must be between 15 and 1800 seconds.'
+      );
+
+      const payload = {
+        whatsAppOptInEnabled: whatsAppOptInEnabled === true,
+        whatsAppJoinLink,
+        kioskModeEnabled: kioskModeEnabled === true,
+        kioskHomeRoute,
+        kioskInactivityTimeoutSeconds: Math.floor(kioskInactivityTimeoutSeconds)
+      };
+
+      const data = await eventsDb.setSingleton('phase2_channels_config', payload);
+      await appendAuditLog(request, {
+        action: 'phase2.channels-config.update',
+        targetType: 'phase2_channels_config',
+        targetId: 'phase2_channels_config',
+        description: 'Updated Phase 2 WhatsApp and kiosk configuration',
+        payload
+      });
+
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, error.status || 500, {
+        ok: false,
+        message: error.message || 'Unable to update Phase 2 channel config.'
+      });
     }
     return;
   }
