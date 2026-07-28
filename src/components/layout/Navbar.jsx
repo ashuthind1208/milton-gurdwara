@@ -1232,7 +1232,7 @@ const Navbar = () => {
     setMembershipPromptNotice('');
     openMembershipModal();
     return undefined;
-  }, [isAuthenticated, isMembershipModalOpen, isMembershipProfileCompleted, openMembershipModal, userRole]);
+  }, [isAuthenticated, isMembershipModalOpen, isMembershipProfileCompleted, openMembershipModal, userRole, approvalStatus, user?.isActive]);
 
   useEffect(() => {
     if (!membershipPromptNotice) {

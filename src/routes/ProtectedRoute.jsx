@@ -14,7 +14,6 @@ const ProtectedRoute = ({ allowedRoles = [], allowAssignedAdminAccess = true }) 
     ? user.adminPageAccess.map((path) => String(path || '').trim()).filter(Boolean)
     : [];
   const hasAssignedAdminAccess = assignedAdminPages.length > 0;
-  const hasRoleBasedAdminAccess = hasFullAccessRole || hasAssignedAdminAccess;
   const isUserApproved = hasFullAccessRole
     ? true
     : String(user?.approvalStatus || '').trim().toLowerCase() === 'approved';

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
@@ -32,23 +32,22 @@ const GlobalSearchBar = ({
   const rootRef = useRef(null);
   const inputRef = useRef(null);
 
-  const isAdminRoute = (route = '') => String(route || '').trim().startsWith('/admin');
-  const isScopedItem = (item) => {
+  const isScopedItem = useCallback((item) => {
     const route = String(item?.route || '').trim();
     if (!route) {
       return false;
     }
 
     if (scope === 'admin') {
-      return isAdminRoute(route);
+      return route.startsWith('/admin');
     }
 
     if (scope === 'public') {
-      return !isAdminRoute(route);
+      return !route.startsWith('/admin');
     }
 
     return true;
-  };
+  }, [scope]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -60,7 +59,7 @@ const GlobalSearchBar = ({
 
   const searchItems = useMemo(
     () => (Array.isArray(items) ? items : indexedItems).filter((item) => isScopedItem(item)),
-    [items, indexedItems, scope]
+    [items, indexedItems, isScopedItem]
   );
 
   const localResultPayload = useMemo(
@@ -85,7 +84,7 @@ const GlobalSearchBar = ({
 
   const backendResultPayload = useMemo(
     () => groupSearchResultsByType((backendSearchQuery.data || []).filter((item) => isScopedItem(item)), { maxResults: 8, maxPerGroup: 3 }),
-    [backendSearchQuery.data, scope]
+    [backendSearchQuery.data, isScopedItem]
   );
 
   const shouldUseBackendResults = backendSearchQuery.isSuccess;
@@ -110,7 +109,7 @@ const GlobalSearchBar = ({
     });
 
     return groupSearchResultsByType(Array.from(merged.values()), { maxResults: 8, maxPerGroup: 3 });
-  }, [backendSearchQuery.data, backendSearchQuery.isSuccess, hasCustomRemoteSearch, localResultPayload, scope]);
+  }, [backendSearchQuery.data, backendSearchQuery.isSuccess, hasCustomRemoteSearch, localResultPayload, isScopedItem]);
 
   const resultPayload = hasCustomRemoteSearch
     ? customRemoteResultPayload

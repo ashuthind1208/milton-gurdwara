@@ -137,7 +137,6 @@ const FamilyDashboardPage = () => {
         const entryContact = String(entry.contact || entry.phone || entry.whatsapp || '').trim().toLowerCase();
         const entryContactDigits = entryContact.replace(/\D/g, '');
         const entryEmail = String(entry.email || '').trim().toLowerCase();
-        const hasUserIdentifier = Boolean(email || userPhoneDigits || userPhone);
         const hasEntryIdentifier = Boolean(entryEmail || entryContactDigits || entryContact);
 
         let belongsToUser = false;
