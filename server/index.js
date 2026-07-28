@@ -136,6 +136,13 @@ const eventReminderDays = String(process.env.EVENT_REMINDER_DAYS || '7,3,1')
   .map((value) => Number(String(value || '').trim()))
   .filter((value) => Number.isFinite(value) && value >= 0);
 const localMailFromAddress = String(process.env.LOCAL_MAIL_FROM || 'no-reply@singhsabhamilton.local').trim() || 'no-reply@singhsabhamilton.local';
+const localMailTransport = String(process.env.LOCAL_MAIL_TRANSPORT || 'sendmail').trim().toLowerCase();
+const smtpHost = String(process.env.SMTP_HOST || '').trim();
+const smtpPortRaw = Number(process.env.SMTP_PORT || 587);
+const smtpSecure = String(process.env.SMTP_SECURE || 'false').trim().toLowerCase() === 'true';
+const smtpUser = String(process.env.SMTP_USER || '').trim();
+const smtpPass = String(process.env.SMTP_PASS || '').trim();
+const smtpFromAddress = String(process.env.SMTP_FROM || localMailFromAddress).trim() || localMailFromAddress;
 let volunteerReminderSweepRunning = false;
 let volunteerReminderLastRunDateKey = '';
 let eventReminderSweepRunning = false;
@@ -624,11 +631,29 @@ const buildMimeEmail = ({ from, toList, subject, textBody, htmlBody, attachments
   return message;
 };
 
+const extractEmailAddress = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return '';
+  }
+
+  const angleMatch = raw.match(/<([^>]+)>/);
+  if (angleMatch && angleMatch[1]) {
+    return String(angleMatch[1]).trim().toLowerCase();
+  }
+
+  return raw.toLowerCase();
+};
+
 const sendViaLocalSendmail = async ({ from, toList, subject, textBody, htmlBody, attachments }) => {
   const message = buildMimeEmail({ from, toList, subject, textBody, htmlBody, attachments });
+  const envelopeFromCandidate = extractEmailAddress(from);
+  const envelopeFrom = isValidEmailAddress(envelopeFromCandidate)
+    ? envelopeFromCandidate
+    : 'no-reply@singhsabhamilton.local';
 
   await new Promise((resolve, reject) => {
-    const child = spawn('/usr/sbin/sendmail', ['-t', '-oi']);
+    const child = spawn('/usr/sbin/sendmail', ['-t', '-oi', '-f', envelopeFrom]);
     let stderr = '';
 
     child.on('error', (error) => reject(error));
@@ -640,12 +665,76 @@ const sendViaLocalSendmail = async ({ from, toList, subject, textBody, htmlBody,
         resolve();
         return;
       }
-      reject(new Error(stderr.trim() || `sendmail exited with code ${code}`));
+      const relayError = stderr.trim() || `sendmail exited with code ${code}`;
+      reject(new Error(`${relayError} (envelope-from=${envelopeFrom})`));
     });
 
     child.stdin.write(message, 'utf8');
     child.stdin.end();
   });
+
+  return {
+    provider: 'local-sendmail',
+    envelopeFrom,
+    fromHeader: from
+  };
+};
+
+const sendViaSmtp = async ({ from, toList, subject, textBody, htmlBody, attachments }) => {
+  if (!smtpHost) {
+    throw new Error('SMTP_HOST is required when LOCAL_MAIL_TRANSPORT=smtp.');
+  }
+
+  const smtpPort = Number.isFinite(smtpPortRaw) && smtpPortRaw > 0 ? smtpPortRaw : 587;
+  const authEnabled = Boolean(smtpUser || smtpPass);
+
+  let nodemailer = null;
+  try {
+    // Lazy load so sendmail-only deployments do not require nodemailer.
+    nodemailer = require('nodemailer');
+  } catch {
+    throw new Error('nodemailer is not installed. Run: npm install nodemailer');
+  }
+
+  const transport = nodemailer.createTransport({
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpSecure,
+    ...(authEnabled ? { auth: { user: smtpUser, pass: smtpPass } } : {})
+  });
+
+  const normalizedAttachments = Array.isArray(attachments)
+    ? attachments.map((entry) => ({
+      filename: String(entry?.filename || 'attachment.bin').trim() || 'attachment.bin',
+      contentType: String(entry?.contentType || 'application/octet-stream').trim() || 'application/octet-stream',
+      content: Buffer.from(String(entry?.contentBase64 || '').replace(/\s+/g, ''), 'base64')
+    }))
+    : [];
+
+  const fromHeader = from || smtpFromAddress;
+  const smtpInfo = await transport.sendMail({
+    from: fromHeader,
+    to: toList,
+    subject,
+    text: textBody || undefined,
+    html: htmlBody || undefined,
+    attachments: normalizedAttachments
+  });
+
+  return {
+    provider: 'smtp',
+    envelopeFrom: smtpFromAddress,
+    fromHeader,
+    messageId: String(smtpInfo?.messageId || '').trim()
+  };
+};
+
+const sendViaConfiguredMailTransport = async ({ from, toList, subject, textBody, htmlBody, attachments }) => {
+  if (localMailTransport === 'smtp') {
+    return sendViaSmtp({ from, toList, subject, textBody, htmlBody, attachments });
+  }
+
+  return sendViaLocalSendmail({ from, toList, subject, textBody, htmlBody, attachments });
 };
 
 const ensureNoUnknownKeys = (payload, allowedKeys, label = 'body') => {
@@ -1515,25 +1604,37 @@ const buildVolunteerReminderEmail = ({ registration, daysRemaining = null, manua
   const sevaDateLabel = formatSevaDateLabel(registration.sevaDate);
   const timeLabel = registration.sevaTime || 'Time TBD';
   const logoSrc = volunteerReminderLogoUrl || `${volunteerReminderBaseUrl}/gurdwara-logo.webp` || embeddedVolunteerReminderLogo;
+  const baseUrl = String(volunteerReminderBaseUrl || 'https://singhsabhamilton.com').trim().replace(/\/+$/, '');
+  const sevaUrl = `${baseUrl}/seva`;
+  const contactUrl = `${baseUrl}/contact`;
+  const eventsUrl = `${baseUrl}/events`;
   const greetingLine = 'ਵਾਹਿਗੁਰੂ ਜੀ ਕਾ ਖਾਲਸਾ, ਵਾਹਿਗੁਰੂ ਜੀ ਕੀ ਫਤਿਹ';
-  const requesterNameBase = String(registration.name || 'Aashoodeep singh Singh').trim().replace(/[.\s]+$/g, '');
+  const requesterNameBase = String(registration.name || 'Sangat Member').trim().replace(/[.\s]+$/g, '');
   const requesterName = `${requesterNameBase}.`;
+  const countdownLabel = Number.isFinite(daysRemaining) && daysRemaining >= 0
+    ? `${daysRemaining} day${daysRemaining === 1 ? '' : 's'} remaining`
+    : 'Upcoming Seva';
 
   const subject = manual
     ? `${registration.sevaType} Seva Details | ${volunteerReminderSiteName}`
-    : `Seva Reminder (${daysRemaining} day${daysRemaining === 1 ? '' : 's'}): ${registration.sevaType}`;
+    : Number.isFinite(daysRemaining)
+      ? `Seva Reminder (${daysRemaining} day${daysRemaining === 1 ? '' : 's'}): ${registration.sevaType}`
+      : `Seva Reminder: ${registration.sevaType}`;
 
   const text = [
     greetingLine,
     '',
     requesterName,
     '',
-    'This is a manual seva notification from admin.',
+    manual ? 'This is a manual seva notification from admin.' : 'This is your seva reminder for an upcoming seva opportunity.',
     '',
     `Seva Type: ${registration.sevaType}`,
     `Seva Date: ${sevaDateLabel}`,
     `Seva Time: ${timeLabel}`,
     `Gurdwara: ${volunteerReminderSiteName}`,
+    `Seva Page: ${sevaUrl}`,
+    `Events Page: ${eventsUrl}`,
+    `Contact: ${contactUrl}`,
     '',
     'Kindly arrive a little early and check in with the seva coordinator.',
     'Thank you for serving the sangat.'
@@ -1545,17 +1646,38 @@ const buildVolunteerReminderEmail = ({ registration, daysRemaining = null, manua
 
   const html = `
   <div style="background:#f5f8fc;padding:28px 14px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
-    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:660px;margin:0 auto;background:#ffffff;border:1px solid #dbe7f6;border-radius:14px;overflow:hidden;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:760px;margin:0 auto;background:#ffffff;border:1px solid #dbe7f6;border-radius:14px;overflow:hidden;">
       <tr>
-        <td style="padding:28px 24px 14px;text-align:center;">
-          ${logoSrc ? `<img src="${escapeHtml(logoSrc)}" alt="${escapeHtml(volunteerReminderSiteName)} logo" width="92" height="92" style="display:block;margin:0 auto 18px;object-fit:contain;background:#ffffff;border-radius:50%;"/>` : ''}
-          <div style="font-size:18px;line-height:1.6;font-weight:700;color:#0f172a;">${escapeHtml(greetingLine)}</div>
-          <div style="margin-top:12px;font-size:16px;line-height:1.7;color:#334155;font-weight:600;">${escapeHtml(requesterName)}</div>
+        <td style="padding:16px 22px;background:linear-gradient(90deg,#0a4d9f,#0b67c2,#e58b16);color:#ffffff;">
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+            <tr>
+              <td style="vertical-align:middle;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                  <tr>
+                    ${logoSrc ? `<td style="width:44px;padding-right:12px;vertical-align:middle;"><img src="${escapeHtml(logoSrc)}" alt="${escapeHtml(volunteerReminderSiteName)} logo" width="44" height="44" style="display:block;border-radius:9999px;background:#ffffff;object-fit:cover;"/></td>` : ''}
+                    <td style="vertical-align:middle;">
+                      <div style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.9;">${escapeHtml(volunteerReminderSiteName)}</div>
+                      <div style="font-size:18px;font-weight:800;line-height:1.3;margin-top:2px;">Seva Opportunity Reminder</div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:22px 24px 12px;">
+          <div style="font-size:19px;line-height:1.45;font-weight:800;color:#0f172a;">${escapeHtml(greetingLine)}</div>
+          <div style="margin-top:8px;font-size:16px;line-height:1.7;color:#334155;font-weight:600;">${escapeHtml(requesterName)}</div>
+          <div style="margin-top:10px;display:inline-block;background:#eef5ff;border:1px solid #cfe1fb;color:#0a4d9f;border-radius:9999px;padding:7px 14px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;">
+            ${escapeHtml(countdownLabel)}
+          </div>
         </td>
       </tr>
       <tr>
         <td style="padding:0 28px 28px;">
-          <div style="font-size:15px;line-height:1.8;color:#334155;margin-bottom:14px;">This is a manual seva notification from admin.</div>
+          <div style="font-size:15px;line-height:1.8;color:#334155;margin-bottom:14px;">${manual ? 'This is a manual seva notification from admin.' : 'This is your seva reminder for an upcoming seva opportunity.'}</div>
           <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border:1px solid #d7e3f3;border-radius:12px;overflow:hidden;background:#fbfdff;margin-bottom:16px;">
             <tr>
               <td style="width:34%;padding:12px 14px;background:#eef5ff;border-bottom:1px solid #d7e3f3;font-size:14px;font-weight:700;color:#0a4d9f;">Seva Type</td>
@@ -1577,6 +1699,22 @@ const buildVolunteerReminderEmail = ({ registration, daysRemaining = null, manua
           <div style="font-size:15px;line-height:1.8;color:#334155;">
             Kindly arrive a little early and check in with the seva coordinator.<br/>
             Thank you for serving the sangat.
+          </div>
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin-top:16px;">
+            <tr>
+              <td style="border-radius:8px;background:#0b67c2;text-align:center;">
+                <a href="${escapeHtml(sevaUrl)}" style="display:inline-block;padding:11px 16px;color:#ffffff;text-decoration:none;font-size:13px;font-weight:700;">View Seva Opportunities</a>
+              </td>
+              <td style="width:8px;">&nbsp;</td>
+              <td style="border-radius:8px;background:#eef5ff;border:1px solid #cfe1fb;text-align:center;">
+                <a href="${escapeHtml(eventsUrl)}" style="display:inline-block;padding:11px 16px;color:#0a4d9f;text-decoration:none;font-size:13px;font-weight:700;">Upcoming Events</a>
+              </td>
+            </tr>
+          </table>
+          <div style="margin-top:16px;border-top:1px solid #e2e8f0;padding-top:12px;font-size:12px;line-height:1.8;color:#64748b;">
+            <div style="font-weight:700;color:#334155;">Need help?</div>
+            <div>Contact Page: <a href="${escapeHtml(contactUrl)}" style="color:#0b67c2;text-decoration:none;">${escapeHtml(contactUrl)}</a></div>
+            <div style="margin-top:6px;">${escapeHtml(volunteerReminderSiteName)}</div>
           </div>
         </td>
       </tr>
@@ -1840,11 +1978,20 @@ const buildEventReminderEmail = ({ registration, daysRemaining = null }) => {
     ? `${formatDateTimeLabel(registration.eventDate, eventDateLabel)} - ${formatDateTimeLabel(registration.eventEndDate, 'End TBD')}`
     : eventDateLabel;
   const logoSrc = volunteerReminderLogoUrl || `${volunteerReminderBaseUrl}/gurdwara-logo.webp` || embeddedVolunteerReminderLogo;
+  const baseUrl = String(volunteerReminderBaseUrl || 'https://singhsabhamilton.com').trim().replace(/\/+$/, '');
+  const eventsUrl = `${baseUrl}/events`;
+  const contactUrl = `${baseUrl}/contact`;
+  const calendarUrl = registration.eventId ? `${baseUrl}/api/events/${encodeURIComponent(String(registration.eventId))}/calendar.ics` : '';
   const greetingLine = 'ਵਾਹਿਗੁਰੂ ਜੀ ਕਾ ਖਾਲਸਾ, ਵਾਹਿਗੁਰੂ ਜੀ ਕੀ ਫਤਿਹ';
   const recipientNameBase = String(registration.name || 'Sangat Member').trim().replace(/[.\s]+$/g, '');
   const recipientName = `${recipientNameBase}.`;
   const registrationType = registration.status === 'waitlisted' ? 'waitlist' : 'registration';
-  const subject = `Event Reminder (${daysRemaining} day${daysRemaining === 1 ? '' : 's'}): ${registration.eventTitle}`;
+  const countdownLabel = Number.isFinite(daysRemaining) && daysRemaining >= 0
+    ? `${daysRemaining} day${daysRemaining === 1 ? '' : 's'} remaining`
+    : 'Upcoming Event';
+  const subject = Number.isFinite(daysRemaining)
+    ? `Event Reminder (${daysRemaining} day${daysRemaining === 1 ? '' : 's'}): ${registration.eventTitle}`
+    : `Event Reminder: ${registration.eventTitle}`;
   const text = [
     greetingLine,
     '',
@@ -1854,6 +2001,9 @@ const buildEventReminderEmail = ({ registration, daysRemaining = null }) => {
     `Event: ${registration.eventTitle}`,
     `Date and Time: ${timeLabel}`,
     `Location: ${registration.eventLocation || 'Singh Sabha Milton Gurdwara'}`,
+    `Events Page: ${eventsUrl}`,
+    calendarUrl ? `Add to Calendar: ${calendarUrl}` : '',
+    `Contact: ${contactUrl}`,
     registration.eventDescription ? `Details: ${registration.eventDescription}` : '',
     '',
     registration.status === 'waitlisted'
@@ -1865,12 +2015,33 @@ const buildEventReminderEmail = ({ registration, daysRemaining = null }) => {
 
   const html = `
   <div style="background:#f5f8fc;padding:28px 14px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
-    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:660px;margin:0 auto;background:#ffffff;border:1px solid #dbe7f6;border-radius:14px;overflow:hidden;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:760px;margin:0 auto;background:#ffffff;border:1px solid #dbe7f6;border-radius:14px;overflow:hidden;">
       <tr>
-        <td style="padding:28px 24px 14px;text-align:center;">
-          ${logoSrc ? `<img src="${escapeHtml(logoSrc)}" alt="${escapeHtml(volunteerReminderSiteName)} logo" width="92" height="92" style="display:block;margin:0 auto 18px;object-fit:contain;background:#ffffff;border-radius:50%;"/>` : ''}
-          <div style="font-size:18px;line-height:1.6;font-weight:700;color:#0f172a;">${escapeHtml(greetingLine)}</div>
-          <div style="margin-top:12px;font-size:16px;line-height:1.7;color:#334155;font-weight:600;">${escapeHtml(recipientName)}</div>
+        <td style="padding:16px 22px;background:linear-gradient(90deg,#0a4d9f,#0b67c2,#e58b16);color:#ffffff;">
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+            <tr>
+              <td style="vertical-align:middle;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                  <tr>
+                    ${logoSrc ? `<td style="width:44px;padding-right:12px;vertical-align:middle;"><img src="${escapeHtml(logoSrc)}" alt="${escapeHtml(volunteerReminderSiteName)} logo" width="44" height="44" style="display:block;border-radius:9999px;background:#ffffff;object-fit:cover;"/></td>` : ''}
+                    <td style="vertical-align:middle;">
+                      <div style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.9;">${escapeHtml(volunteerReminderSiteName)}</div>
+                      <div style="font-size:18px;font-weight:800;line-height:1.3;margin-top:2px;">Event Reminder</div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:22px 24px 12px;">
+          <div style="font-size:19px;line-height:1.45;font-weight:800;color:#0f172a;">${escapeHtml(greetingLine)}</div>
+          <div style="margin-top:8px;font-size:16px;line-height:1.7;color:#334155;font-weight:600;">${escapeHtml(recipientName)}</div>
+          <div style="margin-top:10px;display:inline-block;background:#eef5ff;border:1px solid #cfe1fb;color:#0a4d9f;border-radius:9999px;padding:7px 14px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;">
+            ${escapeHtml(countdownLabel)}
+          </div>
         </td>
       </tr>
       <tr>
@@ -1899,6 +2070,19 @@ const buildEventReminderEmail = ({ registration, daysRemaining = null }) => {
             ${registration.status === 'waitlisted'
               ? 'You are currently on the waitlist. If a confirmed spot opens, the team will contact you.'
               : 'Please arrive a little early and check in at the registration desk.'}
+          </div>
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin-top:16px;">
+            <tr>
+              <td style="border-radius:8px;background:#0b67c2;text-align:center;">
+                <a href="${escapeHtml(eventsUrl)}" style="display:inline-block;padding:11px 16px;color:#ffffff;text-decoration:none;font-size:13px;font-weight:700;">View Event Details</a>
+              </td>
+              ${calendarUrl ? `<td style="width:8px;">&nbsp;</td><td style="border-radius:8px;background:#eef5ff;border:1px solid #cfe1fb;text-align:center;"><a href="${escapeHtml(calendarUrl)}" style="display:inline-block;padding:11px 16px;color:#0a4d9f;text-decoration:none;font-size:13px;font-weight:700;">Add To Calendar</a></td>` : ''}
+            </tr>
+          </table>
+          <div style="margin-top:16px;border-top:1px solid #e2e8f0;padding-top:12px;font-size:12px;line-height:1.8;color:#64748b;">
+            <div style="font-weight:700;color:#334155;">Need help?</div>
+            <div>Contact Page: <a href="${escapeHtml(contactUrl)}" style="color:#0b67c2;text-decoration:none;">${escapeHtml(contactUrl)}</a></div>
+            <div style="margin-top:6px;">${escapeHtml(volunteerReminderSiteName)}</div>
           </div>
         </td>
       </tr>
@@ -3329,7 +3513,7 @@ const server = http.createServer(async (request, response) => {
       const textBody = String(relayPayload.text || relayPayload.bodyText || relayPayload.message || '').trim();
       const attachments = normalizeAttachmentList(relayPayload);
 
-      await sendViaLocalSendmail({
+      const deliveryResult = await sendViaConfiguredMailTransport({
         from: localMailFromAddress,
         toList: recipients,
         subject,
@@ -3341,7 +3525,9 @@ const server = http.createServer(async (request, response) => {
       sendJson(response, 200, {
         ok: true,
         sent: true,
-        provider: 'local-sendmail',
+        provider: String(deliveryResult?.provider || localMailTransport || 'sendmail').trim(),
+        envelopeFrom: String(deliveryResult?.envelopeFrom || localMailFromAddress).trim() || localMailFromAddress,
+        messageId: String(deliveryResult?.messageId || '').trim() || undefined,
         recipients: recipients.length,
         hasAttachments: attachments.length > 0,
         type: String(relayPayload.type || '').trim() || 'generic'

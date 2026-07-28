@@ -86,18 +86,6 @@ const nowLocalMinutes = () => {
   return (now.getHours() * 60) + now.getMinutes();
 };
 
-const isEventAvailable = (event, now = Date.now()) => {
-  const endStamp = Number.isNaN(new Date(event?.endDate || event?.end).getTime())
-    ? null
-    : new Date(event?.endDate || event?.end).getTime();
-  const startStamp = Number.isNaN(new Date(event?.date).getTime()) ? null : new Date(event?.date).getTime();
-  const referenceStamp = Number.isFinite(endStamp) ? endStamp : startStamp;
-  if (!Number.isFinite(referenceStamp)) {
-    return true;
-  }
-  return referenceStamp >= now;
-};
-
 const FamilyDashboardPage = () => {
   const meta = useSeoMeta('Family Dashboard', 'Track your family event RSVPs, waitlists, seva applications, and donations in one view.');
   const { user, isAuthenticated } = useAuth();
@@ -114,7 +102,7 @@ const FamilyDashboardPage = () => {
 
   const { data: events = [] } = useQuery({
     queryKey: ['events', 'family-dashboard'],
-    queryFn: () => eventService.getEvents().then((res) => res.data),
+    queryFn: () => eventService.getEvents({ includeInactive: true }).then((res) => res.data),
     enabled: isAuthenticated
   });
 
@@ -141,19 +129,35 @@ const FamilyDashboardPage = () => {
       return [];
     }
 
-    const now = Date.now();
     const rows = [];
     events.forEach((event) => {
-      if (!isEventAvailable(event, now)) {
-        return;
-      }
-
       const registrants = Array.isArray(event.registrants) ? event.registrants : [];
       registrants.forEach((entry) => {
         const entryName = String(entry.name || '').trim().toLowerCase();
-        const entryContact = String(entry.contact || '').trim().toLowerCase();
+        const entryContact = String(entry.contact || entry.phone || entry.whatsapp || '').trim().toLowerCase();
+        const entryContactDigits = entryContact.replace(/\D/g, '');
         const entryEmail = String(entry.email || '').trim().toLowerCase();
-        const belongsToUser = (email && (entryEmail === email || entryContact === email)) || (userName && entryName === userName);
+        const hasUserIdentifier = Boolean(email || userPhoneDigits || userPhone);
+        const hasEntryIdentifier = Boolean(entryEmail || entryContactDigits || entryContact);
+
+        let belongsToUser = false;
+
+        if (email && (entryEmail === email || entryContact === email)) {
+          belongsToUser = true;
+        }
+
+        if (!belongsToUser && userPhoneDigits && entryContactDigits && userPhoneDigits === entryContactDigits) {
+          belongsToUser = true;
+        }
+
+        if (!belongsToUser && userPhone && entryContact && userPhone === entryContact) {
+          belongsToUser = true;
+        }
+
+        if (!belongsToUser && !hasEntryIdentifier) {
+          belongsToUser = Boolean(userName && entryName === userName);
+        }
+
         if (!belongsToUser) {
           return;
         }
@@ -170,8 +174,8 @@ const FamilyDashboardPage = () => {
       });
     });
 
-    return rows.sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
-  }, [events, isAuthenticated, email, userName]);
+    return rows.sort((a, b) => new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime());
+  }, [events, isAuthenticated, email, userName, userPhone, userPhoneDigits]);
 
   const familySevaApplications = useMemo(() => {
     if (!isAuthenticated) {

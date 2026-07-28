@@ -15,9 +15,9 @@ const ProtectedRoute = ({ allowedRoles = [], allowAssignedAdminAccess = true }) 
     : [];
   const hasAssignedAdminAccess = assignedAdminPages.length > 0;
   const hasRoleBasedAdminAccess = hasFullAccessRole || hasAssignedAdminAccess;
-  const isUserApproved = hasRoleBasedAdminAccess
+  const isUserApproved = hasFullAccessRole
     ? true
-    : String(user?.approvalStatus || 'approved').trim().toLowerCase() === 'approved';
+    : String(user?.approvalStatus || '').trim().toLowerCase() === 'approved';
 
   if (!isAuthenticated) {
     if (isAdminRoute) {
@@ -53,7 +53,7 @@ const ProtectedRoute = ({ allowedRoles = [], allowAssignedAdminAccess = true }) 
     return <Navigate to="/" state={{ from: location }} replace />;
   }
 
-  if (!isUserActive || !isUserApproved) {
+  if (!isUserActive) {
     if (isAdminRoute) {
       try {
         window.sessionStorage.setItem('ssm_admin_logout_in_progress', '1');
@@ -62,6 +62,10 @@ const ProtectedRoute = ({ allowedRoles = [], allowAssignedAdminAccess = true }) 
       }
     }
     return <Navigate to="/" state={{ from: location, accessNotice: 'account_inactive' }} replace />;
+  }
+
+  if (!isUserApproved) {
+    return <Navigate to="/login?mode=join" state={{ from: location, accessNotice: 'approval_pending' }} replace />;
   }
 
   if (allowedRoles.length > 0 && !allowedRoles.includes(user?.role)) {

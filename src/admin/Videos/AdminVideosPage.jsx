@@ -41,6 +41,9 @@ const AdminVideosPage = () => {
   const queryClient = useQueryClient();
   const [videoModal, setVideoModal] = useState({ open: false, mode: 'add', id: '' });
   const [page, setPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [platformFilter, setPlatformFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
 
   const form = useForm({ defaultValues: emptyForm });
 
@@ -49,11 +52,40 @@ const AdminVideosPage = () => {
     queryFn: () => videoService.getVideos().then((res) => res.data)
   });
 
-  const totalPages = Math.max(1, Math.ceil(videos.length / PAGE_SIZE));
+  const filteredVideos = useMemo(() => {
+    const query = String(searchTerm || '').trim().toLowerCase();
+    return videos.filter((video) => {
+      const platformOk = platformFilter === 'all' ? true : String(video?.platform || '').toLowerCase() === platformFilter;
+      const categoryOk = categoryFilter === 'all' ? true : String(video?.category || '') === categoryFilter;
+
+      if (!platformOk || !categoryOk) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      const haystack = [video?.title, video?.description, video?.tags, video?.videoUrl]
+        .map((value) => String(value || '').toLowerCase())
+        .join(' ');
+
+      return haystack.includes(query);
+    });
+  }, [categoryFilter, platformFilter, searchTerm, videos]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredVideos.length / PAGE_SIZE));
   const visibleVideos = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
-    return videos.slice(start, start + PAGE_SIZE);
-  }, [page, videos]);
+    return filteredVideos.slice(start, start + PAGE_SIZE);
+  }, [filteredVideos, page]);
+
+  const categoryOptions = useMemo(() => {
+    const categories = videos
+      .map((video) => String(video?.category || '').trim())
+      .filter(Boolean);
+    return [...new Set(categories)].sort((a, b) => a.localeCompare(b));
+  }, [videos]);
 
   const selectedVideo = useMemo(
     () => videos.find((v) => v.id === videoModal.id) || null,
@@ -77,6 +109,16 @@ const AdminVideosPage = () => {
       });
     }
   }, [form, selectedVideo, videoModal]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, platformFilter, categoryFilter]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['gurdwara-videos'] });
 
@@ -111,6 +153,44 @@ const AdminVideosPage = () => {
       <p className="text-sm text-slate-600">Add YouTube and Facebook video links from the Gurdwara channel and Facebook page. YouTube videos embed directly; Facebook links open in a new tab.</p>
 
       <Card>
+        <div className="mb-4 grid gap-2 md:grid-cols-4">
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:col-span-2">
+            Search
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search title, tags, or URL"
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-700 outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
+            />
+          </label>
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Platform
+            <select
+              value={platformFilter}
+              onChange={(event) => setPlatformFilter(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-700 outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
+            >
+              <option value="all">All</option>
+              <option value="youtube">YouTube</option>
+              <option value="facebook">Facebook</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Category
+            <select
+              value={categoryFilter}
+              onChange={(event) => setCategoryFilter(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-700 outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
+            >
+              <option value="all">All</option>
+              {categoryOptions.map((category) => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
+          </label>
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead>
@@ -155,12 +235,15 @@ const AdminVideosPage = () => {
                   </tr>
                 );
               })}
-              {videos.length === 0 ? (
+              {filteredVideos.length === 0 ? (
                 <tr><td className="px-3 py-4 text-center text-slate-500" colSpan={5}>No videos added yet. Click Add Video to get started.</td></tr>
               ) : null}
             </tbody>
           </table>
         </div>
+        {filteredVideos.length > 0 ? (
+          <p className="mt-3 text-xs text-slate-600">Showing {visibleVideos.length} of {filteredVideos.length} videos</p>
+        ) : null}
         <Pagination page={page} total={totalPages} onChange={setPage} />
       </Card>
 

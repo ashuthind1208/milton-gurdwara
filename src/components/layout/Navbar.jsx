@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createPortal } from 'react-dom';
 import jsPDF from 'jspdf';
 import {
   Bars3Icon,
   XMarkIcon,
+  MagnifyingGlassIcon,
   PauseIcon,
   PlayIcon,
   PlayCircleIcon,
@@ -38,9 +39,11 @@ import eventService from '../../services/eventService';
 import volunteerService from '../../services/volunteerService';
 import donationService from '../../services/donationService';
 import uploadService from '../../services/uploadService';
+import userService from '../../services/userService';
 import { useAuth } from '../../context/AuthContext';
 import StreamingModal from '../common/StreamingModal';
 import AudioPillPlayer from '../common/AudioPillPlayer';
+import GlobalSearchBar from '../common/GlobalSearchBar';
 
 const navClass = ({ isActive }) =>
   `border-b-[3px] px-3 py-2 text-base font-semibold tracking-tight transition ${isActive ? 'border-brand-saffron text-brand-blue' : 'border-transparent text-slate-600 hover:border-slate-200 hover:text-brand-blue'}`;
@@ -392,11 +395,32 @@ const PENDING_APPROVAL_MESSAGE = 'Access is pending till your status is approved
 
 const resolveLandingPathByRole = () => '/';
 
+const getAvatarFallbackUrl = (name = 'Member') => `https://ui-avatars.com/api/?name=${encodeURIComponent(String(name || 'Member'))}`;
+
+const normalizeAvatarUrl = (rawValue = '', displayName = 'Member') => {
+  const value = String(rawValue || '').trim();
+  if (!value) {
+    return getAvatarFallbackUrl(displayName);
+  }
+
+  if (/^(https?:)?\/\//i.test(value) || value.startsWith('data:') || value.startsWith('blob:')) {
+    return value;
+  }
+
+  if (value.startsWith('/')) {
+    return value;
+  }
+
+  // Stored media paths may be relative (for example: uploads/users/avatar.jpg).
+  return `/${value.replace(/^\/+/, '')}`;
+};
+
 const Navbar = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { user, isAuthenticated, logout, updateProfile } = useAuth();
+  const { user, isAuthenticated, logout, updateProfile, persistUser } = useAuth();
   const [open, setOpen] = useState(false);
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
   const [compactStreamsOpen, setCompactStreamsOpen] = useState(false);
   const [dateInfoOpen, setDateInfoOpen] = useState(false);
@@ -412,6 +436,20 @@ const Navbar = () => {
     phone: '',
     address: '',
     avatarUrl: ''
+  });
+  const [isMembershipModalOpen, setIsMembershipModalOpen] = useState(false);
+  const [membershipPromptEnforced, setMembershipPromptEnforced] = useState(false);
+  const [membershipPromptNotice, setMembershipPromptNotice] = useState('');
+  const [membershipFormError, setMembershipFormError] = useState('');
+  const [membershipForm, setMembershipForm] = useState({
+    phone: '',
+    address: '',
+    dateOfBirth: '',
+    canadianStatus: '',
+    donationMethod: '',
+    donationSchedule: 'monthly',
+    membershipPledgeAccepted: false,
+    notes: ''
   });
   const [isPdfBusy, setIsPdfBusy] = useState(false);
   const [isKirtanPlaying, setIsKirtanPlaying] = useState(false);
@@ -453,7 +491,8 @@ const Navbar = () => {
   const userPhoneDigits = userPhone.replace(/\D/g, '');
   const userDisplayName = String(user?.name || '').trim() || 'Sangat Member';
   const userDisplayEmail = String(user?.email || '').trim() || 'No email available';
-  const userAvatarUrl = user?.avatarUrl || user?.picture || user?.photoURL || '';
+  const rawUserAvatarUrl = user?.avatarUrl || user?.picture || user?.photoURL || '';
+  const userAvatarUrl = normalizeAvatarUrl(rawUserAvatarUrl, userDisplayName);
   const userInitial = userDisplayName.charAt(0).toUpperCase() || 'S';
   const profilePhoneMissing = !String(user?.phone || '').trim();
   const approvalStatus = String(user?.approvalStatus || '').toLowerCase();
@@ -464,7 +503,10 @@ const Navbar = () => {
     : [];
   const hasRoleBasedAdminAccess = hasFullAccess || assignedAdminPages.length > 0;
   const canSeeAdminPortalButton = hasRoleBasedAdminAccess;
-  const isApprovalPending = isAuthenticated && !hasRoleBasedAdminAccess && userRole !== 'Family' && approvalStatus !== 'approved';
+  const isApprovalPending = isAuthenticated && userRole !== 'Family' && approvalStatus === 'pending';
+  const membershipProfile = user?.membershipProfile && typeof user.membershipProfile === 'object' ? user.membershipProfile : {};
+  const isMembershipProfileCompleted = membershipProfile.completed === true;
+  const shouldShowPendingMembershipPrompt = isAuthenticated && isApprovalPending && isMembershipProfileCompleted && userRole === 'Member';
   const { data: familyEvents = [] } = useQuery({
     queryKey: ['navbar-family-events'],
     queryFn: () => eventService.getEvents().then((res) => res.data),
@@ -883,7 +925,7 @@ const Navbar = () => {
       sevaCount,
       donationTotal
     };
-  }, [familyDonations, isAuthenticated, userEmail, visibleFamilyEvents, visibleFamilySeva]);
+  }, [familyDonations, isAuthenticated, userEmail, userName, visibleFamilyEvents, visibleFamilySeva]);
 
   const handleLogout = async () => {
     setIsProfilePopoverOpen(false);
@@ -962,6 +1004,94 @@ const Navbar = () => {
     }
   };
 
+  const membershipDetailsMutation = useMutation({
+    mutationFn: (payload) => userService.submitMembershipDetails(String(user?.id || ''), payload),
+    onSuccess: (response) => {
+      if (response?.data) {
+        persistUser(response.data);
+      }
+      setIsMembershipModalOpen(false);
+      setMembershipPromptEnforced(false);
+      setMembershipFormError('');
+      try {
+        window.sessionStorage.removeItem('ssm_prompt_member_details');
+        window.localStorage.removeItem('ssm_prompt_member_details');
+      } catch {
+        // Ignore storage errors.
+      }
+    },
+    onError: (error) => {
+      setMembershipFormError(error?.message || 'Unable to submit member details right now.');
+    }
+  });
+
+  const cancelMembershipMutation = useMutation({
+    mutationFn: async () => {
+      const userId = String(user?.id || '').trim();
+      if (!userId) {
+        throw new Error('Unable to find your registration record.');
+      }
+
+      await userService.removeUser(userId);
+      await logout();
+      return true;
+    },
+    onSuccess: () => {
+      setMembershipPromptEnforced(false);
+      setIsMembershipModalOpen(false);
+      setMembershipFormError('');
+      try {
+        window.sessionStorage.removeItem('ssm_prompt_member_details');
+        window.localStorage.removeItem('ssm_prompt_member_details');
+      } catch {
+        // Ignore storage errors.
+      }
+      navigate('/', { replace: true });
+    },
+    onError: (error) => {
+      setMembershipFormError(error?.message || 'Unable to cancel registration right now.');
+    }
+  });
+
+  const handleCancelMembershipRegistration = () => {
+    const proceed = window.confirm('Cancel membership registration and delete your pending member profile?');
+    if (!proceed) {
+      return;
+    }
+
+    setMembershipFormError('');
+    cancelMembershipMutation.mutate();
+  };
+
+  const openMembershipModal = useCallback(() => {
+    setMembershipFormError('');
+    setMembershipForm({
+      phone: String(user?.phone || '').trim(),
+      address: String(user?.address || '').trim(),
+      dateOfBirth: String(membershipProfile?.dateOfBirth || '').trim(),
+      canadianStatus: String(membershipProfile?.canadianStatus || '').trim(),
+      donationMethod: String(membershipProfile?.donationMethod || '').trim(),
+      donationSchedule: String(membershipProfile?.donationSchedule || 'monthly').trim() || 'monthly',
+      membershipPledgeAccepted: membershipProfile?.membershipPledgeAccepted === true,
+      notes: String(membershipProfile?.notes || '').trim()
+    });
+    setIsMembershipModalOpen(true);
+  }, [membershipProfile?.canadianStatus, membershipProfile?.dateOfBirth, membershipProfile?.donationMethod, membershipProfile?.donationSchedule, membershipProfile?.membershipPledgeAccepted, membershipProfile?.notes, user?.address, user?.phone]);
+
+  const closeMembershipModal = () => {
+    if (membershipPromptEnforced) {
+      setMembershipFormError('Please complete your membership details to continue.');
+      return;
+    }
+
+    setIsMembershipModalOpen(false);
+  };
+
+  const handleMembershipFieldChange = (field) => (event) => {
+    const nextValue = event?.target?.type === 'checkbox' ? event.target.checked : event.target.value;
+    setMembershipForm((previous) => ({ ...previous, [field]: nextValue }));
+  };
+
   const handleSignInClick = (event) => {
     if (!isAuthenticated) {
       return;
@@ -973,12 +1103,145 @@ const Navbar = () => {
 
   const handleBecomeMemberClick = (event) => {
     if (!isAuthenticated) {
+      try {
+        window.sessionStorage.setItem('ssm_prompt_member_details', '1');
+        window.localStorage.setItem('ssm_prompt_member_details', '1');
+      } catch {
+        // Ignore storage errors.
+      }
       return;
     }
 
     event.preventDefault();
+
+    if (userRole === 'Member' && approvalStatus === 'approved' && user?.isActive !== false) {
+      try {
+        window.sessionStorage.removeItem('ssm_prompt_member_details');
+        window.localStorage.removeItem('ssm_prompt_member_details');
+      } catch {
+        // Ignore storage errors.
+      }
+      navigate(resolveLandingPathByRole());
+      return;
+    }
+
+    if (userRole === 'Member' && isMembershipProfileCompleted && approvalStatus === 'approved' && user?.isActive !== false) {
+      navigate(resolveLandingPathByRole());
+      return;
+    }
+
+    if (userRole === 'Member' && isMembershipProfileCompleted) {
+      setIsMembershipModalOpen(false);
+      setMembershipFormError('');
+      setMembershipPromptNotice('Your membership request is already on record with the admin team. You will be notified soon.');
+      return;
+    }
+
+    if (userRole === 'Member' && !isMembershipProfileCompleted) {
+      setMembershipPromptNotice('');
+      openMembershipModal();
+      return;
+    }
+
     navigate(resolveLandingPathByRole());
   };
+
+  const handleSaveMembershipDetails = (event) => {
+    event.preventDefault();
+    setMembershipFormError('');
+
+    const payload = {
+      phone: String(membershipForm.phone || '').trim(),
+      address: String(membershipForm.address || '').trim(),
+      dateOfBirth: String(membershipForm.dateOfBirth || '').trim(),
+      canadianStatus: String(membershipForm.canadianStatus || '').trim(),
+      donationMethod: String(membershipForm.donationMethod || '').trim(),
+      donationSchedule: String(membershipForm.donationSchedule || '').trim().toLowerCase(),
+      membershipPledgeAccepted: membershipForm.membershipPledgeAccepted === true,
+      notes: String(membershipForm.notes || '').trim()
+    };
+
+    if (!payload.phone || !payload.address || !payload.dateOfBirth || !payload.canadianStatus || !payload.donationMethod || !payload.donationSchedule) {
+      setMembershipFormError('Phone, address, date of birth, citizenship status, donation method, and schedule are required.');
+      return;
+    }
+
+    if (!payload.membershipPledgeAccepted) {
+      setMembershipFormError('Please accept the membership pledge to continue.');
+      return;
+    }
+
+    membershipDetailsMutation.mutate(payload);
+  };
+
+  useEffect(() => {
+    if (!shouldShowPendingMembershipPrompt) {
+      setMembershipPromptEnforced(false);
+      setMembershipPromptNotice('');
+      return;
+    }
+
+    setMembershipPromptEnforced(true);
+    try {
+      const noticeKey = `ssm_member_details_notice_${String(user?.id || 'member')}`;
+      const hasShown = window.sessionStorage.getItem(noticeKey) === '1';
+      if (!hasShown) {
+        window.sessionStorage.setItem(noticeKey, '1');
+        setMembershipPromptNotice('Your membership application is pending admin approval. Please wait for an update from the admin team.');
+      }
+    } catch {
+      setMembershipPromptNotice('Your membership application is pending admin approval. Please wait for an update from the admin team.');
+    }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMembershipProfileCompleted, shouldShowPendingMembershipPrompt, user?.id]);
+
+  useEffect(() => {
+    if (!isAuthenticated || userRole !== 'Member') {
+      return undefined;
+    }
+
+    if (approvalStatus === 'approved' && user?.isActive !== false) {
+      try {
+        window.sessionStorage.removeItem('ssm_prompt_member_details');
+        window.localStorage.removeItem('ssm_prompt_member_details');
+      } catch {
+        // Ignore storage errors.
+      }
+      setMembershipPromptNotice('');
+      setIsMembershipModalOpen(false);
+      return undefined;
+    }
+
+    let shouldPromptMembershipDetails = false;
+    try {
+      shouldPromptMembershipDetails = window.sessionStorage.getItem('ssm_prompt_member_details') === '1'
+        || window.localStorage.getItem('ssm_prompt_member_details') === '1';
+    } catch {
+      shouldPromptMembershipDetails = false;
+    }
+
+    if (!shouldPromptMembershipDetails) {
+      return undefined;
+    }
+
+    if (isMembershipModalOpen) {
+      return undefined;
+    }
+
+    setMembershipPromptNotice('');
+    openMembershipModal();
+    return undefined;
+  }, [isAuthenticated, isMembershipModalOpen, isMembershipProfileCompleted, openMembershipModal, userRole]);
+
+  useEffect(() => {
+    if (!membershipPromptNotice) {
+      return undefined;
+    }
+
+    const timerId = window.setTimeout(() => setMembershipPromptNotice(''), 5000);
+    return () => window.clearTimeout(timerId);
+  }, [membershipPromptNotice]);
 
   const handleProfileQuickLink = (targetPath) => (event) => {
     setIsProfilePopoverOpen(false);
@@ -1754,9 +2017,30 @@ const Navbar = () => {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <Link to="/login?mode=join&next=/family-dashboard" onClick={handleBecomeMemberClick} className="rounded-full border border-emerald-300 bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-900 shadow-[0_6px_12px_rgba(16,185,129,0.2)] transition hover:bg-emerald-200">Become Member</Link>
+            <button
+              type="button"
+              onClick={() => setIsSearchModalOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-sky-300 bg-sky-100 px-2.5 py-0.5 text-[11px] font-bold text-sky-900 shadow-[0_6px_12px_rgba(14,165,233,0.22)] transition hover:bg-sky-200"
+            >
+              <MagnifyingGlassIcon className="h-3.5 w-3.5" />
+              Search
+            </button>
+            {!isAuthenticated ? (
+              <Link to="/login?mode=join&next=/family-dashboard" onClick={handleBecomeMemberClick} className="rounded-full border border-emerald-300 bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-900 shadow-[0_6px_12px_rgba(16,185,129,0.2)] transition hover:bg-emerald-200">Become Member</Link>
+            ) : null}
             {isAuthenticated ? (
               <div className="relative flex items-center gap-2">
+                <img
+                  src={userAvatarUrl}
+                  alt={userDisplayName}
+                  className="h-7 w-7 rounded-full border border-brand-saffron/80 object-cover shadow-[0_4px_10px_rgba(15,23,42,0.24)]"
+                  onError={(event) => {
+                    const fallback = getAvatarFallbackUrl(userDisplayName);
+                    if (event.currentTarget.src !== fallback) {
+                      event.currentTarget.src = fallback;
+                    }
+                  }}
+                />
                 <span className="text-[11px] font-bold text-blue-50">Welcome, {userDisplayName}</span>
                 <button
                   type="button"
@@ -1772,11 +2056,17 @@ const Navbar = () => {
                 <div onMouseEnter={openProfilePopover} onMouseLeave={closeProfilePopoverWithDelay} className={`absolute right-0 top-[calc(100%+8px)] z-[276] w-[360px] rounded-3xl border border-brand-blue/35 bg-gradient-to-br from-blue-50/95 via-white to-amber-50/95 p-4 shadow-[0_24px_60px_rgba(15,23,42,0.24)] transition duration-200 ${isProfilePopoverOpen ? 'pointer-events-auto translate-y-0 opacity-100' : 'pointer-events-none translate-y-1 opacity-0'}`}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      {userAvatarUrl ? (
-                        <img src={userAvatarUrl} alt={userDisplayName} className="h-12 w-12 rounded-full border-2 border-brand-saffron object-cover" />
-                      ) : (
-                        <span className="inline-flex h-12 w-12 items-center justify-center rounded-full border-2 border-brand-saffron bg-brand-blue text-lg font-black text-white">{userInitial}</span>
-                      )}
+                      <img
+                        src={userAvatarUrl}
+                        alt={userDisplayName}
+                        className="h-12 w-12 rounded-full border-2 border-brand-saffron object-cover"
+                        onError={(event) => {
+                          const fallback = getAvatarFallbackUrl(userDisplayName);
+                          if (event.currentTarget.src !== fallback) {
+                            event.currentTarget.src = fallback;
+                          }
+                        }}
+                      />
                       <div>
                         <p className="text-sm font-extrabold text-brand-blue">{userDisplayName}</p>
                         <p className="text-xs font-semibold text-slate-600">{userDisplayEmail}</p>
@@ -1940,6 +2230,7 @@ const Navbar = () => {
             </div>
           )}
         </div>
+
       </div>
       </div>
 
@@ -1950,7 +2241,7 @@ const Navbar = () => {
               <img
                 src={gurdwaraLogo}
                 alt="Gurdwara Singh Sabha Milton logo"
-                className="h-[4.5rem] w-[4.5rem] rounded-full border border-brand-saffron object-cover"
+                className="h-[4.05rem] w-[4.05rem] rounded-full border border-brand-saffron object-cover"
               />
             </Link>
           </div>
@@ -1979,7 +2270,15 @@ const Navbar = () => {
             </button>
           </div>
         </div>
-        <div className="mt-2 flex justify-center">
+        <div className="mt-3 pt-1 flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsSearchModalOpen(true)}
+            className="inline-flex items-center gap-2 rounded-full border border-sky-300 bg-sky-100 px-3 py-1 text-[11px] font-bold text-sky-900"
+          >
+            <MagnifyingGlassIcon className="h-3.5 w-3.5" />
+            Search
+          </button>
           <button
             type="button"
             onClick={() => setDateInfoOpen(true)}
@@ -2175,6 +2474,142 @@ const Navbar = () => {
         />
       ) : null}
 
+      {membershipPromptNotice ? (
+        <div className="fixed inset-0 z-[285] flex items-start justify-center bg-slate-900/45 px-4 py-20 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl border border-amber-300 bg-amber-50 p-5 text-center shadow-2xl">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-700">Approval Pending</p>
+            <p className="mt-3 text-sm font-semibold leading-6 text-amber-900">{membershipPromptNotice}</p>
+            <div className="mt-4 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setMembershipPromptNotice('')}
+                className="rounded-full bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isMembershipModalOpen ? createPortal(
+        <div className="fixed inset-0 z-[279] overflow-y-auto bg-slate-900/70 px-4 py-6 backdrop-blur-md" onClick={closeMembershipModal}>
+          <div className="mx-auto flex min-h-full items-start justify-center py-2 lg:items-center lg:py-6">
+            <div className="w-full max-w-5xl max-h-[92vh] overflow-y-auto rounded-2xl bg-white shadow-2xl lg:max-h-none lg:overflow-visible" onClick={(event) => event.stopPropagation()}>
+              <div className="relative overflow-hidden rounded-t-2xl bg-gradient-to-r from-brand-blue via-blue-700 to-brand-saffron px-5 py-4 text-white">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.26),transparent_44%)]" aria-hidden="true" />
+                <div className="relative flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <img src={gurdwaraLogo} alt="Gurdwara Singh Sabha Milton" className="h-14 w-14 rounded-full border-2 border-white/70 bg-white object-cover" />
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/85">Gurdwara Singh Sabha Milton</p>
+                      <h3 className="mt-1 font-heading text-lg font-semibold">Membership Registration Form</h3>
+                    </div>
+                  </div>
+                  <button type="button" onClick={closeMembershipModal} className="rounded-full border border-white/55 bg-white/10 p-1.5 text-white hover:bg-white/20" aria-label="Close membership details modal">
+                    <XMarkIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              <form className="grid gap-4 px-5 py-4 lg:grid-cols-2" onSubmit={handleSaveMembershipDetails}>
+                <p className="lg:col-span-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold leading-5 text-amber-900">
+                  To become a lifetime member of Gurdwara Singh Sabha Milton (GSSM), please complete the form below. An initiation fee of $500 is due upon signup. Going forward, membership will need to be renewed as of January 1st of the following year, at a cost of $50 per month to maintain your membership in good standing. After completing 10 years of $50 monthly donations, your membership will become permanent at no cost.
+                </p>
+                <section className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                  <h4 className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-600">Personal Details</h4>
+                  <div className="h-px w-full bg-slate-200" />
+                  <label className="block text-sm font-semibold text-slate-700">Phone
+                    <input value={membershipForm.phone} onChange={handleMembershipFieldChange('phone')} required className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
+                  </label>
+                  <label className="block text-sm font-semibold text-slate-700">Date of Birth
+                    <input type="date" value={membershipForm.dateOfBirth} onChange={handleMembershipFieldChange('dateOfBirth')} required className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
+                  </label>
+                  <label className="block text-sm font-semibold text-slate-700">Address
+                    <textarea rows={2} value={membershipForm.address} onChange={handleMembershipFieldChange('address')} required className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
+                  </label>
+                </section>
+
+                <section className="space-y-2.5 rounded-2xl border border-slate-200 bg-white p-4">
+                  <h4 className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-600">Citizenship and Donation Method</h4>
+                  <div className="h-px w-full bg-slate-200" />
+                  <label className="block text-sm font-semibold text-slate-700">Canadian Status *
+                    <select value={membershipForm.canadianStatus} onChange={handleMembershipFieldChange('canadianStatus')} required className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
+                      <option value="">Select Canadian Status</option>
+                      <option value="Citizen">Citizen</option>
+                      <option value="Permanent Resident">Permanent Resident</option>
+                      <option value="Immigrant">Immigrant</option>
+                    </select>
+                  </label>
+                  <div className="grid gap-2 md:grid-cols-[minmax(0,220px)_1fr] md:items-end">
+                    <label className="block text-sm font-semibold text-slate-700 md:pr-4">Donation Method *
+                      <select value={membershipForm.donationMethod} onChange={handleMembershipFieldChange('donationMethod')} required className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
+                        <option value="">Select Method</option>
+                        <option value="Interac E-Transfer">Interac E-Transfer</option>
+                        <option value="Cash at Gurdwara">Cash at Gurdwara</option>
+                      </select>
+                    </label>
+                    <fieldset className="min-w-0">
+                      <legend className="text-sm font-semibold text-slate-700">Schedule *</legend>
+                      <div className="mt-1 flex flex-nowrap items-center gap-4 pl-2 md:justify-start">
+                        <label className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700">
+                        <input
+                          type="radio"
+                          name="donation-schedule"
+                          checked={membershipForm.donationSchedule === 'monthly'}
+                          onChange={() => setMembershipForm((previous) => ({ ...previous, donationSchedule: 'monthly' }))}
+                        />
+                        Monthly
+                      </label>
+                        <label className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700">
+                        <input
+                          type="radio"
+                          name="donation-schedule"
+                          checked={membershipForm.donationSchedule === 'yearly'}
+                          onChange={() => setMembershipForm((previous) => ({ ...previous, donationSchedule: 'yearly' }))}
+                        />
+                        Yearly
+                      </label>
+                      </div>
+                    </fieldset>
+                  </div>
+                  <label className="block text-sm font-semibold text-slate-700">Additional Notes
+                    <textarea rows={2} value={membershipForm.notes} onChange={handleMembershipFieldChange('notes')} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
+                  </label>
+                </section>
+
+                <label className="lg:col-span-2 inline-flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+                  <input type="checkbox" checked={membershipForm.membershipPledgeAccepted} onChange={handleMembershipFieldChange('membershipPledgeAccepted')} className="mt-1" />
+                  <span>
+                    I hereby pledge that upon becoming a member of Gurdwara Singh Sabha Milton, I will wholeheartedly commit myself to upholding the rules and regulations set forth by the Executive Committee of Gurdwara Singh Sabha Milton.
+                  </span>
+                </label>
+
+                {membershipFormError ? <p className="lg:col-span-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{membershipFormError}</p> : null}
+
+                <div className="lg:col-span-2 flex items-center justify-end gap-2 border-t border-slate-200 pt-4">
+                  <button
+                    type="button"
+                    onClick={handleCancelMembershipRegistration}
+                    disabled={cancelMembershipMutation.isPending || membershipDetailsMutation.isPending}
+                    className="rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 disabled:opacity-60"
+                  >
+                    {cancelMembershipMutation.isPending ? 'Cancelling...' : 'Cancel Registration'}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={membershipDetailsMutation.isPending || cancelMembershipMutation.isPending}
+                    className="rounded-lg bg-brand-blue px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    {membershipDetailsMutation.isPending ? 'Submitting...' : 'Submit Details'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      , document.body) : null}
+
       {isProfileModalOpen ? createPortal(
         <div className="fixed inset-0 z-[280] overflow-y-auto bg-slate-900/55 px-4 py-6" onClick={() => setIsProfileModalOpen(false)}>
           <div className="mx-auto flex min-h-full items-center justify-center">
@@ -2189,7 +2624,17 @@ const Navbar = () => {
             <form className="mt-4 space-y-3" onSubmit={handleSaveProfile}>
               <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
                 {profileForm.avatarUrl ? (
-                  <img src={profileForm.avatarUrl} alt={profileForm.name || userDisplayName} className="h-16 w-16 rounded-full border-2 border-brand-saffron object-cover" />
+                  <img
+                    src={normalizeAvatarUrl(profileForm.avatarUrl, profileForm.name || userDisplayName)}
+                    alt={profileForm.name || userDisplayName}
+                    className="h-16 w-16 rounded-full border-2 border-brand-saffron object-cover"
+                    onError={(event) => {
+                      const fallback = getAvatarFallbackUrl(profileForm.name || userDisplayName);
+                      if (event.currentTarget.src !== fallback) {
+                        event.currentTarget.src = fallback;
+                      }
+                    }}
+                  />
                 ) : (
                   <span className="inline-flex h-16 w-16 items-center justify-center rounded-full border-2 border-brand-saffron bg-brand-blue text-xl font-black text-white">{userInitial}</span>
                 )}
@@ -2228,27 +2673,71 @@ const Navbar = () => {
         </div>
       , document.body) : null}
 
+      {isSearchModalOpen ? createPortal(
+        <div className="fixed inset-0 z-[281] flex items-start justify-center bg-slate-950/45 px-5 py-20 backdrop-blur-sm sm:px-4" onClick={() => setIsSearchModalOpen(false)}>
+          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_30px_70px_-34px_rgba(15,23,42,0.75)]" onClick={(event) => event.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="font-heading text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Search</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSearchModalOpen(false)}
+                className="rounded-full border border-slate-300 p-1.5 text-slate-600 transition hover:bg-slate-100"
+                aria-label="Close search modal"
+              >
+                <XMarkIcon className="h-4 w-4" />
+              </button>
+            </div>
+            <GlobalSearchBar
+              className="w-full px-2 sm:px-0"
+              inputClassName="py-2.5"
+              placeholder="Search website content"
+              autoFocus
+              inputId="global-search-modal-input"
+              scope="public"
+              onResultSelect={() => setIsSearchModalOpen(false)}
+            />
+          </div>
+        </div>
+      , document.body) : null}
+
       {open ? (
-        <div className="max-h-[calc(100vh-6.5rem)] overflow-y-auto border-t border-slate-100 bg-gradient-to-b from-white to-slate-50 px-4 py-3 lg:hidden">
+        <div className="h-[calc(100dvh-6.5rem)] overflow-y-auto border-t border-slate-100 bg-gradient-to-b from-white to-slate-50 px-4 py-3 pb-10 lg:hidden">
           <div className="mb-3 grid gap-2 sm:grid-cols-2">
-            <Link
-              to="/login?mode=join&next=/family-dashboard"
-              onClick={(event) => {
-                handleBecomeMemberClick(event);
-                setOpen(false);
-              }}
-              className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-center text-sm font-semibold text-emerald-800"
-            >
-              Become Member
-            </Link>
+            {!isAuthenticated ? (
+              <Link
+                to="/login?next=/family-dashboard"
+                onClick={(event) => {
+                  handleBecomeMemberClick(event);
+                  setOpen(false);
+                }}
+                className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-center text-sm font-semibold text-emerald-800"
+              >
+                Become Member
+              </Link>
+            ) : null}
             <Link
               to={isAuthenticated ? resolveLandingPathByRole(user?.role) : '/login'}
               onClick={(event) => {
                 handleSignInClick(event);
                 setOpen(false);
               }}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-sm font-semibold text-slate-700"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-sm font-semibold text-slate-700"
             >
+              {isAuthenticated ? (
+                <img
+                  src={userAvatarUrl}
+                  alt={userDisplayName}
+                  className="h-6 w-6 rounded-full border border-brand-saffron/70 object-cover"
+                  onError={(event) => {
+                    const fallback = getAvatarFallbackUrl(userDisplayName);
+                    if (event.currentTarget.src !== fallback) {
+                      event.currentTarget.src = fallback;
+                    }
+                  }}
+                />
+              ) : null}
               {isAuthenticated ? `Welcome, ${userDisplayName}` : 'Sign In'}
             </Link>
           </div>

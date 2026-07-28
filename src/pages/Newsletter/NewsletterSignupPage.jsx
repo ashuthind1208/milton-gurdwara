@@ -2,56 +2,27 @@ import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ChevronDownIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { siteConfig } from '../../constants/siteConfig';
-import khandaMark from '../../assets/khanda-mark.webp';
-import phase2Service from '../../services/phase2Service';
+import PageHero from '../../components/common/PageHero';
+import Card from '../../components/ui/Card';
+import Button from '../../components/ui/Button';
+import useSeoMeta from '../../hooks/useSeoMeta';
+import Seo from '../../components/common/Seo';
 import notificationService from '../../services/notificationService';
 import { useAuth } from '../../context/AuthContext';
-
-const socialIconClass = 'h-4 w-4';
 
 const newsletterDefaults = {
   name: '',
   email: ''
 };
 
-const FacebookIcon = () => (
-  <svg viewBox="0 0 24 24" className={socialIconClass} aria-hidden="true">
-    <path d="M13.6 22V13.3h2.9l.4-3.4h-3.3V7.8c0-1 .3-1.7 1.8-1.7H17V3.1c-.8-.1-1.6-.1-2.5-.1-2.5 0-4.1 1.5-4.1 4.4v2.5H7.6v3.4h2.8V22h3.2Z" fill="currentColor" />
-  </svg>
-);
-
-const InstagramIcon = () => (
-  <svg viewBox="0 0 24 24" className={socialIconClass} aria-hidden="true">
-    <rect x="4" y="4" width="16" height="16" rx="5" ry="5" fill="none" stroke="currentColor" strokeWidth="1.8" />
-    <circle cx="12" cy="12" r="3.6" fill="none" stroke="currentColor" strokeWidth="1.8" />
-    <circle cx="17.4" cy="6.6" r="1.1" fill="currentColor" />
-  </svg>
-);
-
-const YouTubeIcon = () => (
-  <svg viewBox="0 0 24 24" className={socialIconClass} aria-hidden="true">
-    <path d="M20.6 7.2c-.2-.9-.9-1.6-1.8-1.8-1.6-.4-8-.4-8-.4s-6.4 0-8 .4c-.9.2-1.6.9-1.8 1.8-.4 1.6-.4 4.8-.4 4.8s0 3.2.4 4.8c.2.9.9 1.6 1.8 1.8 1.6.4 8 .4 8 .4s6.4 0 8-.4c.9-.2 1.6-.9 1.8-1.8.4-1.6.4-4.8.4-4.8s0-3.2-.4-4.8Z" fill="currentColor" />
-    <path d="M9.5 15.2V8.8l5.4 3.2-5.4 3.2Z" fill="white" />
-  </svg>
-);
-
-const Footer = () => {
+const NewsletterSignupPage = () => {
+  const meta = useSeoMeta('Newsletter', 'Subscribe to weekly updates from Singh Sabha Milton Gurdwara.');
   const { user, isAuthenticated } = useAuth();
-  const [isNewsletterModalOpen, setIsNewsletterModalOpen] = useState(false);
+  const [isSignupModalOpen, setIsSignupModalOpen] = useState(true);
   const [isTopicDropdownOpen, setIsTopicDropdownOpen] = useState(false);
   const [selectedTopics, setSelectedTopics] = useState([]);
   const [topicError, setTopicError] = useState('');
   const topicDropdownRef = useRef(null);
-  const { data: phase2ChannelsConfig } = useQuery({
-    queryKey: ['phase2-channels-config-footer'],
-    queryFn: () => phase2Service.getChannelsConfig().then((res) => res.data || null),
-    staleTime: 60 * 1000,
-    retry: false
-  });
-
-  const hasWhatsAppInfo = phase2ChannelsConfig?.whatsAppOptInEnabled === true && String(phase2ChannelsConfig?.whatsAppJoinLink || '').trim().length > 0;
-  const whatsAppLink = String(phase2ChannelsConfig?.whatsAppJoinLink || '').trim();
   const form = useForm({ defaultValues: newsletterDefaults });
 
   const { data: topicOptions = [] } = useQuery({
@@ -72,14 +43,14 @@ const Footer = () => {
     setTopicError('');
   }, [form, isAuthenticated, user?.email, user?.name]);
 
-  const closeNewsletterModal = () => {
-    setIsNewsletterModalOpen(false);
+  const closeModal = () => {
+    setIsSignupModalOpen(false);
     setIsTopicDropdownOpen(false);
     setTopicError('');
   };
 
-  const openNewsletterModal = () => {
-    setIsNewsletterModalOpen(true);
+  const openModal = () => {
+    setIsSignupModalOpen(true);
     setIsTopicDropdownOpen(false);
     setTopicError('');
     subscribeMutation.reset();
@@ -106,7 +77,7 @@ const Footer = () => {
       name: values.name,
       email: values.email,
       interests: selectedTopics,
-      source: isAuthenticated ? 'Logged in user' : 'Website footer'
+      source: isAuthenticated ? 'Logged in user' : 'Website'
     }),
     onSuccess: () => {
       if (!isAuthenticated) {
@@ -131,63 +102,32 @@ const Footer = () => {
   };
 
   return (
-    <footer className="mt-16 border-t border-brand-blue/20 bg-gradient-to-br from-brand-cream via-amber-50 to-blue-50 dark:border-slate-800 dark:bg-slate-900">
-      <div className="mx-auto max-w-4xl px-4 py-10 md:px-6">
-        <div className="text-center">
-          <div className="flex items-center justify-center gap-2">
-            <img src={khandaMark} alt="Khanda symbol" className="h-7 w-7" />
-            <p className="font-heading text-lg font-semibold text-brand-blue">{siteConfig.name}</p>
-          </div>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">A spiritually rooted and community focused digital platform for sangat services.</p>
-          <p className="mt-2 text-sm font-gurmukhi text-brand-navy dark:text-brand-cream">ਵਾਹਿਗੁਰੂ ਜੀ ਕਾ ਖਾਲਸਾ, ਵਾਹਿਗੁਰੂ ਜੀ ਕੀ ਫਤਿਹ</p>
-        </div>
+    <div className="space-y-8">
+      <Seo {...meta} />
+      <PageHero
+        title="Weekly Newsletter"
+        description="Get weekly updates on events, seva opportunities, and community highlights. Select one or more topics so updates are mapped accurately."
+      />
 
-        <div className="mt-6 text-center">
-          <p className="font-semibold text-slate-900 dark:text-white">Contact</p>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{siteConfig.contact.address}</p>
-          <p className="text-sm text-slate-600 dark:text-slate-300">{siteConfig.contact.phone}</p>
-          <div className="mt-2 flex items-center justify-center gap-3 text-brand-blue dark:text-blue-200">
-            <a href={siteConfig.social.facebook} target="_blank" rel="noreferrer" aria-label="Facebook" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-brand-blue/20 bg-white/70 transition hover:-translate-y-0.5 hover:bg-white dark:border-blue-300/40 dark:bg-slate-800">
-              <FacebookIcon />
-            </a>
-            <a href={siteConfig.social.instagram} target="_blank" rel="noreferrer" aria-label="Instagram" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-brand-blue/20 bg-white/70 transition hover:-translate-y-0.5 hover:bg-white dark:border-blue-300/40 dark:bg-slate-800">
-              <InstagramIcon />
-            </a>
-            <a href={siteConfig.social.youtube} target="_blank" rel="noreferrer" aria-label="YouTube" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-brand-blue/20 bg-white/70 transition hover:-translate-y-0.5 hover:bg-white dark:border-blue-300/40 dark:bg-slate-800">
-              <YouTubeIcon />
-            </a>
-          </div>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{siteConfig.contact.email}</p>
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
-            <button
-              type="button"
-              onClick={openNewsletterModal}
-              className="inline-flex items-center rounded-full border border-brand-blue/25 bg-blue-50 px-3 py-1 text-xs font-semibold text-brand-blue transition hover:bg-blue-100 dark:border-blue-400/40 dark:bg-blue-900/20 dark:text-blue-200"
-            >
-              Sign Up for Newsletter
-            </button>
-            {hasWhatsAppInfo ? (
-              <a
-                href={whatsAppLink}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-500/50 dark:bg-emerald-900/20 dark:text-emerald-200"
-              >
-                Join WhatsApp Sangat Group
-              </a>
-            ) : null}
-          </div>
+      <Card className="mx-auto max-w-3xl border border-brand-blue/15 bg-gradient-to-br from-white via-blue-50/40 to-amber-50/40">
+        <div className="flex flex-col items-center gap-3 py-3 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-blue/75">Community Updates</p>
+          <h2 className="font-heading text-2xl font-bold text-slate-900">Newsletter Signup</h2>
+          <p className="max-w-xl text-sm text-slate-600">Subscribe for weekly sangat updates. Use the popup form and choose one or more topics for cleaner notification mapping.</p>
+          <Button type="button" onClick={openModal} className="px-6 py-2 text-sm font-bold">
+            Open Newsletter Form
+          </Button>
         </div>
-      </div>
+      </Card>
 
-      {isNewsletterModalOpen ? (
+      {isSignupModalOpen ? (
         <div className="fixed inset-0 z-[170] bg-slate-950/60 px-4 py-6 backdrop-blur-md">
           <div className="mx-auto flex min-h-full items-center justify-center">
             <div className="w-full max-w-4xl overflow-visible rounded-3xl border border-slate-200 bg-white shadow-[0_28px_90px_-40px_rgba(15,23,42,0.65)]">
               <div className="relative rounded-t-3xl bg-gradient-to-r from-brand-blue via-blue-700 to-brand-saffron px-5 py-4 text-white">
                 <button
                   type="button"
-                  onClick={closeNewsletterModal}
+                  onClick={closeModal}
                   className="absolute right-4 top-4 rounded-full border border-white/40 bg-white/10 p-1.5 text-white hover:bg-white/20"
                   aria-label="Close newsletter signup popup"
                 >
@@ -216,13 +156,9 @@ const Footer = () => {
                     <p className="text-base font-bold text-emerald-800">Thank you for subscribing.</p>
                     <p className="mt-1 text-sm text-emerald-700">You will receive updates based on your selected topics.</p>
                     <div className="mt-4">
-                      <button
-                        type="button"
-                        onClick={closeNewsletterModal}
-                        className="rounded-lg bg-brand-blue px-4 py-2 text-sm font-semibold text-white"
-                      >
+                      <Button type="button" onClick={closeModal} className="px-5 py-2 text-sm font-bold">
                         OK
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ) : (
@@ -293,21 +229,13 @@ const Footer = () => {
                 ) : null}
 
                 <div className="md:col-span-2 flex justify-end gap-2 border-t border-slate-200 pt-4">
-                  <button
-                    type="button"
-                    onClick={closeNewsletterModal}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700"
-                  >
+                  <Button type="button" variant="ghost" onClick={closeModal}>
                     Close
-                  </button>
+                  </Button>
                   {!subscribeMutation.isSuccess ? (
-                    <button
-                      type="submit"
-                      disabled={subscribeMutation.isPending}
-                      className="rounded-lg bg-brand-blue px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-                    >
+                    <Button type="submit" disabled={subscribeMutation.isPending}>
                       {subscribeMutation.isPending ? 'Subscribing...' : 'Subscribe'}
-                    </button>
+                    </Button>
                   ) : null}
                 </div>
               </form>
@@ -315,8 +243,8 @@ const Footer = () => {
           </div>
         </div>
       ) : null}
-    </footer>
+    </div>
   );
 };
 
-export default Footer;
+export default NewsletterSignupPage;

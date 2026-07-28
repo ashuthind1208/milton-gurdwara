@@ -24,6 +24,7 @@ const EVENTS_IDENTITY_SETTING_KEY = 'settings-events-allow-custom-name-email';
 const actionIconClass = 'h-4 w-4';
 const quarterMinuteOptions = ['00', '15', '30', '45'];
 const VIEW_REGISTRANTS_PAGE_SIZE = 10;
+const EVENTS_PAGE_SIZE = 10;
 
 const toInputDateTime = (value) => {
   if (!value) {
@@ -228,6 +229,10 @@ const AdminEventsPage = () => {
   const [viewRegistrantsPage, setViewRegistrantsPage] = useState(1);
   const [registrantSearch, setRegistrantSearch] = useState('');
   const [openActionMenuId, setOpenActionMenuId] = useState('');
+  const [eventSearch, setEventSearch] = useState('');
+  const [eventStatusFilter, setEventStatusFilter] = useState('all');
+  const [eventCategoryFilter, setEventCategoryFilter] = useState('all');
+  const [eventsPage, setEventsPage] = useState(1);
 
   const createForm = useForm({ defaultValues: defaultForm });
   const editForm = useForm({ defaultValues: defaultForm });
@@ -463,6 +468,53 @@ const AdminEventsPage = () => {
   const eventCapacity = Number(viewEvent?.capacity || 0);
   const registrationSummary = eventCapacity > 0 ? `${registrants.length}/${eventCapacity}` : `${registrants.length}/∞`;
 
+  const eventCategoryOptions = useMemo(() => {
+    const categories = events
+      .map((entry) => String(entry?.category || '').trim())
+      .filter(Boolean);
+    return [...new Set(categories)].sort((a, b) => a.localeCompare(b));
+  }, [events]);
+
+  const filteredEvents = useMemo(() => {
+    const query = String(eventSearch || '').trim().toLowerCase();
+    return events.filter((event) => {
+      const statusOk = eventStatusFilter === 'all'
+        ? true
+        : eventStatusFilter === 'active'
+          ? event.active !== false
+          : event.active === false;
+
+      const categoryOk = eventCategoryFilter === 'all'
+        ? true
+        : String(event?.category || '').trim() === eventCategoryFilter;
+
+      if (!statusOk || !categoryOk) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      const haystack = [
+        event?.title,
+        event?.location,
+        event?.category,
+        event?.description
+      ]
+        .map((value) => String(value || '').toLowerCase())
+        .join(' ');
+
+      return haystack.includes(query);
+    });
+  }, [events, eventCategoryFilter, eventSearch, eventStatusFilter]);
+
+  const eventsTotalPages = Math.max(1, Math.ceil(filteredEvents.length / EVENTS_PAGE_SIZE));
+  const visibleEvents = useMemo(() => {
+    const start = (eventsPage - 1) * EVENTS_PAGE_SIZE;
+    return filteredEvents.slice(start, start + EVENTS_PAGE_SIZE);
+  }, [eventsPage, filteredEvents]);
+
   useEffect(() => {
     setViewRegistrantsPage(1);
     setRegistrantSearch('');
@@ -481,6 +533,16 @@ const AdminEventsPage = () => {
   useEffect(() => {
     setOpenActionMenuId('');
   }, [events.length]);
+
+  useEffect(() => {
+    setEventsPage(1);
+  }, [eventSearch, eventStatusFilter, eventCategoryFilter]);
+
+  useEffect(() => {
+    if (eventsPage > eventsTotalPages) {
+      setEventsPage(eventsTotalPages);
+    }
+  }, [eventsPage, eventsTotalPages]);
 
   useEffect(() => {
     setHeaderAction(<AdminHeaderActionButton label="Add New Event" onClick={openCreateModal} />);
@@ -513,6 +575,43 @@ const AdminEventsPage = () => {
       </Card>
 
       <Card>
+        <div className="mb-4 grid gap-2 md:grid-cols-4">
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:col-span-2">
+            Search
+            <input
+              type="search"
+              value={eventSearch}
+              onChange={(event) => setEventSearch(event.target.value)}
+              placeholder="Search title, category, or location"
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-700 outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
+            />
+          </label>
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Status
+            <select
+              value={eventStatusFilter}
+              onChange={(event) => setEventStatusFilter(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-700 outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
+            >
+              <option value="all">All</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </label>
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Category
+            <select
+              value={eventCategoryFilter}
+              onChange={(event) => setEventCategoryFilter(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-700 outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
+            >
+              <option value="all">All</option>
+              {eventCategoryOptions.map((category) => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
+          </label>
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead>
@@ -526,7 +625,7 @@ const AdminEventsPage = () => {
               </tr>
             </thead>
             <tbody>
-              {events.map((event) => (
+              {visibleEvents.map((event) => (
                 <tr key={event.id} className="border-b border-slate-100">
                   <td className="py-2 pr-3">
                     <div className="space-y-1.5 lg:hidden">
@@ -685,7 +784,7 @@ const AdminEventsPage = () => {
                   </td>
                 </tr>
               ))}
-              {events.length === 0 ? (
+              {filteredEvents.length === 0 ? (
                 <tr>
                   <td className="py-4 text-center text-slate-500" colSpan={6}>No events found.</td>
                 </tr>
@@ -693,6 +792,30 @@ const AdminEventsPage = () => {
             </tbody>
           </table>
         </div>
+        {filteredEvents.length > 0 ? (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-slate-600">Showing {visibleEvents.length} of {filteredEvents.length} events</p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-40"
+                disabled={eventsPage <= 1}
+                onClick={() => setEventsPage((prev) => prev - 1)}
+              >
+                Prev
+              </button>
+              <span className="text-xs font-semibold text-slate-600">Page {eventsPage} of {eventsTotalPages}</span>
+              <button
+                type="button"
+                className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-40"
+                disabled={eventsPage >= eventsTotalPages}
+                onClick={() => setEventsPage((prev) => prev + 1)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        ) : null}
       </Card>
 
       {createOpen ? (

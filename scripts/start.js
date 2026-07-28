@@ -47,7 +47,9 @@ const backend = spawn(process.execPath, ['server/index.js'], {
   stdio: 'inherit',
   env: {
     ...mergedEnv,
-    PORT: backendPort
+    PORT: backendPort,
+    SERVER_PORT: backendPort,
+    STRIPE_API_PORT: backendPort
   }
 });
 

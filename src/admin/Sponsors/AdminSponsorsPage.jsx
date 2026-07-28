@@ -16,6 +16,7 @@ const emptyFormValues = {
   expiryDate: '',
   active: true
 };
+const SPONSORS_PAGE_SIZE = 10;
 
 const formatDate = (value) => {
   const parsed = new Date(value || '');
@@ -44,6 +45,9 @@ const AdminSponsorsPage = () => {
   const [uploadingField, setUploadingField] = useState('');
   const [uploadProgress, setUploadProgress] = useState({ bannerUrl: 0 });
   const [uploadStatus, setUploadStatus] = useState({ type: 'success', message: '' });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [page, setPage] = useState(1);
 
   const { data: sponsors = [] } = useQuery({
     queryKey: ['sponsors'],
@@ -54,6 +58,36 @@ const AdminSponsorsPage = () => {
     () => sponsors.find((entry) => String(entry.id) === String(modalState.sponsorId)) || null,
     [modalState.sponsorId, sponsors]
   );
+
+  const filteredSponsors = useMemo(() => {
+    const query = String(searchTerm || '').trim().toLowerCase();
+    return sponsors.filter((sponsor) => {
+      const statusOk = statusFilter === 'all'
+        ? true
+        : statusFilter === 'active'
+          ? sponsor.active === true
+          : sponsor.active !== true;
+
+      if (!statusOk) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      const haystack = [sponsor?.title, sponsor?.bannerUrl, sponsor?.createdAt, sponsor?.expiryDate]
+        .map((value) => String(value || '').toLowerCase())
+        .join(' ');
+      return haystack.includes(query);
+    });
+  }, [searchTerm, sponsors, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredSponsors.length / SPONSORS_PAGE_SIZE));
+  const visibleSponsors = useMemo(() => {
+    const start = (page - 1) * SPONSORS_PAGE_SIZE;
+    return filteredSponsors.slice(start, start + SPONSORS_PAGE_SIZE);
+  }, [filteredSponsors, page]);
 
   const createMutation = useMutation({
     mutationFn: (values) => sponsorService.createSponsor(values),
@@ -167,6 +201,16 @@ const AdminSponsorsPage = () => {
   const isViewMode = modalState.mode === 'view';
 
   useEffect(() => {
+    setPage(1);
+  }, [searchTerm, statusFilter]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
+  useEffect(() => {
     setHeaderAction(
       <AdminHeaderActionButton label="Add Sponsor" onClick={() => openModal('create')} />
     );
@@ -185,6 +229,31 @@ const AdminSponsorsPage = () => {
           <p className="mt-1 text-sm text-slate-600">Manage event sponsor names shown on the donation board footer ticker.</p>
         </div>
 
+        <div className="mt-4 grid gap-2 md:grid-cols-3">
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:col-span-2">
+            Search
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search sponsor title or date"
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-700 outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
+            />
+          </label>
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Status
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-700 outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
+            >
+              <option value="all">All</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </label>
+        </div>
+
         <div className="mt-4 overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead>
@@ -197,7 +266,7 @@ const AdminSponsorsPage = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {sponsors.map((sponsor) => (
+              {visibleSponsors.map((sponsor) => (
                 <tr key={sponsor.id}>
                   <td className="px-3 py-2 font-semibold text-slate-800">
                     <div className="space-y-1.5 lg:hidden">
@@ -232,9 +301,38 @@ const AdminSponsorsPage = () => {
                   </td>
                 </tr>
               ))}
+              {filteredSponsors.length === 0 ? (
+                <tr>
+                  <td className="px-3 py-4 text-center text-slate-500" colSpan={5}>No sponsors found.</td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>
+        {filteredSponsors.length > 0 ? (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-slate-600">Showing {visibleSponsors.length} of {filteredSponsors.length} sponsors</p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-40"
+                disabled={page <= 1}
+                onClick={() => setPage((prev) => prev - 1)}
+              >
+                Prev
+              </button>
+              <span className="text-xs font-semibold text-slate-600">Page {page} of {totalPages}</span>
+              <button
+                type="button"
+                className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-40"
+                disabled={page >= totalPages}
+                onClick={() => setPage((prev) => prev + 1)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        ) : null}
       </Card>
 
       {modalState.open ? (

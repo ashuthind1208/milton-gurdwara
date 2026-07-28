@@ -15,6 +15,11 @@ const getApprovalMessage = (user, role) => {
     return '';
   }
 
+  const membershipProfileCompleted = user?.membershipProfile?.completed === true;
+  if (String(role || '').trim() === 'Member' && !membershipProfileCompleted) {
+    return '';
+  }
+
   if (user?.approvalStatus === 'rejected') {
     return 'Your registration was rejected. Please contact the admin team for help.';
   }
@@ -38,6 +43,24 @@ const resolvePostLoginPath = (candidatePath, role) => {
   }
 
   return '/';
+};
+
+const hasPendingMembershipDetailsPrompt = () => {
+  try {
+    return window.sessionStorage.getItem('ssm_prompt_member_details') === '1'
+      || window.localStorage.getItem('ssm_prompt_member_details') === '1';
+  } catch {
+    return false;
+  }
+};
+
+const clearMembershipDetailsPrompt = () => {
+  try {
+    window.sessionStorage.removeItem('ssm_prompt_member_details');
+    window.localStorage.removeItem('ssm_prompt_member_details');
+  } catch {
+    // Ignore storage errors.
+  }
 };
 
 const LoginPage = () => {
@@ -70,12 +93,12 @@ const LoginPage = () => {
   const preferredPath = fromPath || nextPath;
   const effectivePreferredPath = preferredPath;
 
-  const persistAuthIntent = useCallback((intent) => {
+  const persistAuthIntent = useCallback((intent, loginMode = '') => {
     try {
       window.sessionStorage.setItem('ssm_auth_intent', intent);
       window.localStorage.setItem('ssm_auth_intent', intent);
-      window.sessionStorage.setItem('ssm_login_mode', '');
-      window.localStorage.setItem('ssm_login_mode', '');
+      window.sessionStorage.setItem('ssm_login_mode', loginMode);
+      window.localStorage.setItem('ssm_login_mode', loginMode);
       window.sessionStorage.setItem('ssm_post_login_next', effectivePreferredPath || '');
       window.localStorage.setItem('ssm_post_login_next', effectivePreferredPath || '');
       window.sessionStorage.setItem('ssm_signup_role', 'Member');
@@ -110,7 +133,7 @@ const LoginPage = () => {
       // Ignore storage errors and use defaults.
     }
 
-    return {
+      return {
       authIntent: authIntentFromState || (intent === 'signup' ? 'signup' : 'signin'),
       recoveredIsJoinMode: loginMode === 'join',
       recoveredPreferredPath: postLoginNext || '',
@@ -125,6 +148,12 @@ const LoginPage = () => {
 
     const role = user?.role;
     const approvalMessage = getApprovalMessage(user, role);
+    const shouldOpenMembershipForm = hasPendingMembershipDetailsPrompt();
+    if (shouldOpenMembershipForm && String(role || '').trim() === 'Member') {
+      navigate(resolvePostLoginPath(effectivePreferredPath, role), { replace: true });
+      return;
+    }
+
     if (approvalMessage) {
       setNotice(approvalMessage);
       return;
@@ -189,7 +218,7 @@ const LoginPage = () => {
 
       let profile = null;
       try {
-        const { authIntent, recoveredPreferredPath } = consumeAuthIntent(hashParams);
+        const { authIntent, recoveredIsJoinMode, recoveredPreferredPath } = consumeAuthIntent(hashParams);
         const callbackPreferredPath = effectivePreferredPath || recoveredPreferredPath;
 
         const profileResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
@@ -213,11 +242,30 @@ const LoginPage = () => {
           intent: activeIntent
         });
 
+        if (activeIntent === 'signup' || recoveredIsJoinMode) {
+          try {
+            window.sessionStorage.setItem('ssm_prompt_member_details', '1');
+            window.localStorage.setItem('ssm_prompt_member_details', '1');
+          } catch {
+            // Ignore storage errors.
+          }
+        }
+
         if (cancelled) {
           return;
         }
 
         const role = response?.data?.user?.role;
+        const shouldOpenMembershipForm = !response?.data?.wasExistingUser && hasPendingMembershipDetailsPrompt();
+        if (shouldOpenMembershipForm && String(role || '').trim() === 'Member') {
+          navigate(resolvePostLoginPath(callbackPreferredPath, role), { replace: true });
+          return;
+        }
+
+        if (response?.data?.wasExistingUser) {
+          clearMembershipDetailsPrompt();
+        }
+
         const approvalMessage = getApprovalMessage(response?.data?.user, role);
         if (approvalMessage) {
           setNotice(approvalMessage);
@@ -266,12 +314,12 @@ const LoginPage = () => {
         }
 
         parsedOAuthUrl.searchParams.set('state', intent);
-        persistAuthIntent(intent);
+        persistAuthIntent(intent, modeParam === 'join' ? 'join' : '');
         window.location.assign(parsedOAuthUrl.toString());
         return;
       }
 
-      persistAuthIntent(intent);
+      persistAuthIntent(intent, modeParam === 'join' ? 'join' : '');
       window.location.assign(oauthUrl);
       return;
     }
@@ -285,7 +333,26 @@ const LoginPage = () => {
       const activeIntent = intent === 'signup' ? 'signup' : 'signin';
       const response = await loginWithGoogle({ intent: activeIntent });
 
+      if (activeIntent === 'signup' || modeParam === 'join') {
+        try {
+          window.sessionStorage.setItem('ssm_prompt_member_details', '1');
+          window.localStorage.setItem('ssm_prompt_member_details', '1');
+        } catch {
+          // Ignore storage errors.
+        }
+      }
+
+      if (response?.data?.wasExistingUser) {
+        clearMembershipDetailsPrompt();
+      }
+
       const role = response?.data?.user?.role;
+
+      const shouldOpenMembershipForm = !response?.data?.wasExistingUser && hasPendingMembershipDetailsPrompt();
+      if (shouldOpenMembershipForm && String(role || '').trim() === 'Member') {
+        navigate(resolvePostLoginPath(effectivePreferredPath, role), { replace: true });
+        return;
+      }
 
       const approvalMessage = getApprovalMessage(response?.data?.user, role);
       if (approvalMessage) {
@@ -297,7 +364,7 @@ const LoginPage = () => {
     } catch (err) {
       setError(String(err?.message || 'Google sign-in failed. Please try again.'));
     }
-  }, [allowMockGoogleLogin, effectivePreferredPath, loginWithGoogle, navigate, persistAuthIntent]);
+  }, [allowMockGoogleLogin, effectivePreferredPath, loginWithGoogle, modeParam, navigate, persistAuthIntent]);
 
   useEffect(() => {
     if (isAuthenticated) {

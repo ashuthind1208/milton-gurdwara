@@ -43,6 +43,7 @@ const AdminDonationsPage = lazy(() => import('../admin/Donations/AdminDonationsP
 const AdminUsersPage = lazy(() => import('../admin/Users/AdminUsersPage'));
 const AdminRolesAccessPage = lazy(() => import('../admin/RolesAccess/AdminRolesAccessPage'));
 const AdminKidsLearningPage = lazy(() => import('../admin/KidsLearning/AdminKidsLearningPage'));
+const AdminNewsletterPage = lazy(() => import('../admin/Newsletter/AdminNewsletterPage'));
 const AdminAuditTrailPage = lazy(() => import('../admin/AuditTrail/AdminAuditTrailPage'));
 
 const LoadingFallback = () => <div className="py-20 text-center text-slate-600">Loading page...</div>;
@@ -96,6 +97,7 @@ const AppRoutes = () => {
             <Route path="/admin/events" element={<AdminEventsPage />} />
             <Route path="/admin/donations" element={<AdminDonationsPage />} />
             <Route path="/admin/users" element={<AdminUsersPage />} />
+            <Route path="/admin/newsletter" element={<AdminNewsletterPage />} />
             <Route element={<ProtectedRoute allowedRoles={ROLES_ACCESS_ALLOWED_ROLES} allowAssignedAdminAccess={false} />}>
               <Route path="/admin/roles-access" element={<AdminRolesAccessPage />} />
             </Route>

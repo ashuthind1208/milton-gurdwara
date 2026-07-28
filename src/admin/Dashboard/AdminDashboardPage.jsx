@@ -1,13 +1,12 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BellAlertIcon,
-  CalendarDaysIcon,
-  CurrencyDollarIcon,
-  SparklesIcon,
-  UserGroupIcon,
-  UsersIcon
+  ChatBubbleLeftRightIcon,
+  PencilSquareIcon,
+  XMarkIcon,
+  SparklesIcon
 } from '@heroicons/react/24/outline';
 import {
   ArcElement,
@@ -29,7 +28,11 @@ import userService from '../../services/userService';
 import donationService from '../../services/donationService';
 import cmsService from '../../services/cmsService';
 import newsService from '../../services/newsService';
+import sponsorService from '../../services/sponsorService';
+import advertisementService from '../../services/advertisementService';
+import phase2Service from '../../services/phase2Service';
 import { formatCurrency } from '../../utils/formatters';
+import { useAuth } from '../../context/AuthContext';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Tooltip, Legend);
 
@@ -118,31 +121,6 @@ const getTickStrideForRange = (rangeOption) => {
   return Math.max(2, Math.ceil(rangeOption.amount / 15));
 };
 
-const SummaryCard = ({ label, value, sublabel, tone = 'text-slate-900', icon: Icon, href }) => {
-  const content = (
-    <Card className="border border-slate-200 bg-white/95 shadow-[0_20px_45px_-32px_rgba(15,23,42,0.5)] transition hover:-translate-y-0.5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{label}</p>
-          <p className={`mt-3 font-heading text-3xl font-bold ${tone}`}>{value}</p>
-          {sublabel ? <p className="mt-2 text-sm text-slate-500">{sublabel}</p> : null}
-        </div>
-        {Icon ? (
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-600">
-            <Icon className="h-5 w-5" />
-          </span>
-        ) : null}
-      </div>
-    </Card>
-  );
-
-  if (!href) {
-    return content;
-  }
-
-  return <Link to={href}>{content}</Link>;
-};
-
 const EmptyState = ({ text }) => <p className="text-sm text-slate-500">{text}</p>;
 
 const ROLE_COLORS = {
@@ -164,6 +142,8 @@ const TREND_LINE_COLORS = [
   '#84cc16'
 ];
 
+const WHATSAPP_EDIT_ROLES = new Set(['Super Admin', 'Admin']);
+
 const getRoleColor = (role = '', index = 0) => {
   const normalizedRole = String(role || '').trim();
   if (ROLE_COLORS[normalizedRole]) {
@@ -175,9 +155,14 @@ const getRoleColor = (role = '', index = 0) => {
 };
 
 const AdminDashboardPage = () => {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
   const todayDateKey = toDateKey(new Date());
   const [selectedDonationTrendRange, setSelectedDonationTrendRange] = useState('7d');
   const [selectedEventTrendRange, setSelectedEventTrendRange] = useState('7d');
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+  const [whatsAppDraftLink, setWhatsAppDraftLink] = useState('');
+  const [whatsAppModalError, setWhatsAppModalError] = useState('');
   const liveQueryOptions = {
     staleTime: 8 * 1000,
     refetchInterval: 12 * 1000,
@@ -193,6 +178,62 @@ const AdminDashboardPage = () => {
   const { data: volunteerApplications = [] } = useQuery({ queryKey: ['admin-volunteers'], queryFn: () => volunteerService.getApplications().then((res) => res.data), ...liveQueryOptions });
   const { data: cmsData } = useQuery({ queryKey: ['cms-home'], queryFn: () => cmsService.getHomeContent().then((res) => res.data), ...liveQueryOptions });
   const { data: newsArticles = [] } = useQuery({ queryKey: ['news-articles'], queryFn: () => newsService.getArticles().then((res) => res.data), ...liveQueryOptions });
+  const { data: sponsors = [] } = useQuery({ queryKey: ['admin-sponsors'], queryFn: () => sponsorService.getSponsors().then((res) => res.data), ...liveQueryOptions });
+  const { data: advertisements = [] } = useQuery({ queryKey: ['admin-advertisements'], queryFn: () => advertisementService.getAds().then((res) => res.data), ...liveQueryOptions });
+  const { data: phase2ChannelsConfig } = useQuery({
+    queryKey: ['phase2-channels-config-admin-dashboard'],
+    queryFn: () => phase2Service.getChannelsConfig().then((res) => res.data || null),
+    staleTime: 60 * 1000,
+    retry: false
+  });
+
+  const whatsAppJoinLink = String(phase2ChannelsConfig?.whatsAppJoinLink || '').trim();
+  const showWhatsAppPill = phase2ChannelsConfig?.whatsAppOptInEnabled === true && whatsAppJoinLink.length > 0;
+  const canEditWhatsAppLink = WHATSAPP_EDIT_ROLES.has(String(user?.role || '').trim());
+
+  const updateWhatsAppLinkMutation = useMutation({
+    mutationFn: async (nextLink) => {
+      const normalizedLink = String(nextLink || '').trim();
+      if (!normalizedLink) {
+        throw new Error('Please enter a WhatsApp invite link.');
+      }
+
+      const currentConfig = phase2ChannelsConfig && typeof phase2ChannelsConfig === 'object' ? phase2ChannelsConfig : {};
+      const payload = {
+        ...currentConfig,
+        whatsAppOptInEnabled: true,
+        whatsAppJoinLink: normalizedLink
+      };
+
+      return phase2Service.setChannelsConfig(payload);
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['phase2-channels-config-admin-dashboard'] }),
+        queryClient.invalidateQueries({ queryKey: ['phase2-channels-config-footer'] })
+      ]);
+      setIsWhatsAppModalOpen(false);
+      setWhatsAppModalError('');
+    },
+    onError: (error) => {
+      setWhatsAppModalError(String(error?.message || 'Unable to save WhatsApp link right now.'));
+    }
+  });
+
+  const openWhatsAppModal = () => {
+    if (!canEditWhatsAppLink) {
+      return;
+    }
+    setWhatsAppDraftLink(whatsAppJoinLink);
+    setWhatsAppModalError('');
+    setIsWhatsAppModalOpen(true);
+  };
+
+  const handleSaveWhatsAppLink = (event) => {
+    event.preventDefault();
+    setWhatsAppModalError('');
+    updateWhatsAppLinkMutation.mutate(whatsAppDraftLink);
+  };
 
   const pendingUsers = useMemo(
     () => users.filter((user) => String(user.approvalStatus || 'pending').toLowerCase() === 'pending'),
@@ -228,11 +269,6 @@ const AdminDashboardPage = () => {
       joinedThisYear
     };
   }, [users]);
-
-  const inactiveUsers = useMemo(
-    () => users.filter((user) => user.isActive === false),
-    [users]
-  );
 
   const pendingVolunteers = useMemo(
     () => volunteerApplications.filter((entry) => String(entry.status || 'pending').toLowerCase() === 'pending'),
@@ -489,6 +525,18 @@ const AdminDashboardPage = () => {
   const highlightedScheduleItems = Array.isArray(resolvedScheduleDay?.entries)
     ? resolvedScheduleDay.entries.filter((entry) => entry.isHighlighted)
     : [];
+  const activeSponsorsCount = useMemo(
+    () => sponsors.filter((entry) => entry.active).length,
+    [sponsors]
+  );
+  const activeAdvertisements = useMemo(
+    () => advertisements.filter((entry) => entry.active),
+    [advertisements]
+  );
+  const activeAdPlacementCount = useMemo(
+    () => new Set(activeAdvertisements.map((entry) => String(entry.placement || '').trim()).filter(Boolean)).size,
+    [activeAdvertisements]
+  );
 
   const eventChartData = {
     labels: eventRegistrationsTrend.labels,
@@ -556,6 +604,20 @@ const AdminDashboardPage = () => {
               <Button type="button" variant="ghost" className="px-3 py-1.5 text-xs" onClick={() => window.location.assign('/admin/users')}>Open User Queue</Button>
             </div>
 
+            {canEditWhatsAppLink ? (
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={openWhatsAppModal}
+                  className="inline-flex items-center gap-2 rounded-full border-2 border-emerald-500 bg-gradient-to-r from-emerald-500 to-green-600 px-5 py-2.5 text-sm font-extrabold text-white shadow-lg shadow-emerald-700/25 transition hover:-translate-y-0.5"
+                >
+                  <ChatBubbleLeftRightIcon className="h-5 w-5" />
+                  <span>{showWhatsAppPill ? 'Join WhatsApp Sangat Group' : 'Set WhatsApp Sangat Group Link'}</span>
+                  <PencilSquareIcon className="h-4 w-4" />
+                </button>
+              </div>
+            ) : null}
+
             <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               <Link to="/admin/events" className="rounded-xl border border-slate-200 bg-white/85 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-brand-blue/30 hover:text-brand-blue">Manage Events</Link>
               <Link to="/admin/seva-opportunities" className="rounded-xl border border-slate-200 bg-white/85 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-brand-blue/30 hover:text-brand-blue">Review Seva Applications</Link>
@@ -617,15 +679,184 @@ const AdminDashboardPage = () => {
         </div>
       </section>
 
+      {canEditWhatsAppLink && isWhatsAppModalOpen ? (
+        <div className="fixed inset-0 z-[160] bg-slate-900/45 px-4 py-6 backdrop-blur-sm">
+          <div className="mx-auto flex min-h-full items-center justify-center">
+            <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="font-heading text-lg font-bold text-slate-900">WhatsApp Sangat Group Link</h3>
+                <button
+                  type="button"
+                  onClick={() => setIsWhatsAppModalOpen(false)}
+                  className="rounded-full border border-slate-300 p-1 text-slate-600 hover:bg-slate-100"
+                  aria-label="Close WhatsApp link modal"
+                >
+                  <XMarkIcon className="h-4 w-4" />
+                </button>
+              </div>
+
+              <form className="mt-3 space-y-3" onSubmit={handleSaveWhatsAppLink}>
+                <label className="block text-sm font-semibold text-slate-700">
+                  Invite Link
+                  <input
+                    type="url"
+                    value={whatsAppDraftLink}
+                    onChange={(event) => setWhatsAppDraftLink(event.target.value)}
+                    placeholder="https://chat.whatsapp.com/..."
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                  />
+                </label>
+
+                {whatsAppModalError ? (
+                  <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{whatsAppModalError}</p>
+                ) : null}
+
+                <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsWhatsAppModalOpen(false)}
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={updateWhatsAppLinkMutation.isPending}
+                    className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    {updateWhatsAppLinkMutation.isPending ? 'Saving...' : 'Save Link'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard label="Donation Total" value={formatCurrency(donationTotal)} sublabel={`${donations.length} recorded donations`} tone="text-emerald-600" icon={CurrencyDollarIcon} href="/admin/donations" />
-        <SummaryCard label="People Access" value={users.length} sublabel={`${inactiveUsers.length} inactive accounts`} tone="text-brand-blue" icon={UsersIcon} href="/admin/users" />
-        <SummaryCard label="Volunteer Demand" value={volunteerApplications.length} sublabel={`${pendingVolunteers.length} still pending review`} tone="text-amber-600" icon={UserGroupIcon} href="/admin/seva-opportunities" />
-        <SummaryCard label="Upcoming Events" value={upcomingEvents.length} sublabel={`${activeEventCount} active total`} tone="text-violet-600" icon={CalendarDaysIcon} href="/admin/events" />
-        <SummaryCard label="This Month Donations" value={formatCurrency(thisMonthDonationAmount)} sublabel={`Average ${formatCurrency(averageDonation)} per donation`} tone="text-brand-blue" icon={CurrencyDollarIcon} href="/admin/donations" />
-        <SummaryCard label="Event Registrations" value={exactEventRegistrations} sublabel={`${events.length} total events`} tone="text-brand-blue" icon={CalendarDaysIcon} href="/admin/events" />
-        <SummaryCard label="Approved Users" value={approvedUsersCount} sublabel={`${pendingUsers.length} users pending`} tone="text-emerald-600" icon={UsersIcon} href="/admin/users" />
-        <SummaryCard label="Volunteer Approval" value={`${volunteerApprovalRate.toFixed(0)}%`} sublabel={`${approvedVolunteerApplications} approved applications`} tone="text-violet-600" icon={UserGroupIcon} href="/admin/seva-opportunities" />
+        <Card className="border border-emerald-200 bg-white/95 shadow-[0_20px_45px_-32px_rgba(15,23,42,0.5)]">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Finance</p>
+              <h2 className="mt-1 truncate font-heading text-xl font-semibold text-slate-900">Donation Health</h2>
+            </div>
+            <Link to="/admin/donations" className="text-xs font-semibold text-brand-blue hover:underline">Open</Link>
+          </div>
+          <div className="mt-3 border-y border-slate-200">
+            <div className="grid grid-cols-[1fr_auto] gap-3 py-2 text-sm">
+              <span className="text-slate-500">Total Raised</span>
+              <span className="font-semibold text-emerald-700">{formatCurrency(donationTotal)}</span>
+            </div>
+            <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 text-sm">
+              <span className="text-slate-500">This Month</span>
+              <span className="font-semibold text-slate-900">{formatCurrency(thisMonthDonationAmount)}</span>
+            </div>
+            <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 text-sm">
+              <span className="text-slate-500">Avg Donation</span>
+              <span className="font-semibold text-slate-900">{formatCurrency(averageDonation)}</span>
+            </div>
+            <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 text-sm">
+              <span className="text-slate-500">Active Campaigns</span>
+              <span className="font-semibold text-slate-900">{activeCampaignCount}</span>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="border border-blue-200 bg-white/95 shadow-[0_20px_45px_-32px_rgba(15,23,42,0.5)]">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">People</p>
+              <h2 className="mt-1 truncate font-heading text-xl font-semibold text-slate-900">Users &amp; Seva Queue</h2>
+            </div>
+            <div className="flex shrink-0 flex-col items-end gap-1 text-[11px] font-semibold leading-tight sm:text-xs">
+              <Link to="/admin/users" className="text-brand-blue hover:underline">Users</Link>
+              <Link to="/admin/seva-opportunities" className="text-brand-blue hover:underline">Seva</Link>
+            </div>
+          </div>
+          <div className="mt-3 border-y border-slate-200">
+            <div className="grid grid-cols-[1fr_auto] gap-3 py-2 text-sm">
+              <span className="text-slate-500">Approved Users</span>
+              <span className="font-semibold text-slate-900">{approvedUsersCount}</span>
+            </div>
+            <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 text-sm">
+              <span className="text-slate-500">Pending User Approval</span>
+              <span className="font-semibold text-amber-700">{pendingUsers.length}</span>
+            </div>
+            <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 text-sm">
+              <span className="text-slate-500">Volunteer Applications</span>
+              <span className="font-semibold text-slate-900">{volunteerApplications.length}</span>
+            </div>
+            <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 text-sm">
+              <span className="text-slate-500">Volunteer Approval Rate</span>
+              <span className="font-semibold text-slate-900">{volunteerApprovalRate.toFixed(0)}%</span>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="border border-amber-200 bg-white/95 shadow-[0_20px_45px_-32px_rgba(15,23,42,0.5)]">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Programs</p>
+              <h2 className="mt-1 truncate font-heading text-xl font-semibold text-slate-900">Events &amp; Schedule</h2>
+            </div>
+            <div className="flex shrink-0 flex-col items-end gap-1 text-[11px] font-semibold leading-tight sm:text-xs">
+              <Link to="/admin/events" className="text-brand-blue hover:underline">Events</Link>
+              <Link to="/admin/schedule" className="text-brand-blue hover:underline">Schedule</Link>
+            </div>
+          </div>
+          <div className="mt-3 border-y border-slate-200">
+            <div className="grid grid-cols-[1fr_auto] gap-3 py-2 text-sm">
+              <span className="text-slate-500">Active Events</span>
+              <span className="font-semibold text-slate-900">{activeEventCount}</span>
+            </div>
+            <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 text-sm">
+              <span className="text-slate-500">Upcoming Events</span>
+              <span className="font-semibold text-slate-900">{upcomingEvents.length}</span>
+            </div>
+            <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 text-sm">
+              <span className="text-slate-500">Event Registrations</span>
+              <span className="font-semibold text-slate-900">{exactEventRegistrations}</span>
+            </div>
+            <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 text-sm">
+              <span className="text-slate-500">Today&apos;s Schedule</span>
+              <span className="font-semibold text-slate-900">{todayScheduleCount} ({highlightedScheduleItems.length} highlighted)</span>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="border border-violet-200 bg-white/95 shadow-[0_20px_45px_-32px_rgba(15,23,42,0.5)]">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Content &amp; Partners</p>
+              <h2 className="mt-1 truncate font-heading text-xl font-semibold text-slate-900">Publishing Pipeline</h2>
+            </div>
+            <div className="flex shrink-0 flex-col items-end gap-1 text-[11px] font-semibold leading-tight sm:text-xs">
+              <Link to="/admin/news" className="text-brand-blue hover:underline">News</Link>
+              <Link to="/admin/sponsors" className="text-brand-blue hover:underline">Sponsors</Link>
+            </div>
+          </div>
+          <div className="mt-3 border-y border-slate-200">
+            <div className="grid grid-cols-[1fr_auto] gap-3 py-2 text-sm">
+              <span className="text-slate-500">Live News Articles</span>
+              <span className="font-semibold text-slate-900">{liveNewsCount}</span>
+            </div>
+            <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 text-sm">
+              <span className="text-slate-500">Active Sponsors</span>
+              <span className="font-semibold text-slate-900">{activeSponsorsCount}</span>
+            </div>
+            <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 text-sm">
+              <span className="text-slate-500">Active Advertisers</span>
+              <span className="font-semibold text-slate-900">{activeAdvertisements.length}</span>
+            </div>
+            <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 text-sm">
+              <span className="text-slate-500">Ad Placements In Use</span>
+              <span className="font-semibold text-slate-900">{activeAdPlacementCount}</span>
+            </div>
+          </div>
+          <div className="mt-2 text-right">
+            <Link to="/admin/advertisements" className="text-xs font-semibold text-brand-blue hover:underline">Manage advertisements</Link>
+          </div>
+        </Card>
       </section>
 
       <section className="grid gap-4 md:grid-cols-3">
@@ -652,7 +883,7 @@ const AdminDashboardPage = () => {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Donations by Campaign</p>
-                <h2 className="font-heading text-2xl font-semibold text-slate-900">{selectedDonationTrendRangeOption.heading} (actual records)</h2>
+                <h2 className="truncate font-heading text-2xl font-semibold text-slate-900">{selectedDonationTrendRangeOption.heading} (actual records)</h2>
               </div>
               <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 p-1">
                 {TREND_RANGE_OPTIONS.map((entry) => (
@@ -704,7 +935,7 @@ const AdminDashboardPage = () => {
           <Card className="admin-dashboard-card border border-slate-200 bg-white">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Event Registrations</p>
-              <h2 className="font-heading text-2xl font-semibold text-slate-900">{selectedEventTrendRangeOption.heading} (actual records)</h2>
+              <h2 className="truncate font-heading text-2xl font-semibold text-slate-900">{selectedEventTrendRangeOption.heading} (actual records)</h2>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 p-1">
               {TREND_RANGE_OPTIONS.map((entry) => (
@@ -749,7 +980,7 @@ const AdminDashboardPage = () => {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Role Distribution</p>
-                <h2 className="font-heading text-xl font-semibold text-slate-900">Type of Users</h2>
+                <h2 className="truncate font-heading text-xl font-semibold text-slate-900">Type of Users</h2>
               </div>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{users.length} users</span>
             </div>
@@ -776,7 +1007,7 @@ const AdminDashboardPage = () => {
 
           <Card className="admin-dashboard-card border border-slate-200 bg-white">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Quick Queue</p>
-            <h2 className="mt-1 font-heading text-xl font-semibold text-slate-900">Pending review</h2>
+            <h2 className="mt-1 truncate font-heading text-xl font-semibold text-slate-900">Pending review</h2>
             <div className="mt-4 border-y border-slate-200">
               {pendingUsers.length === 0 && pendingVolunteers.length === 0 ? (
                 <div className="py-3"><EmptyState text="No pending approvals right now." /></div>
@@ -809,7 +1040,7 @@ const AdminDashboardPage = () => {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Campaign Momentum</p>
-              <h2 className="font-heading text-xl font-semibold text-slate-900">Donation spread</h2>
+              <h2 className="truncate font-heading text-xl font-semibold text-slate-900">Donation spread</h2>
             </div>
             <Link to="/admin/donations" className="text-sm font-semibold text-brand-blue hover:underline">Open Donations</Link>
           </div>
@@ -836,7 +1067,7 @@ const AdminDashboardPage = () => {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Recent Donations</p>
-              <h2 className="font-heading text-xl font-semibold text-slate-900">Latest donor activity</h2>
+              <h2 className="truncate font-heading text-xl font-semibold text-slate-900">Latest donor activity</h2>
             </div>
             <BellAlertIcon className="h-5 w-5 text-slate-400" />
           </div>
@@ -859,7 +1090,7 @@ const AdminDashboardPage = () => {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Publishing Overview</p>
-              <h2 className="font-heading text-xl font-semibold text-slate-900">Content pulse</h2>
+              <h2 className="truncate font-heading text-xl font-semibold text-slate-900">Content pulse</h2>
             </div>
             <SparklesIcon className="h-5 w-5 text-slate-400" />
           </div>
@@ -885,7 +1116,7 @@ const AdminDashboardPage = () => {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Upcoming Calendar</p>
-              <h2 className="font-heading text-xl font-semibold text-slate-900">What&apos;s next</h2>
+              <h2 className="truncate font-heading text-xl font-semibold text-slate-900">What&apos;s next</h2>
             </div>
             <Link to="/admin/events" className="text-sm font-semibold text-brand-blue hover:underline">Manage events</Link>
           </div>
@@ -906,7 +1137,7 @@ const AdminDashboardPage = () => {
 
         <Card className="admin-dashboard-card border border-slate-200 bg-white">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Operational Snapshot</p>
-          <h2 className="mt-1 font-heading text-xl font-semibold text-slate-900">Live backend values</h2>
+          <h2 className="mt-1 truncate font-heading text-xl font-semibold text-slate-900">Live backend values</h2>
           <div className="mt-4 border-y border-slate-200">
             <div className="grid grid-cols-[1fr_auto] gap-3 py-2 text-sm">
               <span className="text-slate-500">Event Registrations</span>

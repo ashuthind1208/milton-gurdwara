@@ -6,7 +6,7 @@ import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 
-test('renders home hero title', async () => {
+test('renders the public navbar branding', async () => {
   const queryClient = new QueryClient();
   render(
     <HelmetProvider>
@@ -21,6 +21,6 @@ test('renders home hero title', async () => {
       </QueryClientProvider>
     </HelmetProvider>
   );
-  const heading = await screen.findByText(/digital home for the sangat/i);
-  expect(heading).toBeInTheDocument();
+  const logos = await screen.findAllByAltText(/gurdwara singh sabha milton logo/i);
+  expect(logos.length).toBeGreaterThan(0);
 });

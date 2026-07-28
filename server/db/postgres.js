@@ -1622,6 +1622,271 @@ const listItems = async (resource) => {
   }));
 };
 
+const searchPublicContent = async (queryText, options = {}) => {
+  if (!pool) {
+    throw new Error('Database is not configured.');
+  }
+
+  const query = String(queryText || '').trim();
+  if (!query) {
+    return [];
+  }
+
+  const requestedLimit = Number(options?.limit);
+  const limit = Number.isFinite(requestedLimit) ? Math.min(50, Math.max(1, Math.floor(requestedLimit))) : 12;
+
+  const scope = String(options?.scope || 'public').trim().toLowerCase();
+
+  const publicSearchSql = `
+    WITH searchable_rows AS (
+      SELECT
+        CONCAT('event-', e.id::text) AS id,
+        'event'::text AS type,
+        COALESCE(e.title, '') AS title,
+        TRIM(CONCAT(COALESCE(TO_CHAR(e.date, 'Mon DD, YYYY'), ''), CASE WHEN COALESCE(e.location, '') <> '' THEN CONCAT(' - ', e.location) ELSE '' END)) AS subtitle,
+        COALESCE(e.description, '') AS body,
+        '/events'::text AS route,
+        e.updated_at AS updated_at
+      FROM events e
+      WHERE e.active = TRUE
+
+      UNION ALL
+
+      SELECT
+        CONCAT('news-', n.id) AS id,
+        'news'::text AS type,
+        COALESCE(n.heading, '') AS title,
+        TRIM(COALESCE(TO_CHAR(n.published_at, 'Mon DD, YYYY'), '')) AS subtitle,
+        COALESCE(n.content, '') AS body,
+        '/news'::text AS route,
+        n.updated_at AS updated_at
+      FROM news_articles n
+      WHERE n.active = TRUE
+
+      UNION ALL
+
+      SELECT
+        CONCAT('seva-', s.id) AS id,
+        'seva'::text AS type,
+        COALESCE(s.seva_type, '') AS title,
+        TRIM(CONCAT(COALESCE(TO_CHAR(s.seva_date, 'Mon DD, YYYY'), ''), CASE WHEN COALESCE(s.seva_time, '') <> '' THEN CONCAT(' - ', s.seva_time) ELSE '' END)) AS subtitle,
+        CONCAT('Need ', COALESCE(s.total_volunteers_required, 0)::text, ' volunteers') AS body,
+        '/seva'::text AS route,
+        s.updated_at AS updated_at
+      FROM seva_opportunities s
+      WHERE s.active = TRUE
+
+      UNION ALL
+
+      SELECT
+        CONCAT('cms-', p.slug) AS id,
+        'cms'::text AS type,
+        COALESCE(p.hero_title, '') AS title,
+        COALESCE(p.hero_description, '') AS subtitle,
+        CONCAT(COALESCE(p.intro, ''), ' ', COALESCE(string_agg(COALESCE(sec.title, '') || ' ' || COALESCE(sec.body, ''), ' '), '')) AS body,
+        CONCAT('/', COALESCE(p.slug, '')) AS route,
+        p.updated_at AS updated_at
+      FROM cms_pages p
+      LEFT JOIN cms_page_sections sec ON sec.page_id = p.id
+      GROUP BY p.id, p.slug, p.hero_title, p.hero_description, p.intro, p.updated_at
+    ),
+    scored_rows AS (
+      SELECT
+        id,
+        type,
+        title,
+        subtitle,
+        body,
+        route,
+        updated_at,
+        GREATEST(
+          ts_rank_cd(
+            to_tsvector('simple', CONCAT(COALESCE(title, ''), ' ', COALESCE(subtitle, ''), ' ', COALESCE(body, ''))),
+            websearch_to_tsquery('simple', $1)
+          ),
+          CASE
+            WHEN LOWER(CONCAT(COALESCE(title, ''), ' ', COALESCE(subtitle, ''), ' ', COALESCE(body, ''))) LIKE CONCAT('%', LOWER($2), '%')
+            THEN 0.05
+            ELSE 0
+          END
+        ) AS score
+      FROM searchable_rows
+      WHERE
+        to_tsvector('simple', CONCAT(COALESCE(title, ''), ' ', COALESCE(subtitle, ''), ' ', COALESCE(body, ''))) @@ websearch_to_tsquery('simple', $1)
+        OR LOWER(CONCAT(COALESCE(title, ''), ' ', COALESCE(subtitle, ''), ' ', COALESCE(body, ''))) LIKE CONCAT('%', LOWER($2), '%')
+    )
+    SELECT
+      id,
+      type,
+      title,
+      subtitle,
+      body,
+      route,
+      updated_at,
+      score
+    FROM scored_rows
+    ORDER BY score DESC, updated_at DESC NULLS LAST
+    LIMIT $3;
+  `;
+
+  const adminSearchSql = `
+    WITH resource_routes AS (
+      SELECT * FROM (VALUES
+        ('users', '/admin/users', 'Users'),
+        ('cms_pages', '/admin/cms', 'CMS'),
+        ('cms_page_sections', '/admin/cms', 'CMS'),
+        ('cms_hero_slides', '/admin/cms', 'CMS'),
+        ('news_articles', '/admin/news', 'News and Updates'),
+        ('schedule_days', '/admin/schedule', 'Daily Schedule'),
+        ('schedule_entries', '/admin/schedule', 'Daily Schedule'),
+        ('hukamnama_entries', '/admin/hukamnama', 'Hukamnama'),
+        ('hukamnama_lines', '/admin/hukamnama', 'Hukamnama'),
+        ('langar_items', '/admin/langar', 'Seva Items'),
+        ('seva_opportunities', '/admin/seva-opportunities', 'Seva Opportunities'),
+        ('volunteer_registrations', '/admin/seva-opportunities', 'Seva Opportunities'),
+        ('gallery_albums', '/admin/gallery', 'Gallery Folders'),
+        ('videos', '/admin/videos', 'Videos'),
+        ('streaming_configs', '/admin/streaming', 'Streaming'),
+        ('advertisements', '/admin/advertisements', 'Advertisements'),
+        ('sponsors', '/admin/sponsors', 'Sponsors'),
+        ('events', '/admin/events', 'Events'),
+        ('kids_learning', '/admin/kids-learning', 'Kids Learning'),
+        ('kids_learning_content', '/admin/kids-learning', 'Kids Learning'),
+        ('subscribers', '/admin/newsletter', 'Newsletter'),
+        ('newsletter_campaigns', '/admin/newsletter', 'Newsletter'),
+        ('newsletter_topics', '/admin/newsletter', 'Newsletter'),
+        ('library_physical_books', '/admin/library', 'Library'),
+        ('library_digital_resources', '/admin/library', 'Library'),
+        ('library_program_updates', '/admin/library', 'Library'),
+        ('library_media_resources', '/admin/library', 'Library'),
+        ('donations', '/admin/donations', 'Donations'),
+        ('donation_campaigns', '/admin/donations', 'Donations'),
+        ('roles_access', '/admin/roles-access', 'Roles and Access'),
+        ('roles', '/admin/roles-access', 'Roles and Access')
+      ) AS t(resource, route, page_label)
+    ),
+    searchable_rows AS (
+      SELECT
+        CONCAT('admin-item-', ai.resource, '-', ai.id) AS id,
+        'admin'::text AS type,
+        COALESCE(
+          ai.payload->>'title',
+          ai.payload->>'name',
+          ai.payload->>'heading',
+          ai.payload->>'heroTitle',
+          ai.payload->>'subject',
+          ai.payload->>'sevaType',
+          ai.payload->>'email',
+          ai.payload->>'id',
+          ai.id
+        ) AS title,
+        COALESCE(
+          rr.page_label,
+          ai.payload->>'subtitle',
+          ai.payload->>'category',
+          ai.resource
+        ) AS subtitle,
+        ai.payload::text AS body,
+        rr.route AS route,
+        ai.updated_at AS updated_at
+      FROM app_items ai
+      LEFT JOIN resource_routes rr ON rr.resource = ai.resource
+      WHERE ai.resource <> 'audit_logs'
+        AND ai.resource NOT LIKE 'admin_notification_reads%'
+        AND rr.route IS NOT NULL
+
+      UNION ALL
+
+      SELECT
+        CONCAT('admin-user-', u.id) AS id,
+        'admin'::text AS type,
+        COALESCE(u.name, u.email, u.id) AS title,
+        'Users'::text AS subtitle,
+        CONCAT(COALESCE(u.email, ''), ' ', COALESCE(u.role, ''), ' ', COALESCE(u.member_type, ''), ' ', COALESCE(u.phone, ''), ' ', COALESCE(u.address, '')) AS body,
+        '/admin/users'::text AS route,
+        u.updated_at AS updated_at
+      FROM admin_users u
+
+      UNION ALL
+
+      SELECT
+        CONCAT('admin-event-', e.id::text) AS id,
+        'admin'::text AS type,
+        COALESCE(e.title, '') AS title,
+        'Events'::text AS subtitle,
+        CONCAT(COALESCE(e.description, ''), ' ', COALESCE(e.location, ''), ' ', COALESCE(e.category, '')) AS body,
+        '/admin/events'::text AS route,
+        e.updated_at AS updated_at
+      FROM events e
+
+      UNION ALL
+
+      SELECT
+        CONCAT('admin-campaign-', d.id::text) AS id,
+        'admin'::text AS type,
+        COALESCE(d.name, '') AS title,
+        'Donations'::text AS subtitle,
+        CONCAT(COALESCE(d.description, ''), ' ', COALESCE(d.progress_title, ''), ' ', COALESCE(d.progress_description, '')) AS body,
+        '/admin/donations'::text AS route,
+        d.updated_at AS updated_at
+      FROM donation_campaigns d
+    ),
+    scored_rows AS (
+      SELECT
+        id,
+        type,
+        title,
+        subtitle,
+        body,
+        route,
+        updated_at,
+        GREATEST(
+          ts_rank_cd(
+            to_tsvector('simple', CONCAT(COALESCE(title, ''), ' ', COALESCE(subtitle, ''), ' ', COALESCE(body, ''))),
+            websearch_to_tsquery('simple', $1)
+          ),
+          CASE
+            WHEN LOWER(CONCAT(COALESCE(title, ''), ' ', COALESCE(subtitle, ''), ' ', COALESCE(body, ''))) LIKE CONCAT('%', LOWER($2), '%')
+            THEN 0.05
+            ELSE 0
+          END
+        ) AS score
+      FROM searchable_rows
+      WHERE
+        to_tsvector('simple', CONCAT(COALESCE(title, ''), ' ', COALESCE(subtitle, ''), ' ', COALESCE(body, ''))) @@ websearch_to_tsquery('simple', $1)
+        OR LOWER(CONCAT(COALESCE(title, ''), ' ', COALESCE(subtitle, ''), ' ', COALESCE(body, ''))) LIKE CONCAT('%', LOWER($2), '%')
+    )
+    SELECT
+      id,
+      type,
+      title,
+      subtitle,
+      body,
+      route,
+      updated_at,
+      score
+    FROM scored_rows
+    ORDER BY score DESC, updated_at DESC NULLS LAST
+    LIMIT $3;
+  `;
+
+  const result = await pool.query(
+    scope === 'admin' ? adminSearchSql : publicSearchSql,
+    [query, query, limit]
+  );
+
+  return result.rows.map((row) => ({
+    id: String(row.id || ''),
+    type: String(row.type || ''),
+    title: String(row.title || '').trim(),
+    subtitle: String(row.subtitle || '').trim(),
+    body: String(row.body || '').replace(/\s+/g, ' ').trim(),
+    route: String(row.route || '/').trim() || '/',
+    updatedAt: row.updated_at || '',
+    score: Number(row.score || 0)
+  }));
+};
+
 const createItem = async (resource, payload) => {
   if (!pool) {
     throw new Error('Database is not configured.');
@@ -2896,6 +3161,7 @@ module.exports = {
   getSingleton,
   setSingleton,
   listItems,
+  searchPublicContent,
   createItem,
   updateItem,
   removeItem,

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -7,6 +8,7 @@ import {
   PowerIcon,
   BellIcon,
   BellAlertIcon,
+  MagnifyingGlassIcon,
   ChartBarSquareIcon,
   CalendarDaysIcon,
   CameraIcon,
@@ -26,11 +28,13 @@ import {
   SparklesIcon
 } from '@heroicons/react/24/outline';
 import { XMarkIcon } from '@heroicons/react/24/outline';
+import GlobalSearchBar from '../components/common/GlobalSearchBar';
 import { adminNav } from '../constants/navigation';
 import { useAuth } from '../context/AuthContext';
 import gurdwaraLogo from '../assets/gurdwara-logo.webp';
 import auditService from '../services/auditService';
 import contentApiService from '../services/contentApiService';
+import phase2Service from '../services/phase2Service';
 import userService from '../services/userService';
 
 const FULL_ACCESS_ROLES = new Set(['Super Admin', 'Admin']);
@@ -48,6 +52,16 @@ const normalizeNotificationReadIds = (value) => {
 const getFirstName = (fullName) => {
   const tokens = String(fullName || '').trim().split(/\s+/).filter(Boolean);
   return tokens[0] || 'Member';
+};
+
+const getAdminAvatarFallback = (name = 'Member') => `https://ui-avatars.com/api/?name=${encodeURIComponent(String(name || 'Member'))}`;
+
+const getAdminAvatarSrc = (entry = {}) => {
+  const primary = String(entry?.avatarUrl || entry?.picture || entry?.photoURL || '').trim();
+  if (primary) {
+    return primary;
+  }
+  return getAdminAvatarFallback(entry?.name || 'Member');
 };
 
 const formatActivityTime = (value) => {
@@ -208,6 +222,31 @@ const toNotificationPageLabel = (path = '') => {
   }
   const suffix = normalized.replace('/admin/', '').replace(/[-_]+/g, ' ').trim();
   return suffix ? suffix.charAt(0).toUpperCase() + suffix.slice(1) : 'Admin';
+};
+
+const mapPublicSearchRouteToAdmin = (route = '') => {
+  const normalized = String(route || '').trim();
+  if (!normalized) {
+    return '';
+  }
+
+  if (normalized.startsWith('/admin')) {
+    return normalized;
+  }
+
+  const routeMap = {
+    '/events': '/admin/events',
+    '/news': '/admin/news',
+    '/library': '/admin/library',
+    '/seva': '/admin/seva-opportunities',
+    '/gallery': '/admin/gallery',
+    '/hukamnama': '/admin/hukamnama',
+    '/about': '/admin/cms',
+    '/sikhism': '/admin/cms',
+    '/contact': '/admin/cms'
+  };
+
+  return routeMap[normalized] || '';
 };
 
 const toNotificationDetail = (entry) => {
@@ -389,6 +428,7 @@ const iconByPath = {
   '/admin/sponsors': CameraIcon,
   '/admin/events': QueueListIcon,
   '/admin/kids-learning': BookOpenIcon,
+  '/admin/phase2-config': SparklesIcon,
   '/admin/donations': CurrencyDollarIcon,
   '/admin/audit-trail': BellAlertIcon,
   '/admin/roles-access': QueueListIcon,
@@ -403,6 +443,7 @@ const AdminLayout = () => {
   const [accessDeniedModalOpen, setAccessDeniedModalOpen] = useState(false);
   const [accessDeniedNotice, setAccessDeniedNotice] = useState('');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [headerAction, setHeaderAction] = useState(null);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -446,6 +487,7 @@ const AdminLayout = () => {
     return matched || user || null;
   }, [user, users]);
   const firstName = getFirstName(effectiveUser?.name);
+  const effectiveUserAvatar = getAdminAvatarSrc(effectiveUser || {});
   const hasFullAccess = FULL_ACCESS_ROLES.has(String(effectiveUser?.role || ''));
   const assignedAdminPages = useMemo(
     () => (Array.isArray(effectiveUser?.adminPageAccess) ? effectiveUser.adminPageAccess.map((path) => String(path || '').trim()).filter(Boolean) : []),
@@ -465,6 +507,77 @@ const AdminLayout = () => {
   const visibleNav = hasFullAccess
     ? adminNav
     : adminNav.filter((item) => limitedAccessPaths.includes(item.path));
+  const adminSearchItems = useMemo(() => {
+    const allowedPaths = new Set(visibleNav.map((item) => String(item.path || '').trim()).filter(Boolean));
+    const pageItems = visibleNav
+      .filter((item) => String(item.path || '').trim() !== '/admin/audit-trail')
+      .map((item) => {
+      const normalizedPath = String(item.path || '').trim();
+      const pageSlug = normalizedPath === '/admin'
+        ? 'dashboard'
+        : normalizedPath.replace('/admin/', '').replace(/[-_]+/g, ' ').trim();
+
+      return {
+        id: `admin-search-page-${normalizedPath}`,
+        type: 'admin',
+        title: item.label,
+        subtitle: normalizedPath,
+        body: `Open ${item.label}`,
+        keywords: [item.label, normalizedPath, pageSlug].filter(Boolean),
+        route: normalizedPath,
+        updatedAt: ''
+      };
+      });
+
+    const userItems = allowedPaths.has('/admin/users')
+      ? users.map((entry) => ({
+        id: `admin-search-user-${entry.id}`,
+        type: 'admin',
+        title: String(entry.name || entry.email || 'User').trim(),
+        subtitle: `Users - ${String(entry.role || 'Member').trim()}`,
+        body: [
+          entry.email,
+          entry.phone,
+          entry.address,
+          entry.approvalStatus,
+          entry.memberType,
+          entry.id
+        ].filter(Boolean).join(' '),
+        keywords: [entry.role, entry.memberType, entry.approvalStatus].filter(Boolean),
+        route: '/admin/users',
+        updatedAt: entry.updatedAt || entry.createdAt || ''
+      }))
+      : [];
+
+    return [...pageItems, ...userItems];
+  }, [visibleNav, users]);
+  const adminRemoteFullTextSearch = useCallback(async (query) => {
+    const allowedPaths = new Set(
+      visibleNav
+        .map((item) => String(item.path || '').trim())
+        .filter((path) => Boolean(path) && path !== '/admin/audit-trail')
+    );
+
+    const response = await phase2Service.searchFullText(query, { limit: 20, scope: 'admin' });
+    const rows = Array.isArray(response?.data) ? response.data : [];
+
+    return rows
+      .map((row) => {
+        const mappedRoute = mapPublicSearchRouteToAdmin(row.route);
+        if (!mappedRoute || !allowedPaths.has(mappedRoute)) {
+          return null;
+        }
+
+        return {
+          ...row,
+          id: `admin-remote-${String(row.type || 'content')}-${String(row.id || row.title || '')}-${mappedRoute}`,
+          type: 'admin',
+          route: mappedRoute,
+          subtitle: String(row.subtitle || toNotificationPageLabel(mappedRoute)).trim()
+        };
+      })
+      .filter(Boolean);
+  }, [visibleNav]);
   const currentNavItem = [...adminNav]
     .sort((a, b) => b.path.length - a.path.length)
     .find((item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`));
@@ -546,6 +659,10 @@ const AdminLayout = () => {
 
   useEffect(() => {
     setMobileNavOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    setIsSearchModalOpen(false);
   }, [location.pathname]);
 
   useEffect(() => {
@@ -802,10 +919,21 @@ const AdminLayout = () => {
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950">
       <div className="grid grid-cols-1 lg:min-h-screen lg:grid-cols-[270px_1fr]">
       <aside className="hidden border-r border-slate-800 bg-slate-950 p-4 text-slate-100 lg:sticky lg:top-0 lg:block lg:h-screen lg:overflow-y-auto lg:self-start">
-        <p className="flex items-center gap-2 font-heading text-xl font-bold text-white">
-          <img src={gurdwaraLogo} alt="Singh Sabha logo" className="h-8 w-8 rounded-full border border-brand-saffron/70 object-cover" />
-          Admin Portal
-        </p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="flex items-center gap-2 font-heading text-xl font-bold text-white">
+            <img src={gurdwaraLogo} alt="Singh Sabha logo" className="h-8 w-8 rounded-full border border-brand-saffron/70 object-cover" />
+            Admin Portal
+          </p>
+          <button
+            type="button"
+            onClick={() => setIsSearchModalOpen(true)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-brand-saffron transition hover:bg-white/20"
+            aria-label="Open admin search"
+            title="Search accessible content"
+          >
+            <MagnifyingGlassIcon className="h-4 w-4" />
+          </button>
+        </div>
         <nav className="mt-6 grid gap-2" aria-label="Admin navigation">
           {visibleNav.map((item) => (
             <NavLink
@@ -860,7 +988,17 @@ const AdminLayout = () => {
                   </span>
                 ) : null}
               </button>
-              <img src={effectiveUser?.avatarUrl || gurdwaraLogo} alt={effectiveUser?.name || 'Profile'} className="h-9 w-9 rounded-full border border-slate-200 object-cover" />
+              <img
+                src={effectiveUserAvatar}
+                alt={effectiveUser?.name || 'Profile'}
+                className="h-9 w-9 rounded-full border border-slate-200 object-cover"
+                onError={(event) => {
+                  const fallback = getAdminAvatarFallback(effectiveUser?.name || 'Member');
+                  if (event.currentTarget.src !== fallback) {
+                    event.currentTarget.src = fallback;
+                  }
+                }}
+              />
               <Link
                 to="/"
                 className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700"
@@ -900,7 +1038,17 @@ const AdminLayout = () => {
                   </span>
                 ) : null}
               </button>
-              <img src={effectiveUser?.avatarUrl || gurdwaraLogo} alt={effectiveUser?.name || 'Profile'} className="h-9 w-9 rounded-full border border-slate-200 object-cover" />
+              <img
+                src={effectiveUserAvatar}
+                alt={effectiveUser?.name || 'Profile'}
+                className="h-9 w-9 rounded-full border border-slate-200 object-cover"
+                onError={(event) => {
+                  const fallback = getAdminAvatarFallback(effectiveUser?.name || 'Member');
+                  if (event.currentTarget.src !== fallback) {
+                    event.currentTarget.src = fallback;
+                  }
+                }}
+              />
               <p className="text-base font-extrabold text-slate-800">{firstName}</p>
               <Link
                 to="/"
@@ -959,14 +1107,28 @@ const AdminLayout = () => {
                 <img src={gurdwaraLogo} alt="Singh Sabha logo" className="h-8 w-8 rounded-full border border-brand-saffron/70 object-cover" />
                 Admin Portal
               </p>
-              <button
-                type="button"
-                onClick={() => setMobileNavOpen(false)}
-                className="rounded-md border border-slate-700 p-1 text-slate-300"
-                aria-label="Close admin menu"
-              >
-                <XMarkIcon className="h-5 w-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileNavOpen(false);
+                    setIsSearchModalOpen(true);
+                  }}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-brand-saffron transition hover:bg-white/20"
+                  aria-label="Open admin search"
+                  title="Search accessible pages"
+                >
+                  <MagnifyingGlassIcon className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMobileNavOpen(false)}
+                  className="rounded-md border border-slate-700 p-1 text-slate-300"
+                  aria-label="Close admin menu"
+                >
+                  <XMarkIcon className="h-5 w-5" />
+                </button>
+              </div>
             </div>
 
             <nav className="mt-6 grid gap-2" aria-label="Admin navigation mobile">
@@ -1008,6 +1170,37 @@ const AdminLayout = () => {
           </div>
         </div>
       ) : null}
+
+      {isSearchModalOpen ? createPortal(
+        <div className="fixed inset-0 z-[281] flex items-start justify-center bg-slate-950/45 px-5 py-20 backdrop-blur-sm sm:px-4" onClick={() => setIsSearchModalOpen(false)}>
+          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_30px_70px_-34px_rgba(15,23,42,0.75)]" onClick={(event) => event.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="font-heading text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Search</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSearchModalOpen(false)}
+                className="rounded-full border border-slate-300 p-1.5 text-slate-600 transition hover:bg-slate-100"
+                aria-label="Close search modal"
+              >
+                <XMarkIcon className="h-4 w-4" />
+              </button>
+            </div>
+            <GlobalSearchBar
+              className="w-full px-2 sm:px-0"
+              inputClassName="py-2.5"
+              placeholder="Search accessible content"
+              autoFocus
+              inputId="admin-global-search-modal"
+              items={adminSearchItems}
+              remoteSearchFn={adminRemoteFullTextSearch}
+              scope="admin"
+              onResultSelect={() => setIsSearchModalOpen(false)}
+            />
+          </div>
+        </div>
+      , document.body) : null}
     </div>
   );
 };

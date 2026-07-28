@@ -177,6 +177,44 @@ const resolveAvatarUrl = (user = {}) => (
   user.avatarUrl || user.picture || user.photoURL || user.imageUrl || user.profileImageUrl || ''
 );
 
+const normalizeMembershipFeeRecords = (records = []) => {
+  if (!Array.isArray(records)) {
+    return [];
+  }
+
+  return records
+    .map((entry, index) => ({
+      id: String(entry?.id || `fee-${Date.now()}-${index}`).trim(),
+      amount: Number(entry?.amount || 0),
+      currency: String(entry?.currency || 'CAD').trim() || 'CAD',
+      receiptNumber: String(entry?.receiptNumber || '').trim(),
+      paymentDate: String(entry?.paymentDate || '').trim(),
+      paymentMethod: String(entry?.paymentMethod || 'Cash').trim() || 'Cash',
+      membershipEntryType: String(entry?.membershipEntryType || 'renew').trim().toLowerCase() === 'new' ? 'new' : 'renew',
+      status: String(entry?.status || 'pending').trim().toLowerCase() || 'pending',
+      notes: String(entry?.notes || '').trim(),
+      updatedAt: String(entry?.updatedAt || new Date().toISOString())
+    }))
+    .sort((left, right) => new Date(right.paymentDate || right.updatedAt || 0).getTime() - new Date(left.paymentDate || left.updatedAt || 0).getTime());
+};
+
+const normalizeMembershipProfile = (profile = {}) => {
+  const source = profile && typeof profile === 'object' ? profile : {};
+  return {
+    completed: source.completed === true,
+    submittedAt: String(source.submittedAt || '').trim(),
+    dateOfBirth: String(source.dateOfBirth || '').trim(),
+    occupation: String(source.occupation || '').trim(),
+    emergencyContactName: String(source.emergencyContactName || '').trim(),
+    emergencyContactPhone: String(source.emergencyContactPhone || '').trim(),
+    canadianStatus: String(source.canadianStatus || '').trim(),
+    donationMethod: String(source.donationMethod || '').trim(),
+    donationSchedule: String(source.donationSchedule || 'monthly').trim().toLowerCase() || 'monthly',
+    membershipPledgeAccepted: source.membershipPledgeAccepted === true,
+    notes: String(source.notes || '').trim()
+  };
+};
+
 const normalizeUser = (user = {}, roleDefinitions = []) => {
   const role = normalizeRole(user.role);
   const memberType = resolveMemberType(role, user.memberType || '');
@@ -198,6 +236,8 @@ const normalizeUser = (user = {}, roleDefinitions = []) => {
     isActive: user.isActive !== false,
     approvalStatus: user.approvalStatus || (isPrivilegedRole ? 'approved' : 'pending'),
     approvalUpdatedAt: user.approvalUpdatedAt || '',
+    membershipProfile: normalizeMembershipProfile(user.membershipProfile),
+    membershipFeeRecords: normalizeMembershipFeeRecords(user.membershipFeeRecords),
     createdAt: user.createdAt || new Date().toISOString(),
     updatedAt: user.updatedAt || new Date().toISOString()
   };
@@ -318,6 +358,46 @@ const userService = {
 
     const created = await contentApiService.create(RESOURCE, updated);
     return serviceResponse(normalizeUser(created || updated, roleDefinitions));
+  },
+
+  submitMembershipDetails: async (id, payload) => {
+    if (!id) {
+      throw new Error('User id is required.');
+    }
+
+    const roleDefinitions = await getRoleDefinitions();
+    const users = await ensureSeedUsers();
+    const existing = users.find((user) => user.id === id);
+    if (!existing) {
+      throw new Error('User not found.');
+    }
+
+    const profile = normalizeMembershipProfile({
+      ...existing.membershipProfile,
+      ...(payload || {}),
+      completed: true,
+      submittedAt: new Date().toISOString()
+    });
+
+    const updated = normalizeUser({
+      ...existing,
+      phone: String(payload?.phone || existing.phone || '').trim(),
+      address: String(payload?.address || existing.address || '').trim(),
+      membershipProfile: profile,
+      isActive: false,
+      registrationComplete: true,
+      approvalStatus: existing.approvalStatus || 'pending',
+      approvalUpdatedAt: existing.approvalUpdatedAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }, roleDefinitions);
+
+    const saved = await contentApiService.update(RESOURCE, id, {
+      ...updated,
+      id,
+      createdAt: existing.createdAt
+    });
+
+    return serviceResponse(normalizeUser(saved || updated, roleDefinitions));
   },
 
   createUser: async (payload) => {

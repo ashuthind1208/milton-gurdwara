@@ -4,6 +4,7 @@ import PageHero from '../../components/common/PageHero';
 import Seo from '../../components/common/Seo';
 import useSeoMeta from '../../hooks/useSeoMeta';
 import Card from '../../components/ui/Card';
+import BreadcrumbTrail from '../../components/common/BreadcrumbTrail';
 import kidsLearningService from '../../services/kidsLearningService';
 
 const todayDateOnly = () => {
@@ -55,6 +56,21 @@ const KidsLearningPage = () => {
 
   const wordCard = isPublishedNow(data?.wordOfWeek) ? data?.wordOfWeek : null;
 
+  const breadcrumbItems = useMemo(() => {
+    const items = [
+      { label: 'Home', path: '/' },
+      { label: 'Kids Learning', path: '/kids-learning' }
+    ];
+
+    if (selectedQuizId) {
+      items.push({ label: 'Quiz', isCurrent: true });
+      return items;
+    }
+
+    items[items.length - 1] = { ...items[items.length - 1], isCurrent: true };
+    return items;
+  }, [selectedQuizId]);
+
   return (
     <div className="space-y-8">
       <Seo {...meta} />
@@ -62,6 +78,7 @@ const KidsLearningPage = () => {
         title={data?.heroTitle || 'Kids Sikh Learning'}
         description={data?.heroDescription || 'Stories, quizzes, and Punjabi vocabulary for Sikh children and families.'}
       />
+      <BreadcrumbTrail items={breadcrumbItems} className="-mt-4 px-1" />
 
       {data?.intro ? (
         <Card>

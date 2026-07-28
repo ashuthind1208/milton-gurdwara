@@ -43,6 +43,7 @@ const emptyFormValues = {
   placement: 'Homepage Sidebar',
   active: true
 };
+const ADS_PAGE_SIZE = 10;
 
 const TREND_RANGE_OPTIONS = [
   { id: '7d', label: 'Last 7 days', days: 7 },
@@ -59,6 +60,10 @@ const AdminAdvertisementsPage = () => {
   const [trendAdId, setTrendAdId] = useState(null);
   const [trendRangeId, setTrendRangeId] = useState('7d');
   const [trendHoverIndex, setTrendHoverIndex] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [placementFilter, setPlacementFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [page, setPage] = useState(1);
 
   const form = useForm({
     defaultValues: emptyFormValues
@@ -164,6 +169,38 @@ const AdminAdvertisementsPage = () => {
     };
   }, [trendSeries]);
 
+  const filteredAds = useMemo(() => {
+    const query = String(searchTerm || '').trim().toLowerCase();
+    return ads.filter((ad) => {
+      const placementOk = placementFilter === 'all' ? true : String(ad?.placement || '') === placementFilter;
+      const statusOk = statusFilter === 'all'
+        ? true
+        : statusFilter === 'active'
+          ? ad.active === true
+          : ad.active !== true;
+
+      if (!placementOk || !statusOk) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      const haystack = [ad?.title, ad?.content, ad?.website, ad?.placement]
+        .map((value) => String(value || '').toLowerCase())
+        .join(' ');
+
+      return haystack.includes(query);
+    });
+  }, [ads, placementFilter, searchTerm, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredAds.length / ADS_PAGE_SIZE));
+  const visibleAds = useMemo(() => {
+    const start = (page - 1) * ADS_PAGE_SIZE;
+    return filteredAds.slice(start, start + ADS_PAGE_SIZE);
+  }, [filteredAds, page]);
+
   useEffect(() => {
     if (trendGraph.points.length === 0) {
       setTrendHoverIndex(null);
@@ -171,6 +208,16 @@ const AdminAdvertisementsPage = () => {
     }
     setTrendHoverIndex(trendGraph.points.length - 1);
   }, [selectedTrendAd?.id, trendRangeId, trendGraph.points.length]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, placementFilter, statusFilter]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   const createMutation = useMutation({
     mutationFn: (values) => advertisementService.createAd(values),
@@ -283,6 +330,44 @@ const AdminAdvertisementsPage = () => {
           <p className="mt-1 text-sm text-slate-600">View, edit, delete, and toggle active status directly from this table.</p>
         </div>
 
+        <div className="mt-4 grid gap-2 md:grid-cols-4">
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:col-span-2">
+            Search
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search advertiser, website, or content"
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-700 outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
+            />
+          </label>
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Placement
+            <select
+              value={placementFilter}
+              onChange={(event) => setPlacementFilter(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-700 outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
+            >
+              <option value="all">All</option>
+              {placementOptions.map((placement) => (
+                <option key={placement} value={placement}>{placement}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Status
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-700 outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
+            >
+              <option value="all">All</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </label>
+        </div>
+
         <div className="mt-4 overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead>
@@ -296,7 +381,7 @@ const AdminAdvertisementsPage = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {ads.map((ad) => (
+              {visibleAds.map((ad) => (
                 <tr key={ad.id}>
                   <td className="px-3 py-2 font-semibold text-slate-800">
                     <div className="space-y-1.5 lg:hidden">
@@ -341,9 +426,38 @@ const AdminAdvertisementsPage = () => {
                   </td>
                 </tr>
               ))}
+              {filteredAds.length === 0 ? (
+                <tr>
+                  <td className="px-3 py-4 text-center text-slate-500" colSpan={6}>No advertisements found.</td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>
+        {filteredAds.length > 0 ? (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-slate-600">Showing {visibleAds.length} of {filteredAds.length} advertisements</p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-40"
+                disabled={page <= 1}
+                onClick={() => setPage((prev) => prev - 1)}
+              >
+                Prev
+              </button>
+              <span className="text-xs font-semibold text-slate-600">Page {page} of {totalPages}</span>
+              <button
+                type="button"
+                className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-40"
+                disabled={page >= totalPages}
+                onClick={() => setPage((prev) => prev + 1)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        ) : null}
       </Card>
 
       {modalState.open ? (

@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircleIcon,
   ClockIcon,
+  CurrencyDollarIcon,
   EyeIcon,
   PencilSquareIcon,
   Squares2X2Icon,
@@ -121,6 +122,101 @@ const userFormDefaults = {
   role: 'Member'
 };
 
+const membershipFeeFormDefaults = {
+  amount: '',
+  currency: 'CAD',
+  receiptNumber: '',
+  paymentDate: '',
+  paymentMethod: 'Cash',
+  membershipEntryType: 'renew',
+  status: 'pending',
+  notes: ''
+};
+
+const sortMembershipFeeRecords = (records = []) => {
+  return [...records].sort((left, right) => {
+    const rightStamp = new Date(right.paymentDate || right.updatedAt || 0).getTime();
+    const leftStamp = new Date(left.paymentDate || left.updatedAt || 0).getTime();
+    return rightStamp - leftStamp;
+  });
+};
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const MEMBERSHIP_VALIDITY_DAYS_BY_SCHEDULE = {
+  monthly: 30,
+  yearly: 365
+};
+
+const toValidDate = (value) => {
+  const parsed = new Date(value || '');
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return parsed;
+};
+
+const resolveMembershipReviewMeta = ({ records = [], schedule = 'monthly' } = {}) => {
+  const normalizedSchedule = String(schedule || 'monthly').trim().toLowerCase() === 'yearly' ? 'yearly' : 'monthly';
+  const validityDays = MEMBERSHIP_VALIDITY_DAYS_BY_SCHEDULE[normalizedSchedule];
+  const paidRecords = (Array.isArray(records) ? records : []).filter((entry) => String(entry?.status || '').toLowerCase() === 'paid');
+  if (paidRecords.length === 0) {
+    return {
+      isActive: false,
+      schedule: normalizedSchedule,
+      showReviewCard: false,
+      latestPaidDate: null,
+      nextDueDate: null,
+      daysUntilDue: null,
+      overdueDays: null,
+      reminder: ''
+    };
+  }
+
+  const latestPaidRecord = [...paidRecords].sort((left, right) => new Date(right.paymentDate || right.updatedAt || 0).getTime() - new Date(left.paymentDate || left.updatedAt || 0).getTime())[0];
+  const latestPaidDate = toValidDate(latestPaidRecord?.paymentDate || latestPaidRecord?.updatedAt);
+
+  if (!latestPaidDate) {
+    return {
+      isActive: false,
+      showReviewCard: true,
+      latestPaidDate: null,
+      nextDueDate: null,
+      daysUntilDue: null,
+      overdueDays: null,
+      reminder: 'Latest paid fee has an invalid date. Review required before activation.'
+    };
+  }
+
+  const nextDueDate = new Date(latestPaidDate.getTime() + (validityDays * MS_PER_DAY));
+  const daysUntilDue = Math.ceil((nextDueDate.getTime() - Date.now()) / MS_PER_DAY);
+  const isActive = daysUntilDue >= 0;
+
+  if (isActive) {
+    return {
+      isActive: true,
+      schedule: normalizedSchedule,
+      showReviewCard: true,
+      latestPaidDate,
+      nextDueDate,
+      daysUntilDue,
+      overdueDays: null,
+      reminder: `${normalizedSchedule === 'yearly' ? 'Yearly' : 'Monthly'} membership is active. Next review due in ${daysUntilDue} day${daysUntilDue === 1 ? '' : 's'}.`
+    };
+  }
+
+  const overdueDays = Math.abs(daysUntilDue);
+  return {
+    isActive: false,
+    schedule: normalizedSchedule,
+    showReviewCard: true,
+    latestPaidDate,
+    nextDueDate,
+    daysUntilDue,
+    overdueDays,
+    reminder: `${normalizedSchedule === 'yearly' ? 'Yearly' : 'Monthly'} membership fee is overdue by ${overdueDays} day${overdueDays === 1 ? '' : 's'}. Review and collect renewal payment.`
+  };
+};
+
 const AdminUsersPage = () => {
   const { setHeaderAction } = useOutletContext();
   const { user: currentUser, persistUser } = useAuth();
@@ -132,6 +228,12 @@ const AdminUsersPage = () => {
   const [approvalNotice, setApprovalNotice] = useState('');
   const [removeBlockedMessage, setRemoveBlockedMessage] = useState('');
   const [showDeleteActions, setShowDeleteActions] = useState(false);
+  const [membershipUserId, setMembershipUserId] = useState('');
+  const [membershipSearchTerm, setMembershipSearchTerm] = useState('');
+  const [membershipFeeEntryOpen, setMembershipFeeEntryOpen] = useState(false);
+  const [editingMembershipFeeId, setEditingMembershipFeeId] = useState('');
+  const [membershipFeeNotice, setMembershipFeeNotice] = useState(null);
+  const [confirmDeleteMembershipFee, setConfirmDeleteMembershipFee] = useState(null);
   const [editAvatarUrl, setEditAvatarUrl] = useState('');
   const [isEditImageUploading, setIsEditImageUploading] = useState(false);
   const [editImageUploadProgress, setEditImageUploadProgress] = useState(0);
@@ -139,6 +241,7 @@ const AdminUsersPage = () => {
 
   const form = useForm({ defaultValues: userFormDefaults });
   const editForm = useForm({ defaultValues: userFormDefaults });
+  const membershipFeeForm = useForm({ defaultValues: membershipFeeFormDefaults });
 
   const { data: users = [] } = useQuery({
     queryKey: ['admin-users'],
@@ -336,6 +439,46 @@ const AdminUsersPage = () => {
     setViewUser(user);
   };
 
+  const openMembershipUser = (user) => {
+    setViewUser(null);
+    setEditUserId('');
+    setMembershipSearchTerm('');
+    setMembershipUserId(user.id);
+    membershipFeeForm.reset({
+      ...membershipFeeFormDefaults,
+      paymentDate: new Date().toISOString().slice(0, 10)
+    });
+    setEditingMembershipFeeId('');
+    setMembershipFeeEntryOpen(false);
+  };
+
+  const openMembershipFeeEntry = (record = null) => {
+    const hasPaidMembershipFee = membershipFeeRecords.some((entry) => String(entry?.status || '').toLowerCase() === 'paid');
+    const defaultMembershipEntryType = hasPaidMembershipFee ? 'renew' : 'new';
+
+    if (record) {
+      membershipFeeForm.reset({
+        amount: String(record.amount ?? ''),
+        currency: String(record.currency || 'CAD'),
+        receiptNumber: String(record.receiptNumber || ''),
+        paymentDate: String(record.paymentDate || ''),
+        paymentMethod: String(record.paymentMethod || 'Cash'),
+        membershipEntryType: String(record.membershipEntryType || defaultMembershipEntryType || 'renew').trim().toLowerCase() === 'new' ? 'new' : 'renew',
+        status: String(record.status || 'pending'),
+        notes: String(record.notes || '')
+      });
+      setEditingMembershipFeeId(String(record.id || ''));
+    } else {
+      membershipFeeForm.reset({
+        ...membershipFeeFormDefaults,
+        paymentDate: new Date().toISOString().slice(0, 10),
+        membershipEntryType: defaultMembershipEntryType
+      });
+      setEditingMembershipFeeId('');
+    }
+    setMembershipFeeEntryOpen(true);
+  };
+
   const openCreateUser = () => {
     form.reset(userFormDefaults);
     setCreateUserOpen(true);
@@ -344,6 +487,10 @@ const AdminUsersPage = () => {
   const closeModals = () => {
     setViewUser(null);
     setEditUserId('');
+    setMembershipUserId('');
+    setMembershipSearchTerm('');
+    setMembershipFeeEntryOpen(false);
+    setEditingMembershipFeeId('');
     setCreateUserOpen(false);
     setEditAvatarUrl('');
     setIsEditImageUploading(false);
@@ -382,6 +529,135 @@ const AdminUsersPage = () => {
 
   const viewUserAccess = useMemo(() => getDefaultAdminPageAccess(viewUser || {}), [viewUser]);
   const editUserRecord = useMemo(() => users.find((entry) => entry.id === editUserId) || null, [editUserId, users]);
+  const membershipUserRecord = useMemo(() => users.find((entry) => entry.id === membershipUserId) || null, [membershipUserId, users]);
+  const membershipFeeRecords = useMemo(
+    () => sortMembershipFeeRecords(Array.isArray(membershipUserRecord?.membershipFeeRecords) ? membershipUserRecord.membershipFeeRecords : []),
+    [membershipUserRecord]
+  );
+  const membershipReviewMeta = useMemo(
+    () => resolveMembershipReviewMeta({
+      records: membershipFeeRecords,
+      schedule: membershipUserRecord?.membershipProfile?.donationSchedule,
+      startDate: membershipUserRecord?.membershipProfile?.submittedAt || membershipUserRecord?.createdAt || new Date().toISOString()
+    }),
+    [membershipFeeRecords, membershipUserRecord?.createdAt, membershipUserRecord?.membershipProfile?.donationSchedule, membershipUserRecord?.membershipProfile?.submittedAt]
+  );
+  const filteredMembershipFeeRecords = useMemo(() => {
+    const query = String(membershipSearchTerm || '').trim().toLowerCase();
+    if (!query) {
+      return membershipFeeRecords;
+    }
+
+    return membershipFeeRecords.filter((entry) => {
+      const haystack = [entry.receiptNumber, entry.status, entry.paymentMethod, entry.notes, entry.currency, entry.paymentDate]
+        .map((value) => String(value || '').toLowerCase())
+        .join(' ');
+      return haystack.includes(query);
+    });
+  }, [membershipFeeRecords, membershipSearchTerm]);
+
+  const membershipFeeMutation = useMutation({
+    mutationFn: ({ id, values, editingId }) => {
+      const userRecord = users.find((entry) => entry.id === id);
+      if (!userRecord) {
+        throw new Error('User not found.');
+      }
+
+      const targetId = String(editingId || '').trim();
+      const nextRecord = {
+        id: targetId || `fee-${Date.now()}`,
+        amount: Number(values.amount || 0),
+        currency: String(values.currency || 'CAD').trim() || 'CAD',
+        receiptNumber: String(values.receiptNumber || '').trim(),
+        paymentDate: String(values.paymentDate || '').trim(),
+        paymentMethod: String(values.paymentMethod || 'Cash').trim() || 'Cash',
+        membershipEntryType: String(values.membershipEntryType || 'renew').trim().toLowerCase() === 'new' ? 'new' : 'renew',
+        status: String(values.status || 'pending').trim().toLowerCase(),
+        notes: String(values.notes || '').trim(),
+        updatedAt: new Date().toISOString()
+      };
+
+      const existingFeeRecords = Array.isArray(userRecord.membershipFeeRecords) ? userRecord.membershipFeeRecords : [];
+      const filteredExisting = targetId
+        ? existingFeeRecords.filter((entry) => String(entry?.id || '') !== targetId)
+        : existingFeeRecords;
+      const nextFeeRecords = sortMembershipFeeRecords([...filteredExisting, nextRecord]);
+      const nextReviewMeta = resolveMembershipReviewMeta({
+        records: nextFeeRecords,
+        schedule: userRecord?.membershipProfile?.donationSchedule,
+        startDate: userRecord?.membershipProfile?.submittedAt || userRecord?.createdAt || new Date().toISOString()
+      });
+
+      return userService.updateUser(id, {
+        membershipFeeRecords: nextFeeRecords,
+        isActive: nextReviewMeta.isActive
+      });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      membershipFeeForm.reset({
+        ...membershipFeeFormDefaults,
+        paymentDate: new Date().toISOString().slice(0, 10)
+      });
+      setMembershipFeeNotice({
+        type: 'success',
+        message: String(variables?.editingId || '').trim()
+          ? 'Membership fee entry updated. Member active status refreshed automatically.'
+          : 'Membership fee entry added. Member active status refreshed automatically.'
+      });
+      setEditingMembershipFeeId('');
+      setMembershipFeeEntryOpen(false);
+    },
+    onError: (error) => {
+      setMembershipFeeNotice({
+        type: 'error',
+        message: String(error?.message || 'Unable to save membership fee entry right now.')
+      });
+    }
+  });
+
+  const membershipFeeDeleteMutation = useMutation({
+    mutationFn: ({ id, feeId }) => {
+      const userRecord = users.find((entry) => entry.id === id);
+      if (!userRecord) {
+        throw new Error('User not found.');
+      }
+
+      const existingFeeRecords = Array.isArray(userRecord.membershipFeeRecords) ? userRecord.membershipFeeRecords : [];
+      const nextFeeRecords = existingFeeRecords.filter((entry) => String(entry?.id || '') !== String(feeId || ''));
+      const nextSortedFeeRecords = sortMembershipFeeRecords(nextFeeRecords);
+      const nextReviewMeta = resolveMembershipReviewMeta({
+        records: nextSortedFeeRecords,
+        schedule: userRecord?.membershipProfile?.donationSchedule,
+        startDate: userRecord?.membershipProfile?.submittedAt || userRecord?.createdAt || new Date().toISOString()
+      });
+
+      return userService.updateUser(id, {
+        membershipFeeRecords: nextSortedFeeRecords,
+        isActive: nextReviewMeta.isActive
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      setMembershipFeeNotice({ type: 'success', message: 'Membership fee entry removed. Member active status refreshed automatically.' });
+      setConfirmDeleteMembershipFee(null);
+    },
+    onError: (error) => {
+      setMembershipFeeNotice({
+        type: 'error',
+        message: String(error?.message || 'Unable to remove membership fee entry right now.')
+      });
+    }
+  });
+
+  useEffect(() => {
+    if (!membershipFeeNotice?.message) {
+      return undefined;
+    }
+
+    const timerId = window.setTimeout(() => setMembershipFeeNotice(null), 4000);
+    return () => window.clearTimeout(timerId);
+  }, [membershipFeeNotice]);
 
   const renderActivePill = (user) => {
     const isActive = user.isActive !== false;
@@ -568,6 +844,17 @@ const AdminUsersPage = () => {
                         >
                           <PencilSquareIcon className={actionIconClass} />
                         </button>
+                        {String(user.role || '').trim().toLowerCase() === 'member' ? (
+                          <button
+                            type="button"
+                            onClick={() => openMembershipUser(user)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 text-emerald-700 transition hover:bg-emerald-50"
+                            aria-label="Membership fee tracking"
+                            title="Membership"
+                          >
+                            <CurrencyDollarIcon className={actionIconClass} />
+                          </button>
+                        ) : null}
                         {showDeleteActions ? (
                           <button
                             type="button"
@@ -645,6 +932,17 @@ const AdminUsersPage = () => {
                     >
                       <PencilSquareIcon className={actionIconClass} />
                     </button>
+                    {String(user.role || '').trim().toLowerCase() === 'member' ? (
+                      <button
+                        type="button"
+                        onClick={() => openMembershipUser(user)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 text-emerald-700 transition hover:bg-emerald-50"
+                        aria-label="Membership fee tracking"
+                        title="Membership"
+                      >
+                        <CurrencyDollarIcon className={actionIconClass} />
+                      </button>
+                    ) : null}
                     {showDeleteActions ? (
                       <button
                         type="button"
@@ -958,6 +1256,300 @@ const AdminUsersPage = () => {
                 <Button type="submit" disabled={editMutation.isPending || isEditImageUploading}>{editMutation.isPending ? 'Saving...' : 'Save Changes'}</Button>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {membershipUserRecord ? (
+        <div className="fixed inset-0 z-[52] flex items-start justify-center overflow-y-auto p-3 sm:items-center sm:p-4">
+          <div className="absolute inset-0 bg-slate-900/50" onClick={closeModals} aria-hidden="true" />
+          <div className="relative z-10 my-4 flex max-h-[calc(100vh-1.5rem)] w-full max-w-7xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200 sm:my-6 sm:max-h-[calc(100vh-3rem)]">
+            <div className="flex flex-col gap-3 border-b border-slate-200 bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-700 px-4 py-4 text-white sm:flex-row sm:items-start sm:justify-between sm:px-6 sm:py-5">
+              <div className="min-w-0">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-white/80">Membership Desk</p>
+                <h3 className="mt-1 font-heading text-2xl font-semibold">Membership Fee Tracking</h3>
+                <p className="mt-1 truncate text-sm text-white/85">{membershipUserRecord.name || 'Member'} • {membershipUserRecord.email || '-'}</p>
+              </div>
+              <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+                <Button
+                  type="button"
+                  className="min-w-0 rounded-full border border-white/25 bg-emerald-950 px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-emerald-950/25 hover:bg-emerald-900"
+                  onClick={openMembershipFeeEntry}
+                >
+                  <span className="sm:hidden">Add Fee Entry</span>
+                  <span className="hidden sm:inline">Add Membership Fee Entry</span>
+                </Button>
+                <button type="button" onClick={closeModals} className="rounded-md p-1.5 text-white/85 hover:bg-white/10 hover:text-white" aria-label="Close membership modal">
+                  <XMarkIcon className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {membershipFeeNotice?.message ? (
+                <p className={`mb-4 rounded-xl border px-3 py-2 text-sm font-semibold ${membershipFeeNotice.type === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+                  {membershipFeeNotice.message}
+                </p>
+              ) : null}
+              <div className="grid gap-5 lg:grid-cols-[minmax(340px,420px)_1fr] lg:items-start">
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Member Profile</p>
+                    <div className="mt-2 h-px w-full bg-slate-200" />
+                    <div className="mt-3 space-y-2 text-sm text-slate-700">
+                      <p><span className="font-semibold text-slate-900">Phone:</span> {membershipUserRecord.phone || '-'}</p>
+                      <p><span className="font-semibold text-slate-900">Address:</span> {membershipUserRecord.address || '-'}</p>
+                      <p><span className="font-semibold text-slate-900">Date of Birth:</span> {membershipUserRecord.membershipProfile?.dateOfBirth || '-'}</p>
+                      <p><span className="font-semibold text-slate-900">Canadian Status:</span> {membershipUserRecord.membershipProfile?.canadianStatus || '-'}</p>
+                      <p><span className="font-semibold text-slate-900">Donation Method:</span> {membershipUserRecord.membershipProfile?.donationMethod || '-'}</p>
+                      <p><span className="font-semibold text-slate-900">Schedule:</span> {(membershipUserRecord.membershipProfile?.donationSchedule || 'monthly').replace(/^./, (token) => token.toUpperCase())}</p>
+                    </div>
+                  </div>
+
+                  {membershipReviewMeta.showReviewCard ? (
+                    <div className={`rounded-2xl border p-4 shadow-sm ${membershipReviewMeta.isActive ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-600">{membershipReviewMeta.schedule === 'yearly' ? 'Yearly' : 'Monthly'} Membership Review</p>
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${membershipReviewMeta.isActive ? 'border border-emerald-300 bg-emerald-100 text-emerald-700' : 'border border-amber-300 bg-amber-100 text-amber-700'}`}>
+                          {membershipReviewMeta.isActive ? 'Active' : 'Review Required'}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm text-slate-700">{membershipReviewMeta.reminder}</p>
+                      <p className="mt-2 text-xs text-slate-600">
+                        Latest paid date: {membershipReviewMeta.latestPaidDate ? membershipReviewMeta.latestPaidDate.toISOString().slice(0, 10) : '-'}
+                        {' '}| Next due date: {membershipReviewMeta.nextDueDate ? membershipReviewMeta.nextDueDate.toISOString().slice(0, 10) : '-'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                      No paid membership fee recorded yet. Add a paid fee entry to activate the member and show the review status.
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-3 lg:pr-6">
+                  <label className="block text-sm font-semibold text-slate-700">
+                    Search fee records
+                  </label>
+
+                  <div className="h-px w-full bg-slate-200" />
+
+                  <input
+                    type="search"
+                    value={membershipSearchTerm}
+                    onChange={(event) => setMembershipSearchTerm(event.target.value)}
+                    placeholder="Search receipt, status, method"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5"
+                  />
+
+                  <div className="rounded-2xl border border-slate-200 shadow-sm md:hidden">
+                    {filteredMembershipFeeRecords.length === 0 ? (
+                      <p className="px-4 py-4 text-center text-sm text-slate-500">No membership fee records found.</p>
+                    ) : (
+                      <div className="divide-y divide-slate-200">
+                        {filteredMembershipFeeRecords.map((entry) => (
+                          <div key={entry.id} className="space-y-3 px-4 py-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-semibold text-slate-900">{entry.currency} {Number(entry.amount || 0).toFixed(2)}</p>
+                              <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${entry.status === 'paid' ? 'border border-emerald-200 bg-emerald-50 text-emerald-700' : 'border border-amber-200 bg-amber-50 text-amber-700'}`}>{entry.status || 'pending'}</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-slate-600">
+                              <p><span className="font-semibold text-slate-800">Date:</span> {entry.paymentDate || '-'}</p>
+                              <p><span className="font-semibold text-slate-800">Type:</span> <span className="capitalize">{entry.membershipEntryType || 'renew'}</span></p>
+                              <p><span className="font-semibold text-slate-800">Method:</span> {entry.paymentMethod || '-'}</p>
+                              <p><span className="font-semibold text-slate-800">Receipt:</span> {entry.receiptNumber || '-'}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openMembershipFeeEntry(entry)}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50"
+                                aria-label="Edit membership fee entry"
+                                title="Edit"
+                              >
+                                <PencilSquareIcon className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteMembershipFee(entry)}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-700 hover:bg-red-50"
+                                aria-label="Remove membership fee entry"
+                                title="Remove"
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 shadow-sm md:block">
+                    <table className="min-w-[900px] text-left text-sm">
+                      <thead className="bg-slate-50 text-slate-500">
+                        <tr>
+                          <th className="px-3 py-2">Date</th>
+                          <th className="px-3 py-2">Amount</th>
+                          <th className="px-3 py-2">Receipt</th>
+                          <th className="px-3 py-2">Type</th>
+                          <th className="px-3 py-2">Method</th>
+                          <th className="px-3 py-2">Status</th>
+                          <th className="px-3 py-2">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredMembershipFeeRecords.map((entry) => (
+                          <tr key={entry.id} className="border-t border-slate-100">
+                            <td className="whitespace-nowrap px-3 py-2 text-slate-700">{entry.paymentDate || '-'}</td>
+                            <td className="whitespace-nowrap px-3 py-2 font-semibold text-slate-900">{entry.currency} {Number(entry.amount || 0).toFixed(2)}</td>
+                            <td className="whitespace-nowrap px-3 py-2 text-slate-700">{entry.receiptNumber || '-'}</td>
+                            <td className="whitespace-nowrap px-3 py-2 text-slate-700 capitalize">{entry.membershipEntryType || 'renew'}</td>
+                            <td className="whitespace-nowrap px-3 py-2 text-slate-700">{entry.paymentMethod || '-'}</td>
+                            <td className="px-3 py-2">
+                              <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${entry.status === 'paid' ? 'border border-emerald-200 bg-emerald-50 text-emerald-700' : 'border border-amber-200 bg-amber-50 text-amber-700'}`}>{entry.status || 'pending'}</span>
+                            </td>
+                            <td className="px-3 py-2">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => openMembershipFeeEntry(entry)}
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50"
+                                  aria-label="Edit membership fee entry"
+                                  title="Edit"
+                                >
+                                  <PencilSquareIcon className="h-4 w-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmDeleteMembershipFee(entry)}
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-700 hover:bg-red-50"
+                                  aria-label="Remove membership fee entry"
+                                  title="Remove"
+                                >
+                                  <TrashIcon className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                        {filteredMembershipFeeRecords.length === 0 ? (
+                          <tr>
+                            <td className="px-3 py-4 text-center text-slate-500" colSpan={7}>No membership fee records found.</td>
+                          </tr>
+                        ) : null}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {membershipUserRecord && membershipFeeEntryOpen ? (
+        <div className="fixed inset-0 z-[53] flex items-start justify-center overflow-y-auto p-3 sm:items-center sm:p-4">
+          <div className="absolute inset-0 bg-slate-900/55" onClick={() => setMembershipFeeEntryOpen(false)} aria-hidden="true" />
+          <div className="relative z-10 my-4 flex max-h-[calc(100vh-1.5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:my-6 sm:max-h-[calc(100vh-3rem)]">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-700 px-5 py-3 text-white">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/80">Membership Desk</p>
+                <h3 className="mt-0.5 font-heading text-base font-semibold">Add Membership Fee Entry</h3>
+              </div>
+              <button type="button" onClick={() => setMembershipFeeEntryOpen(false)} className="rounded-md p-1 text-white/90 hover:bg-white/10 hover:text-white" aria-label="Close membership fee modal">
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form className="flex-1 overflow-y-auto px-5 py-4" onSubmit={membershipFeeForm.handleSubmit((values) => membershipFeeMutation.mutate({ id: membershipUserRecord.id, values, editingId: editingMembershipFeeId }))}>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <section className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
+                  <h4 className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Payment Details</h4>
+                  <div className="h-px w-full bg-slate-200" />
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <label className="text-sm font-semibold text-slate-700">Amount
+                      <input type="number" min="0" step="0.01" {...membershipFeeForm.register('amount', { required: true })} className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5" />
+                    </label>
+                    <label className="text-sm font-semibold text-slate-700">Currency
+                      <input {...membershipFeeForm.register('currency', { required: true })} className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5" />
+                    </label>
+                    <label className="text-sm font-semibold text-slate-700">Receipt Number
+                      <input {...membershipFeeForm.register('receiptNumber')} className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5" />
+                    </label>
+                    <label className="text-sm font-semibold text-slate-700">Payment Date
+                      <input type="date" {...membershipFeeForm.register('paymentDate', { required: true })} className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5" />
+                    </label>
+                    <label className="text-sm font-semibold text-slate-700">Payment Method
+                      <select {...membershipFeeForm.register('paymentMethod')} className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5">
+                        <option value="Cash">Cash</option>
+                        <option value="E-Transfer">E-Transfer</option>
+                        <option value="Card">Card</option>
+                        <option value="Cheque">Cheque</option>
+                      </select>
+                    </label>
+                    <label className="text-sm font-semibold text-slate-700">Status
+                      <select {...membershipFeeForm.register('status')} className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5">
+                        <option value="pending">Pending</option>
+                        <option value="paid">Paid</option>
+                        <option value="waived">Waived</option>
+                      </select>
+                    </label>
+                  </div>
+                </section>
+
+                <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <h4 className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Membership Type and Notes</h4>
+                  <div className="h-px w-full bg-slate-200" />
+                  <fieldset>
+                    <legend className="text-sm font-semibold text-slate-700">Membership Type *</legend>
+                    <div className="mt-2 flex flex-nowrap items-center gap-3">
+                      <label className="inline-flex shrink-0 items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700">
+                        <input type="radio" value="new" {...membershipFeeForm.register('membershipEntryType')} />
+                        New
+                      </label>
+                      <label className="inline-flex shrink-0 items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700">
+                        <input type="radio" value="renew" {...membershipFeeForm.register('membershipEntryType')} />
+                        Renew
+                      </label>
+                    </div>
+                  </fieldset>
+                  <label className="block text-sm font-semibold text-slate-700">Notes
+                    <textarea rows={3} {...membershipFeeForm.register('notes')} className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5" />
+                  </label>
+                  <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                    Membership automation is based on the schedule shown above. Only paid entries activate the member and show the review card.
+                  </p>
+                </section>
+              </div>
+
+              <div className="mt-4 flex justify-end gap-2 border-t border-slate-200 pt-4">
+                <Button type="button" variant="ghost" onClick={() => setMembershipFeeEntryOpen(false)}>Cancel</Button>
+                <Button type="submit" disabled={membershipFeeMutation.isPending}>{membershipFeeMutation.isPending ? 'Saving...' : (editingMembershipFeeId ? 'Update Fee Entry' : 'Save Fee Entry')}</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {membershipUserRecord && confirmDeleteMembershipFee ? (
+        <div className="fixed inset-0 z-[54] flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-slate-900/55" onClick={() => setConfirmDeleteMembershipFee(null)} aria-hidden="true" />
+          <div className="relative z-10 w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
+            <h3 className="font-heading text-lg font-semibold text-slate-900">Remove Fee Entry</h3>
+            <p className="mt-2 text-sm text-slate-700">
+              Remove receipt <span className="font-semibold">{confirmDeleteMembershipFee.receiptNumber || 'N/A'}</span> for {confirmDeleteMembershipFee.currency} {Number(confirmDeleteMembershipFee.amount || 0).toFixed(2)}?
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button type="button" variant="ghost" onClick={() => setConfirmDeleteMembershipFee(null)}>Cancel</Button>
+              <Button
+                type="button"
+                onClick={() => membershipFeeDeleteMutation.mutate({ id: membershipUserRecord.id, feeId: confirmDeleteMembershipFee.id })}
+                disabled={membershipFeeDeleteMutation.isPending}
+              >
+                {membershipFeeDeleteMutation.isPending ? 'Removing...' : 'Remove'}
+              </Button>
+            </div>
           </div>
         </div>
       ) : null}

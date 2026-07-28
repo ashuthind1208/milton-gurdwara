@@ -1,6 +1,6 @@
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
   CheckIcon,
@@ -14,6 +14,7 @@ import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton
 import cmsService from '../../services/cmsService';
 
 const actionIconClass = 'h-4 w-4';
+const LANGAR_PAGE_SIZE = 10;
 
 const defaultForm = {
   name: '',
@@ -55,6 +56,10 @@ const AdminLangarPage = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [viewItem, setViewItem] = useState(null);
   const [editingItem, setEditingItem] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [page, setPage] = useState(1);
 
   const form = useForm({ defaultValues: defaultForm });
   const editForm = useForm({ defaultValues: defaultForm });
@@ -65,6 +70,47 @@ const AdminLangarPage = () => {
     queryKey: ['cms-home'],
     queryFn: () => cmsService.getHomeContent().then((res) => res.data)
   });
+
+  const langarItems = useMemo(() => cmsData?.langarItems || [], [cmsData?.langarItems]);
+
+  const categoryOptions = useMemo(() => {
+    const categories = langarItems
+      .map((item) => String(item?.category || '').trim())
+      .filter(Boolean);
+    return [...new Set(categories)].sort((a, b) => a.localeCompare(b));
+  }, [langarItems]);
+
+  const filteredItems = useMemo(() => {
+    const query = String(searchTerm || '').trim().toLowerCase();
+    return langarItems.filter((item) => {
+      const statusOk = statusFilter === 'all'
+        ? true
+        : statusFilter === 'required_soon'
+          ? item.needed === true
+          : item.needed !== true;
+      const categoryOk = categoryFilter === 'all' ? true : String(item?.category || '') === categoryFilter;
+
+      if (!statusOk || !categoryOk) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      const haystack = [item?.name, item?.category, item?.stockStatus, item?.customStatusLabel]
+        .map((value) => String(value || '').toLowerCase())
+        .join(' ');
+
+      return haystack.includes(query);
+    });
+  }, [categoryFilter, langarItems, searchTerm, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / LANGAR_PAGE_SIZE));
+  const visibleItems = useMemo(() => {
+    const start = (page - 1) * LANGAR_PAGE_SIZE;
+    return filteredItems.slice(start, start + LANGAR_PAGE_SIZE);
+  }, [filteredItems, page]);
 
   const addMutation = useMutation({
     mutationFn: (values) => cmsService.addLangarItem(buildLangarPayload(values)),
@@ -122,11 +168,58 @@ const AdminLangarPage = () => {
     return () => setHeaderAction(null);
   }, [setHeaderAction]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, statusFilter, categoryFilter]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
   return (
     <div className="space-y-6">
       <h1 className="sr-only">Seva Items</h1>
 
       <Card>
+        <div className="mb-4 grid gap-2 md:grid-cols-4">
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:col-span-2">
+            Search
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search item name or category"
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-700 outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
+            />
+          </label>
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Status
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-700 outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
+            >
+              <option value="all">All</option>
+              <option value="required_soon">Required Soon</option>
+              <option value="stock_available">Stock Available</option>
+            </select>
+          </label>
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Category
+            <select
+              value={categoryFilter}
+              onChange={(event) => setCategoryFilter(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-700 outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
+            >
+              <option value="all">All</option>
+              {categoryOptions.map((category) => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
+          </label>
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead>
@@ -140,7 +233,7 @@ const AdminLangarPage = () => {
               </tr>
             </thead>
             <tbody>
-              {(cmsData?.langarItems || []).map((item) => (
+              {visibleItems.map((item) => (
                 <tr key={item.id} className="border-b border-slate-100">
                   <td className="py-2 pr-3 font-semibold text-slate-800">
                     <div className="space-y-1.5 lg:hidden">
@@ -206,7 +299,7 @@ const AdminLangarPage = () => {
                   </td>
                 </tr>
               ))}
-              {(cmsData?.langarItems || []).length === 0 ? (
+              {filteredItems.length === 0 ? (
                 <tr>
                   <td className="py-4 text-center text-slate-500" colSpan={6}>No seva items found.</td>
                 </tr>
@@ -214,6 +307,30 @@ const AdminLangarPage = () => {
             </tbody>
           </table>
         </div>
+        {filteredItems.length > 0 ? (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-slate-600">Showing {visibleItems.length} of {filteredItems.length} seva items</p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-40"
+                disabled={page <= 1}
+                onClick={() => setPage((prev) => prev - 1)}
+              >
+                Prev
+              </button>
+              <span className="text-xs font-semibold text-slate-600">Page {page} of {totalPages}</span>
+              <button
+                type="button"
+                className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-40"
+                disabled={page >= totalPages}
+                onClick={() => setPage((prev) => prev + 1)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        ) : null}
       </Card>
 
       {createOpen ? (

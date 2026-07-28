@@ -25,6 +25,8 @@ const AdminStreamingPage = () => {
   const [modalState, setModalState] = useState({ open: false, mode: 'view', id: '' });
   const [availability, setAvailability] = useState({ loading: false, available: false, checkedAt: '', reason: '' });
   const [page, setPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const { data: streamingItems = [] } = useQuery({
     queryKey: ['streaming-config'],
@@ -37,12 +39,37 @@ const AdminStreamingPage = () => {
     return haystack.includes('milton') || haystack.includes('singh sabha');
   };
   const currentStreaming = useMemo(() => rows.find((entry) => entry.id === modalState.id) || null, [modalState.id, rows]);
-  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const filteredRows = useMemo(() => {
+    const query = String(searchTerm || '').trim().toLowerCase();
+    return rows.filter((row) => {
+      const statusOk = statusFilter === 'all'
+        ? true
+        : statusFilter === 'active'
+          ? row.active === true
+          : row.active !== true;
+
+      if (!statusOk) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      const haystack = [row?.title, row?.text, row?.streamUrl]
+        .map((value) => String(value || '').toLowerCase())
+        .join(' ');
+
+      return haystack.includes(query);
+    });
+  }, [rows, searchTerm, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const visibleRows = useMemo(() => {
     const safePage = Math.min(page, totalPages);
     const start = (safePage - 1) * PAGE_SIZE;
-    return rows.slice(start, start + PAGE_SIZE);
-  }, [page, rows, totalPages]);
+    return filteredRows.slice(start, start + PAGE_SIZE);
+  }, [filteredRows, page, totalPages]);
 
   useEffect(() => {
     if (!modalState.open) {
@@ -81,6 +108,10 @@ const AdminStreamingPage = () => {
       setPage(totalPages);
     }
   }, [page, totalPages]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, statusFilter]);
 
   const modalTitle = useMemo(() => {
     if (modalState.mode === 'add') {
@@ -137,6 +168,30 @@ const AdminStreamingPage = () => {
       </div>
 
       <Card>
+        <div className="mb-4 grid gap-2 md:grid-cols-3">
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:col-span-2">
+            Search
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search title, text, or stream URL"
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-700 outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
+            />
+          </label>
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Status
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-700 outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
+            >
+              <option value="all">All</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </label>
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead>
@@ -233,11 +288,14 @@ const AdminStreamingPage = () => {
             </tbody>
           </table>
         </div>
-        {rows.length > PAGE_SIZE ? (
-          <div className="mt-4 flex items-center justify-end gap-2 text-sm text-slate-600">
+        {filteredRows.length > 0 ? (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+            <p className="text-xs">Showing {visibleRows.length} of {filteredRows.length} streams</p>
+            <div className="flex items-center gap-2">
             <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1} className="rounded-lg border border-slate-300 px-3 py-1.5 font-semibold disabled:opacity-40">Prev</button>
             <span>Page {Math.min(page, totalPages)} of {totalPages}</span>
             <button type="button" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={page >= totalPages} className="rounded-lg border border-slate-300 px-3 py-1.5 font-semibold disabled:opacity-40">Next</button>
+            </div>
           </div>
         ) : null}
       </Card>

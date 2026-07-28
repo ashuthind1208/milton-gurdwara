@@ -1,5 +1,6 @@
 import { serviceResponse } from './serviceResponse';
 import contentApiService from './contentApiService';
+import { siteConfig } from '../constants/siteConfig';
 
 const RESOURCE = 'subscribers';
 const NEWSLETTER_RESOURCE = 'newsletter_campaigns';
@@ -43,6 +44,41 @@ const uniqueTopics = (topics = []) => {
     });
 };
 
+const normalizeInterestTopics = (value) => {
+  if (Array.isArray(value)) {
+    return uniqueTopics(value);
+  }
+
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return [];
+  }
+
+  return uniqueTopics(raw.split(/[\n;,|]/g).map((entry) => entry.trim()));
+};
+
+const interestsToCsv = (topics = []) => uniqueTopics(topics).join(', ');
+
+const subscriberHasTopic = (subscriber = {}, topicName = '') => {
+  const normalizedTopic = normalizeTopicName(topicName).toLowerCase();
+  if (!normalizedTopic) {
+    return true;
+  }
+
+  const subscriberTopics = normalizeInterestTopics(subscriber?.interestsList?.length
+    ? subscriber.interestsList
+    : subscriber?.interests);
+  const topicSet = new Set(subscriberTopics.map((entry) => entry.toLowerCase()));
+  if (normalizedTopic === 'all announcements') {
+    return true;
+  }
+
+  if (topicSet.has(normalizedTopic)) {
+    return true;
+  }
+  return false;
+};
+
 const normalizeWeekIso = (value = '') => {
   const raw = String(value || '').trim();
   if (!raw) {
@@ -53,6 +89,17 @@ const normalizeWeekIso = (value = '') => {
     return '';
   }
   return parsed.toISOString().slice(0, 10);
+};
+
+const isWithinCampaignWeekWindow = (record = {}) => {
+  const weekStart = normalizeWeekIso(record?.weekStart || '');
+  const weekEnd = normalizeWeekIso(record?.weekEnd || '');
+  if (!weekStart || !weekEnd) {
+    return false;
+  }
+
+  const todayIso = new Date().toISOString().slice(0, 10);
+  return todayIso >= weekStart && todayIso <= weekEnd;
 };
 
 const isLifecycleInactive = (record = {}) => {
@@ -71,10 +118,11 @@ const isLifecycleInactive = (record = {}) => {
 };
 
 const normalizeSubscriber = (item = {}, index = 0) => ({
+  interestsList: normalizeInterestTopics(item.interestsList?.length ? item.interestsList : item.interests),
   id: item.id || `sub-${Date.now()}-${index}`,
   name: item.name || '',
   email: normalizeEmailAddress(item.email),
-  interests: item.interests || 'Events and updates',
+  interests: interestsToCsv(normalizeInterestTopics(item.interestsList?.length ? item.interestsList : item.interests)) || 'Events and updates',
   source: item.source || 'Website',
   createdAt: item.createdAt || new Date().toISOString(),
   active: item.active !== false,
@@ -134,13 +182,15 @@ const buildNewsletterEmailHtml = (campaign = {}) => {
           <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
             <tr>
               <td style="vertical-align:middle;">
-                <div style="display:flex;align-items:center;gap:12px;">
-                  ${logoUrl ? `<img src="${escapeHtml(logoUrl)}" alt="Singh Sabha Milton logo" width="44" height="44" style="display:block;border-radius:9999px;background:#ffffff;object-fit:cover;"/>` : ''}
-                  <div>
-                    <div style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.9;">Singh Sabha Milton</div>
-                    <div style="font-size:18px;font-weight:800;line-height:1.3;">Newsletter Bulletin</div>
-                  </div>
-                </div>
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                  <tr>
+                    ${logoUrl ? `<td style="width:44px;padding-right:12px;vertical-align:middle;"><img src="${escapeHtml(logoUrl)}" alt="Singh Sabha Milton logo" width="44" height="44" style="display:block;border-radius:9999px;background:#ffffff;object-fit:cover;"/></td>` : ''}
+                    <td style="vertical-align:middle;">
+                      <div style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.9;">Singh Sabha Milton</div>
+                      <div style="font-size:18px;font-weight:800;line-height:1.3;margin-top:2px;">Newsletter Bulletin</div>
+                    </td>
+                  </tr>
+                </table>
               </td>
             </tr>
           </table>
@@ -164,6 +214,106 @@ const buildNewsletterEmailHtml = (campaign = {}) => {
         <td style="padding:18px 24px 26px;">
           <div style="border-top:1px solid #e2e8f0;padding-top:16px;font-size:15px;line-height:1.8;color:#334155;">
             ${contentHtml}
+          </div>
+        </td>
+      </tr>
+    </table>
+  </div>`;
+};
+
+const toPublicBaseUrl = () => {
+  const configured = String(
+    process.env.REACT_APP_PUBLIC_SITE_URL ||
+    process.env.REACT_APP_SITE_URL ||
+    siteConfig.baseUrl ||
+    ''
+  ).trim();
+
+  if (configured) {
+    return configured.replace(/\/+$/, '');
+  }
+
+  if (typeof window !== 'undefined' && window?.location?.origin) {
+    return String(window.location.origin).replace(/\/+$/, '');
+  }
+
+  return 'https://singhsabhamilton.com';
+};
+
+const buildApprovalEmailHtml = (user = {}) => {
+  const logoUrl = toNewsletterLogoUrl();
+  const baseUrl = toPublicBaseUrl();
+  const loginUrl = `${baseUrl}/login`;
+  const homeUrl = `${baseUrl}/`;
+  const contactUrl = `${baseUrl}/contact`;
+  const memberName = String(user?.name || 'Member').trim();
+  const safeMemberName = escapeHtml(memberName);
+  const safeBaseUrl = escapeHtml(baseUrl);
+  const safeLoginUrl = escapeHtml(loginUrl);
+  const safeHomeUrl = escapeHtml(homeUrl);
+  const safeContactUrl = escapeHtml(contactUrl);
+  const supportEmail = escapeHtml(String(siteConfig?.contact?.email || '').trim());
+  const supportPhone = escapeHtml(String(siteConfig?.contact?.phone || '').trim());
+  const supportAddress = escapeHtml(String(siteConfig?.contact?.address || '').trim());
+
+  return `
+  <div style="background:#f5f8fc;padding:28px 14px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:760px;margin:0 auto;background:#ffffff;border:1px solid #dbe7f6;border-radius:14px;overflow:hidden;">
+      <tr>
+        <td style="padding:16px 22px;background:linear-gradient(90deg,#0a4d9f,#0b67c2,#e58b16);color:#ffffff;">
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+            <tr>
+              <td style="vertical-align:middle;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                  <tr>
+                    ${logoUrl ? `<td style="width:44px;padding-right:12px;vertical-align:middle;"><img src="${escapeHtml(logoUrl)}" alt="Singh Sabha Milton logo" width="44" height="44" style="display:block;border-radius:9999px;background:#ffffff;object-fit:cover;"/></td>` : ''}
+                    <td style="vertical-align:middle;">
+                      <div style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.9;">Singh Sabha Milton</div>
+                      <div style="font-size:18px;font-weight:800;line-height:1.3;margin-top:2px;">Registration Approved</div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:24px 24px 14px;">
+          <div style="font-size:22px;line-height:1.35;font-weight:800;color:#0f172a;">Welcome, ${safeMemberName}.</div>
+          <div style="margin-top:12px;font-size:15px;line-height:1.8;color:#334155;">
+            Your registration has been approved. You can now sign in to access member features, register for events, and stay connected with the sangat.
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:0 24px 12px;">
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+            <tr>
+              <td style="border-radius:8px;background:#0b67c2;text-align:center;">
+                <a href="${safeLoginUrl}" style="display:inline-block;padding:12px 20px;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;">Sign In To Your Account</a>
+              </td>
+              <td style="width:10px;">&nbsp;</td>
+              <td style="border-radius:8px;background:#eef5ff;border:1px solid #cfe1fb;text-align:center;">
+                <a href="${safeHomeUrl}" style="display:inline-block;padding:12px 20px;color:#0a4d9f;text-decoration:none;font-size:14px;font-weight:700;">Visit Website</a>
+              </td>
+            </tr>
+          </table>
+          <div style="margin-top:14px;font-size:13px;line-height:1.7;color:#475569;">
+            If the button does not open, copy and paste this link into your browser:<br/>
+            <a href="${safeLoginUrl}" style="color:#0b67c2;text-decoration:underline;word-break:break-all;">${safeLoginUrl}</a>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:16px 24px 24px;">
+          <div style="border-top:1px solid #e2e8f0;padding-top:14px;font-size:12px;line-height:1.8;color:#64748b;">
+            <div style="font-weight:700;color:#334155;">Need help?</div>
+            ${supportEmail ? `<div>Email: <a href="mailto:${supportEmail}" style="color:#0b67c2;text-decoration:none;">${supportEmail}</a></div>` : ''}
+            ${supportPhone ? `<div>Phone: <a href="tel:${supportPhone.replace(/\s+/g, '')}" style="color:#0b67c2;text-decoration:none;">${supportPhone}</a></div>` : ''}
+            ${supportAddress ? `<div>Address: ${supportAddress}</div>` : ''}
+            <div>Contact Page: <a href="${safeContactUrl}" style="color:#0b67c2;text-decoration:none;">${safeContactUrl}</a></div>
+            <div style="margin-top:8px;">${escapeHtml(siteConfig.shortName || 'Singh Sabha Milton')} | ${safeBaseUrl}</div>
           </div>
         </td>
       </tr>
@@ -208,22 +358,58 @@ const notificationService = {
     const existing = await contentApiService.list(RESOURCE);
     const normalizedEmail = String(payload?.email || '').trim().toLowerCase();
 
-    const duplicate = existing.find((entry) => String(entry?.email || '').trim().toLowerCase() === normalizedEmail);
-    if (duplicate?.id) {
-      await contentApiService.remove(RESOURCE, duplicate.id);
+    if (!normalizedEmail) {
+      throw new Error('Valid email address is required.');
     }
 
-    const chosenTopic = normalizeTopicName(payload?.customTopic || payload?.interests || '');
+    const duplicate = existing.find((entry) => String(entry?.email || '').trim().toLowerCase() === normalizedEmail);
 
-    if (chosenTopic) {
-      await notificationService.addNewsletterTopic(chosenTopic);
+    const selectedTopics = uniqueTopics([
+      ...normalizeInterestTopics(payload?.interests),
+      ...normalizeInterestTopics(payload?.customTopic)
+    ]);
+
+    if (selectedTopics.length === 0) {
+      throw new Error('Please select at least one topic.');
+    }
+
+    if (selectedTopics.length > 0) {
+      await Promise.all(selectedTopics.map((topic) => notificationService.addNewsletterTopic(topic)));
+    }
+
+    if (duplicate?.id) {
+      const existingRecord = normalizeSubscriber(duplicate);
+      const mergedTopics = uniqueTopics([
+        ...normalizeInterestTopics(existingRecord.interestsList?.length ? existingRecord.interestsList : existingRecord.interests),
+        ...selectedTopics
+      ]);
+
+      if (mergedTopics.length > 0) {
+        await Promise.all(mergedTopics.map((topic) => notificationService.addNewsletterTopic(topic)));
+      }
+
+      const updatedRecord = normalizeSubscriber({
+        ...duplicate,
+        id: duplicate.id,
+        name: String(payload?.name || existingRecord.name || '').trim(),
+        email: normalizedEmail,
+        interestsList: mergedTopics,
+        interests: interestsToCsv(mergedTopics),
+        source: payload?.source || existingRecord.source,
+        createdAt: duplicate.createdAt || existingRecord.createdAt,
+        updatedAt: new Date().toISOString(),
+        active: true
+      });
+      const updated = await contentApiService.update(RESOURCE, duplicate.id, updatedRecord);
+      return serviceResponse(normalizeSubscriber(updated || updatedRecord));
     }
 
     const record = normalizeSubscriber({
       id: `sub-${Date.now()}`,
       name: payload?.name,
       email: normalizedEmail,
-      interests: chosenTopic || payload?.interests,
+      interestsList: selectedTopics,
+      interests: interestsToCsv(selectedTopics),
       source: payload?.source,
       createdAt: new Date().toISOString(),
       active: true
@@ -253,6 +439,8 @@ const notificationService = {
     const merged = normalizeSubscriber({
       ...existing,
       ...payload,
+      interestsList: normalizeInterestTopics(payload?.interestsList?.length ? payload.interestsList : payload?.interests),
+      interests: interestsToCsv(normalizeInterestTopics(payload?.interestsList?.length ? payload.interestsList : payload?.interests)) || payload?.interests,
       id,
       updatedAt: new Date().toISOString()
     });
@@ -366,14 +554,18 @@ const notificationService = {
     const subscribers = await contentApiService.list(RESOURCE);
     const activeSubscribers = subscribers
       .map((entry, index) => normalizeSubscriber(entry, index))
-      .filter((entry) => entry.active !== false && entry.email);
+      .filter((entry) => entry.active !== false && entry.email && subscriberHasTopic(entry, campaign?.topic));
 
     if (activeSubscribers.length === 0) {
-      throw new Error('No active subscribers found.');
+      throw new Error('No active subscribers found for this topic.');
     }
 
     if (isLifecycleInactive(campaign) || String(campaign?.status || '').trim().toLowerCase() === 'inactive') {
       throw new Error('Campaign is inactive and cannot be sent.');
+    }
+
+    if (!isWithinCampaignWeekWindow(campaign)) {
+      throw new Error('Campaign can be sent only during its selected week.');
     }
 
     const recipients = [...new Set(activeSubscribers
@@ -454,12 +646,21 @@ const notificationService = {
 
     const deliveryUrl = String(process.env.REACT_APP_APPROVAL_EMAIL_WEBHOOK_URL || '/api/internal/mail-relay').trim();
 
+    const approvalBodyHtml = buildApprovalEmailHtml(user);
+    const plainMessage = 'Your registration has been approved. You can now sign in and continue.';
+
     const payload = {
       type: 'approval',
       to: targetEmail,
       name: user?.name || 'Member',
       subject: 'Your registration is approved',
-      message: 'Your registration has been approved. You can now sign in and continue.',
+      message: plainMessage,
+      text: plainMessage,
+      bodyText: plainMessage,
+      html: approvalBodyHtml,
+      bodyHtml: approvalBodyHtml,
+      body: approvalBodyHtml,
+      content: approvalBodyHtml,
       approvedAt: new Date().toISOString()
     };
 

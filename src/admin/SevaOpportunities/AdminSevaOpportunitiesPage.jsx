@@ -24,6 +24,8 @@ const actionIconClass = 'h-4 w-4';
 const SEVA_IDENTITY_SETTING_KEY = 'settings-seva-allow-custom-name-email';
 const quarterMinuteOptions = ['00', '15', '30', '45'];
 const hourOptions = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, '0'));
+const OPPORTUNITIES_PAGE_SIZE = 10;
+const VOLUNTEERS_MODAL_PAGE_SIZE = 8;
 
 const formatDisplayDate = (value) => {
   if (!value) {
@@ -34,6 +36,36 @@ const formatDisplayDate = (value) => {
     return String(value);
   }
   return formatDate(parsed);
+};
+
+const getDaysRemainingMeta = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return { label: 'Expiry unknown', tone: 'neutral' };
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    return { label: 'Expiry unknown', tone: 'neutral' };
+  }
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+  const diffDays = Math.ceil((target.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+
+  if (diffDays < 0) {
+    const overdueDays = Math.abs(diffDays);
+    return {
+      label: `${overdueDays} day${overdueDays === 1 ? '' : 's'} overdue`,
+      tone: 'overdue'
+    };
+  }
+
+  return {
+    label: `${diffDays} day${diffDays === 1 ? '' : 's'} remaining`,
+    tone: 'remaining'
+  };
 };
 
 const splitTimeRange = (value) => {
@@ -164,6 +196,11 @@ const AdminSevaOpportunitiesPage = () => {
   const [viewOpportunity, setViewOpportunity] = useState(null);
   const [editing, setEditing] = useState(null);
   const [openActionMenuId, setOpenActionMenuId] = useState('');
+  const [opportunitySearch, setOpportunitySearch] = useState('');
+  const [opportunityStatusFilter, setOpportunityStatusFilter] = useState('all');
+  const [opportunitiesPage, setOpportunitiesPage] = useState(1);
+  const [volunteerSearch, setVolunteerSearch] = useState('');
+  const [volunteerPage, setVolunteerPage] = useState(1);
 
   const createForm = useForm({ defaultValues: defaultForm });
   const editForm = useForm({ defaultValues: defaultForm });
@@ -198,6 +235,83 @@ const AdminSevaOpportunitiesPage = () => {
 
     return registrations.filter((entry) => doesRegistrationMatchOpportunity(entry, viewOpportunity));
   }, [registrations, viewOpportunity]);
+
+  const filteredVolunteers = useMemo(() => {
+    const query = String(volunteerSearch || '').trim().toLowerCase();
+    if (!query) {
+      return selectedVolunteers;
+    }
+
+    return selectedVolunteers.filter((entry) => {
+      const haystack = [
+        entry?.name,
+        entry?.email,
+        entry?.phone,
+        entry?.status,
+        entry?.contactPreference
+      ]
+        .map((value) => String(value || '').toLowerCase())
+        .join(' ');
+
+      return haystack.includes(query);
+    });
+  }, [selectedVolunteers, volunteerSearch]);
+
+  const volunteerTotalPages = Math.max(1, Math.ceil(filteredVolunteers.length / VOLUNTEERS_MODAL_PAGE_SIZE));
+  const visibleVolunteers = useMemo(() => {
+    const start = (volunteerPage - 1) * VOLUNTEERS_MODAL_PAGE_SIZE;
+    return filteredVolunteers.slice(start, start + VOLUNTEERS_MODAL_PAGE_SIZE);
+  }, [filteredVolunteers, volunteerPage]);
+
+  const confirmedVolunteersCount = useMemo(
+    () => selectedVolunteers.filter((entry) => String(entry?.status || 'confirmed').toLowerCase() !== 'waitlisted').length,
+    [selectedVolunteers]
+  );
+
+  const totalRequiredVolunteers = Number(viewOpportunity?.totalVolunteersRequired || 10);
+  const remainingVolunteers = Math.max(0, totalRequiredVolunteers - confirmedVolunteersCount);
+  const expiryMeta = useMemo(
+    () => getDaysRemainingMeta(viewOpportunity?.expiryDate || viewOpportunity?.date),
+    [viewOpportunity?.date, viewOpportunity?.expiryDate]
+  );
+
+  const filteredOpportunities = useMemo(() => {
+    const query = String(opportunitySearch || '').trim().toLowerCase();
+    return opportunities.filter((item) => {
+      const statusOk = opportunityStatusFilter === 'all'
+        ? true
+        : opportunityStatusFilter === 'closed'
+          ? item.status === 'closed'
+          : opportunityStatusFilter === 'active'
+            ? item.status !== 'closed' && item.active !== false
+            : item.status !== 'closed' && item.active === false;
+
+      if (!statusOk) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      const haystack = [
+        item?.sevaType,
+        item?.date,
+        item?.time,
+        item?.expiryDate
+      ]
+        .map((value) => String(value || '').toLowerCase())
+        .join(' ');
+
+      return haystack.includes(query);
+    });
+  }, [opportunities, opportunitySearch, opportunityStatusFilter]);
+
+  const opportunitiesTotalPages = Math.max(1, Math.ceil(filteredOpportunities.length / OPPORTUNITIES_PAGE_SIZE));
+  const visibleOpportunities = useMemo(() => {
+    const start = (opportunitiesPage - 1) * OPPORTUNITIES_PAGE_SIZE;
+    return filteredOpportunities.slice(start, start + OPPORTUNITIES_PAGE_SIZE);
+  }, [filteredOpportunities, opportunitiesPage]);
 
   const createMutation = useMutation({
     mutationFn: (values) => volunteerService.createSevaOpportunity(values),
@@ -333,7 +447,7 @@ const AdminSevaOpportunitiesPage = () => {
 
   const opportunityActionButtonClass = 'inline-flex h-8 w-8 items-center justify-center rounded-md border transition';
   const opportunityActionIconClass = 'h-4 w-4';
-  const modalShellClass = 'w-full max-w-3xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-[1.5rem] border border-slate-200 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.18)]';
+  const modalShellClass = 'w-full max-w-6xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-[1.5rem] border border-slate-200 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.18)]';
   const modalHeaderClass = 'flex items-start justify-between gap-3 border-b border-slate-200/80 bg-gradient-to-r from-slate-950 via-slate-900 to-brand-blue px-5 py-4 text-white sm:px-6';
   const modalBodyClass = 'px-5 py-5 sm:px-6';
   const slimInputClass = 'mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm leading-5 shadow-sm outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/15';
@@ -348,6 +462,26 @@ const AdminSevaOpportunitiesPage = () => {
 
     return () => setHeaderAction(null);
   }, [setHeaderAction]);
+
+  useEffect(() => {
+    setOpportunitiesPage(1);
+  }, [opportunitySearch, opportunityStatusFilter]);
+
+  useEffect(() => {
+    if (opportunitiesPage > opportunitiesTotalPages) {
+      setOpportunitiesPage(opportunitiesTotalPages);
+    }
+  }, [opportunitiesPage, opportunitiesTotalPages]);
+
+  useEffect(() => {
+    setVolunteerPage(1);
+  }, [volunteerSearch, viewOpportunity?.id]);
+
+  useEffect(() => {
+    if (volunteerPage > volunteerTotalPages) {
+      setVolunteerPage(volunteerTotalPages);
+    }
+  }, [volunteerPage, volunteerTotalPages]);
 
   return (
     <div className="space-y-6">
@@ -373,6 +507,31 @@ const AdminSevaOpportunitiesPage = () => {
       </Card>
 
       <Card>
+        <div className="mb-4 grid gap-2 md:grid-cols-3">
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:col-span-2">
+            Search
+            <input
+              type="search"
+              value={opportunitySearch}
+              onChange={(event) => setOpportunitySearch(event.target.value)}
+              placeholder="Search seva type, date, or time"
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-700 outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
+            />
+          </label>
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Status
+            <select
+              value={opportunityStatusFilter}
+              onChange={(event) => setOpportunityStatusFilter(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-700 outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
+            >
+              <option value="all">All</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="closed">Closed</option>
+            </select>
+          </label>
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead>
@@ -385,7 +544,7 @@ const AdminSevaOpportunitiesPage = () => {
               </tr>
             </thead>
             <tbody>
-              {opportunities.map((item) => (
+              {visibleOpportunities.map((item) => (
                 <tr key={item.id} className="border-b border-slate-100">
                   <td className="py-1.5 pr-2.5 font-semibold text-slate-800 lg:py-2 lg:pr-3">
                     <div className="space-y-1 lg:hidden">
@@ -573,7 +732,7 @@ const AdminSevaOpportunitiesPage = () => {
                   </td>
                 </tr>
               ))}
-              {opportunities.length === 0 ? (
+              {filteredOpportunities.length === 0 ? (
                 <tr>
                   <td className="py-4 text-center text-slate-500" colSpan={5}>No seva opportunities found.</td>
                 </tr>
@@ -581,6 +740,30 @@ const AdminSevaOpportunitiesPage = () => {
             </tbody>
           </table>
         </div>
+        {filteredOpportunities.length > 0 ? (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-slate-600">Showing {visibleOpportunities.length} of {filteredOpportunities.length} opportunities</p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-40"
+                disabled={opportunitiesPage <= 1}
+                onClick={() => setOpportunitiesPage((prev) => prev - 1)}
+              >
+                Prev
+              </button>
+              <span className="text-xs font-semibold text-slate-600">Page {opportunitiesPage} of {opportunitiesTotalPages}</span>
+              <button
+                type="button"
+                className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-40"
+                disabled={opportunitiesPage >= opportunitiesTotalPages}
+                onClick={() => setOpportunitiesPage((prev) => prev + 1)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        ) : null}
       </Card>
 
       {createOpen ? (
@@ -653,67 +836,115 @@ const AdminSevaOpportunitiesPage = () => {
           <div className="mx-auto flex min-h-full items-center justify-center">
           <div className={modalShellClass}>
             <div className={modalHeaderClass}>
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/65">Seva Opportunity</p>
-                <h3 className="mt-1 font-heading text-xl font-semibold sm:text-2xl">Opportunity Details</h3>
-              </div>
-              <button type="button" onClick={closeModals} className="rounded-full border border-white/20 bg-white/10 p-2 text-white transition hover:bg-white/20" aria-label="Close seva details modal">
-                <XMarkIcon className="h-4 w-4" />
-              </button>
-            </div>
-            <div className={`${modalBodyClass} space-y-4`}>
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Seva Type</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">{viewOpportunity.sevaType || '-'}</p>
+              <div className="flex min-w-0 flex-1 flex-col justify-between gap-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/65">Seva Opportunity</p>
+                    <h3 className="mt-1 font-heading text-2xl font-extrabold tracking-tight text-brand-saffron sm:text-3xl">
+                      {viewOpportunity.sevaType || 'Opportunity Details'}
+                    </h3>
+                  </div>
+                  <button type="button" onClick={closeModals} className="rounded-full border border-white/20 bg-white/10 p-2 text-white transition hover:bg-white/20" aria-label="Close seva details modal">
+                    <XMarkIcon className="h-4 w-4" />
+                  </button>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Status</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">{viewOpportunity.status === 'closed' ? 'Closed' : viewOpportunity.active ? 'Active' : 'Inactive'}</p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Date</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">{formatDisplayDate(viewOpportunity.date)}</p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Time</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">{viewOpportunity.time || '-'}</p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Expiry</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">{formatDisplayDate(viewOpportunity.expiryDate)}</p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Volunteers</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">{selectedVolunteers.length}/{viewOpportunity.totalVolunteersRequired || 10}</p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm md:col-span-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Waitlist</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">{viewOpportunity.waitlistEnabled === false ? 'Disabled' : 'Enabled'}</p>
-                </div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Registered Volunteers</p>
-                <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
-                  {selectedVolunteers.length === 0 ? (
-                    <p className="text-sm text-slate-500">No volunteers registered for this opportunity yet.</p>
-                  ) : selectedVolunteers.map((entry) => (
-                    <div key={entry.id} className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-800">{entry.name || '-'}</p>
-                        <p className="text-xs text-slate-600">{entry.phone || 'No phone'} • {entry.email || 'No email'}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeVolunteerMutation.mutate(entry.id)}
-                        disabled={removeVolunteerMutation.isPending}
-                        className="rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        Remove
-                      </button>
+
+                <div className="flex items-end justify-between gap-3 border-t border-white/15 pt-2">
+                  <div className="min-w-0 overflow-x-auto">
+                    <div className="flex flex-nowrap items-center gap-2 whitespace-nowrap">
+                      <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${viewOpportunity.status === 'closed' ? 'border-rose-200/80 bg-rose-500/20 text-rose-50' : viewOpportunity.active ? 'border-emerald-200/80 bg-emerald-500/20 text-emerald-50' : 'border-slate-200/80 bg-slate-500/20 text-slate-100'}`}>Status: {viewOpportunity.status === 'closed' ? 'Closed' : viewOpportunity.active ? 'Active' : 'Inactive'}</span>
+                      <span className="rounded-full border border-sky-200/80 bg-sky-500/20 px-2.5 py-1 text-[11px] font-semibold text-sky-50">Date & Time: {formatDisplayDate(viewOpportunity.date)} | {viewOpportunity.time || '-'}</span>
+                      <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${viewOpportunity.waitlistEnabled === false ? 'border-slate-200/80 bg-slate-500/20 text-slate-100' : 'border-emerald-200/80 bg-emerald-500/20 text-emerald-50'}`}>Waitlist: {viewOpportunity.waitlistEnabled === false ? 'Disabled' : 'Enabled'}</span>
+                      <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${expiryMeta.tone === 'overdue' ? 'border-rose-200/80 bg-rose-500/20 text-rose-50' : expiryMeta.tone === 'remaining' ? 'border-amber-200/80 bg-amber-500/20 text-amber-50' : 'border-slate-200/80 bg-slate-500/20 text-slate-100'}`}>Expiry: {expiryMeta.label}</span>
                     </div>
-                  ))}
+                  </div>
+                  <div className="shrink-0 text-right leading-tight">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-amber-100/90">Remaining</p>
+                    <p className="mt-0.5 text-2xl font-extrabold text-brand-saffron">{remainingVolunteers}</p>
+                  </div>
                 </div>
+              </div>
+            </div>
+            <div className={modalBodyClass}>
+              <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Registered Volunteers</p>
+                    <p className="text-xs text-slate-500">Minimal table view for quick management.</p>
+                    <div className="mt-2 border-t border-slate-200" />
+                  </div>
+                  <input
+                    type="search"
+                    value={volunteerSearch}
+                    onChange={(event) => setVolunteerSearch(event.target.value)}
+                    placeholder="Search name, email, phone"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-700 outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 sm:w-64"
+                  />
+                </div>
+
+                {selectedVolunteers.length === 0 ? (
+                  <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-sm text-slate-500">No volunteers registered for this opportunity yet.</p>
+                ) : filteredVolunteers.length === 0 ? (
+                  <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-sm text-slate-500">No volunteers match your search.</p>
+                ) : (
+                  <>
+                    <div className="mt-3 overflow-x-auto rounded-xl border border-slate-200">
+                      <table className="min-w-full text-left text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                            <th className="px-3 py-2">Name</th>
+                            <th className="px-3 py-2">Email</th>
+                            <th className="px-3 py-2">Phone</th>
+                            <th className="px-3 py-2">Status</th>
+                            <th className="px-3 py-2 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {visibleVolunteers.map((entry, index) => (
+                            <tr key={entry.id} className={`border-b border-slate-100 last:border-b-0 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
+                              <td className="px-3 py-2 font-medium text-slate-800">{entry.name || '-'}</td>
+                              <td className="px-3 py-2 text-slate-700">{entry.email || '-'}</td>
+                              <td className="px-3 py-2 text-slate-700">{entry.phone || '-'}</td>
+                              <td className="px-3 py-2 text-slate-700">{entry.status || 'confirmed'}</td>
+                              <td className="px-3 py-2 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => removeVolunteerMutation.mutate(entry.id)}
+                                  disabled={removeVolunteerMutation.isPending}
+                                  className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                >
+                                  Remove
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <p className="text-xs text-slate-600">Showing {visibleVolunteers.length} of {filteredVolunteers.length} matched</p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-40"
+                          disabled={volunteerPage <= 1}
+                          onClick={() => setVolunteerPage((prev) => prev - 1)}
+                        >
+                          Prev
+                        </button>
+                        <span className="text-xs font-semibold text-slate-600">Page {volunteerPage} of {volunteerTotalPages}</span>
+                        <button
+                          type="button"
+                          className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-40"
+                          disabled={volunteerPage >= volunteerTotalPages}
+                          onClick={() => setVolunteerPage((prev) => prev + 1)}
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>

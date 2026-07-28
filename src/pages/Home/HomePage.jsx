@@ -109,7 +109,7 @@ const HomePage = () => {
     }
 
     // Ensure each repeated ticker segment is long enough to avoid visible dead space.
-    const minimumCardsPerSegment = 10;
+    const minimumCardsPerSegment = 14;
     const repeatCount = Math.max(1, Math.ceil(minimumCardsPerSegment / tickerItems.length));
 
     return Array.from({ length: repeatCount }, (_, repeatIndex) => (
@@ -119,6 +119,15 @@ const HomePage = () => {
       }))
     )).flat();
   }, [tickerItems]);
+  const tickerRenderKey = useMemo(() => {
+    if (tickerLoopItems.length === 0) {
+      return 'empty';
+    }
+
+    const firstId = String(tickerLoopItems[0]?.id || 'na');
+    const lastId = String(tickerLoopItems[tickerLoopItems.length - 1]?.id || 'na');
+    return `${tickerLoopItems.length}-${firstId}-${lastId}`;
+  }, [tickerLoopItems]);
   const latestArticle = useMemo(
     () => (newsArticles || []).find((article) => newsService.isLiveArticle(article)) || null,
     [newsArticles]
@@ -303,28 +312,30 @@ const HomePage = () => {
         topRightSlot={null}
       />
 
-      <section className="ticker-shell ticker-shell-home overflow-hidden py-1">
-        <div className="ticker-track">
-          {[0, 1].map((groupIndex) => (
-            <div key={groupIndex} className="ticker-group">
-              {tickerLoopItems.map((event) => (
-                <button
-                  key={`${groupIndex}-${event._tickerLoopKey}`}
-                  type="button"
-                  className="ticker-item ticker-item-home mx-1 inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white/95 px-3 py-1 text-xs font-black uppercase tracking-wide text-slate-900 transition hover:-translate-y-0.5 hover:bg-slate-200 hover:text-slate-900"
-                  onClick={() => setSelectedTickerEvent(event)}
-                >
-                  <span className="h-1.5 w-1.5 rounded-full bg-brand-saffron" />
-                  <span className="max-w-[190px] truncate font-black sm:max-w-[280px]">{event.title}</span>
-                  <span className="ticker-item-date rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-900">
-                    {new Date(event.date).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}
-                  </span>
-                </button>
-              ))}
-            </div>
-          ))}
-        </div>
-      </section>
+      {tickerItems.length > 0 ? (
+        <section className="ticker-shell ticker-shell-home overflow-hidden py-1">
+          <div key={tickerRenderKey} className="ticker-track ticker-force-motion">
+            {[0, 1, 2].map((groupIndex) => (
+              <div key={groupIndex} className="ticker-group">
+                {tickerLoopItems.map((event) => (
+                  <button
+                    key={`${groupIndex}-${event._tickerLoopKey}`}
+                    type="button"
+                    className="ticker-item ticker-item-home mx-1 inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white/95 px-3 py-1 text-xs font-black uppercase tracking-wide text-slate-900 transition hover:-translate-y-0.5 hover:bg-slate-200 hover:text-slate-900"
+                    onClick={() => setSelectedTickerEvent(event)}
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-brand-saffron" />
+                    <span className="max-w-[190px] truncate font-black sm:max-w-[280px]">{event.title}</span>
+                    <span className="ticker-item-date rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-900">
+                      {new Date(event.date).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {globalBannerAds.length > 0 ? (
         <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
@@ -410,7 +421,7 @@ const HomePage = () => {
               {specialDayTickerTextVisible ? (
                 <div className={`daily-schedule-special-ticker mt-2 w-full min-w-0 max-w-full overflow-hidden border-y ${isTodaySpecial ? 'border-brand-saffron/40 bg-brand-saffron' : 'border-brand-blue/20 bg-brand-blue/10'}`}>
                   <div className="ticker-mask px-3 py-1.5">
-                    <div className="ticker-track daily-schedule-special-track ticker-speed-fast ticker-no-pause">
+                    <div className="ticker-track ticker-force-motion daily-schedule-special-track ticker-speed-fast ticker-no-pause">
                       {[0, 1].map((groupIndex) => (
                         <div key={`special-day-note-${groupIndex}`} className="ticker-group">
                           {[0, 1, 2, 3].map((unitIndex) => (

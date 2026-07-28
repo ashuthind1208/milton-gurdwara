@@ -52,18 +52,18 @@ const resolveAuthPolicy = ({ email, intent = 'signin', existingUser = null }) =>
     };
   }
 
-  if (intent === 'signup') {
-    return {
-      role: userRoles.MEMBER,
-      approvalStatus: 'pending',
-      registrationComplete: true
-    };
-  }
-
   if (existingUser?.role) {
     return {
       role: existingUser.role,
       approvalStatus: existingUser.approvalStatus || 'approved',
+      registrationComplete: true
+    };
+  }
+
+  if (intent === 'signup') {
+    return {
+      role: userRoles.MEMBER,
+      approvalStatus: 'pending',
       registrationComplete: true
     };
   }

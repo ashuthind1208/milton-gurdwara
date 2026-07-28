@@ -21,6 +21,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { BookOpenIcon, DocumentTextIcon } from '@heroicons/react/24/solid';
 import PageHero from '../../components/common/PageHero';
+import BreadcrumbTrail from '../../components/common/BreadcrumbTrail';
 import useSeoMeta from '../../hooks/useSeoMeta';
 import Seo from '../../components/common/Seo';
 import Card from '../../components/ui/Card';
@@ -282,6 +283,26 @@ const LibraryPage = () => {
     [mediaModalId, mediaResources]
   );
 
+  const breadcrumbItems = useMemo(() => {
+    const items = [
+      { label: 'Home', path: '/' },
+      { label: 'Library', path: '/library' }
+    ];
+
+    if (sessionModalEntry) {
+      items.push({ label: 'Program Sessions', isCurrent: true });
+      return items;
+    }
+
+    if (mediaModalEntry) {
+      items.push({ label: 'Digital Media', isCurrent: true });
+      return items;
+    }
+
+    items[items.length - 1] = { ...items[items.length - 1], isCurrent: true };
+    return items;
+  }, [mediaModalEntry, sessionModalEntry]);
+
   const libraryTickerItems = useMemo(() => {
     const items = [
       ...programUpdates.slice(0, 4).map((entry) => ({
@@ -499,6 +520,7 @@ const LibraryPage = () => {
         title="Library"
         description="Track available hard-copy books and browse downloadable Sikh learning material in one place."
       />
+      <BreadcrumbTrail items={breadcrumbItems} className="-mt-4 px-1" />
 
       {libraryTopAds.length > 0 ? (
         <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
