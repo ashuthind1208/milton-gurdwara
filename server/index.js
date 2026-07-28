@@ -143,6 +143,7 @@ const smtpSecure = String(process.env.SMTP_SECURE || 'false').trim().toLowerCase
 const smtpUser = String(process.env.SMTP_USER || '').trim();
 const smtpPass = String(process.env.SMTP_PASS || '').trim();
 const smtpFromAddress = String(process.env.SMTP_FROM || localMailFromAddress).trim() || localMailFromAddress;
+const contactUsInboxAddress = String(process.env.CONTACT_US_EMAIL || smtpFromAddress || smtpUser || localMailFromAddress).trim();
 let volunteerReminderSweepRunning = false;
 let volunteerReminderLastRunDateKey = '';
 let eventReminderSweepRunning = false;
@@ -711,9 +712,13 @@ const sendViaSmtp = async ({ from, toList, subject, textBody, htmlBody, attachme
     }))
     : [];
 
-  const fromHeader = from || smtpFromAddress;
+  // Use a mailbox authenticated with SMTP to avoid provider-side silent drops.
+  const fromHeader = smtpFromAddress;
+  const replyToCandidate = extractEmailAddress(from);
+  const replyToHeader = isValidEmailAddress(replyToCandidate) ? replyToCandidate : undefined;
   const smtpInfo = await transport.sendMail({
     from: fromHeader,
+    replyTo: replyToHeader,
     to: toList,
     subject,
     text: textBody || undefined,
@@ -721,11 +726,25 @@ const sendViaSmtp = async ({ from, toList, subject, textBody, htmlBody, attachme
     attachments: normalizedAttachments
   });
 
+  const acceptedRecipients = Array.isArray(smtpInfo?.accepted)
+    ? smtpInfo.accepted.filter(Boolean).map((entry) => String(entry).trim()).filter(Boolean)
+    : [];
+  if (acceptedRecipients.length === 0) {
+    const rejectedRecipients = Array.isArray(smtpInfo?.rejected)
+      ? smtpInfo.rejected.filter(Boolean).map((entry) => String(entry).trim()).filter(Boolean)
+      : [];
+    throw new Error(`SMTP did not accept any recipients. Rejected: ${rejectedRecipients.join(', ') || 'unknown'}`);
+  }
+
   return {
     provider: 'smtp',
     envelopeFrom: smtpFromAddress,
     fromHeader,
-    messageId: String(smtpInfo?.messageId || '').trim()
+    messageId: String(smtpInfo?.messageId || '').trim(),
+    accepted: acceptedRecipients,
+    rejected: Array.isArray(smtpInfo?.rejected)
+      ? smtpInfo.rejected.filter(Boolean).map((entry) => String(entry).trim()).filter(Boolean)
+      : []
   };
 };
 
@@ -1599,6 +1618,92 @@ const escapeHtml = (value) => String(value || '')
   .replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&#39;');
+
+const buildContactInquiryEmail = ({ name = '', email = '', phone = '', message = '', subject = '' }) => {
+  const logoSrc = volunteerReminderLogoUrl || `${volunteerReminderBaseUrl}/gurdwara-logo.webp` || embeddedVolunteerReminderLogo;
+  const siteName = String(volunteerReminderSiteName || 'Singh Sabha Milton Gurdwara').trim();
+  const recipientSubject = sanitizeHeaderValue(subject || `Contact Us Inquiry from ${name}`) || 'Contact Us Inquiry';
+  const contactMessage = String(message || '').trim();
+  const submittedAt = new Date().toLocaleString('en-CA', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  const text = [
+    `Contact inquiry received - ${siteName}`,
+    '',
+    `Name: ${name || '-'}`,
+    `Email: ${email || '-'}`,
+    `Phone: ${phone || '-'}`,
+    `Submitted: ${submittedAt}`,
+    `Subject: ${recipientSubject}`,
+    '',
+    'Message:',
+    contactMessage || '-'
+  ].join('\n');
+
+  const html = `
+  <div style="background:#f5f8fc;padding:28px 14px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:760px;margin:0 auto;background:#ffffff;border:1px solid #dbe7f6;border-radius:14px;overflow:hidden;">
+      <tr>
+        <td style="padding:16px 22px;background:linear-gradient(90deg,#0a4d9f,#0b67c2,#e58b16);color:#ffffff;">
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+            <tr>
+              <td style="vertical-align:middle;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                  <tr>
+                    ${logoSrc ? `<td style="width:44px;padding-right:12px;vertical-align:middle;"><img src="${escapeHtml(logoSrc)}" alt="${escapeHtml(siteName)} logo" width="44" height="44" style="display:block;border-radius:9999px;background:#ffffff;object-fit:cover;"/></td>` : ''}
+                    <td style="vertical-align:middle;">
+                      <div style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.9;">${escapeHtml(siteName)}</div>
+                      <div style="font-size:18px;font-weight:800;line-height:1.3;margin-top:2px;">Contact Us Inquiry</div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:18px 22px;">
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border:1px solid #c7dcf7;border-radius:14px;overflow:hidden;background:#f6faff;box-shadow:0 8px 24px -18px rgba(11,103,194,.65);margin-bottom:16px;">
+            <tr>
+              <td colspan="2" style="padding:11px 14px;background:linear-gradient(90deg,#eaf2ff,#f6f9ff);border-bottom:1px solid #c7dcf7;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#0a4d9f;">Submission Details</td>
+            </tr>
+            <tr>
+              <td style="width:34%;padding:11px 12px;border-right:1px solid #d7e3f3;border-bottom:1px solid #d7e3f3;background:#edf4ff;font-size:12px;font-weight:700;color:#1e3a8a;">Name</td>
+              <td style="padding:11px 12px;border-bottom:1px solid #d7e3f3;background:#ffffff;font-size:14px;color:#0f172a;font-weight:600;">${escapeHtml(name || '-')}</td>
+            </tr>
+            <tr>
+              <td style="width:34%;padding:11px 12px;border-right:1px solid #d7e3f3;border-bottom:1px solid #d7e3f3;background:#edf4ff;font-size:12px;font-weight:700;color:#1e3a8a;">Email</td>
+              <td style="padding:11px 12px;border-bottom:1px solid #d7e3f3;background:#ffffff;font-size:14px;color:#0f172a;font-weight:600;">${escapeHtml(email || '-')}</td>
+            </tr>
+            <tr>
+              <td style="width:34%;padding:11px 12px;border-right:1px solid #d7e3f3;border-bottom:1px solid #d7e3f3;background:#edf4ff;font-size:12px;font-weight:700;color:#1e3a8a;">Phone</td>
+              <td style="padding:11px 12px;border-bottom:1px solid #d7e3f3;background:#ffffff;font-size:14px;color:#0f172a;font-weight:600;">${escapeHtml(phone || '-')}</td>
+            </tr>
+            <tr>
+              <td style="width:34%;padding:11px 12px;border-right:1px solid #d7e3f3;background:#edf4ff;font-size:12px;font-weight:700;color:#1e3a8a;">Submitted</td>
+              <td style="padding:11px 12px;background:#ffffff;font-size:14px;color:#0f172a;font-weight:600;">${escapeHtml(submittedAt)}</td>
+            </tr>
+          </table>
+
+          <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#0b67c2;margin-bottom:8px;">Message</div>
+          <div style="border:1px solid #cfe1fb;border-radius:12px;background:#ffffff;padding:12px 14px;line-height:1.6;white-space:pre-wrap;box-shadow:inset 0 0 0 1px #f5f9ff;">${escapeHtml(contactMessage || '-')}</div>
+        </td>
+      </tr>
+    </table>
+  </div>`;
+
+  return {
+    subject: recipientSubject,
+    text,
+    html
+  };
+};
 
 const buildVolunteerReminderEmail = ({ registration, daysRemaining = null, manual = false }) => {
   const sevaDateLabel = formatSevaDateLabel(registration.sevaDate);
@@ -3485,6 +3590,58 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (requestUrl.pathname === '/api/contact-us/send' && request.method === 'POST') {
+    try {
+      const payload = await parseJsonObjectBody(request, { maxBytes: 128 * 1024, allowEmpty: false });
+      ensureNoUnknownKeys(payload, ['name', 'email', 'phone', 'message', 'subject', 'to']);
+
+      const name = readStringField(payload, 'name', { required: true, min: 2, max: 140 });
+      const senderEmail = readEmailField(payload, 'email', { required: true });
+      const phone = readStringField(payload, 'phone', { max: 40 });
+      const message = readStringField(payload, 'message', { required: true, min: 8, max: 5000 });
+      const subject = readStringField(payload, 'subject', { max: 200 }) || `Contact Us Inquiry from ${name}`;
+      const requestedRecipient = readStringField(payload, 'to', { max: 254, toLowerCase: true });
+
+      const recipient = isValidEmailAddress(requestedRecipient)
+        ? requestedRecipient
+        : (isValidEmailAddress(contactUsInboxAddress) ? contactUsInboxAddress : '');
+      assertInput(Boolean(recipient), 'Contact inbox email is not configured. Set CONTACT_US_EMAIL or SMTP_FROM.');
+
+      const template = buildContactInquiryEmail({
+        name,
+        email: senderEmail,
+        phone,
+        message,
+        subject
+      });
+
+      const deliveryResult = await sendViaConfiguredMailTransport({
+        from: localMailFromAddress,
+        toList: [recipient],
+        subject: template.subject,
+        textBody: template.text,
+        htmlBody: template.html,
+        attachments: []
+      });
+
+      sendJson(response, 200, {
+        ok: true,
+        sent: true,
+        provider: String(deliveryResult?.provider || localMailTransport || 'sendmail').trim(),
+        recipient,
+        type: 'contact'
+      });
+    } catch (error) {
+      logServerError(error, 'contact-us-send');
+      sendJson(response, error.status || 502, {
+        ok: false,
+        sent: false,
+        message: error?.message || 'Unable to send contact message.'
+      });
+    }
+    return;
+  }
+
   if (requestUrl.pathname === '/api/internal/mail-relay' && request.method === 'POST') {
     const remoteAddress = String(request.socket?.remoteAddress || '').trim();
     if (!isLoopbackAddress(remoteAddress)) {
@@ -3528,6 +3685,8 @@ const server = http.createServer(async (request, response) => {
         provider: String(deliveryResult?.provider || localMailTransport || 'sendmail').trim(),
         envelopeFrom: String(deliveryResult?.envelopeFrom || localMailFromAddress).trim() || localMailFromAddress,
         messageId: String(deliveryResult?.messageId || '').trim() || undefined,
+        acceptedRecipients: Array.isArray(deliveryResult?.accepted) ? deliveryResult.accepted : undefined,
+        rejectedRecipients: Array.isArray(deliveryResult?.rejected) ? deliveryResult.rejected : undefined,
         recipients: recipients.length,
         hasAttachments: attachments.length > 0,
         type: String(relayPayload.type || '').trim() || 'generic'

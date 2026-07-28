@@ -488,18 +488,18 @@ const SevaPage = () => {
                 const statusMeta = getOpportunityStatusMeta(item);
                 const joinWaitlist = item.confirmedRegistered >= item.totalRequired && item.waitlistEnabled;
                 return (
-                  <Card key={item.id} className="border border-slate-200 bg-white p-3.5">
+                  <Card key={item.id} className="flex h-full flex-col border border-slate-200 bg-white p-3.5">
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="text-base font-bold text-slate-900">{item.sevaType}</h3>
+                      <h3 className="truncate whitespace-nowrap text-base font-bold text-slate-900">{item.sevaType}</h3>
                       <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${statusMeta.className}`}>
                         {statusMeta.label}
                       </span>
                     </div>
                     <div className="mt-1 space-y-1 text-left">
-                      <p className="flex items-center gap-1 text-xs text-slate-600"><CalendarDaysIcon className="h-3.5 w-3.5 text-brand-blue" /> {formatDateLabel(item.date)}</p>
-                      <p className="flex items-center gap-1 text-xs text-slate-600"><ClockIcon className="h-3.5 w-3.5 text-brand-blue" /> {item.time || 'Time TBD'}</p>
+                      <p className="flex items-center gap-1 truncate whitespace-nowrap text-xs text-slate-600"><CalendarDaysIcon className="h-3.5 w-3.5 text-brand-blue" /> {formatDateLabel(item.date)}</p>
+                      <p className="flex items-center gap-1 truncate whitespace-nowrap text-xs text-slate-600"><ClockIcon className="h-3.5 w-3.5 text-brand-blue" /> {item.time || 'Time TBD'}</p>
                     </div>
-                    <p className="mt-1 text-xs text-slate-500">Registration closes: {formatDateLabel(item.expiryDate)}</p>
+                    <p className="mt-1 truncate whitespace-nowrap text-xs text-slate-500">Registration closes: {formatDateLabel(item.expiryDate)}</p>
                     <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
                       <div className="h-full rounded-full bg-brand-blue" style={{ width: `${fillPercent}%` }} />
                     </div>
@@ -509,7 +509,7 @@ const SevaPage = () => {
                     </div>
                     {item.waitlistCount > 0 ? <p className="mt-1 text-[11px] font-semibold text-amber-700">Waitlisted: {item.waitlistCount}</p> : null}
                     {isAuthenticated || allowIdentityOverride ? (
-                      <>
+                      <div className="mt-auto pt-2">
                         <button
                           type="button"
                           onClick={() => {
@@ -535,7 +535,7 @@ const SevaPage = () => {
                         {alreadyRegistered && item.isOpen ? (
                           <p className="mt-2 text-xs font-semibold leading-snug text-red-700">You can&apos;t register since you have already registered for this seva.</p>
                         ) : null}
-                      </>
+                      </div>
                     ) : null}
                   </Card>
                 );
@@ -642,11 +642,11 @@ const SevaPage = () => {
 
       {(isAuthenticated || allowIdentityOverride) && isRegisterModalOpen ? (
         <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-900/45 px-4 py-6">
-          <div className="w-full max-w-xl rounded-[28px] border border-brand-blue/20 bg-[radial-gradient(circle_at_top_left,_#eff6ff,_#ffffff_45%,_#fff7ed)] p-4 shadow-[0_28px_70px_-40px_rgba(15,23,42,0.6)] sm:p-5">
+          <div className="w-full max-w-5xl rounded-[28px] border border-brand-blue/20 bg-[radial-gradient(circle_at_top_left,_#eff6ff,_#ffffff_45%,_#fff7ed)] p-4 shadow-[0_28px_70px_-40px_rgba(15,23,42,0.6)] sm:p-5">
             <div className="flex items-center justify-between gap-3">
-              <div>
+              <div className="min-w-0">
                 <h3 className="font-heading text-xl font-semibold text-slate-900">Volunteer Registration</h3>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{activeRegisterOpportunity?.sevaType ? formatSevaOpportunityLabel(activeRegisterOpportunity) : 'Quick, signed-in registration'}</p>
+                <p className="overflow-x-auto whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-slate-500">{activeRegisterOpportunity?.sevaType ? formatSevaOpportunityLabel(activeRegisterOpportunity) : 'Quick, signed-in registration'}</p>
               </div>
               <button
                 type="button"

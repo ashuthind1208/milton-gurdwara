@@ -1,6 +1,8 @@
 import Card from '../ui/Card';
 import { formatDate } from '../../utils/formatters';
 
+const stripHtml = (value) => String(value || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+
 const NewsCard = ({ article }) => {
   const statusLabel = article.active ? 'Active' : 'Inactive';
 
@@ -12,7 +14,11 @@ const NewsCard = ({ article }) => {
       </div>
 
       <h3 className="mt-2 font-heading text-xl font-semibold text-slate-900 dark:text-white">{article.heading}</h3>
-      <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300">{article.content}</p>
+      {stripHtml(article.content) ? (
+        <div className="mt-2 text-sm text-slate-600 dark:text-slate-300" dangerouslySetInnerHTML={{ __html: String(article.content || '') }} />
+      ) : (
+        <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300">-</p>
+      )}
 
       <div className="mt-3 grid gap-3 md:grid-cols-2">
         {(article.imageLinks || []).map((url, index) => (

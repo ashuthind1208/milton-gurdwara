@@ -106,15 +106,15 @@ const VolunteerForm = ({
             <div className="mt-3 space-y-2">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Name</p>
-                <p className="text-sm font-bold text-slate-900">{defaultValues.name || '-'}</p>
+                <p className="truncate whitespace-nowrap text-sm font-bold text-slate-900">{defaultValues.name || '-'}</p>
               </div>
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Phone</p>
-                <p className="text-sm font-bold text-slate-900">{defaultValues.phone || '-'}</p>
+                <p className="truncate whitespace-nowrap text-sm font-bold text-slate-900">{defaultValues.phone || '-'}</p>
               </div>
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Email</p>
-                <p className="break-all text-sm font-bold text-slate-900">{defaultValues.email || '-'}</p>
+                <p className="truncate whitespace-nowrap text-sm font-bold text-slate-900">{defaultValues.email || '-'}</p>
               </div>
             </div>
           )}
@@ -142,29 +142,29 @@ const VolunteerForm = ({
               <div className="space-y-2 text-sm">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Type</p>
-                  <p className="font-bold text-slate-900">{lockedOpportunity?.sevaType || 'Seva'}</p>
+                  <p className="truncate whitespace-nowrap font-bold text-slate-900">{lockedOpportunity?.sevaType || 'Seva'}</p>
                 </div>
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Date</p>
-                  <p className="font-bold text-slate-900">{lockedOpportunityDateLabel}</p>
+                  <p className="truncate whitespace-nowrap font-bold text-slate-900">{lockedOpportunityDateLabel}</p>
                 </div>
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Time</p>
-                  <p className="font-bold text-slate-900">{lockedOpportunityTimeLabel}</p>
+                  <p className="truncate whitespace-nowrap font-bold text-slate-900">{lockedOpportunityTimeLabel}</p>
                 </div>
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Seats</p>
-                  <p className="font-bold text-slate-900">{Number(lockedOpportunity?.registered || 0)}/{Number(lockedOpportunity?.totalRequired || 0)}</p>
+                  <p className="truncate whitespace-nowrap font-bold text-slate-900">{Number(lockedOpportunity?.registered || 0)}/{Number(lockedOpportunity?.totalRequired || 0)}</p>
                 </div>
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Closes</p>
-                  <p className="font-bold text-slate-900">{lockedOpportunity?.expiryDate ? new Date(`${lockedOpportunity.expiryDate}T00:00:00`).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD'}</p>
+                  <p className="truncate whitespace-nowrap font-bold text-slate-900">{lockedOpportunity?.expiryDate ? new Date(`${lockedOpportunity.expiryDate}T00:00:00`).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD'}</p>
                 </div>
               </div>
             ) : (
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Selected Opportunity</p>
-                <p className="text-sm font-bold leading-snug text-slate-900">{selectedOpportunityLabel || 'Choose a seva opportunity from the list above.'}</p>
+                <p className="truncate whitespace-nowrap text-sm font-bold leading-snug text-slate-900">{selectedOpportunityLabel || 'Choose a seva opportunity from the list above.'}</p>
               </div>
             )}
           </div>

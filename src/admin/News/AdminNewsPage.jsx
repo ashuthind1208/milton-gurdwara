@@ -16,6 +16,7 @@ import newsService from '../../services/newsService';
 import { formatDate } from '../../utils/formatters';
 import uploadService from '../../services/uploadService';
 import StatusAlert from '../../components/common/StatusAlert';
+import RichTextEditor from '../../components/forms/RichTextEditor';
 
 const actionIconClass = 'h-4 w-4';
 
@@ -30,6 +31,7 @@ const defaultFormValues = {
 };
 
 const listToTextarea = (values = []) => (values || []).join('\n');
+const stripHtml = (value) => String(value || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 
 const normalizeFormValues = (values) => ({
   heading: values.heading,
@@ -59,6 +61,8 @@ const AdminNewsPage = () => {
   const [editUploadState, setEditUploadState] = useState('');
   const [createUploadProgress, setCreateUploadProgress] = useState({ links: 0, imageLinks: 0 });
   const [editUploadProgress, setEditUploadProgress] = useState({ links: 0, imageLinks: 0 });
+  const [createContentHtml, setCreateContentHtml] = useState('');
+  const [editContentHtml, setEditContentHtml] = useState('');
   const [uploadStatus, setUploadStatus] = useState({ type: 'success', message: '' });
 
   const createForm = useForm({ defaultValues: defaultFormValues });
@@ -70,19 +74,21 @@ const AdminNewsPage = () => {
   });
 
   const createMutation = useMutation({
-    mutationFn: (values) => newsService.createArticle(normalizeFormValues(values)),
+    mutationFn: (values) => newsService.createArticle(normalizeFormValues({ ...values, content: createContentHtml })),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['news-articles'] });
       createForm.reset(defaultFormValues);
+      setCreateContentHtml('');
       setCreateOpen(false);
     }
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, values }) => newsService.updateArticle(id, normalizeFormValues(values)),
+    mutationFn: ({ id, values }) => newsService.updateArticle(id, normalizeFormValues({ ...values, content: editContentHtml })),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['news-articles'] });
       setEditingArticle(null);
+      setEditContentHtml('');
     }
   });
 
@@ -110,12 +116,15 @@ const AdminNewsPage = () => {
       expiryDate: article.expiryDate || '',
       active: typeof article.active === 'boolean' ? article.active : true
     });
+    setEditContentHtml(String(article.content || ''));
   };
 
   const closeModals = () => {
     setCreateOpen(false);
     setViewArticle(null);
     setEditingArticle(null);
+    setCreateContentHtml('');
+    setEditContentHtml('');
   };
 
   const uploadNewsFile = async ({ file, mode, targetField }) => {
@@ -180,6 +189,13 @@ const AdminNewsPage = () => {
     return () => setHeaderAction(null);
   }, [setHeaderAction]);
 
+  useEffect(() => {
+    if (!createOpen) {
+      return;
+    }
+    setCreateContentHtml(String(createForm.getValues('content') || ''));
+  }, [createForm, createOpen]);
+
   return (
     <div className="space-y-6">
       <h1 className="sr-only">News and Updates</h1>
@@ -201,7 +217,7 @@ const AdminNewsPage = () => {
                 <tr key={article.id} className="border-b border-slate-100">
                   <td className="py-2 pr-3">
                     <p className="font-semibold text-slate-800">{article.heading || 'Untitled'}</p>
-                    <p className="text-xs text-slate-500 line-clamp-1">{article.content || '-'}</p>
+                    <p className="text-xs text-slate-500 line-clamp-1">{stripHtml(article.content) || '-'}</p>
                   </td>
                   <td className="py-2 pr-3">{formatDate(article.publishedAt)}</td>
                   <td className="py-2 pr-3">{article.expiryDate ? formatDate(article.expiryDate) : '-'}</td>
@@ -270,7 +286,14 @@ const AdminNewsPage = () => {
               <h3 className="font-heading text-xl font-semibold">Add News</h3>
               <button type="button" onClick={closeModals} className="rounded-md border border-slate-300 px-2 py-1 text-sm">Close</button>
             </div>
-            <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={createForm.handleSubmit((values) => createMutation.mutate(values))}>
+            <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={createForm.handleSubmit((values) => {
+              const contentPlain = stripHtml(createContentHtml);
+              if (!contentPlain) {
+                setUploadStatus({ type: 'error', message: 'Content is required.' });
+                return;
+              }
+              createMutation.mutate({ ...values, content: createContentHtml });
+            })}>
               <div className="md:col-span-2">
                 <StatusAlert type={uploadStatus.type} message={uploadStatus.message} />
               </div>
@@ -278,28 +301,15 @@ const AdminNewsPage = () => {
                 <input {...createForm.register('heading', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
               <label className="text-sm md:col-span-2">Content
-                <textarea rows={4} {...createForm.register('content', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <div className="mt-1">
+                  <RichTextEditor value={createContentHtml} onChange={setCreateContentHtml} minHeight={180} />
+                </div>
               </label>
               <label className="text-sm">Publishing Date
                 <input type="date" {...createForm.register('publishedAt', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
               <label className="text-sm">Expiry Date
                 <input type="date" {...createForm.register('expiryDate')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-              </label>
-              <label className="text-sm md:col-span-2">Links (one per line or comma-separated)
-                <textarea rows={3} {...createForm.register('links')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-                <input
-                  type="file"
-                  accept="image/*,video/*,application/pdf,text/plain"
-                  className="mt-2 block w-full text-xs"
-                  onChange={(event) => uploadNewsFile({ file: event.target.files?.[0], mode: 'create', targetField: 'links' })}
-                />
-                <p className="mt-1 text-xs text-slate-500">{createUploadState === 'links' ? `Uploading file... ${createUploadProgress.links}%` : 'Upload a file to append its URL here (image/video/pdf/txt, max 15MB), or paste links manually.'}</p>
-                {createUploadState === 'links' ? (
-                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                    <div className="h-full bg-brand-blue transition-all" style={{ width: `${createUploadProgress.links}%` }} />
-                  </div>
-                ) : null}
               </label>
               <label className="text-sm md:col-span-2">Image Links (one per line or comma-separated)
                 <textarea rows={3} {...createForm.register('imageLinks')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
@@ -333,25 +343,50 @@ const AdminNewsPage = () => {
       {viewArticle ? (
         <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6">
           <div className="mx-auto flex min-h-full items-center justify-center">
-          <div className="w-full max-w-3xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="font-heading text-xl font-semibold">News Details</h3>
-              <button type="button" onClick={closeModals} className="rounded-md border border-slate-300 px-2 py-1 text-sm">Close</button>
+          <div className="w-full max-w-4xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-[0_24px_56px_-42px_rgba(15,23,42,0.75)]">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-gradient-to-r from-brand-blue via-blue-600 to-brand-saffron px-5 py-4 text-white">
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/80">News Center</p>
+                <h3 className="mt-1 truncate font-heading text-xl font-bold sm:text-2xl">{viewArticle.heading || 'News Details'}</h3>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <span className="rounded-full border border-white/30 bg-white/15 px-2.5 py-1 text-[11px] font-semibold">Published: {formatDate(viewArticle.publishedAt)}</span>
+                  <span className="rounded-full border border-white/30 bg-white/15 px-2.5 py-1 text-[11px] font-semibold">Expiry: {viewArticle.expiryDate ? formatDate(viewArticle.expiryDate) : '-'}</span>
+                  <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${viewArticle.active ? 'border-emerald-200/90 bg-emerald-500/25 text-emerald-50' : 'border-slate-200/80 bg-slate-500/25 text-slate-100'}`}>
+                    {viewArticle.active ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+              </div>
+              <button type="button" onClick={closeModals} className="rounded-md border border-white/30 bg-white/10 px-2.5 py-1 text-sm">Close</button>
             </div>
-            <div className="mt-4 space-y-3 text-sm text-slate-700">
-              <p><span className="font-semibold">Heading:</span> {viewArticle.heading || '-'}</p>
-              <p><span className="font-semibold">Published:</span> {formatDate(viewArticle.publishedAt)}</p>
-              <p><span className="font-semibold">Expiry:</span> {viewArticle.expiryDate ? formatDate(viewArticle.expiryDate) : '-'}</p>
-              <p><span className="font-semibold">Status:</span> {viewArticle.active ? 'Active' : 'Inactive'}</p>
-              <p className="whitespace-pre-wrap"><span className="font-semibold">Content:</span> {viewArticle.content || '-'}</p>
-              <div>
-                <p className="font-semibold">Links:</p>
+            <div className="space-y-4 px-5 py-4 text-sm text-slate-700">
+              <section className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Content</p>
+                {stripHtml(viewArticle.content) ? (
+                  <div className="prose prose-sm max-w-none text-slate-700" dangerouslySetInnerHTML={{ __html: String(viewArticle.content || '') }} />
+                ) : (
+                  <p>-</p>
+                )}
+              </section>
+
+              {(viewArticle.imageLinks || []).length > 0 ? (
+                <section className="rounded-xl border border-slate-200 bg-white p-4">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Images</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {(viewArticle.imageLinks || []).map((entry) => (
+                      <img key={entry} src={entry} alt={viewArticle.heading || 'News image'} className="h-44 w-full rounded-lg border border-slate-200 object-cover" loading="lazy" />
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              <section className="rounded-xl border border-slate-200 bg-white p-4">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Links</p>
                 {(viewArticle.links || []).length === 0 ? <p>-</p> : (
-                  <ul className="list-disc pl-5">
-                    {(viewArticle.links || []).map((entry) => <li key={entry}><a href={entry} target="_blank" rel="noreferrer" className="text-brand-blue hover:underline">{entry}</a></li>)}
+                  <ul className="space-y-1">
+                    {(viewArticle.links || []).map((entry) => <li key={entry}><a href={entry} target="_blank" rel="noreferrer" className="break-all text-brand-blue hover:underline">{entry}</a></li>)}
                   </ul>
                 )}
-              </div>
+              </section>
             </div>
           </div>
           </div>
@@ -366,7 +401,14 @@ const AdminNewsPage = () => {
               <h3 className="font-heading text-xl font-semibold">Edit News</h3>
               <button type="button" onClick={closeModals} className="rounded-md border border-slate-300 px-2 py-1 text-sm">Close</button>
             </div>
-            <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={editForm.handleSubmit((values) => updateMutation.mutate({ id: editingArticle.id, values }))}>
+            <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={editForm.handleSubmit((values) => {
+              const contentPlain = stripHtml(editContentHtml);
+              if (!contentPlain) {
+                setUploadStatus({ type: 'error', message: 'Content is required.' });
+                return;
+              }
+              updateMutation.mutate({ id: editingArticle.id, values: { ...values, content: editContentHtml } });
+            })}>
               <div className="md:col-span-2">
                 <StatusAlert type={uploadStatus.type} message={uploadStatus.message} />
               </div>
@@ -374,7 +416,9 @@ const AdminNewsPage = () => {
                 <input {...editForm.register('heading', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
               <label className="text-sm md:col-span-2">Content
-                <textarea rows={4} {...editForm.register('content', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <div className="mt-1">
+                  <RichTextEditor value={editContentHtml} onChange={setEditContentHtml} minHeight={180} />
+                </div>
               </label>
               <label className="text-sm">Publishing Date
                 <input type="date" {...editForm.register('publishedAt', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />

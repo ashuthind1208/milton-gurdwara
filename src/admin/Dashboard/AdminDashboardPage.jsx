@@ -619,12 +619,30 @@ const AdminDashboardPage = () => {
             ) : null}
 
             <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              <Link to="/admin/events" className="rounded-xl border border-slate-200 bg-white/85 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-brand-blue/30 hover:text-brand-blue">Manage Events</Link>
-              <Link to="/admin/seva-opportunities" className="rounded-xl border border-slate-200 bg-white/85 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-brand-blue/30 hover:text-brand-blue">Review Seva Applications</Link>
-              <Link to="/admin/news" className="rounded-xl border border-slate-200 bg-white/85 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-brand-blue/30 hover:text-brand-blue">Publish News and Updates</Link>
-              <Link to="/admin/library" className="rounded-xl border border-slate-200 bg-white/85 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-brand-blue/30 hover:text-brand-blue">Update Library Resources</Link>
-              <Link to="/admin/roles-access" className="rounded-xl border border-slate-200 bg-white/85 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-brand-blue/30 hover:text-brand-blue">Tune Role Access Controls</Link>
-              <Link to="/admin/audit-trail" className="rounded-xl border border-slate-200 bg-white/85 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-brand-blue/30 hover:text-brand-blue">Inspect Activity Timeline</Link>
+              <Link to="/admin/events" className="group inline-flex items-center justify-between rounded-xl border border-sky-200 bg-gradient-to-r from-sky-50 to-blue-50 px-3 py-2 text-xs font-semibold text-sky-800 transition hover:-translate-y-0.5 hover:border-sky-300">
+                <span>Manage Events</span>
+                <SparklesIcon className="h-4 w-4 text-sky-600" />
+              </Link>
+              <Link to="/admin/seva-opportunities" className="group inline-flex items-center justify-between rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-green-50 px-3 py-2 text-xs font-semibold text-emerald-800 transition hover:-translate-y-0.5 hover:border-emerald-300">
+                <span>Review Seva Applications</span>
+                <ChatBubbleLeftRightIcon className="h-4 w-4 text-emerald-600" />
+              </Link>
+              <Link to="/admin/news" className="group inline-flex items-center justify-between rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 px-3 py-2 text-xs font-semibold text-amber-800 transition hover:-translate-y-0.5 hover:border-amber-300">
+                <span>Publish News and Updates</span>
+                <BellAlertIcon className="h-4 w-4 text-amber-600" />
+              </Link>
+              <Link to="/admin/library" className="group inline-flex items-center justify-between rounded-xl border border-violet-200 bg-gradient-to-r from-violet-50 to-fuchsia-50 px-3 py-2 text-xs font-semibold text-violet-800 transition hover:-translate-y-0.5 hover:border-violet-300">
+                <span>Update Library Resources</span>
+                <SparklesIcon className="h-4 w-4 text-violet-600" />
+              </Link>
+              <Link to="/admin/roles-access" className="group inline-flex items-center justify-between rounded-xl border border-rose-200 bg-gradient-to-r from-rose-50 to-pink-50 px-3 py-2 text-xs font-semibold text-rose-800 transition hover:-translate-y-0.5 hover:border-rose-300">
+                <span>Tune Role Access Controls</span>
+                <PencilSquareIcon className="h-4 w-4 text-rose-600" />
+              </Link>
+              <Link to="/admin/audit-trail" className="group inline-flex items-center justify-between rounded-xl border border-teal-200 bg-gradient-to-r from-teal-50 to-cyan-50 px-3 py-2 text-xs font-semibold text-teal-800 transition hover:-translate-y-0.5 hover:border-teal-300">
+                <span>Inspect Activity Timeline</span>
+                <BellAlertIcon className="h-4 w-4 text-teal-600" />
+              </Link>
             </div>
           </div>
 

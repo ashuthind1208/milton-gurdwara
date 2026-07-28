@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   ClockIcon,
@@ -19,15 +20,170 @@ const QUICK_HOURS = [
   { label: 'Office Support', value: 'Mon-Sun: 10:00 AM to 6:00 PM' }
 ];
 
+const escapeHtml = (value) => String(value || '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const buildContactInquiryHtml = ({ siteName, logoUrl, name, email, phone, message }) => {
+  const submittedAt = new Date().toLocaleString('en-CA', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  return `
+  <div style="background:#f5f8fc;padding:28px 14px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:760px;margin:0 auto;background:#ffffff;border:1px solid #dbe7f6;border-radius:14px;overflow:hidden;">
+      <tr>
+        <td style="padding:16px 22px;background:linear-gradient(90deg,#0a4d9f,#0b67c2,#e58b16);color:#ffffff;">
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+            <tr>
+              <td style="vertical-align:middle;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                  <tr>
+                    ${logoUrl ? `<td style="width:44px;padding-right:12px;vertical-align:middle;"><img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(siteName)} logo" width="44" height="44" style="display:block;border-radius:9999px;background:#ffffff;object-fit:cover;"/></td>` : ''}
+                    <td style="vertical-align:middle;">
+                      <div style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.9;">${escapeHtml(siteName)}</div>
+                      <div style="font-size:18px;font-weight:800;line-height:1.3;margin-top:2px;">Contact Us Inquiry</div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:18px 22px;">
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border:1px solid #c7dcf7;border-radius:14px;overflow:hidden;background:#f6faff;box-shadow:0 8px 24px -18px rgba(11,103,194,.65);margin-bottom:16px;">
+            <tr>
+              <td colspan="2" style="padding:11px 14px;background:linear-gradient(90deg,#eaf2ff,#f6f9ff);border-bottom:1px solid #c7dcf7;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#0a4d9f;">Submission Details</td>
+            </tr>
+            <tr>
+              <td style="width:34%;padding:11px 12px;border-right:1px solid #d7e3f3;border-bottom:1px solid #d7e3f3;background:#edf4ff;font-size:12px;font-weight:700;color:#1e3a8a;">Name</td>
+              <td style="padding:11px 12px;border-bottom:1px solid #d7e3f3;background:#ffffff;font-size:14px;color:#0f172a;font-weight:600;">${escapeHtml(name || '-')}</td>
+            </tr>
+            <tr>
+              <td style="width:34%;padding:11px 12px;border-right:1px solid #d7e3f3;border-bottom:1px solid #d7e3f3;background:#edf4ff;font-size:12px;font-weight:700;color:#1e3a8a;">Email</td>
+              <td style="padding:11px 12px;border-bottom:1px solid #d7e3f3;background:#ffffff;font-size:14px;color:#0f172a;font-weight:600;">${escapeHtml(email || '-')}</td>
+            </tr>
+            <tr>
+              <td style="width:34%;padding:11px 12px;border-right:1px solid #d7e3f3;border-bottom:1px solid #d7e3f3;background:#edf4ff;font-size:12px;font-weight:700;color:#1e3a8a;">Phone</td>
+              <td style="padding:11px 12px;border-bottom:1px solid #d7e3f3;background:#ffffff;font-size:14px;color:#0f172a;font-weight:600;">${escapeHtml(phone || '-')}</td>
+            </tr>
+            <tr>
+              <td style="width:34%;padding:11px 12px;border-right:1px solid #d7e3f3;background:#edf4ff;font-size:12px;font-weight:700;color:#1e3a8a;">Submitted</td>
+              <td style="padding:11px 12px;background:#ffffff;font-size:14px;color:#0f172a;font-weight:600;">${escapeHtml(submittedAt)}</td>
+            </tr>
+          </table>
+          <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#0b67c2;margin-bottom:8px;">Message</div>
+          <div style="border:1px solid #cfe1fb;border-radius:12px;background:#ffffff;padding:12px 14px;line-height:1.6;white-space:pre-wrap;box-shadow:inset 0 0 0 1px #f5f9ff;">${escapeHtml(message || '-')}</div>
+        </td>
+      </tr>
+    </table>
+  </div>`;
+};
+
 const ContactPage = () => {
+  const [isSendingContactMessage, setIsSendingContactMessage] = useState(false);
+  const contactSubmitEndpoint = String(process.env.REACT_APP_CONTACT_US_WEBHOOK_URL || '/api/internal/mail-relay').trim() || '/api/internal/mail-relay';
+  const contactRecipientOverride = String(process.env.REACT_APP_CONTACT_US_RECIPIENT_EMAIL || '').trim();
   const meta = useSeoMeta('Contact', 'Contact details, map placeholder, directions, and inquiry form.');
   const { data: content } = useQuery({
     queryKey: ['page-content', 'contact'],
     queryFn: () => cmsService.getPageContent('contact').then((res) => res.data)
   });
 
-  const onSubmit = () => {
-    window.alert('Thank you. Your message has been submitted.');
+  const onSubmit = async (values) => {
+    if (isSendingContactMessage) {
+      return;
+    }
+
+    setIsSendingContactMessage(true);
+    try {
+      const siteName = String(siteConfig?.orgName || 'Singh Sabha Milton Gurdwara').trim();
+      const logoUrl = String(process.env.REACT_APP_NEWSLETTER_LOGO_URL || '').trim();
+      const recipientEmail = String(contactRecipientOverride || email || '').trim();
+      const subject = `Contact Us Inquiry from ${String(values?.name || 'Visitor').trim()}`;
+      const htmlBody = buildContactInquiryHtml({
+        siteName,
+        logoUrl,
+        name: values?.name,
+        email: values?.email,
+        phone: values?.phone,
+        message: values?.message
+      });
+      const textBody = [
+        `Contact inquiry received - ${siteName}`,
+        '',
+        `Name: ${String(values?.name || '').trim()}`,
+        `Email: ${String(values?.email || '').trim()}`,
+        `Phone: ${String(values?.phone || '').trim() || '-'}`,
+        '',
+        'Message:',
+        String(values?.message || '').trim()
+      ].join('\n');
+
+      const contactPayload = {
+        name: String(values?.name || '').trim(),
+        email: String(values?.email || '').trim(),
+        phone: String(values?.phone || '').trim(),
+        message: String(values?.message || '').trim(),
+        subject,
+        to: recipientEmail
+      };
+
+      const relayPayload = {
+        ...contactPayload,
+        type: 'contact',
+        html: htmlBody,
+        bodyHtml: htmlBody,
+        body: htmlBody,
+        text: textBody,
+        bodyText: textBody
+      };
+
+      const endpointUsesRelay = /\/api\/internal\/mail-relay\/?$/i.test(contactSubmitEndpoint);
+
+      const contactResponse = await fetch(contactSubmitEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(endpointUsesRelay ? relayPayload : contactPayload)
+      });
+
+      const contactBody = await contactResponse.json().catch(() => ({}));
+      if (contactResponse.ok && contactBody?.ok !== false) {
+        window.alert('Thank you. Your message has been sent successfully.');
+        return;
+      }
+
+      // If a custom endpoint is configured and fails, do not silently override it.
+      if (contactSubmitEndpoint !== '/api/contact-us/send' || contactResponse.status !== 404) {
+        throw new Error(String(contactBody?.message || 'Unable to send your message right now.'));
+      }
+
+      const response = await fetch('/api/internal/mail-relay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(relayPayload)
+      });
+
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || body?.ok === false) {
+        throw new Error(String(body?.message || 'Unable to send your message right now.'));
+      }
+
+      window.alert('Thank you. Your message has been sent successfully.');
+    } catch (error) {
+      window.alert(String(error?.message || 'Unable to send your message right now.'));
+    } finally {
+      setIsSendingContactMessage(false);
+    }
   };
 
   const address = content?.address || siteConfig.contact.address || '7035 Sixth Line, Milton ON';
@@ -145,7 +301,7 @@ const ContactPage = () => {
             <h3 className="font-heading text-2xl font-semibold text-brand-blue">Send a Message</h3>
             <p className="mt-1 text-sm text-slate-600">Share your query and the team will connect with you shortly.</p>
             <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/55 p-3 sm:p-4">
-              <ContactForm onSubmit={onSubmit} />
+              <ContactForm onSubmit={onSubmit} isSubmitting={isSendingContactMessage} />
             </div>
           </article>
 
