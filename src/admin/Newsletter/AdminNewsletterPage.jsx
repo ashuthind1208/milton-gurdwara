@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useOutletContext } from 'react-router-dom';
 import {
   CheckCircleIcon,
+  EnvelopeIcon,
   FunnelIcon,
   LockClosedIcon,
   PaperAirplaneIcon,
@@ -114,7 +115,6 @@ const buildWeekRangeOptions = (pastWeeks = 4, futureWeeks = 20) => {
 
 const campaignDefaults = {
   title: '',
-  subject: '',
   topic: '',
   customTopic: '',
   weekRange: '',
@@ -330,7 +330,6 @@ const AdminNewsletterPage = () => {
 
       const haystack = [
         entry.title,
-        entry.subject,
         entry.topic,
         effectiveStatus,
         entry.sentAt,
@@ -481,7 +480,6 @@ const AdminNewsletterPage = () => {
     setCreateError('');
     const payload = {
       title: values.title,
-      subject: values.subject,
       topic,
       weekStart,
       weekEnd,
@@ -508,7 +506,6 @@ const AdminNewsletterPage = () => {
 
     campaignForm.reset({
       title: String(campaign?.title || '').trim(),
-      subject: String(campaign?.subject || '').trim(),
       topic: hasPredefinedTopic ? currentTopic : (currentTopic ? CUSTOM_TOPIC_VALUE : ''),
       customTopic: hasPredefinedTopic ? '' : currentTopic,
       weekRange: weekRangeValue,
@@ -589,6 +586,23 @@ const AdminNewsletterPage = () => {
 
   return (
     <div className="space-y-6">
+      {sendCampaignMutation.isPending ? (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/45 px-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-sm rounded-2xl border border-brand-blue/20 bg-white p-5 text-center shadow-2xl">
+            <div className="donation-email-send-loader" aria-hidden="true">
+              <span className="donation-email-send-orb donation-email-send-orb-saffron" />
+              <span className="donation-email-send-orb donation-email-send-orb-blue" />
+              <span className="donation-email-send-orb donation-email-send-orb-gold" />
+              <div className="donation-email-send-envelope-wrap">
+                <EnvelopeIcon className="h-7 w-7" />
+              </div>
+            </div>
+            <p className="mt-3 text-sm font-bold text-slate-900">Please wait, sending emails...</p>
+            <p className="mt-1 text-xs text-slate-600">Delivering newsletter campaign to subscribers.</p>
+          </div>
+        </div>
+      ) : null}
+
       <h1 className="sr-only">Newsletter Admin</h1>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -784,7 +798,7 @@ const AdminNewsletterPage = () => {
                 type="search"
                 value={historySearch}
                 onChange={(event) => setHistorySearch(event.target.value)}
-                placeholder="Search title, subject, topic, content"
+                placeholder="Search title, topic, content"
                 className="mt-1 h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm shadow-sm"
               />
             </label>
@@ -852,7 +866,6 @@ const AdminNewsletterPage = () => {
                   <tr key={campaign.id} className="border-t border-slate-100 hover:bg-blue-50/30">
                     <td className="px-3 py-2.5">
                       <p className="font-semibold text-slate-900">{campaign.title || 'Untitled campaign'}</p>
-                      <p className="text-xs text-slate-500">{campaign.subject || '-'}</p>
                       <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${statusPillClassName(effectiveStatus)}`}>
                         {effectiveStatus}
                       </span>
@@ -929,7 +942,6 @@ const AdminNewsletterPage = () => {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-slate-900">{campaign.title || 'Untitled campaign'}</p>
-                    <p className="text-xs text-slate-500">{campaign.subject || '-'}</p>
                   </div>
                   <div className="flex items-center gap-1">
                     <button
@@ -1056,14 +1068,8 @@ const AdminNewsletterPage = () => {
                 </section>
 
                 <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <label className="text-sm font-semibold text-slate-700">Title
-                      <input {...campaignForm.register('title', { required: true })} className="mt-1 h-9 w-full rounded-xl border border-slate-300 px-3 text-sm" />
-                    </label>
-                    <label className="text-sm font-semibold text-slate-700">Subject
-                      <input {...campaignForm.register('subject', { required: true })} className="mt-1 h-9 w-full rounded-xl border border-slate-300 px-3 text-sm" />
-                    </label>
-                    <label className="text-sm font-semibold text-slate-700 md:col-span-2">Topic
+                  <div className="grid gap-3">
+                    <label className="text-sm font-semibold text-slate-700">Topic
                       <select {...campaignForm.register('topic', { required: true })} className="mt-1 h-9 w-full rounded-xl border border-slate-300 px-3 text-sm">
                         <option value="">Select topic</option>
                         {topicOptions.map((topic) => (
@@ -1073,10 +1079,13 @@ const AdminNewsletterPage = () => {
                       </select>
                     </label>
                     {selectedTopic === CUSTOM_TOPIC_VALUE ? (
-                      <label className="text-sm font-semibold text-slate-700 md:col-span-2">Custom Topic
+                      <label className="text-sm font-semibold text-slate-700">Custom Topic
                         <input {...campaignForm.register('customTopic', { required: true })} placeholder="Enter new topic" className="mt-1 h-9 w-full rounded-xl border border-slate-300 px-3 text-sm" />
                       </label>
                     ) : null}
+                    <label className="text-sm font-semibold text-slate-700">Title
+                      <input {...campaignForm.register('title', { required: true })} className="mt-1 h-9 w-full rounded-xl border border-slate-300 px-3 text-sm" />
+                    </label>
                   </div>
 
                   <div>

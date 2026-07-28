@@ -543,18 +543,23 @@ const donationService = {
   },
 
   updateCampaign: async (id, payload) => {
-    const normalizedPayload = normalizeCampaign({ id, ...(payload || {}) });
+    const sourcePayload = payload || {};
+    const normalizedPayload = normalizeCampaign({ id, ...sourcePayload });
+    const hasOwn = (key) => Object.prototype.hasOwnProperty.call(sourcePayload, key);
+
+    const patchPayload = {
+      ...sourcePayload,
+      ...(hasOwn('isActive') || hasOwn('active') ? { isActive: normalizedPayload.isActive } : {}),
+      ...(hasOwn('raised') ? { raised: normalizedPayload.raised } : {}),
+      ...(hasOwn('target') ? { target: normalizedPayload.target } : {})
+    };
+
     const response = await fetchJson(`/api/donation-campaigns/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...payload,
-        isActive: normalizedPayload.isActive,
-        raised: normalizedPayload.raised,
-        target: normalizedPayload.target
-      })
+      body: JSON.stringify(patchPayload)
     });
-    return serviceResponse(normalizeCampaign(response.data || { ...payload, id, isActive: normalizedPayload.isActive }));
+    return serviceResponse(normalizeCampaign(response.data || { ...patchPayload, id }));
   },
 
   removeCampaign: async (id) => {
@@ -617,8 +622,14 @@ const donationService = {
     fileName = '',
     attachmentBase64 = ''
   }) => {
+    const donationId = String(donation?.id || '').trim();
+    const donationReceiptId = String(donation?.receiptId || '').trim();
+
     const payload = {
-      donation: normalizeDonation(donation || {}),
+      donation: {
+        id: donationId,
+        receiptId: donationReceiptId
+      },
       campaignDescription: String(campaignDescription || ''),
       organizationName: String(organizationName || ''),
       address: String(address || ''),

@@ -3,7 +3,6 @@ import { useOutletContext } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  CheckIcon,
   EyeIcon,
   PencilSquareIcon,
   TrashIcon,
@@ -32,6 +31,13 @@ const defaultFormValues = {
 
 const listToTextarea = (values = []) => (values || []).join('\n');
 const stripHtml = (value) => String(value || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+const truncateText = (value, maxLength = 60) => {
+  const text = String(value || '').trim();
+  if (text.length <= maxLength) {
+    return text;
+  }
+  return `${text.slice(0, maxLength)}...`;
+};
 
 const normalizeFormValues = (values) => ({
   heading: values.heading,
@@ -201,7 +207,68 @@ const AdminNewsPage = () => {
       <h1 className="sr-only">News and Updates</h1>
 
       <Card>
-        <div className="overflow-x-auto">
+        <div className="space-y-3 md:hidden">
+          {articles.map((article) => (
+            <article key={`mobile-${article.id}`} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-slate-800">{article.heading || 'Untitled'}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">{truncateText(stripHtml(article.content), 60) || '-'}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => toggleActiveMutation.mutate({ id: article.id, active: !article.active })}
+                  className={`inline-flex shrink-0 rounded-full border px-2 py-1 text-[11px] font-semibold ${article.active ? 'border-emerald-300 bg-emerald-100 text-emerald-700' : 'border-slate-300 bg-slate-100 text-slate-700'}`}
+                  title={article.active ? 'Set inactive' : 'Set active'}
+                  aria-label={article.active ? 'Set inactive' : 'Set active'}
+                >
+                  {article.active ? 'Active' : 'Inactive'}
+                </button>
+              </div>
+
+              <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-slate-500">
+                <span>Published: {formatDate(article.publishedAt)}</span>
+                <span>Expiry: {article.expiryDate ? formatDate(article.expiryDate) : '-'}</span>
+              </div>
+
+              <div className="mt-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewArticle(article)}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 text-slate-700"
+                  title="View"
+                  aria-label="View"
+                >
+                  <EyeIcon className={actionIconClass} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openEdit(article)}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-200 text-blue-700"
+                  title="Edit"
+                  aria-label="Edit"
+                >
+                  <PencilSquareIcon className={actionIconClass} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deleteMutation.mutate(article.id)}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-700"
+                  title="Delete"
+                  aria-label="Delete"
+                >
+                  <TrashIcon className={actionIconClass} />
+                </button>
+              </div>
+            </article>
+          ))}
+
+          {articles.length === 0 ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">No news records found.</div>
+          ) : null}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
           <table className="min-w-full text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
@@ -217,26 +284,23 @@ const AdminNewsPage = () => {
                 <tr key={article.id} className="border-b border-slate-100">
                   <td className="py-2 pr-3">
                     <p className="font-semibold text-slate-800">{article.heading || 'Untitled'}</p>
-                    <p className="text-xs text-slate-500 line-clamp-1">{stripHtml(article.content) || '-'}</p>
+                    <p className="text-xs text-slate-500">{truncateText(stripHtml(article.content), 60) || '-'}</p>
                   </td>
                   <td className="py-2 pr-3">{formatDate(article.publishedAt)}</td>
                   <td className="py-2 pr-3">{article.expiryDate ? formatDate(article.expiryDate) : '-'}</td>
                   <td className="py-2 pr-3">
-                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${article.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'}`}>
+                    <button
+                      type="button"
+                      onClick={() => toggleActiveMutation.mutate({ id: article.id, active: !article.active })}
+                      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold transition ${article.active ? 'border-emerald-300 bg-emerald-100 text-emerald-700 hover:border-emerald-400 hover:bg-emerald-200/70' : 'border-slate-300 bg-slate-100 text-slate-700 hover:border-slate-400 hover:bg-slate-200/70'}`}
+                      title={article.active ? 'Set inactive' : 'Set active'}
+                      aria-label={article.active ? 'Set inactive' : 'Set active'}
+                    >
                       {article.active ? 'Active' : 'Inactive'}
-                    </span>
+                    </button>
                   </td>
                   <td className="py-2 pr-3">
                     <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => toggleActiveMutation.mutate({ id: article.id, active: !article.active })}
-                        className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border ${article.active ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-50' : 'border-slate-300 text-slate-700 hover:bg-slate-100'}`}
-                        title={article.active ? 'Mark inactive' : 'Mark active'}
-                        aria-label={article.active ? 'Mark inactive' : 'Mark active'}
-                      >
-                        <CheckIcon className={actionIconClass} />
-                      </button>
                       <button
                         type="button"
                         onClick={() => setViewArticle(article)}
@@ -279,14 +343,24 @@ const AdminNewsPage = () => {
       </Card>
 
       {createOpen ? (
-        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6">
+        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-2 py-3 sm:px-4 sm:py-6">
           <div className="mx-auto flex min-h-full items-center justify-center">
-          <div className="w-full max-w-3xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="font-heading text-xl font-semibold">Add News</h3>
-              <button type="button" onClick={closeModals} className="rounded-md border border-slate-300 px-2 py-1 text-sm">Close</button>
+          <div className="w-full max-w-4xl max-h-[calc(100vh-1rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-[0_24px_56px_-42px_rgba(15,23,42,0.75)] sm:max-h-[calc(100vh-3rem)] sm:rounded-2xl">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-gradient-to-r from-brand-blue via-sky-600 to-brand-saffron px-3 py-3 text-white sm:px-5 sm:py-4">
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/80">News Workspace</p>
+                <h3 className="mt-1 truncate font-heading text-lg font-bold sm:text-2xl">Add Article</h3>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <span className="rounded-full border border-white/30 bg-white/15 px-2 py-0.5 text-[10px] font-semibold sm:px-2.5 sm:py-1 sm:text-[11px]">Publish: {formatDate(createForm.getValues('publishedAt'))}</span>
+                  <span className="rounded-full border border-white/30 bg-white/15 px-2 py-0.5 text-[10px] font-semibold sm:px-2.5 sm:py-1 sm:text-[11px]">Expiry: {createForm.getValues('expiryDate') ? formatDate(createForm.getValues('expiryDate')) : '-'}</span>
+                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold sm:px-2.5 sm:py-1 sm:text-[11px] ${createForm.watch('active') ? 'border-emerald-200/90 bg-emerald-500/25 text-emerald-50' : 'border-slate-200/80 bg-slate-500/25 text-slate-100'}`}>
+                    {createForm.watch('active') ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+              </div>
+              <button type="button" onClick={closeModals} className="rounded-md border border-white/30 bg-white/10 px-2.5 py-1 text-sm">Close</button>
             </div>
-            <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={createForm.handleSubmit((values) => {
+            <form className="grid gap-3 px-3 py-3 sm:px-5 sm:py-4 md:grid-cols-2" onSubmit={createForm.handleSubmit((values) => {
               const contentPlain = stripHtml(createContentHtml);
               if (!contentPlain) {
                 setUploadStatus({ type: 'error', message: 'Content is required.' });
@@ -341,24 +415,24 @@ const AdminNewsPage = () => {
       ) : null}
 
       {viewArticle ? (
-        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6">
+        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-2 py-3 sm:px-4 sm:py-6">
           <div className="mx-auto flex min-h-full items-center justify-center">
-          <div className="w-full max-w-4xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-[0_24px_56px_-42px_rgba(15,23,42,0.75)]">
-            <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-gradient-to-r from-brand-blue via-blue-600 to-brand-saffron px-5 py-4 text-white">
+          <div className="w-full max-w-4xl max-h-[calc(100vh-1rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-[0_24px_56px_-42px_rgba(15,23,42,0.75)] sm:max-h-[calc(100vh-3rem)] sm:rounded-2xl">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-gradient-to-r from-brand-blue via-blue-600 to-brand-saffron px-3 py-3 text-white sm:px-5 sm:py-4">
               <div className="min-w-0">
                 <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/80">News Center</p>
-                <h3 className="mt-1 truncate font-heading text-xl font-bold sm:text-2xl">{viewArticle.heading || 'News Details'}</h3>
+                <h3 className="mt-1 truncate font-heading text-lg font-bold sm:text-2xl">{viewArticle.heading || 'News Details'}</h3>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  <span className="rounded-full border border-white/30 bg-white/15 px-2.5 py-1 text-[11px] font-semibold">Published: {formatDate(viewArticle.publishedAt)}</span>
-                  <span className="rounded-full border border-white/30 bg-white/15 px-2.5 py-1 text-[11px] font-semibold">Expiry: {viewArticle.expiryDate ? formatDate(viewArticle.expiryDate) : '-'}</span>
-                  <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${viewArticle.active ? 'border-emerald-200/90 bg-emerald-500/25 text-emerald-50' : 'border-slate-200/80 bg-slate-500/25 text-slate-100'}`}>
+                  <span className="rounded-full border border-white/30 bg-white/15 px-2 py-0.5 text-[10px] font-semibold sm:px-2.5 sm:py-1 sm:text-[11px]">Published: {formatDate(viewArticle.publishedAt)}</span>
+                  <span className="rounded-full border border-white/30 bg-white/15 px-2 py-0.5 text-[10px] font-semibold sm:px-2.5 sm:py-1 sm:text-[11px]">Expiry: {viewArticle.expiryDate ? formatDate(viewArticle.expiryDate) : '-'}</span>
+                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold sm:px-2.5 sm:py-1 sm:text-[11px] ${viewArticle.active ? 'border-emerald-200/90 bg-emerald-500/25 text-emerald-50' : 'border-slate-200/80 bg-slate-500/25 text-slate-100'}`}>
                     {viewArticle.active ? 'Active' : 'Inactive'}
                   </span>
                 </div>
               </div>
               <button type="button" onClick={closeModals} className="rounded-md border border-white/30 bg-white/10 px-2.5 py-1 text-sm">Close</button>
             </div>
-            <div className="space-y-4 px-5 py-4 text-sm text-slate-700">
+            <div className="space-y-4 px-3 py-3 text-sm text-slate-700 sm:px-5 sm:py-4">
               <section className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Content</p>
                 {stripHtml(viewArticle.content) ? (
@@ -378,15 +452,6 @@ const AdminNewsPage = () => {
                   </div>
                 </section>
               ) : null}
-
-              <section className="rounded-xl border border-slate-200 bg-white p-4">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Links</p>
-                {(viewArticle.links || []).length === 0 ? <p>-</p> : (
-                  <ul className="space-y-1">
-                    {(viewArticle.links || []).map((entry) => <li key={entry}><a href={entry} target="_blank" rel="noreferrer" className="break-all text-brand-blue hover:underline">{entry}</a></li>)}
-                  </ul>
-                )}
-              </section>
             </div>
           </div>
           </div>
@@ -394,14 +459,24 @@ const AdminNewsPage = () => {
       ) : null}
 
       {editingArticle ? (
-        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6">
+        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-2 py-3 sm:px-4 sm:py-6">
           <div className="mx-auto flex min-h-full items-center justify-center">
-          <div className="w-full max-w-3xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="font-heading text-xl font-semibold">Edit News</h3>
-              <button type="button" onClick={closeModals} className="rounded-md border border-slate-300 px-2 py-1 text-sm">Close</button>
+          <div className="w-full max-w-4xl max-h-[calc(100vh-1rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-[0_24px_56px_-42px_rgba(15,23,42,0.75)] sm:max-h-[calc(100vh-3rem)] sm:rounded-2xl">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-gradient-to-r from-sky-600 via-brand-blue to-indigo-700 px-3 py-3 text-white sm:px-5 sm:py-4">
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/80">News Workspace</p>
+                <h3 className="mt-1 truncate font-heading text-lg font-bold sm:text-2xl">Edit Article</h3>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <span className="rounded-full border border-white/30 bg-white/15 px-2 py-0.5 text-[10px] font-semibold sm:px-2.5 sm:py-1 sm:text-[11px]">Published: {formatDate(editForm.getValues('publishedAt'))}</span>
+                  <span className="rounded-full border border-white/30 bg-white/15 px-2 py-0.5 text-[10px] font-semibold sm:px-2.5 sm:py-1 sm:text-[11px]">Expiry: {editForm.getValues('expiryDate') ? formatDate(editForm.getValues('expiryDate')) : '-'}</span>
+                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold sm:px-2.5 sm:py-1 sm:text-[11px] ${editForm.watch('active') ? 'border-emerald-200/90 bg-emerald-500/25 text-emerald-50' : 'border-slate-200/80 bg-slate-500/25 text-slate-100'}`}>
+                    {editForm.watch('active') ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+              </div>
+              <button type="button" onClick={closeModals} className="rounded-md border border-white/30 bg-white/10 px-2.5 py-1 text-sm">Close</button>
             </div>
-            <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={editForm.handleSubmit((values) => {
+            <form className="grid gap-3 px-3 py-3 sm:px-5 sm:py-4 md:grid-cols-2" onSubmit={editForm.handleSubmit((values) => {
               const contentPlain = stripHtml(editContentHtml);
               if (!contentPlain) {
                 setUploadStatus({ type: 'error', message: 'Content is required.' });
@@ -425,21 +500,6 @@ const AdminNewsPage = () => {
               </label>
               <label className="text-sm">Expiry Date
                 <input type="date" {...editForm.register('expiryDate')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-              </label>
-              <label className="text-sm md:col-span-2">Links (one per line or comma-separated)
-                <textarea rows={3} {...editForm.register('links')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-                <input
-                  type="file"
-                  accept="image/*,video/*,application/pdf,text/plain"
-                  className="mt-2 block w-full text-xs"
-                  onChange={(event) => uploadNewsFile({ file: event.target.files?.[0], mode: 'edit', targetField: 'links' })}
-                />
-                <p className="mt-1 text-xs text-slate-500">{editUploadState === 'links' ? `Uploading file... ${editUploadProgress.links}%` : 'Upload a file to append its URL here (image/video/pdf/txt, max 15MB), or paste links manually.'}</p>
-                {editUploadState === 'links' ? (
-                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                    <div className="h-full bg-brand-blue transition-all" style={{ width: `${editUploadProgress.links}%` }} />
-                  </div>
-                ) : null}
               </label>
               <label className="text-sm md:col-span-2">Image Links (one per line or comma-separated)
                 <textarea rows={3} {...editForm.register('imageLinks')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />

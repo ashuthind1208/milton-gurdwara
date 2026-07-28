@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -201,6 +201,8 @@ const AdminSevaOpportunitiesPage = () => {
   const [opportunitiesPage, setOpportunitiesPage] = useState(1);
   const [volunteerSearch, setVolunteerSearch] = useState('');
   const [volunteerPage, setVolunteerPage] = useState(1);
+  const [marqueePills, setMarqueePills] = useState([]);
+  const marqueeRailRef = useRef(null);
 
   const createForm = useForm({ defaultValues: defaultForm });
   const editForm = useForm({ defaultValues: defaultForm });
@@ -274,6 +276,49 @@ const AdminSevaOpportunitiesPage = () => {
     () => getDaysRemainingMeta(viewOpportunity?.expiryDate || viewOpportunity?.date),
     [viewOpportunity?.date, viewOpportunity?.expiryDate]
   );
+
+  const viewHeaderPills = useMemo(() => {
+    if (!viewOpportunity) {
+      return [];
+    }
+
+    return [
+      {
+        key: 'status',
+        text: `Status: ${viewOpportunity.status === 'closed' ? 'Closed' : viewOpportunity.active ? 'Active' : 'Inactive'}`,
+        className: viewOpportunity.status === 'closed'
+          ? 'border-rose-200/80 bg-rose-500/20 text-rose-50'
+          : viewOpportunity.active
+            ? 'border-emerald-200/80 bg-emerald-500/20 text-emerald-50'
+            : 'border-slate-200/80 bg-slate-500/20 text-slate-100'
+      },
+      {
+        key: 'datetime',
+        text: `Date & Time: ${formatDisplayDate(viewOpportunity.date)} | ${viewOpportunity.time || '-'}`,
+        className: 'border-sky-200/80 bg-sky-500/20 text-sky-50'
+      },
+      {
+        key: 'waitlist',
+        text: `Waitlist: ${viewOpportunity.waitlistEnabled === false ? 'Disabled' : 'Enabled'}`,
+        className: viewOpportunity.waitlistEnabled === false
+          ? 'border-slate-200/80 bg-slate-500/20 text-slate-100'
+          : 'border-emerald-200/80 bg-emerald-500/20 text-emerald-50'
+      },
+      {
+        key: 'expiry',
+        text: `Expiry: ${expiryMeta.label}`,
+        className: expiryMeta.tone === 'overdue'
+          ? 'border-rose-200/80 bg-rose-500/20 text-rose-50'
+          : expiryMeta.tone === 'remaining'
+            ? 'border-amber-200/80 bg-amber-500/20 text-amber-50'
+            : 'border-slate-200/80 bg-slate-500/20 text-slate-100'
+      }
+    ];
+  }, [expiryMeta.label, expiryMeta.tone, viewOpportunity]);
+
+  useEffect(() => {
+    setMarqueePills(viewHeaderPills);
+  }, [viewHeaderPills]);
 
   const filteredOpportunities = useMemo(() => {
     const query = String(opportunitySearch || '').trim().toLowerCase();
@@ -366,7 +411,13 @@ const AdminSevaOpportunitiesPage = () => {
     onSuccess: (result, opportunity) => {
       const sent = Number(result?.data?.sent || result?.sent || 0);
       const skipped = Number(result?.data?.skipped || result?.skipped || 0);
-      window.alert(`Reminder email run completed for ${opportunity?.sevaType || 'selected seva'}: ${sent} sent, ${skipped} skipped.`);
+      const skippedByReason = result?.data?.skippedByReason || result?.skippedByReason || {};
+      const ineligible = Number(skippedByReason?.ineligible || 0);
+      const deliveryFailed = Number(skippedByReason?.deliveryFailed || 0);
+      const details = skipped > 0
+        ? ` (ineligible: ${ineligible}, delivery failed: ${deliveryFailed})`
+        : '';
+      window.alert(`Reminder email run completed for ${opportunity?.sevaType || 'selected seva'}: ${sent} sent, ${skipped} skipped${details}.`);
     },
     onError: (error) => {
       window.alert(error?.message || 'Unable to send reminder emails right now.');
@@ -483,8 +534,85 @@ const AdminSevaOpportunitiesPage = () => {
     }
   }, [volunteerPage, volunteerTotalPages]);
 
+  useEffect(() => {
+    if (!viewOpportunity || viewHeaderPills.length === 0) {
+      return undefined;
+    }
+
+    if (!window.matchMedia('(max-width: 639px)').matches) {
+      return undefined;
+    }
+
+    const railElement = marqueeRailRef.current;
+
+    if (!railElement) {
+      return undefined;
+    }
+
+    let animationFrameId = 0;
+    let lastTimestamp = 0;
+    let offset = 0;
+    const speedPixelsPerSecond = 46;
+
+    const animate = (timestamp) => {
+      if (!lastTimestamp) {
+        lastTimestamp = timestamp;
+      }
+
+      const deltaSeconds = (timestamp - lastTimestamp) / 1000;
+      lastTimestamp = timestamp;
+
+      const firstPillElement = railElement.firstElementChild;
+      if (firstPillElement) {
+        const computedRailStyles = window.getComputedStyle(railElement);
+        const railGap = Number.parseFloat(computedRailStyles.columnGap || computedRailStyles.gap || '0') || 0;
+        const firstPillWidth = firstPillElement.getBoundingClientRect().width + railGap;
+
+        offset -= speedPixelsPerSecond * deltaSeconds;
+
+        if (firstPillWidth > 0 && offset <= -firstPillWidth) {
+          offset += firstPillWidth;
+          setMarqueePills((prev) => {
+            if (!prev || prev.length <= 1) {
+              return prev;
+            }
+            return [...prev.slice(1), prev[0]];
+          });
+        }
+
+        railElement.style.transform = `translate3d(${offset}px, 0, 0)`;
+      }
+
+      animationFrameId = window.requestAnimationFrame(animate);
+    };
+
+    railElement.style.transform = 'translate3d(0, 0, 0)';
+    animationFrameId = window.requestAnimationFrame(animate);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrameId);
+    };
+  }, [viewHeaderPills, viewOpportunity]);
+
   return (
     <div className="space-y-6">
+      {manualReminderMutation.isPending ? (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/45 px-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-sm rounded-2xl border border-brand-blue/20 bg-white p-5 text-center shadow-2xl">
+            <div className="donation-email-send-loader" aria-hidden="true">
+              <span className="donation-email-send-orb donation-email-send-orb-saffron" />
+              <span className="donation-email-send-orb donation-email-send-orb-blue" />
+              <span className="donation-email-send-orb donation-email-send-orb-gold" />
+              <div className="donation-email-send-envelope-wrap">
+                <EnvelopeIcon className="h-7 w-7" />
+              </div>
+            </div>
+            <p className="mt-3 text-sm font-bold text-slate-900">Please wait, sending emails...</p>
+            <p className="mt-1 text-xs text-slate-600">Sending reminders for {manualReminderMutation.variables?.sevaType || 'selected seva opportunity'}.</p>
+          </div>
+        </div>
+      ) : null}
+
       <h1 className="sr-only">Seva Opportunities</h1>
 
       <Card>
@@ -532,7 +660,123 @@ const AdminSevaOpportunitiesPage = () => {
             </select>
           </label>
         </div>
-        <div className="overflow-x-auto">
+        <div className="space-y-3 md:hidden">
+          {visibleOpportunities.map((item) => (
+            <article key={`mobile-${item.id}`} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 space-y-1">
+                  <p className="truncate text-[13px] font-bold leading-tight text-slate-800">{item.sevaType || '-'}</p>
+                  <p className="text-[11px] leading-snug text-slate-600">{formatDisplayDate(item.date)}</p>
+                  <p className="text-[11px] leading-snug text-slate-600">{item.time || '-'}</p>
+                  <p className="text-[11px] leading-snug text-slate-600">Volunteers: {(volunteersByOpportunity[item.id] || []).length}/{item.totalVolunteersRequired || 10}</p>
+                  <span className={`inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${getStatusPillClasses(item, false)}`}>
+                    {item.status === 'closed' ? 'Closed' : item.active ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const itemMenuId = String(item.id || '');
+                      setOpenActionMenuId((prev) => (prev === itemMenuId ? '' : itemMenuId));
+                    }}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-100"
+                    aria-label="More actions"
+                    title="More actions"
+                  >
+                    <EllipsisVerticalIcon className={actionIconClass} />
+                  </button>
+
+                  {openActionMenuId === String(item.id || '') ? (
+                    <div className="absolute right-0 top-8 z-20 min-w-[170px] rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          toggleOpportunityStatus(item);
+                          setOpenActionMenuId('');
+                        }}
+                        disabled={item.status === 'closed' || toggleActiveMutation.isPending}
+                        className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {item.status === 'closed' ? 'Closed' : item.active ? 'Set Inactive' : 'Set Active'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setViewOpportunity(item);
+                          setOpenActionMenuId('');
+                        }}
+                        className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                      >
+                        View
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          openEdit(item);
+                          setOpenActionMenuId('');
+                        }}
+                        className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          exportOpportunityVolunteers(item, 'csv');
+                          setOpenActionMenuId('');
+                        }}
+                        disabled={getOpportunityVolunteers(item).length === 0}
+                        className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Download CSV
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          exportOpportunityVolunteers(item, 'pdf');
+                          setOpenActionMenuId('');
+                        }}
+                        disabled={getOpportunityVolunteers(item).length === 0}
+                        className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Download PDF
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          manualReminderMutation.mutate(item);
+                          setOpenActionMenuId('');
+                        }}
+                        disabled={getOpportunityVolunteers(item).length === 0 || manualReminderMutation.isPending}
+                        className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Send Email
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          deleteMutation.mutate(item.id);
+                          setOpenActionMenuId('');
+                        }}
+                        className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-red-700 hover:bg-red-50"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </article>
+          ))}
+
+          {filteredOpportunities.length === 0 ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">No seva opportunities found.</div>
+          ) : null}
+        </div>
+
+        <div className="hidden overflow-x-auto overflow-y-visible md:block">
           <table className="min-w-full text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
@@ -546,35 +790,17 @@ const AdminSevaOpportunitiesPage = () => {
             <tbody>
               {visibleOpportunities.map((item) => (
                 <tr key={item.id} className="border-b border-slate-100">
-                  <td className="py-1.5 pr-2.5 font-semibold text-slate-800 lg:py-2 lg:pr-3">
-                    <div className="space-y-1 lg:hidden">
-                      <p className="text-[13px] font-bold leading-tight text-slate-800">{item.sevaType || '-'}</p>
-                      <p className="text-[11px] leading-snug text-slate-600">{formatDisplayDate(item.date)}</p>
-                      <p className="text-[11px] leading-snug text-slate-600">{item.time || '-'}</p>
-                      <p className="text-[11px] leading-snug text-slate-600">Volunteers: {(volunteersByOpportunity[item.id] || []).length}/{item.totalVolunteersRequired || 10}</p>
-                      <div>
-                        <button
-                          type="button"
-                          onClick={() => toggleOpportunityStatus(item)}
-                          disabled={item.status === 'closed' || toggleActiveMutation.isPending}
-                          className={`inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-70 ${getStatusPillClasses(item, item.status !== 'closed')}`}
-                          title={item.status === 'closed' ? 'Closed opportunities cannot be reactivated until the date is updated.' : (item.active ? 'Set inactive' : 'Set active')}
-                          aria-label={item.status === 'closed' ? 'Closed' : (item.active ? 'Set inactive' : 'Set active')}
-                        >
-                          {item.status === 'closed' ? 'Closed' : item.active ? 'Active' : 'Inactive'}
-                        </button>
-                      </div>
-                    </div>
-                    <span className="hidden lg:inline">{item.sevaType || '-'}</span>
+                  <td className="py-2 pr-3 font-semibold text-slate-800">
+                    {item.sevaType || '-'}
                   </td>
-                  <td className="admin-seva-mobile-hidden py-2 pr-3 align-top">
+                  <td className="py-2 pr-3 align-top">
                     <div className="space-y-0.5 text-left">
                       <p>{formatDisplayDate(item.date)}</p>
                       <p className="text-xs text-slate-600">{item.time || '-'}</p>
                     </div>
                   </td>
-                  <td className="admin-seva-mobile-hidden py-2 pr-3">{(volunteersByOpportunity[item.id] || []).length}/{item.totalVolunteersRequired || 10}</td>
-                  <td className="admin-seva-mobile-hidden py-2 pr-3">
+                  <td className="py-2 pr-3">{(volunteersByOpportunity[item.id] || []).length}/{item.totalVolunteersRequired || 10}</td>
+                  <td className="py-2 pr-3">
                     <button
                       type="button"
                       onClick={() => toggleOpportunityStatus(item)}
@@ -586,89 +812,102 @@ const AdminSevaOpportunitiesPage = () => {
                       {item.status === 'closed' ? 'Closed' : item.active ? 'Active' : 'Inactive'}
                     </button>
                   </td>
-                  <td className="py-1.5 pr-2.5 lg:py-2 lg:pr-3">
-                    <div className="flex items-center justify-end gap-2 lg:hidden">
-                      <div className="relative">
-                        <button
-                          type="button"
-                          onClick={() => setOpenActionMenuId((prev) => (prev === item.id ? '' : item.id))}
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-100"
-                          aria-label="More actions"
-                          title="More actions"
-                        >
-                          <EllipsisVerticalIcon className={actionIconClass} />
-                        </button>
-                        {openActionMenuId === item.id ? (
-                          <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setViewOpportunity(item);
-                                setOpenActionMenuId('');
-                              }}
-                              className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                            >
-                              View
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                openEdit(item);
-                                setOpenActionMenuId('');
-                              }}
-                              className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                exportOpportunityVolunteers(item, 'csv');
-                                setOpenActionMenuId('');
-                              }}
-                              disabled={getOpportunityVolunteers(item).length === 0}
-                              className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
-                            >
-                              Download CSV
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                exportOpportunityVolunteers(item, 'pdf');
-                                setOpenActionMenuId('');
-                              }}
-                              disabled={getOpportunityVolunteers(item).length === 0}
-                              className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
-                            >
-                              Download PDF
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                manualReminderMutation.mutate(item);
-                                setOpenActionMenuId('');
-                              }}
-                              disabled={getOpportunityVolunteers(item).length === 0 || manualReminderMutation.isPending}
-                              className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
-                            >
-                              Send Email
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                deleteMutation.mutate(item.id);
-                                setOpenActionMenuId('');
-                              }}
-                              className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-red-700 hover:bg-red-50"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
+                  <td className="py-2 pr-3">
+                    <div className="relative xl:hidden">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const itemMenuId = String(item.id || '');
+                          setOpenActionMenuId((prev) => (prev === itemMenuId ? '' : itemMenuId));
+                        }}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-100"
+                        aria-label="More actions"
+                        title="More actions"
+                      >
+                        <EllipsisVerticalIcon className={actionIconClass} />
+                      </button>
+
+                      {openActionMenuId === String(item.id || '') ? (
+                        <div className="absolute right-0 top-8 z-20 min-w-[170px] rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              toggleOpportunityStatus(item);
+                              setOpenActionMenuId('');
+                            }}
+                            disabled={item.status === 'closed' || toggleActiveMutation.isPending}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {item.status === 'closed' ? 'Closed' : item.active ? 'Set Inactive' : 'Set Active'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setViewOpportunity(item);
+                              setOpenActionMenuId('');
+                            }}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                          >
+                            View
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              openEdit(item);
+                              setOpenActionMenuId('');
+                            }}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              exportOpportunityVolunteers(item, 'csv');
+                              setOpenActionMenuId('');
+                            }}
+                            disabled={getOpportunityVolunteers(item).length === 0}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            Download CSV
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              exportOpportunityVolunteers(item, 'pdf');
+                              setOpenActionMenuId('');
+                            }}
+                            disabled={getOpportunityVolunteers(item).length === 0}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            Download PDF
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              manualReminderMutation.mutate(item);
+                              setOpenActionMenuId('');
+                            }}
+                            disabled={getOpportunityVolunteers(item).length === 0 || manualReminderMutation.isPending}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            Send Email
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              deleteMutation.mutate(item.id);
+                              setOpenActionMenuId('');
+                            }}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-red-700 hover:bg-red-50"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
 
-                    <div className="hidden items-center justify-end gap-2 lg:flex">
+                    <div className="hidden items-center justify-end gap-2 xl:flex">
                       <button
                         type="button"
                         onClick={() => setViewOpportunity(item)}
@@ -849,16 +1088,27 @@ const AdminSevaOpportunitiesPage = () => {
                   </button>
                 </div>
 
-                <div className="flex items-end justify-between gap-3 border-t border-white/15 pt-2">
-                  <div className="min-w-0 overflow-x-auto">
-                    <div className="flex flex-nowrap items-center gap-2 whitespace-nowrap">
-                      <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${viewOpportunity.status === 'closed' ? 'border-rose-200/80 bg-rose-500/20 text-rose-50' : viewOpportunity.active ? 'border-emerald-200/80 bg-emerald-500/20 text-emerald-50' : 'border-slate-200/80 bg-slate-500/20 text-slate-100'}`}>Status: {viewOpportunity.status === 'closed' ? 'Closed' : viewOpportunity.active ? 'Active' : 'Inactive'}</span>
-                      <span className="rounded-full border border-sky-200/80 bg-sky-500/20 px-2.5 py-1 text-[11px] font-semibold text-sky-50">Date & Time: {formatDisplayDate(viewOpportunity.date)} | {viewOpportunity.time || '-'}</span>
-                      <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${viewOpportunity.waitlistEnabled === false ? 'border-slate-200/80 bg-slate-500/20 text-slate-100' : 'border-emerald-200/80 bg-emerald-500/20 text-emerald-50'}`}>Waitlist: {viewOpportunity.waitlistEnabled === false ? 'Disabled' : 'Enabled'}</span>
-                      <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${expiryMeta.tone === 'overdue' ? 'border-rose-200/80 bg-rose-500/20 text-rose-50' : expiryMeta.tone === 'remaining' ? 'border-amber-200/80 bg-amber-500/20 text-amber-50' : 'border-slate-200/80 bg-slate-500/20 text-slate-100'}`}>Expiry: {expiryMeta.label}</span>
+                <div className="flex flex-col gap-2 border-t border-white/15 pt-2 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
+                  <div className="min-w-0 w-full overflow-hidden pb-1">
+                    <div className="seva-pill-marquee-track sm:hidden">
+                      <div ref={marqueeRailRef} className="seva-pill-marquee-rail">
+                        {marqueePills.map((pill) => (
+                          <span key={`pill-${pill.key}`} className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-semibold ${pill.className}`}>
+                            {pill.text}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="hidden flex-wrap items-center gap-2 sm:flex">
+                      {viewHeaderPills.map((pill) => (
+                        <span key={`pill-static-${pill.key}`} className={`whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-semibold ${pill.className}`}>
+                          {pill.text}
+                        </span>
+                      ))}
                     </div>
                   </div>
-                  <div className="shrink-0 text-right leading-tight">
+                  <div className="hidden shrink-0 self-end text-right leading-tight sm:block sm:self-auto">
                     <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-amber-100/90">Remaining</p>
                     <p className="mt-0.5 text-2xl font-extrabold text-brand-saffron">{remainingVolunteers}</p>
                   </div>

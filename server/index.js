@@ -114,10 +114,28 @@ const uploadServiceMimePolicies = {
   default: ['image/*']
 };
 const maxJsonBodyBytes = 2 * 1024 * 1024;
-const internalMailRelayUrl = String(process.env.INTERNAL_MAIL_RELAY_URL || `http://127.0.0.1:${port}/api/internal/mail-relay`).trim();
-const volunteerReminderWebhookUrl = String(
-  process.env.VOLUNTEER_REMINDER_WEBHOOK_URL || process.env.REACT_APP_APPROVAL_EMAIL_WEBHOOK_URL || internalMailRelayUrl
-).trim();
+
+const resolveLocalWebhookUrl = (value, fallbackPath = '/api/internal/mail-relay') => {
+  const normalizedFallbackPath = String(fallbackPath || '/api/internal/mail-relay').trim();
+  const trimmed = String(value || '').trim();
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  const rawPath = trimmed || normalizedFallbackPath;
+  const pathValue = rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
+  return `http://127.0.0.1:${port}${pathValue}`;
+};
+
+const internalMailRelayUrl = resolveLocalWebhookUrl(
+  process.env.INTERNAL_MAIL_RELAY_URL || process.env.WEBHOOK_URL || '/api/internal/mail-relay',
+  '/api/internal/mail-relay'
+);
+const volunteerReminderWebhookUrl = resolveLocalWebhookUrl(
+  process.env.VOLUNTEER_REMINDER_WEBHOOK_URL || process.env.WEBHOOK_URL || process.env.REACT_APP_APPROVAL_EMAIL_WEBHOOK_URL || internalMailRelayUrl,
+  '/api/internal/mail-relay'
+);
 const volunteerReminderLogoUrl = String(process.env.VOLUNTEER_REMINDER_LOGO_URL || '').trim();
 const volunteerReminderSiteName = String(process.env.VOLUNTEER_REMINDER_ORG_NAME || 'Singh Sabha Milton Gurdwara').trim();
 const volunteerReminderBaseUrl = String(process.env.VOLUNTEER_REMINDER_BASE_URL || 'http://localhost:3001').trim().replace(/\/$/, '');
@@ -125,10 +143,15 @@ const volunteerReminderHtmlTemplateEnabled = String(process.env.VOLUNTEER_REMIND
 const volunteerReminderSendTimeRaw = String(process.env.VOLUNTEER_REMINDER_SEND_TIME || '09:00').trim();
 const volunteerReminderTimeZone = String(process.env.VOLUNTEER_REMINDER_TIME_ZONE || 'America/Toronto').trim() || 'America/Toronto';
 const volunteerReminderDays = [10, 5, 2, 1];
-const eventReminderWebhookUrl = String(process.env.EVENT_REMINDER_WEBHOOK_URL || volunteerReminderWebhookUrl || internalMailRelayUrl).trim();
-const donationInvoiceWebhookUrl = String(
-  process.env.DONATION_INVOICE_WEBHOOK_URL || process.env.DONATION_EMAIL_WEBHOOK_URL || volunteerReminderWebhookUrl || internalMailRelayUrl
-).trim();
+const eventReminderWebhookUrl = resolveLocalWebhookUrl(
+  process.env.EVENT_REMINDER_WEBHOOK_URL || process.env.WEBHOOK_URL || volunteerReminderWebhookUrl || internalMailRelayUrl,
+  '/api/internal/mail-relay'
+);
+const donationInvoiceWebhookUrl = resolveLocalWebhookUrl(
+  process.env.DONATION_INVOICE_WEBHOOK_URL || process.env.DONATION_EMAIL_WEBHOOK_URL || process.env.WEBHOOK_URL || volunteerReminderWebhookUrl || internalMailRelayUrl
+  ,
+  '/api/internal/mail-relay'
+);
 const eventReminderSendTimeRaw = String(process.env.EVENT_REMINDER_SEND_TIME || volunteerReminderSendTimeRaw || '09:00').trim();
 const eventReminderTimeZone = String(process.env.EVENT_REMINDER_TIME_ZONE || volunteerReminderTimeZone || 'America/Toronto').trim() || 'America/Toronto';
 const eventReminderDays = String(process.env.EVENT_REMINDER_DAYS || '7,3,1')
@@ -519,6 +542,33 @@ const normalizeRecipientList = (payload = {}) => {
   return list;
 };
 
+const normalizeBccRecipientList = (payload = {}) => {
+  const list = [];
+
+  const pushIfEmail = (candidate) => {
+    const email = String(candidate || '').trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return;
+    }
+    if (!list.includes(email)) {
+      list.push(email);
+    }
+  };
+
+  const bccField = String(payload.bcc || '').trim();
+  if (bccField) {
+    bccField.split(',').forEach((entry) => pushIfEmail(entry));
+  }
+
+  const bccList = Array.isArray(payload.bccList) ? payload.bccList : [];
+  bccList.forEach((entry) => pushIfEmail(entry));
+
+  const bccRecipients = Array.isArray(payload.bccRecipients) ? payload.bccRecipients : [];
+  bccRecipients.forEach((entry) => pushIfEmail(entry));
+
+  return list;
+};
+
 const normalizeAttachmentList = (payload = {}) => {
   const attachments = [];
   const raw = Array.isArray(payload.attachments) ? payload.attachments : [];
@@ -535,7 +585,9 @@ const normalizeAttachmentList = (payload = {}) => {
     attachments.push({
       filename: fileName,
       contentType,
-      contentBase64: base64.replace(/\s+/g, '')
+      contentBase64: base64.replace(/\s+/g, ''),
+      contentId: sanitizeHeaderValue(entry?.contentId || ''),
+      disposition: String(entry?.disposition || '').trim().toLowerCase() === 'inline' || entry?.inline === true ? 'inline' : 'attachment'
     });
   });
 
@@ -555,10 +607,11 @@ const normalizeAttachmentList = (payload = {}) => {
   return attachments;
 };
 
-const buildMimeEmail = ({ from, toList, subject, textBody, htmlBody, attachments = [] }) => {
+const buildMimeEmail = ({ from, toList, bccList = [], subject, textBody, htmlBody, attachments = [] }) => {
   const safeFrom = sanitizeHeaderValue(from || 'no-reply@singhsabhamilton.local') || 'no-reply@singhsabhamilton.local';
   const safeSubject = sanitizeHeaderValue(subject || 'Notification');
-  const safeTo = toList.map((entry) => sanitizeHeaderValue(entry)).filter(Boolean).join(', ');
+  const safeTo = toList.map((entry) => sanitizeHeaderValue(entry)).filter(Boolean).join(', ') || 'undisclosed-recipients:;';
+  const safeBcc = bccList.map((entry) => sanitizeHeaderValue(entry)).filter(Boolean).join(', ');
   const plainText = String(textBody || '').trim() || 'Notification from Singh Sabha Milton.';
   const html = String(htmlBody || '').trim();
 
@@ -568,6 +621,10 @@ const buildMimeEmail = ({ from, toList, subject, textBody, htmlBody, attachments
     `Subject: ${safeSubject}`,
     'MIME-Version: 1.0'
   ];
+
+  if (safeBcc) {
+    headers.push(`Bcc: ${safeBcc}`);
+  }
 
   const altBoundary = `alt_${crypto.randomBytes(8).toString('hex')}`;
   const mixBoundary = `mix_${crypto.randomBytes(8).toString('hex')}`;
@@ -606,11 +663,14 @@ const buildMimeEmail = ({ from, toList, subject, textBody, htmlBody, attachments
   const attachmentParts = attachments.map((entry) => {
     const safeName = sanitizeHeaderValue(entry.filename || 'attachment.bin') || 'attachment.bin';
     const safeType = sanitizeHeaderValue(entry.contentType || 'application/octet-stream') || 'application/octet-stream';
+    const safeContentId = sanitizeHeaderValue(entry.contentId || '');
+    const safeDisposition = String(entry.disposition || '').trim().toLowerCase() === 'inline' ? 'inline' : 'attachment';
     const encoded = String(entry.contentBase64 || '').replace(/\s+/g, '').replace(/(.{76})/g, '$1\r\n');
     return [
       `--${mixBoundary}`,
       `Content-Type: ${safeType}; name="${safeName}"`,
-      `Content-Disposition: attachment; filename="${safeName}"`,
+      `Content-Disposition: ${safeDisposition}; filename="${safeName}"`,
+      ...(safeContentId ? [`Content-ID: <${safeContentId}>`] : []),
       'Content-Transfer-Encoding: base64',
       '',
       encoded
@@ -646,8 +706,8 @@ const extractEmailAddress = (value) => {
   return raw.toLowerCase();
 };
 
-const sendViaLocalSendmail = async ({ from, toList, subject, textBody, htmlBody, attachments }) => {
-  const message = buildMimeEmail({ from, toList, subject, textBody, htmlBody, attachments });
+const sendViaLocalSendmail = async ({ from, toList, bccList, subject, textBody, htmlBody, attachments }) => {
+  const message = buildMimeEmail({ from, toList, bccList, subject, textBody, htmlBody, attachments });
   const envelopeFromCandidate = extractEmailAddress(from);
   const envelopeFrom = isValidEmailAddress(envelopeFromCandidate)
     ? envelopeFromCandidate
@@ -681,7 +741,7 @@ const sendViaLocalSendmail = async ({ from, toList, subject, textBody, htmlBody,
   };
 };
 
-const sendViaSmtp = async ({ from, toList, subject, textBody, htmlBody, attachments }) => {
+const sendViaSmtp = async ({ from, toList, bccList, subject, textBody, htmlBody, attachments }) => {
   if (!smtpHost) {
     throw new Error('SMTP_HOST is required when LOCAL_MAIL_TRANSPORT=smtp.');
   }
@@ -708,7 +768,9 @@ const sendViaSmtp = async ({ from, toList, subject, textBody, htmlBody, attachme
     ? attachments.map((entry) => ({
       filename: String(entry?.filename || 'attachment.bin').trim() || 'attachment.bin',
       contentType: String(entry?.contentType || 'application/octet-stream').trim() || 'application/octet-stream',
-      content: Buffer.from(String(entry?.contentBase64 || '').replace(/\s+/g, ''), 'base64')
+      content: Buffer.from(String(entry?.contentBase64 || '').replace(/\s+/g, ''), 'base64'),
+      cid: String(entry?.contentId || '').trim() || undefined,
+      contentDisposition: String(entry?.disposition || '').trim().toLowerCase() === 'inline' ? 'inline' : 'attachment'
     }))
     : [];
 
@@ -719,7 +781,8 @@ const sendViaSmtp = async ({ from, toList, subject, textBody, htmlBody, attachme
   const smtpInfo = await transport.sendMail({
     from: fromHeader,
     replyTo: replyToHeader,
-    to: toList,
+    to: Array.isArray(toList) && toList.length > 0 ? toList : undefined,
+    bcc: Array.isArray(bccList) && bccList.length > 0 ? bccList : undefined,
     subject,
     text: textBody || undefined,
     html: htmlBody || undefined,
@@ -748,12 +811,12 @@ const sendViaSmtp = async ({ from, toList, subject, textBody, htmlBody, attachme
   };
 };
 
-const sendViaConfiguredMailTransport = async ({ from, toList, subject, textBody, htmlBody, attachments }) => {
+const sendViaConfiguredMailTransport = async ({ from, toList, bccList = [], subject, textBody, htmlBody, attachments }) => {
   if (localMailTransport === 'smtp') {
-    return sendViaSmtp({ from, toList, subject, textBody, htmlBody, attachments });
+    return sendViaSmtp({ from, toList, bccList, subject, textBody, htmlBody, attachments });
   }
 
-  return sendViaLocalSendmail({ from, toList, subject, textBody, htmlBody, attachments });
+  return sendViaLocalSendmail({ from, toList, bccList, subject, textBody, htmlBody, attachments });
 };
 
 const ensureNoUnknownKeys = (payload, allowedKeys, label = 'body') => {
@@ -1772,17 +1835,18 @@ const buildVolunteerReminderEmail = ({ registration, daysRemaining = null, manua
         </td>
       </tr>
       <tr>
-        <td style="padding:22px 24px 12px;">
+        <td style="padding:22px 24px 12px;text-align:center;">
           <div style="font-size:19px;line-height:1.45;font-weight:800;color:#0f172a;">${escapeHtml(greetingLine)}</div>
           <div style="margin-top:8px;font-size:16px;line-height:1.7;color:#334155;font-weight:600;">${escapeHtml(requesterName)}</div>
-          <div style="margin-top:10px;display:inline-block;background:#eef5ff;border:1px solid #cfe1fb;color:#0a4d9f;border-radius:9999px;padding:7px 14px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;">
-            ${escapeHtml(countdownLabel)}
-          </div>
         </td>
       </tr>
       <tr>
         <td style="padding:0 28px 28px;">
-          <div style="font-size:15px;line-height:1.8;color:#334155;margin-bottom:14px;">${manual ? 'This is a manual seva notification from admin.' : 'This is your seva reminder for an upcoming seva opportunity.'}</div>
+          <div style="font-size:15px;line-height:1.85;color:#334155;margin-bottom:14px;text-align:center;">
+            ${manual
+    ? `This is a manual seva update from the admin team for your upcoming seva (${escapeHtml(countdownLabel)}). Please review the details below and plan your seva accordingly.`
+    : `A warm reminder that your seva opportunity is coming up (${escapeHtml(countdownLabel)}). Please review the details below and arrive a little early so the seva can begin smoothly.`}
+          </div>
           <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border:1px solid #d7e3f3;border-radius:12px;overflow:hidden;background:#fbfdff;margin-bottom:16px;">
             <tr>
               <td style="width:34%;padding:12px 14px;background:#eef5ff;border-bottom:1px solid #d7e3f3;font-size:14px;font-weight:700;color:#0a4d9f;">Seva Type</td>
@@ -1949,18 +2013,24 @@ const sendManualOpportunityReminders = async (opportunityId) => {
   let processed = 0;
   let sent = 0;
   let skipped = 0;
+  const skippedByReason = {
+    ineligible: 0,
+    deliveryFailed: 0
+  };
 
   for (const registration of matching) {
     processed += 1;
 
     if (!registration.email || registration.status === 'rejected' || registration.status === 'cancelled') {
       skipped += 1;
+      skippedByReason.ineligible += 1;
       continue;
     }
 
     const result = await sendVolunteerReminderEmail(registration, { manual: true });
     if (!result.sent) {
       skipped += 1;
+      skippedByReason.deliveryFailed += 1;
       continue;
     }
 
@@ -1974,6 +2044,7 @@ const sendManualOpportunityReminders = async (opportunityId) => {
     processed,
     sent,
     skipped,
+    skippedByReason,
     webhookConfigured: Boolean(volunteerReminderWebhookUrl)
   };
 };
@@ -2245,7 +2316,7 @@ const sendEventReminderEmail = async (registration, options = {}) => {
   }
 };
 
-const buildDonationInvoiceEmail = ({ donation = {}, organizationName = '', campaignDescription = '' }) => {
+const buildDonationInvoiceEmail = ({ donation = {}, organizationName = '', campaignDescription = '', address = '', phone = '' }) => {
   const donorName = String(donation.donorName || 'Sangat Member').trim();
   const donorEmail = String(donation.donorEmail || '').trim().toLowerCase();
   const receiptId = String(donation.receiptId || donation.id || '').trim();
@@ -2256,8 +2327,11 @@ const buildDonationInvoiceEmail = ({ donation = {}, organizationName = '', campa
     ? new Date(donation.createdAt).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' })
     : new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' });
   const siteName = String(organizationName || volunteerReminderSiteName || 'Singh Sabha Milton Gurdwara').trim();
+  const siteAddress = String(address || '').trim();
+  const sitePhone = String(phone || '').trim();
   const purposeText = String(campaignDescription || '').trim() || `Support for ${campaignName}`;
   const subject = `Donation Invoice ${receiptId || campaignName} - Thank You`;
+  const logoSrc = volunteerReminderLogoUrl || `${volunteerReminderBaseUrl}/gurdwara-logo.webp` || embeddedVolunteerReminderLogo;
 
   const text = [
     `Sat Sri Akal ${donorName},`,
@@ -2270,7 +2344,9 @@ const buildDonationInvoiceEmail = ({ donation = {}, organizationName = '', campa
     `Date: ${donationDateLabel}`,
     receiptId ? `Receipt/Invoice No: ${receiptId}` : '',
     '',
-    'Please find your donation invoice attached to this email.',
+    'Please find your donation invoice PDF attached to this email.',
+    siteAddress ? `Address: ${siteAddress}` : '',
+    sitePhone ? `Phone: ${sitePhone}` : '',
     '',
     `With gratitude,`,
     siteName
@@ -2279,40 +2355,71 @@ const buildDonationInvoiceEmail = ({ donation = {}, organizationName = '', campa
   const safeName = escapeHtml(donorName || 'Sangat Member');
   const html = `
   <div style="background:#f5f8fc;padding:28px 14px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
-    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:660px;margin:0 auto;background:#ffffff;border:1px solid #dbe7f6;border-radius:14px;overflow:hidden;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:760px;margin:0 auto;background:#ffffff;border:1px solid #dbe7f6;border-radius:14px;overflow:hidden;">
       <tr>
-        <td style="padding:28px 24px 18px;text-align:left;">
-          <div style="font-size:20px;line-height:1.4;font-weight:800;color:#0f172a;">Thank You for Your Donation</div>
+        <td style="padding:16px 22px;background:linear-gradient(90deg,#0a4d9f,#0b67c2,#e58b16);color:#ffffff;">
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+            <tr>
+              <td style="vertical-align:middle;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                  <tr>
+                    ${logoSrc ? `<td style="width:44px;padding-right:12px;vertical-align:middle;"><img src="${escapeHtml(logoSrc)}" alt="${escapeHtml(siteName)} logo" width="44" height="44" style="display:block;border-radius:9999px;background:#ffffff;object-fit:cover;"/></td>` : ''}
+                    <td style="vertical-align:middle;">
+                      <div style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.9;">${escapeHtml(siteName)}</div>
+                      <div style="font-size:18px;font-weight:800;line-height:1.3;margin-top:2px;">Donation Invoice &amp; Thank You</div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:22px 24px 8px;text-align:left;">
           <div style="margin-top:10px;font-size:15px;line-height:1.8;color:#334155;">Sat Sri Akal ${safeName},</div>
-          <div style="margin-top:8px;font-size:15px;line-height:1.8;color:#334155;">Thank you for your generous donation. We are grateful for your support.</div>
+          <div style="margin-top:8px;font-size:15px;line-height:1.8;color:#334155;">Thank you for your generous contribution. Your seva directly supports the sangat and ongoing Gurdwara initiatives. We deeply appreciate your kindness and trust.</div>
         </td>
       </tr>
       <tr>
         <td style="padding:0 24px 24px;">
-          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border:1px solid #d7e3f3;border-radius:12px;overflow:hidden;background:#fbfdff;">
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border:1px solid #c7dcf7;border-radius:14px;overflow:hidden;background:#f6faff;box-shadow:0 8px 24px -18px rgba(11,103,194,.65);">
             <tr>
-              <td style="width:34%;padding:12px 14px;background:#eef5ff;border-bottom:1px solid #d7e3f3;font-size:14px;font-weight:700;color:#0a4d9f;">Campaign</td>
-              <td style="padding:12px 14px;border-bottom:1px solid #d7e3f3;font-size:16px;font-weight:700;color:#0f172a;">${escapeHtml(campaignName)}</td>
+              <td colspan="2" style="padding:11px 14px;background:linear-gradient(90deg,#eaf2ff,#f6f9ff);border-bottom:1px solid #c7dcf7;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#0a4d9f;">Donation Details</td>
             </tr>
             <tr>
-              <td style="padding:12px 14px;background:#eef5ff;border-bottom:1px solid #d7e3f3;font-size:14px;font-weight:700;color:#0a4d9f;">Purpose</td>
-              <td style="padding:12px 14px;border-bottom:1px solid #d7e3f3;font-size:15px;color:#0f172a;">${escapeHtml(purposeText)}</td>
+              <td style="width:34%;padding:11px 12px;border-right:1px solid #d7e3f3;border-bottom:1px solid #d7e3f3;background:#edf4ff;font-size:12px;font-weight:700;color:#1e3a8a;">Campaign</td>
+              <td style="padding:11px 12px;border-bottom:1px solid #d7e3f3;background:#ffffff;font-size:14px;color:#0f172a;font-weight:600;">${escapeHtml(campaignName)}</td>
             </tr>
             <tr>
-              <td style="padding:12px 14px;background:#eef5ff;border-bottom:1px solid #d7e3f3;font-size:14px;font-weight:700;color:#0a4d9f;">Amount</td>
-              <td style="padding:12px 14px;border-bottom:1px solid #d7e3f3;font-size:16px;font-weight:700;color:#0f172a;">${escapeHtml(amountText)}</td>
+              <td style="width:34%;padding:11px 12px;border-right:1px solid #d7e3f3;border-bottom:1px solid #d7e3f3;background:#edf4ff;font-size:12px;font-weight:700;color:#1e3a8a;">Purpose</td>
+              <td style="padding:11px 12px;border-bottom:1px solid #d7e3f3;background:#ffffff;font-size:14px;color:#0f172a;font-weight:600;">${escapeHtml(purposeText)}</td>
             </tr>
             <tr>
-              <td style="padding:12px 14px;background:#eef5ff;border-bottom:1px solid #d7e3f3;font-size:14px;font-weight:700;color:#0a4d9f;">Date</td>
-              <td style="padding:12px 14px;border-bottom:1px solid #d7e3f3;font-size:15px;color:#0f172a;">${escapeHtml(donationDateLabel)}</td>
+              <td style="width:34%;padding:11px 12px;border-right:1px solid #d7e3f3;border-bottom:1px solid #d7e3f3;background:#edf4ff;font-size:12px;font-weight:700;color:#1e3a8a;">Amount</td>
+              <td style="padding:11px 12px;border-bottom:1px solid #d7e3f3;background:#ffffff;font-size:14px;color:#0f172a;font-weight:700;">${escapeHtml(amountText)}</td>
             </tr>
             <tr>
-              <td style="padding:12px 14px;background:#eef5ff;font-size:14px;font-weight:700;color:#0a4d9f;">Receipt/Invoice</td>
-              <td style="padding:12px 14px;font-size:15px;color:#0f172a;">${escapeHtml(receiptId || '-')}</td>
+              <td style="width:34%;padding:11px 12px;border-right:1px solid #d7e3f3;border-bottom:1px solid #d7e3f3;background:#edf4ff;font-size:12px;font-weight:700;color:#1e3a8a;">Date</td>
+              <td style="padding:11px 12px;border-bottom:1px solid #d7e3f3;background:#ffffff;font-size:14px;color:#0f172a;font-weight:600;">${escapeHtml(donationDateLabel)}</td>
+            </tr>
+            <tr>
+              <td style="width:34%;padding:11px 12px;border-right:1px solid #d7e3f3;background:#edf4ff;font-size:12px;font-weight:700;color:#1e3a8a;">Receipt/Invoice</td>
+              <td style="padding:11px 12px;background:#ffffff;font-size:14px;color:#0f172a;font-weight:600;">${escapeHtml(receiptId || '-')}</td>
             </tr>
           </table>
-          <div style="margin-top:14px;font-size:15px;line-height:1.8;color:#334155;">Please find your donation invoice attached to this email.</div>
-          <div style="margin-top:10px;font-size:15px;line-height:1.8;color:#334155;">With gratitude,<br/>${escapeHtml(siteName)}</div>
+          <div style="margin-top:14px;font-size:15px;line-height:1.8;color:#334155;">Please find your donation invoice PDF attached to this email for your records.</div>
+          <div style="margin-top:18px;font-size:15px;line-height:1.8;color:#334155;">
+            <div style="font-weight:700;color:#0f172a;">With gratitude,</div>
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin-top:6px;">
+              <tr>
+                ${logoSrc ? `<td style="padding-right:8px;vertical-align:middle;"><img src="${escapeHtml(logoSrc)}" alt="${escapeHtml(siteName)} logo" width="18" height="18" style="display:block;border-radius:9999px;object-fit:cover;"/></td>` : ''}
+                <td style="vertical-align:middle;font-weight:800;color:#0f172a;">${escapeHtml(siteName)}</td>
+              </tr>
+            </table>
+            ${siteAddress ? `<div><strong style="color:#0f172a;">Address:</strong> ${escapeHtml(siteAddress)}</div>` : ''}
+            ${sitePhone ? `<div><strong style="color:#0f172a;">Phone:</strong> ${escapeHtml(sitePhone)}</div>` : ''}
+          </div>
         </td>
       </tr>
     </table>
@@ -2388,7 +2495,9 @@ const sendDonationInvoiceEmail = async ({
   const template = buildDonationInvoiceEmail({
     donation: persistedDonation,
     organizationName,
-    campaignDescription
+    campaignDescription,
+    address,
+    phone
   });
 
   if (!isValidEmailAddress(template.donorEmail)) {
@@ -3656,7 +3765,8 @@ const server = http.createServer(async (request, response) => {
       const payload = await parseJsonObjectBody(request);
       const relayPayload = isPlainObject(payload.body) ? payload.body : payload;
       const recipients = normalizeRecipientList(relayPayload);
-      if (recipients.length === 0) {
+      const bccRecipients = normalizeBccRecipientList(relayPayload);
+      if (recipients.length === 0 && bccRecipients.length === 0) {
         sendJson(response, 400, {
           ok: false,
           message: 'Recipient address required.'
@@ -3673,6 +3783,7 @@ const server = http.createServer(async (request, response) => {
       const deliveryResult = await sendViaConfiguredMailTransport({
         from: localMailFromAddress,
         toList: recipients,
+        bccList: bccRecipients,
         subject,
         textBody,
         htmlBody,
@@ -3688,6 +3799,7 @@ const server = http.createServer(async (request, response) => {
         acceptedRecipients: Array.isArray(deliveryResult?.accepted) ? deliveryResult.accepted : undefined,
         rejectedRecipients: Array.isArray(deliveryResult?.rejected) ? deliveryResult.rejected : undefined,
         recipients: recipients.length,
+        bccRecipients: bccRecipients.length,
         hasAttachments: attachments.length > 0,
         type: String(relayPayload.type || '').trim() || 'generic'
       });

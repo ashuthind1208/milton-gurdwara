@@ -36,3 +36,28 @@
     transform: rotate(360deg);
   }
 }
+
+.seva-pill-marquee-track {
+  display: block;
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.seva-pill-marquee-rail {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.1rem;
+  white-space: nowrap;
+  will-change: transform;
+}
+
+.seva-pill-marquee-set {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 1rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+

@@ -41,12 +41,24 @@ const mergedEnv = {
   ...localEnv
 };
 
-const backendPort = mergedEnv.STRIPE_API_PORT || '4242';
+const canonicalWebhookUrl = String(
+  mergedEnv.WEBHOOK_URL
+  || mergedEnv.REACT_APP_WEBHOOK_URL
+  || '/api/internal/mail-relay'
+).trim() || '/api/internal/mail-relay';
+
+const mergedEnvWithWebhook = {
+  ...mergedEnv,
+  WEBHOOK_URL: canonicalWebhookUrl,
+  REACT_APP_WEBHOOK_URL: String(mergedEnv.REACT_APP_WEBHOOK_URL || canonicalWebhookUrl).trim() || '/api/internal/mail-relay'
+};
+
+const backendPort = mergedEnvWithWebhook.STRIPE_API_PORT || '4242';
 
 const backend = spawn(process.execPath, ['server/index.js'], {
   stdio: 'inherit',
   env: {
-    ...mergedEnv,
+    ...mergedEnvWithWebhook,
     PORT: backendPort,
     SERVER_PORT: backendPort,
     STRIPE_API_PORT: backendPort
@@ -56,9 +68,9 @@ const backend = spawn(process.execPath, ['server/index.js'], {
 const frontend = spawn('npx', ['react-scripts', 'start'], {
   stdio: 'inherit',
   env: {
-    ...mergedEnv,
-    PORT: mergedEnv.PORT || '3000',
-    BROWSER: mergedEnv.BROWSER || 'none'
+    ...mergedEnvWithWebhook,
+    PORT: mergedEnvWithWebhook.PORT || '3000',
+    BROWSER: mergedEnvWithWebhook.BROWSER || 'none'
   },
   shell: true
 });

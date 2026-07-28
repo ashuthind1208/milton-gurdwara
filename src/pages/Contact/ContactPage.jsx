@@ -91,7 +91,11 @@ const buildContactInquiryHtml = ({ siteName, logoUrl, name, email, phone, messag
 
 const ContactPage = () => {
   const [isSendingContactMessage, setIsSendingContactMessage] = useState(false);
-  const contactSubmitEndpoint = String(process.env.REACT_APP_CONTACT_US_WEBHOOK_URL || '/api/internal/mail-relay').trim() || '/api/internal/mail-relay';
+  const contactSubmitEndpoint = String(
+    process.env.REACT_APP_WEBHOOK_URL ||
+    process.env.REACT_APP_CONTACT_US_WEBHOOK_URL ||
+    '/api/internal/mail-relay'
+  ).trim() || '/api/internal/mail-relay';
   const contactRecipientOverride = String(process.env.REACT_APP_CONTACT_US_RECIPIENT_EMAIL || '').trim();
   const meta = useSeoMeta('Contact', 'Contact details, map placeholder, directions, and inquiry form.');
   const { data: content } = useQuery({

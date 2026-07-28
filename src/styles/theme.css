@@ -60,7 +60,7 @@
 
 .ticker-shell-home .ticker-track {
   padding: 0.35rem 0.15rem;
-  animation-duration: 34s;
+  animation-duration: 40s;
 }
 
 .ticker-item-home {
@@ -138,6 +138,51 @@
   color: var(--brand-saffron);
 }
 
+.donation-email-send-loader {
+  position: relative;
+  width: 220px;
+  height: 56px;
+  margin: 0 auto;
+}
+
+.donation-email-send-orb {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  transform: translateY(-50%);
+  opacity: 0.7;
+  animation: donation-email-orb-pulse 1.5s ease-in-out infinite;
+}
+
+.donation-email-send-orb-saffron {
+  left: 22px;
+  background: var(--brand-saffron);
+  animation-delay: 0s;
+}
+
+.donation-email-send-orb-blue {
+  left: 44px;
+  background: var(--brand-blue);
+  animation-delay: 0.2s;
+}
+
+.donation-email-send-orb-gold {
+  left: 66px;
+  background: var(--brand-gold);
+  animation-delay: 0.4s;
+}
+
+.donation-email-send-envelope-wrap {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  color: var(--brand-blue);
+  animation: donation-email-envelope-flight 1.8s ease-in-out infinite;
+}
+
 .modal-meta-shell:hover .modal-meta-track {
   animation-play-state: paused;
 }
@@ -149,6 +194,39 @@
 
   100% {
     transform: translateX(-50%);
+  }
+}
+
+@keyframes donation-email-envelope-flight {
+  0% {
+    left: 0;
+    opacity: 0.25;
+    transform: translateY(-50%) scale(0.95);
+  }
+  35% {
+    opacity: 1;
+  }
+  55% {
+    left: calc(100% - 28px);
+    opacity: 1;
+    transform: translateY(-55%) scale(1.03);
+  }
+  100% {
+    left: calc(100% - 28px);
+    opacity: 0.2;
+    transform: translateY(-50%) scale(0.95);
+  }
+}
+
+@keyframes donation-email-orb-pulse {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: translateY(-50%) scale(0.8);
+  }
+  50% {
+    opacity: 0.9;
+    transform: translateY(-50%) scale(1.05);
   }
 }
 

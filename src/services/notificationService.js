@@ -132,7 +132,7 @@ const normalizeSubscriber = (item = {}, index = 0) => ({
 const normalizeCampaign = (item = {}, index = 0) => ({
   id: item.id || `newsletter-${Date.now()}-${index}`,
   title: String(item.title || '').trim(),
-  subject: String(item.subject || '').trim(),
+  subject: String(item.subject || item.title || '').trim(),
   body: String(item.body || '').trim(),
   bodyHtml: String(item.bodyHtml || item.body || '').trim(),
   status: String(item.status || 'draft').trim().toLowerCase(),
@@ -167,12 +167,211 @@ const toNewsletterLogoUrl = () => {
   return '';
 };
 
+const toNewsletterAssetBaseUrl = () => {
+  const configured = String(
+    process.env.REACT_APP_NEWSLETTER_ASSET_BASE_URL
+    || process.env.REACT_APP_PUBLIC_SITE_URL
+    || process.env.REACT_APP_SITE_URL
+    || siteConfig.baseUrl
+    || ''
+  ).trim();
+
+  if (configured) {
+    return configured.replace(/\/+$/, '');
+  }
+
+  if (typeof window !== 'undefined' && window?.location?.origin) {
+    return String(window.location.origin).replace(/\/+$/, '');
+  }
+
+  return '';
+};
+
+const toAbsoluteNewsletterAssetUrl = (value = '', baseUrl = '') => {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return '';
+  }
+
+  if (/^(data:|cid:|mailto:|tel:|#)/i.test(raw)) {
+    return raw;
+  }
+
+  if (/^https?:\/\//i.test(raw)) {
+    const localhostPattern = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i;
+    if (!localhostPattern.test(raw)) {
+      return raw;
+    }
+
+    if (!baseUrl) {
+      return raw;
+    }
+
+    try {
+      const parsed = new URL(raw);
+      return `${baseUrl}${parsed.pathname || ''}${parsed.search || ''}${parsed.hash || ''}`;
+    } catch {
+      return raw;
+    }
+  }
+
+  if (!baseUrl) {
+    return raw;
+  }
+
+  if (raw.startsWith('/')) {
+    return `${baseUrl}${raw}`;
+  }
+
+  return `${baseUrl}/${raw.replace(/^\.\//, '')}`;
+};
+
+const escapeRegExp = (value = '') => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const arrayBufferToBase64 = (buffer) => {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const chunk = bytes.subarray(index, Math.min(index + chunkSize, bytes.length));
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+};
+
+const resolveImageExtensionFromMime = (mime = '') => {
+  const normalized = String(mime || '').trim().toLowerCase();
+  if (normalized.includes('png')) return 'png';
+  if (normalized.includes('jpeg') || normalized.includes('jpg')) return 'jpg';
+  if (normalized.includes('webp')) return 'webp';
+  if (normalized.includes('gif')) return 'gif';
+  if (normalized.includes('svg')) return 'svg';
+  return 'img';
+};
+
+const extractImageSourcesFromHtml = (html = '') => {
+  const sources = [];
+  const matches = String(html || '').matchAll(/<img\b[^>]*\bsrc\s*=\s*(['"])(.*?)\1/gi);
+  for (const match of matches) {
+    const src = String(match?.[2] || '').trim();
+    if (src) {
+      sources.push(src);
+    }
+  }
+  return Array.from(new Set(sources));
+};
+
+const shouldInlineNewsletterImageSource = (src = '') => {
+  const value = String(src || '').trim();
+  if (!value) {
+    return false;
+  }
+  if (/^(cid:|mailto:|tel:|#)/i.test(value)) {
+    return false;
+  }
+  if (/^data:image\//i.test(value)) {
+    return false;
+  }
+  if (value.startsWith('/')) {
+    return true;
+  }
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(value)) {
+    return true;
+  }
+  return false;
+};
+
+const inlineNewsletterImagesForEmail = async (html = '') => {
+  let nextHtml = String(html || '').trim();
+  if (!nextHtml) {
+    return { html: '', attachments: [] };
+  }
+
+  const sources = extractImageSourcesFromHtml(nextHtml).filter((src) => shouldInlineNewsletterImageSource(src));
+  if (sources.length === 0) {
+    return { html: nextHtml, attachments: [] };
+  }
+
+  const baseUrl = toNewsletterAssetBaseUrl();
+  const attachments = [];
+
+  for (let index = 0; index < sources.length; index += 1) {
+    const source = sources[index];
+    const fetchUrl = toAbsoluteNewsletterAssetUrl(source, baseUrl);
+    if (!/^https?:\/\//i.test(fetchUrl)) {
+      continue;
+    }
+
+    try {
+      const response = await fetch(fetchUrl);
+      if (!response.ok) {
+        continue;
+      }
+
+      const contentType = String(response.headers.get('content-type') || '').trim().toLowerCase();
+      if (!contentType.startsWith('image/')) {
+        continue;
+      }
+
+      const contentBase64 = arrayBufferToBase64(await response.arrayBuffer());
+      const extension = resolveImageExtensionFromMime(contentType);
+      const contentId = `newsletter-image-${Date.now()}-${index}@singhsabha`;
+      attachments.push({
+        filename: `newsletter-image-${index + 1}.${extension}`,
+        contentType,
+        content: contentBase64,
+        contentId,
+        disposition: 'inline'
+      });
+
+      const sourcePattern = escapeRegExp(source);
+      const replaceRegex = new RegExp(`(<img\\b[^>]*\\bsrc\\s*=\\s*['"])${sourcePattern}(['"][^>]*>)`, 'gi');
+      nextHtml = nextHtml.replace(replaceRegex, `$1cid:${contentId}$2`);
+    } catch {
+      // Best-effort inline conversion; keep original URL when fetch fails.
+    }
+  }
+
+  return {
+    html: nextHtml,
+    attachments
+  };
+};
+
+const normalizeNewsletterBodyHtmlForEmail = (html = '') => {
+  const assetBaseUrl = toNewsletterAssetBaseUrl();
+  const rawHtml = String(html || '').trim();
+  if (!rawHtml) {
+    return '';
+  }
+
+  return rawHtml.replace(/<img\b[^>]*>/gi, (tag) => {
+    let nextTag = tag;
+
+    nextTag = nextTag.replace(/src\s*=\s*(['"])(.*?)\1/i, (match, quote, srcValue) => {
+      const normalizedSrc = toAbsoluteNewsletterAssetUrl(srcValue, assetBaseUrl);
+      return `src=${quote}${escapeHtml(normalizedSrc)}${quote}`;
+    });
+
+    if (/style\s*=\s*['"]/i.test(nextTag)) {
+      nextTag = nextTag.replace(/style\s*=\s*(['"])(.*?)\1/i, (match, quote, styleValue) => {
+        const mergedStyle = `${String(styleValue || '').trim().replace(/;?\s*$/, ';')}max-width:100%;height:auto;display:block;margin:12px auto;`;
+        return `style=${quote}${mergedStyle}${quote}`;
+      });
+    } else {
+      nextTag = nextTag.replace('<img', '<img style="max-width:100%;height:auto;display:block;margin:12px auto;"');
+    }
+
+    return nextTag;
+  });
+};
+
 const buildNewsletterEmailHtml = (campaign = {}) => {
   const logoUrl = toNewsletterLogoUrl();
   const topic = normalizeTopicName(campaign.topic || '') || 'Newsletter Update';
   const title = String(campaign.title || 'Singh Sabha Milton Newsletter').trim();
-  const subject = String(campaign.subject || '').trim();
-  const contentHtml = String(campaign.bodyHtml || '').trim() || `<p>${escapeHtml(String(campaign.body || '').trim())}</p>`;
+  const contentHtml = normalizeNewsletterBodyHtmlForEmail(String(campaign.bodyHtml || '').trim())
+    || `<p>${escapeHtml(String(campaign.body || '').trim())}</p>`;
 
   return `
   <div style="background:#f5f8fc;padding:28px 14px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
@@ -197,17 +396,18 @@ const buildNewsletterEmailHtml = (campaign = {}) => {
         </td>
       </tr>
       <tr>
-        <td style="padding:18px 24px 10px;text-align:center;">
-          <div style="font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#0b67c2;margin-bottom:8px;">Topic</div>
-          <div style="display:inline-block;background:#eef5ff;border:1px solid #cfe1fb;color:#0a4d9f;border-radius:9999px;padding:8px 16px;font-size:18px;font-weight:800;line-height:1.3;">
-            ${escapeHtml(topic)}
-          </div>
+        <td style="padding:16px 24px 8px;text-align:center;">
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 auto;background:#f8fafc;border:1px solid #dbe7f6;border-radius:10px;">
+            <tr>
+              <td style="padding:6px 8px 6px 10px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#64748b;white-space:nowrap;vertical-align:middle;">Topic</td>
+              <td style="padding:6px 10px 6px 0;font-size:14px;font-weight:700;line-height:1.4;color:#0a4d9f;white-space:normal;vertical-align:middle;">${escapeHtml(topic)}</td>
+            </tr>
+          </table>
         </td>
       </tr>
       <tr>
         <td style="padding:8px 24px 0;">
           <div style="font-size:21px;line-height:1.35;font-weight:800;color:#0f172a;text-align:center;">${escapeHtml(title)}</div>
-          ${subject ? `<div style="margin-top:8px;font-size:14px;line-height:1.7;color:#334155;text-align:center;">${escapeHtml(subject)}</div>` : ''}
         </td>
       </tr>
       <tr>
@@ -576,6 +776,7 @@ const notificationService = {
       throw new Error('No valid recipient email addresses found.');
     }
     const deliveryUrl = String(
+      process.env.REACT_APP_WEBHOOK_URL ||
       process.env.REACT_APP_NEWSLETTER_WEBHOOK_URL ||
       process.env.REACT_APP_APPROVAL_EMAIL_WEBHOOK_URL ||
       '/api/internal/mail-relay'
@@ -585,6 +786,7 @@ const notificationService = {
     let errorReason = '';
     let sentAt = new Date().toISOString();
     const wrappedBodyHtml = buildNewsletterEmailHtml(campaign);
+    const preparedEmail = await inlineNewsletterImagesForEmail(wrappedBodyHtml);
 
     try {
       const response = await fetch(deliveryUrl, {
@@ -593,20 +795,20 @@ const notificationService = {
         body: JSON.stringify({
           type: 'newsletter',
           campaignId: campaign.id,
-          to: recipients.join(','),
-          toList: recipients,
-          recipientEmails: recipients,
-          primaryRecipient: recipients[0] || '',
+          bcc: recipients.join(','),
+          bccList: recipients,
+          bccRecipients: recipients,
           title: campaign.title,
-          subject: campaign.subject,
-          body: wrappedBodyHtml,
-          html: wrappedBodyHtml,
-          message: wrappedBodyHtml,
-          content: wrappedBodyHtml,
+          subject: campaign.subject || campaign.title || 'Singh Sabha Milton Newsletter',
+          body: preparedEmail.html,
+          html: preparedEmail.html,
+          message: preparedEmail.html,
+          content: preparedEmail.html,
           bodyText: campaign.body || '',
           text: campaign.body || '',
-          bodyHtml: wrappedBodyHtml,
+          bodyHtml: preparedEmail.html,
           rawBodyHtml: campaign.bodyHtml || campaign.body,
+          attachments: preparedEmail.attachments,
           topic: campaign.topic || '',
           weekStart: campaign.weekStart || '',
           weekEnd: campaign.weekEnd || '',
@@ -644,7 +846,11 @@ const notificationService = {
       return serviceResponse({ sent: false, reason: 'missing_email' });
     }
 
-    const deliveryUrl = String(process.env.REACT_APP_APPROVAL_EMAIL_WEBHOOK_URL || '/api/internal/mail-relay').trim();
+    const deliveryUrl = String(
+      process.env.REACT_APP_WEBHOOK_URL ||
+      process.env.REACT_APP_APPROVAL_EMAIL_WEBHOOK_URL ||
+      '/api/internal/mail-relay'
+    ).trim();
 
     const approvalBodyHtml = buildApprovalEmailHtml(user);
     const plainMessage = 'Your registration has been approved. You can now sign in and continue.';

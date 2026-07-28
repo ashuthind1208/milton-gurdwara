@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   DocumentArrowDownIcon,
   EnvelopeIcon,
+  EllipsisVerticalIcon,
   FunnelIcon,
   MagnifyingGlassIcon,
   ArrowDownIcon,
@@ -217,7 +218,7 @@ const AdminDonationsPage = () => {
   const [viewingCampaign, setViewingCampaign] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [campaignFilter, setCampaignFilter] = useState('all');
-  const [sortMode, setSortMode] = useState('oldest');
+  const [sortMode, setSortMode] = useState('newest');
   const [page, setPage] = useState(1);
   const [createPhotoUploadPending, setCreatePhotoUploadPending] = useState(false);
   const [createPhotoUploadProgress, setCreatePhotoUploadProgress] = useState(0);
@@ -235,6 +236,8 @@ const AdminDonationsPage = () => {
   const [cashDonationOpen, setCashDonationOpen] = useState(false);
   const [invoiceEmailStatus, setInvoiceEmailStatus] = useState({ type: 'success', message: '' });
   const [invoiceEmailSendingId, setInvoiceEmailSendingId] = useState('');
+  const [openCampaignActionMenuId, setOpenCampaignActionMenuId] = useState('');
+  const [openDonorActionMenuId, setOpenDonorActionMenuId] = useState('');
   const form = useForm({ defaultValues: campaignDefaults });
   const editForm = useForm({ defaultValues: campaignDefaults });
   const progressItemForm = useForm({ defaultValues: progressItemDefaults });
@@ -399,6 +402,14 @@ const AdminDonationsPage = () => {
       queryClient.invalidateQueries({ queryKey: ['admin-campaigns'] });
       queryClient.invalidateQueries({ queryKey: ['campaigns'] });
       setEditingCampaign(null);
+    }
+  });
+
+  const toggleStatusMutation = useMutation({
+    mutationFn: ({ id, isActive }) => donationService.updateCampaign(id, { isActive }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-campaigns'] });
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
     }
   });
 
@@ -723,9 +734,9 @@ const AdminDonationsPage = () => {
   };
 
   const toggleCampaignStatus = (campaign) => {
-    updateMutation.mutate({
+    toggleStatusMutation.mutate({
       id: campaign.id,
-      values: { isActive: !campaign.isActive }
+      isActive: !campaign.isActive
     });
   };
 
@@ -790,6 +801,7 @@ const AdminDonationsPage = () => {
         type: 'success',
         message: `Invoice emailed to ${donorEmail}.`
       });
+      window.alert(`Invoice emailed successfully to ${donorEmail}.`);
     } catch (error) {
       setInvoiceEmailStatus({
         type: 'error',
@@ -837,6 +849,23 @@ const AdminDonationsPage = () => {
 
   return (
     <div className="space-y-6">
+      {invoiceEmailSendingId ? (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/45 px-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-sm rounded-2xl border border-brand-blue/20 bg-white p-5 text-center shadow-2xl">
+            <div className="donation-email-send-loader" aria-hidden="true">
+              <span className="donation-email-send-orb donation-email-send-orb-saffron" />
+              <span className="donation-email-send-orb donation-email-send-orb-blue" />
+              <span className="donation-email-send-orb donation-email-send-orb-gold" />
+              <div className="donation-email-send-envelope-wrap">
+                <EnvelopeIcon className="h-7 w-7" />
+              </div>
+            </div>
+            <p className="mt-3 text-sm font-bold text-slate-900">Please wait, sending email...</p>
+            <p className="mt-1 text-xs text-slate-600">Generating invoice and delivering it to the donor inbox.</p>
+          </div>
+        </div>
+      ) : null}
+
       <h1 className="sr-only">Donation Management</h1>
 
       <Card>
@@ -932,7 +961,7 @@ const AdminDonationsPage = () => {
                       <button
                         type="button"
                         onClick={() => toggleCampaignStatus(campaign)}
-                        disabled={updateMutation.isPending}
+                        disabled={toggleStatusMutation.isPending}
                         className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-semibold transition ${campaign.isActive ? 'border-emerald-300 bg-emerald-100 text-emerald-800 hover:border-emerald-400' : 'border-slate-300 bg-slate-100 text-slate-700 hover:border-slate-400'} disabled:cursor-not-allowed disabled:opacity-60`}
                       >
                         <PowerIcon className="h-3.5 w-3.5" />
@@ -941,7 +970,67 @@ const AdminDonationsPage = () => {
                     )}
                   </td>
                   <td className="py-2 pr-2 text-right">
-                    <div className="flex flex-col items-end gap-1 sm:flex-row sm:flex-wrap sm:justify-end">
+                    <div className="relative xl:hidden">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const actionMenuId = String(campaign.id || '');
+                          setOpenCampaignActionMenuId((prev) => (prev === actionMenuId ? '' : actionMenuId));
+                        }}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-100"
+                        aria-label="More actions"
+                        title="More actions"
+                      >
+                        <EllipsisVerticalIcon className="h-4 w-4" />
+                      </button>
+
+                      {openCampaignActionMenuId === String(campaign.id || '') ? (
+                        <div className="absolute right-0 top-8 z-20 min-w-[170px] rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              openProgressManager(campaign);
+                              setOpenCampaignActionMenuId('');
+                            }}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                          >
+                            Manage Progress
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setViewingCampaign(campaign);
+                              setOpenCampaignActionMenuId('');
+                            }}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                          >
+                            View
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              openEdit(campaign);
+                              setOpenCampaignActionMenuId('');
+                            }}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              deleteMutation.mutate(campaign.id);
+                              setOpenCampaignActionMenuId('');
+                            }}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-red-700 hover:bg-red-50"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="hidden items-center justify-end gap-1.5 xl:flex">
                       <button type="button" onClick={() => openProgressManager(campaign)} className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 transition hover:border-indigo-300 hover:bg-indigo-100" aria-label="Manage campaign progress" title="Manage campaign progress">
                         <SparklesIcon className="h-3.5 w-3.5" />
                       </button>
@@ -1271,25 +1360,64 @@ const AdminDonationsPage = () => {
                   </td>
                   <td className="admin-compact-mobile-hidden py-1.5 pr-3 text-xs font-semibold text-slate-800">{formatCurrency(entry.amount)}</td>
                   <td className="py-1.5 pr-3 text-right align-top">
-                    <div className="flex flex-col items-end gap-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                    <div className="relative xl:hidden">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const actionMenuId = String(entry.id || '');
+                          setOpenDonorActionMenuId((prev) => (prev === actionMenuId ? '' : actionMenuId));
+                        }}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-100"
+                        aria-label="More actions"
+                        title="More actions"
+                      >
+                        <EllipsisVerticalIcon className="h-4 w-4" />
+                      </button>
+
+                      {openDonorActionMenuId === String(entry.id || '') ? (
+                        <div className="absolute right-0 top-8 z-20 min-w-[170px] rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleDownloadInvoice(entry);
+                              setOpenDonorActionMenuId('');
+                            }}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                          >
+                            Download Invoice
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void handleEmailInvoice(entry);
+                              setOpenDonorActionMenuId('');
+                            }}
+                            disabled={!entry.donorEmail || invoiceEmailSendingId === String(entry.id || '')}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {invoiceEmailSendingId === String(entry.id || '') ? 'Sending...' : 'Email Invoice'}
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="hidden flex-row flex-nowrap items-center justify-end gap-1.5 xl:flex">
                       <button
                         type="button"
                         onClick={() => handleDownloadInvoice(entry)}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-brand-blue/20 px-2 py-1 text-[11px] font-semibold text-brand-blue transition hover:border-brand-blue hover:bg-brand-blue hover:text-white sm:px-3 sm:text-xs"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-brand-blue/20 text-brand-blue transition hover:border-brand-blue hover:bg-brand-blue hover:text-white"
                         title="Download invoice PDF"
                       >
                         <DocumentArrowDownIcon className="h-4 w-4" />
-                        <span className="hidden sm:inline">Invoice</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => void handleEmailInvoice(entry)}
                         disabled={!entry.donorEmail || invoiceEmailSendingId === String(entry.id || '')}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 transition hover:border-emerald-400 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 sm:px-3 sm:text-xs"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-emerald-300/70 bg-emerald-50 text-emerald-700 transition hover:border-emerald-400 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
                         title={entry.donorEmail ? 'Email invoice to donor' : 'Donor email not available'}
                       >
                         <EnvelopeIcon className="h-4 w-4" />
-                        <span className="hidden sm:inline">{invoiceEmailSendingId === String(entry.id || '') ? 'Sending...' : 'Email Invoice'}</span>
                       </button>
                     </div>
                   </td>

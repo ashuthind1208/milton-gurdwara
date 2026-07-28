@@ -459,6 +459,11 @@
     max-width: 100%;
   }
 
+  /* Keep Tailwind hidden wrappers hidden on mobile action cells. */
+  .admin-main-content table td:last-child > div.hidden {
+    display: none !important;
+  }
+
   .admin-main-content table td:last-child > div > button.h-8.w-8,
   .admin-main-content table td:last-child > div > a.h-8.w-8,
   .admin-main-content table td:last-child > div > button.h-7.w-7,

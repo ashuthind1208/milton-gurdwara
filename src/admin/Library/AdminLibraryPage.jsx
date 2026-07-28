@@ -201,6 +201,9 @@ const AdminLibraryPage = () => {
   const [mediaPage, setMediaPage] = useState(1);
   const [mediaModal, setMediaModal] = useState({ open: false, mode: 'add', id: '' });
   const [openPhysicalActionMenuId, setOpenPhysicalActionMenuId] = useState('');
+  const [openDigitalActionMenuId, setOpenDigitalActionMenuId] = useState('');
+  const [openProgramActionMenuId, setOpenProgramActionMenuId] = useState('');
+  const [openMediaActionMenuId, setOpenMediaActionMenuId] = useState('');
   const [programImageUploadPending, setProgramImageUploadPending] = useState(false);
   const [programImageUploadProgress, setProgramImageUploadProgress] = useState(0);
   const [programImageUploadStatus, setProgramImageUploadStatus] = useState({ type: '', message: '' });
@@ -685,25 +688,13 @@ const AdminLibraryPage = () => {
                   setPhysicalModalOpen(true);
                 }}
               >
-                Add Physical Resource
+                <span className="sm:hidden">+ Add</span>
+                <span className="hidden sm:inline">Add Physical Resource</span>
               </Button>
             </div>
-            {editingPhysicalId ? (
-              <button
-                type="button"
-                className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700"
-                onClick={() => {
-                  setEditingPhysicalId('');
-                  physicalForm.reset(emptyPhysicalForm);
-                  setPhysicalModalOpen(false);
-                }}
-              >
-                Cancel Edit
-              </button>
-            ) : null}
           </div>
 
-          <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200">
+          <div className="mt-4 overflow-x-auto overflow-y-visible rounded-xl border border-slate-200">
             <table className="min-w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
@@ -885,25 +876,13 @@ const AdminLibraryPage = () => {
                   setDigitalModalOpen(true);
                 }}
               >
-                Add Digital Resource
+                <span className="sm:hidden">+ Add</span>
+                <span className="hidden sm:inline">Add Digital Resource</span>
               </Button>
             </div>
-            {editingDigitalId ? (
-              <button
-                type="button"
-                className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700"
-                onClick={() => {
-                  setEditingDigitalId('');
-                  digitalForm.reset(emptyDigitalForm);
-                  setDigitalModalOpen(false);
-                }}
-              >
-                Cancel Edit
-              </button>
-            ) : null}
           </div>
 
-          <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200">
+          <div className="mt-4 overflow-x-auto overflow-y-visible rounded-xl border border-slate-200">
             <table className="min-w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
@@ -947,7 +926,47 @@ const AdminLibraryPage = () => {
                       <a className="text-xs font-semibold text-brand-blue hover:underline" href={resource.downloadUrl} target="_blank" rel="noreferrer">Open Link</a>
                     </td>
                     <td className="px-3 py-1.5">
-                      <div className="flex items-center gap-1.5">
+                      <div className="relative lg:hidden">
+                        <button
+                          type="button"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded border border-slate-300 text-slate-700 hover:bg-slate-100"
+                          title="More actions"
+                          aria-label="More actions"
+                          onClick={() => {
+                            const resourceMenuId = String(resource.id || '');
+                            setOpenDigitalActionMenuId((prev) => (prev === resourceMenuId ? '' : resourceMenuId));
+                          }}
+                        >
+                          <EllipsisVerticalIcon className={actionIconClass} />
+                        </button>
+                        {openDigitalActionMenuId === String(resource.id || '') ? (
+                          <div className="absolute right-0 top-8 z-20 min-w-[150px] rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingDigitalId(resource.id);
+                                setDigitalModalOpen(true);
+                                setOpenDigitalActionMenuId('');
+                              }}
+                              className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                deleteDigitalMutation.mutate(resource.id);
+                                setOpenDigitalActionMenuId('');
+                              }}
+                              className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-red-700 hover:bg-red-50"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <div className="hidden items-center gap-1.5 lg:flex">
                         <button
                           type="button"
                           className="inline-flex h-7 w-7 items-center justify-center rounded border border-blue-200 text-blue-700 hover:bg-blue-50"
@@ -994,7 +1013,7 @@ const AdminLibraryPage = () => {
           <Button type="button" onClick={() => setProgramModal({ open: true, mode: 'add', id: '' })}>Add Library Session</Button>
         </div>
 
-        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200">
+        <div className="mt-4 overflow-x-auto overflow-y-visible rounded-xl border border-slate-200">
           <table className="min-w-full text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
@@ -1032,7 +1051,56 @@ const AdminLibraryPage = () => {
                   <td className="admin-compact-mobile-hidden px-3 py-1.5">{entry.scheduleDate || '-'} {entry.scheduleTime ? `| ${entry.scheduleTime}` : ''}</td>
                   <td className="admin-compact-mobile-hidden px-3 py-1.5">{entry.audience || '-'}</td>
                   <td className="px-3 py-1.5">
-                    <div className="flex items-center gap-1.5">
+                    <div className="relative lg:hidden">
+                      <button
+                        type="button"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded border border-slate-300 text-slate-700 hover:bg-slate-100"
+                        title="More actions"
+                        aria-label="More actions"
+                        onClick={() => {
+                          const entryMenuId = String(entry.id || '');
+                          setOpenProgramActionMenuId((prev) => (prev === entryMenuId ? '' : entryMenuId));
+                        }}
+                      >
+                        <EllipsisVerticalIcon className={actionIconClass} />
+                      </button>
+                      {openProgramActionMenuId === String(entry.id || '') ? (
+                        <div className="absolute right-0 top-8 z-20 min-w-[150px] rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setProgramModal({ open: true, mode: 'view', id: entry.id });
+                              setOpenProgramActionMenuId('');
+                            }}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                          >
+                            View
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setProgramModal({ open: true, mode: 'edit', id: entry.id });
+                              setOpenProgramActionMenuId('');
+                            }}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              deleteProgramMutation.mutate(entry.id);
+                              setOpenProgramActionMenuId('');
+                            }}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-red-700 hover:bg-red-50"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="hidden items-center gap-1.5 lg:flex">
                       <button
                         type="button"
                         className="inline-flex h-7 w-7 items-center justify-center rounded border border-slate-300 text-slate-700 hover:bg-slate-100"
@@ -1132,7 +1200,7 @@ const AdminLibraryPage = () => {
               </label>
               <div className="md:col-span-2 flex gap-2">
                 <Button type="submit" disabled={isSavingPhysical}>
-                  {isSavingPhysical ? 'Saving...' : (editingPhysicalId ? 'Update Physical Resource' : 'Add Physical Resource')}
+                  {isSavingPhysical ? 'Saving...' : (editingPhysicalId ? 'Update' : 'Add Physical Resource')}
                 </Button>
                 <Button type="button" variant="ghost" onClick={() => setPhysicalModalOpen(false)}>Cancel</Button>
               </div>
@@ -1453,7 +1521,7 @@ const AdminLibraryPage = () => {
           <Button type="button" onClick={() => setMediaModal({ open: true, mode: 'add', id: '' })}>Add Media</Button>
         </div>
 
-        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200">
+        <div className="mt-4 overflow-x-auto overflow-y-visible rounded-xl border border-slate-200">
           <table className="min-w-full text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
@@ -1485,7 +1553,56 @@ const AdminLibraryPage = () => {
                     <td className="admin-compact-mobile-hidden px-3 py-1.5 capitalize">{entry.mediaType}</td>
                     <td className="admin-compact-mobile-hidden px-3 py-1.5">{entry.tags || '-'}</td>
                     <td className="px-3 py-1.5">
-                      <div className="flex items-center gap-1.5">
+                      <div className="relative lg:hidden">
+                        <button
+                          type="button"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded border border-slate-300 text-slate-700 hover:bg-slate-100"
+                          title="More actions"
+                          aria-label="More actions"
+                          onClick={() => {
+                            const entryMenuId = String(entry.id || '');
+                            setOpenMediaActionMenuId((prev) => (prev === entryMenuId ? '' : entryMenuId));
+                          }}
+                        >
+                          <EllipsisVerticalIcon className={actionIconClass} />
+                        </button>
+                        {openMediaActionMenuId === String(entry.id || '') ? (
+                          <div className="absolute right-0 top-8 z-20 min-w-[150px] rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMediaModal({ open: true, mode: 'view', id: entry.id });
+                                setOpenMediaActionMenuId('');
+                              }}
+                              className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                            >
+                              View
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMediaModal({ open: true, mode: 'edit', id: entry.id });
+                                setOpenMediaActionMenuId('');
+                              }}
+                              className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                deleteMediaMutation.mutate(entry.id);
+                                setOpenMediaActionMenuId('');
+                              }}
+                              className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-red-700 hover:bg-red-50"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <div className="hidden items-center gap-1.5 lg:flex">
                         <button type="button" className="inline-flex h-7 w-7 items-center justify-center rounded border border-slate-300 text-slate-700 hover:bg-slate-100" title="View" onClick={() => setMediaModal({ open: true, mode: 'view', id: entry.id })}><EyeIcon className={actionIconClass} /></button>
                         <button type="button" className="inline-flex h-7 w-7 items-center justify-center rounded border border-blue-200 text-blue-700 hover:bg-blue-50" title="Edit" onClick={() => setMediaModal({ open: true, mode: 'edit', id: entry.id })}><PencilSquareIcon className={actionIconClass} /></button>
                         <button type="button" className="inline-flex h-7 w-7 items-center justify-center rounded border border-red-200 text-red-700 hover:bg-red-50" title="Delete" onClick={() => deleteMediaMutation.mutate(entry.id)}><TrashIcon className={actionIconClass} /></button>
