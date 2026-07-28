@@ -1,8 +1,8 @@
 # Singh Sabha Milton Platform
 ## Handbook and Runbook (People-First Edition)
 
-Version: 1.1  
-Date: 2026-07-17  
+Version: 1.2  
+Date: 2026-07-28  
 Audience: Sangat, Sevadars, Operations Team, Leadership
 
 ---
@@ -447,6 +447,22 @@ Screenshots:
   - Family vs Member vs Volunteer vs Admin visibility
 - Validate duplicate registration guard in Events and Seva
 - Run production build and smoke test top journeys
+- Confirm database bootstrap artifacts are current:
+  - Schema and seed baseline file: `server/db/schema_and_seed.sql`
+  - Runtime schema authority: `server/db/postgres.js` (`ensureEventsSchema`)
+
+### Database Baseline and Recovery
+- Purpose:
+  - `server/db/schema_and_seed.sql` provides a portable baseline to initialize a fresh PostgreSQL database with core schema and representative seed content.
+- What it contains:
+  - Core table/index creation statements.
+  - Seed records for `admin_users`, `app_singletons`, `app_items`, and mirrored relational rows currently backed by content-store resources.
+- When to refresh it:
+  - After schema changes in `server/db/postgres.js`.
+  - After meaningful content seed updates in `server/data/users.json` or `server/data/content-store.json`.
+- How to apply on a new environment:
+  - Run the SQL file against the target PostgreSQL database before first app start.
+  - Start the backend and verify key modules: Users, CMS, Streaming, Videos, Seva, Donations.
 
 ### If Something Breaks
 Registration incidents:

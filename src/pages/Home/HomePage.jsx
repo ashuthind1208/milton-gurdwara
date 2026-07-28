@@ -631,6 +631,8 @@ const HomePage = () => {
                 </span>
               </div>
 
+              <div className="mt-5 mb-2 h-px bg-slate-200" />
+
               {selectedTickerEvent.description ? (
                 <p className="text-sm leading-6 text-slate-700">{selectedTickerEvent.description}</p>
               ) : null}

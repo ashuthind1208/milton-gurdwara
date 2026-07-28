@@ -82,7 +82,7 @@
 <body>
   <main class="wrap"><h1>Singh Sabha Milton Platform</h1>
 <h2>Handbook and Runbook (People-First Edition)</h2>
-<p>Version: 1.1<br>Date: 2026-07-17<br>Audience: Sangat, Sevadars, Operations Team, Leadership</p>
+<p>Version: 1.2<br>Date: 2026-07-28<br>Audience: Sangat, Sevadars, Operations Team, Leadership</p>
 <hr>
 <h2>Cover Note</h2>
 <p>This is not just a website. It is a digital front door for the sangat.</p>
@@ -570,6 +570,33 @@
 </li>
 <li>Validate duplicate registration guard in Events and Seva</li>
 <li>Run production build and smoke test top journeys</li>
+<li>Confirm database bootstrap artifacts are current:<ul>
+<li>Schema and seed baseline file: <code>server/db/schema_and_seed.sql</code></li>
+<li>Runtime schema authority: <code>server/db/postgres.js</code> (<code>ensureEventsSchema</code>)</li>
+</ul>
+</li>
+</ul>
+<h3>Database Baseline and Recovery</h3>
+<ul>
+<li>Purpose:<ul>
+<li><code>server/db/schema_and_seed.sql</code> provides a portable baseline to initialize a fresh PostgreSQL database with core schema and representative seed content.</li>
+</ul>
+</li>
+<li>What it contains:<ul>
+<li>Core table/index creation statements.</li>
+<li>Seed records for <code>admin_users</code>, <code>app_singletons</code>, <code>app_items</code>, and mirrored relational rows currently backed by content-store resources.</li>
+</ul>
+</li>
+<li>When to refresh it:<ul>
+<li>After schema changes in <code>server/db/postgres.js</code>.</li>
+<li>After meaningful content seed updates in <code>server/data/users.json</code> or <code>server/data/content-store.json</code>.</li>
+</ul>
+</li>
+<li>How to apply on a new environment:<ul>
+<li>Run the SQL file against the target PostgreSQL database before first app start.</li>
+<li>Start the backend and verify key modules: Users, CMS, Streaming, Videos, Seva, Donations.</li>
+</ul>
+</li>
 </ul>
 <h3>If Something Breaks</h3>
 <p>Registration incidents:</p>

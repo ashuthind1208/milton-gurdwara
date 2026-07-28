@@ -46,10 +46,13 @@ import AudioPillPlayer from '../common/AudioPillPlayer';
 import GlobalSearchBar from '../common/GlobalSearchBar';
 
 const navClass = ({ isActive }) =>
-  `border-b-[3px] px-3 py-2 text-base font-semibold tracking-tight transition ${isActive ? 'border-brand-saffron text-brand-blue' : 'border-transparent text-slate-600 hover:border-slate-200 hover:text-brand-blue'}`;
+  `border-b-[3px] px-3 py-2.5 text-base font-semibold tracking-tight transition ${isActive ? 'border-brand-saffron text-white' : 'border-transparent text-blue-100 hover:border-blue-200/70 hover:text-white'}`;
 
 const compactNavClass = ({ isActive }) =>
-  `border-b-[2px] px-1.5 py-1 text-[13px] font-bold tracking-tight text-brand-blue transition ${isActive ? 'border-brand-saffron' : 'border-transparent hover:border-brand-blue/30'}`;
+  `border-b-[2px] px-2.5 py-2 text-[13px] font-bold tracking-tight text-blue-100 transition ${isActive ? 'border-brand-saffron text-white' : 'border-transparent hover:border-blue-200/50 hover:text-white'}`;
+
+const mobileDrawerNavClass = ({ isActive }) =>
+  `rounded-xl border px-3 py-2.5 text-sm font-semibold transition ${isActive ? 'border-brand-blue/45 bg-brand-blue/10 text-brand-blue' : 'border-slate-200 bg-white text-slate-800 hover:border-brand-blue/35 hover:text-brand-blue'}`;
 
 const iconClass = 'h-4.5 w-4.5';
 const streamGlyphClass = 'h-6 w-6';
@@ -59,6 +62,7 @@ const CALENDAR_NAV_DAY_MS = 24 * 60 * 60 * 1000;
 const PDF_HEADER_BG = [0, 64, 129];
 const COMPACT_ENTER_SCROLL_Y = 72;
 const COMPACT_EXIT_SCROLL_Y = 36;
+const COMPACT_TOGGLE_COOLDOWN_MS = 220;
 const PDF_HOLIDAY_PILL_PALETTE = [
   { bg: [220, 252, 231], text: [22, 101, 52] },
   { bg: [254, 243, 199], text: [146, 64, 14] },
@@ -467,7 +471,9 @@ const Navbar = () => {
   const compactScrollRestoreRef = useRef(null);
   const compactRestoreFramesRef = useRef({ first: 0, second: 0 });
   const preserveCompactUntilRef = useRef(0);
+  const compactToggleCooldownUntilRef = useRef(0);
   const isCompactRef = useRef(false);
+  const lastScrollYRef = useRef(0);
   const [calendarViewDate, setCalendarViewDate] = useState(() => new Date());
   const nanakshahiDate = useMemo(() => getNanakshahiDate(new Date()), []);
   const calendarViewNanakshahiYear = useMemo(
@@ -722,6 +728,7 @@ const Navbar = () => {
       }
 
       isCompactRef.current = nextValue;
+      compactToggleCooldownUntilRef.current = Date.now() + COMPACT_TOGGLE_COOLDOWN_MS;
       setIsCompact(nextValue);
     };
 
@@ -729,16 +736,32 @@ const Navbar = () => {
       ticking = false;
 
       if (Date.now() < preserveCompactUntilRef.current) {
+        lastScrollYRef.current = Math.max(window.scrollY, 0);
         syncCompactState(true);
         return;
       }
 
-      const scrollY = window.scrollY;
-      const shouldCompact = isCompactRef.current
-        ? scrollY > COMPACT_EXIT_SCROLL_Y
-        : scrollY > COMPACT_ENTER_SCROLL_Y;
+      if (Date.now() < compactToggleCooldownUntilRef.current) {
+        lastScrollYRef.current = Math.max(window.scrollY, 0);
+        return;
+      }
 
-      syncCompactState(shouldCompact);
+      const scrollY = Math.max(window.scrollY, 0);
+      const scrollDirection = scrollY === lastScrollYRef.current
+        ? 0
+        : (scrollY > lastScrollYRef.current ? 1 : -1);
+
+      let nextCompact = isCompactRef.current;
+      if (isCompactRef.current) {
+        if (scrollY <= COMPACT_EXIT_SCROLL_Y && scrollDirection < 0) {
+          nextCompact = false;
+        }
+      } else if (scrollY >= COMPACT_ENTER_SCROLL_Y && scrollDirection > 0) {
+        nextCompact = true;
+      }
+
+      lastScrollYRef.current = scrollY;
+      syncCompactState(nextCompact);
     };
 
     const onScroll = () => {
@@ -1914,8 +1937,8 @@ const Navbar = () => {
   }, []);
 
   return (
-    <header className={`sticky top-0 z-50 bg-gradient-to-b from-blue-50/85 via-white to-amber-50/70 shadow-[0_6px_24px_-8px_rgba(10,77,159,0.18)] ring-1 ring-slate-200/70 backdrop-blur-md transition-all duration-300 ${isCompact ? 'pb-1' : ''}`}>
-      <div className="hidden bg-brand-navy px-4 py-1 text-xs text-blue-50 md:block">
+    <header className={`sticky top-0 z-50 bg-slate-950/95 shadow-[0_10px_26px_-10px_rgba(2,6,23,0.65)] ring-1 ring-slate-700/80 backdrop-blur-md transition-all duration-300 ${isCompact ? 'pb-1' : ''}`}>
+      <div className="hidden border-b border-white/20 bg-[#0a1a33] px-4 py-1 text-xs text-blue-50 md:block">
         <div className="mx-auto flex max-w-7xl items-center justify-between md:px-2">
           <div className="flex items-center gap-2">
             <p>{siteConfig.contact.address}</p>
@@ -2020,13 +2043,13 @@ const Navbar = () => {
             <button
               type="button"
               onClick={() => setIsSearchModalOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-sky-300 bg-sky-100 px-2.5 py-0.5 text-[11px] font-bold text-sky-900 shadow-[0_6px_12px_rgba(14,165,233,0.22)] transition hover:bg-sky-200"
+              className="inline-flex items-center gap-1.5 rounded-full border border-brand-blue/70 bg-brand-blue/20 px-2.5 py-0.5 text-[11px] font-bold text-blue-50 shadow-[0_6px_12px_rgba(10,77,159,0.28)] transition hover:bg-brand-blue/35"
             >
               <MagnifyingGlassIcon className="h-3.5 w-3.5" />
               Search
             </button>
             {!isAuthenticated ? (
-              <Link to="/login?mode=join&next=/family-dashboard" onClick={handleBecomeMemberClick} className="rounded-full border border-emerald-300 bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-900 shadow-[0_6px_12px_rgba(16,185,129,0.2)] transition hover:bg-emerald-200">Become Member</Link>
+              <Link to="/login?mode=join&next=/family-dashboard" onClick={handleBecomeMemberClick} className="rounded-full border border-brand-saffron bg-brand-saffron px-3 py-1 text-[11px] font-extrabold text-brand-navy shadow-[0_8px_18px_rgba(245,166,35,0.4)] transition hover:-translate-y-0.5 hover:bg-amber-300">Become Member</Link>
             ) : null}
             {isAuthenticated ? (
               <div className="relative flex items-center gap-2">
@@ -2129,15 +2152,15 @@ const Navbar = () => {
                 </div>
               </div>
             ) : (
-              <Link to="/login" onClick={handleSignInClick} className="rounded-full border border-brand-saffron bg-brand-saffron px-2.5 py-0.5 text-[11px] font-bold text-brand-navy shadow-[0_6px_12px_rgba(245,166,35,0.3)] transition hover:bg-amber-300">Sign In</Link>
+              <Link to="/login" onClick={handleSignInClick} className="rounded-full border border-brand-blue bg-brand-blue px-3 py-1 text-[11px] font-extrabold text-white shadow-[0_8px_18px_rgba(10,77,159,0.42)] transition hover:-translate-y-0.5 hover:bg-blue-700">Sign In</Link>
             )}
           </div>
         </div>
       </div>
 
-      <div className="w-full bg-gradient-to-r from-blue-50/55 via-white/95 to-amber-50/45">
+      <div className="mt-2 w-full bg-slate-900/92">
         <div className="mx-auto max-w-7xl px-4 md:px-6">
-          <div className={`relative hidden items-center transition-[min-height,padding] duration-300 ease-in-out lg:flex ${isCompact ? 'min-h-[86px] py-2' : 'min-h-[146px] py-2'}`}>
+          <div className={`relative hidden items-center transition-[min-height,padding] duration-300 ease-in-out xl:flex ${isCompact ? 'min-h-[86px] py-2' : 'min-h-[146px] py-2'}`}>
           <Link
             to="/"
             className={`absolute left-1/2 top-1/2 z-20 flex -translate-y-1/2 -translate-x-1/2 items-center justify-center text-brand-blue transition-all duration-300 ease-in-out ${isCompact ? 'pointer-events-none opacity-0 scale-[0.94]' : 'pointer-events-auto opacity-100 scale-100'}`}
@@ -2168,12 +2191,12 @@ const Navbar = () => {
 
           {!isCompact ? (
             <>
-              <nav className="flex w-full items-center justify-between pr-8" aria-label="Left navigation">
+              <nav className="flex w-full items-center justify-start gap-2 pr-10" aria-label="Left navigation">
                 {leftMenuBalanced.map((item) => {
                   const Icon = item.icon;
                   return (
                     <NavLink key={item.path} to={item.path} className={navClass}>
-                      <span className="inline-flex items-center gap-1.5"><Icon className={iconClass} /> {item.label}</span>
+                      <span className="inline-flex items-center gap-2"><Icon className={iconClass} /> {item.label}</span>
                     </NavLink>
                   );
                 })}
@@ -2181,13 +2204,13 @@ const Navbar = () => {
 
               <div className="w-[7.5rem] shrink-0" aria-hidden="true" />
 
-              <div className="flex w-full items-center justify-end pl-8">
-                <nav className="flex w-full items-center justify-between" aria-label="Right navigation">
+              <div className="flex w-full items-center justify-end pl-10">
+                <nav className="flex w-full items-center justify-end gap-2" aria-label="Right navigation">
                   {rightMenuBalanced.map((item) => {
                     const Icon = item.icon;
                     return (
                       <NavLink key={item.path} to={item.path} preventScrollReset className={navClass}>
-                        <span className="inline-flex items-center gap-1.5"><Icon className={iconClass} /> {item.label}</span>
+                        <span className="inline-flex items-center gap-2"><Icon className={iconClass} /> {item.label}</span>
                       </NavLink>
                     );
                   })}
@@ -2218,7 +2241,7 @@ const Navbar = () => {
                   <button
                     type="button"
                     onClick={() => setCompactStreamsOpen(true)}
-                    className="inline-flex shrink-0 items-center gap-1 rounded-full border border-brand-blue/20 bg-gradient-to-r from-white via-blue-50 to-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-brand-blue shadow-[0_4px_14px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-brand-blue/40"
+                    className="inline-flex shrink-0 items-center gap-1 rounded-full border border-blue-100/35 bg-white/95 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-brand-blue shadow-[0_4px_14px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-blue-100/70"
                   >
                     <span className="inline-flex h-4.5 w-4.5 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-amber-100 text-brand-blue shadow-inner">
                       <LiveStreamGlyph />
@@ -2234,7 +2257,7 @@ const Navbar = () => {
       </div>
       </div>
 
-      <div className="lg:hidden px-4 pb-4 pt-1">
+      <div className="bg-slate-900/92 xl:hidden px-4 pb-4 pt-1">
         <div className="flex items-center">
           <div className="flex w-1/3 justify-start">
             <Link to="/" className="inline-flex items-center" aria-label="Go to homepage">
@@ -2246,7 +2269,7 @@ const Navbar = () => {
             </Link>
           </div>
 
-          <div className="flex w-1/3 justify-center">
+          <div className="flex w-1/3 justify-center md:hidden">
             {liveStreams.length > 0 ? (
               <button
                 type="button"
@@ -2258,11 +2281,32 @@ const Navbar = () => {
             ) : null}
           </div>
 
-          <div className="flex w-1/3 justify-end">
+          <div className="hidden w-1/3 justify-center md:flex">
             <button
               type="button"
               onClick={() => setOpen((prev) => !prev)}
-              className="z-[240] rounded-lg p-2 text-slate-700"
+              className="z-[240] rounded-lg p-2 text-white"
+              aria-label="Open mobile menu"
+              aria-expanded={open}
+            >
+              {open ? <XMarkIcon className="h-6 w-6" /> : <Bars3Icon className="h-6 w-6" />}
+            </button>
+          </div>
+
+          <div className="flex w-1/3 justify-end">
+            {liveStreams.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setCompactStreamsOpen(true)}
+                className="hidden rounded-full bg-brand-blue px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white shadow-[0_8px_18px_rgba(10,77,159,0.35)] [animation:pulse_2.1s_ease-in-out_infinite] md:inline-flex"
+              >
+                Watch Live
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => setOpen((prev) => !prev)}
+              className="z-[240] rounded-lg p-2 text-white md:hidden"
               aria-label="Open mobile menu"
               aria-expanded={open}
             >
@@ -2291,7 +2335,7 @@ const Navbar = () => {
       </div>
 
       {!isCompact ? (
-        <div className="hidden border-b-2 border-brand-blue/45 bg-gradient-to-r from-blue-50/60 via-white to-amber-50/55 pb-5 pt-1 md:block">
+        <div className="hidden border-b-2 border-brand-blue/45 bg-slate-900/92 pb-5 pt-1 xl:block">
         <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 md:px-6">
               {miltonPrimaryStream ? (
                 <div className="flex justify-center pt-0.5 pb-3">
@@ -2703,7 +2747,7 @@ const Navbar = () => {
       , document.body) : null}
 
       {open ? (
-        <div className="h-[calc(100dvh-6.5rem)] overflow-y-auto border-t border-slate-100 bg-gradient-to-b from-white to-slate-50 px-4 py-3 pb-10 lg:hidden">
+        <div className="h-[calc(100dvh-6.5rem)] overflow-y-auto border-t border-slate-100 bg-gradient-to-b from-white to-slate-50 px-4 py-3 pb-10 xl:hidden">
           <div className="mb-3 grid gap-2 sm:grid-cols-2">
             {!isAuthenticated ? (
               <Link
@@ -2712,7 +2756,7 @@ const Navbar = () => {
                   handleBecomeMemberClick(event);
                   setOpen(false);
                 }}
-                className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-center text-sm font-semibold text-emerald-800"
+                className="rounded-xl border border-brand-saffron bg-brand-saffron px-3 py-2 text-center text-sm font-extrabold text-brand-navy shadow-[0_8px_18px_rgba(245,166,35,0.35)]"
               >
                 Become Member
               </Link>
@@ -2723,7 +2767,7 @@ const Navbar = () => {
                 handleSignInClick(event);
                 setOpen(false);
               }}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-sm font-semibold text-slate-700"
+              className={`inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-center text-sm font-semibold ${isAuthenticated ? 'border border-slate-200 bg-white text-slate-700' : 'border border-brand-blue bg-brand-blue text-white font-extrabold shadow-[0_8px_18px_rgba(10,77,159,0.34)]'}`}
             >
               {isAuthenticated ? (
                 <img
@@ -2764,7 +2808,7 @@ const Navbar = () => {
           ) : null}
           <div className="grid gap-2">
             {mobileMenuItems.map((item) => (
-              <NavLink key={item.path} to={item.path} className={navClass} onClick={() => setOpen(false)}>
+              <NavLink key={item.path} to={item.path} className={mobileDrawerNavClass} onClick={() => setOpen(false)}>
                 {item.label}
               </NavLink>
             ))}

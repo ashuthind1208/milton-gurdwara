@@ -509,33 +509,37 @@ const SevaPage = () => {
                     </div>
                     {item.waitlistCount > 0 ? <p className="mt-1 text-[11px] font-semibold text-amber-700">Waitlisted: {item.waitlistCount}</p> : null}
                     {isAuthenticated || allowIdentityOverride ? (
-                      <div className="mt-auto pt-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (isAuthenticated && profilePhoneMissing) {
-                              window.alert('Please add your phone number in profile before registering for seva.');
-                              return;
-                            }
-                            if (!item.isOpen || alreadyRegistered) {
-                              return;
-                            }
-                            setRegisterOpportunityId(String(item.id));
-                            setIsRegisterModalOpen(true);
-                          }}
-                          disabled={!item.isOpen || alreadyRegistered || (isAuthenticated && profilePhoneMissing)}
-                          className="mt-2.5 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-brand-blue via-blue-600 to-brand-saffron px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white transition hover:from-amber-200 hover:via-amber-300 hover:to-brand-saffron hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {joinWaitlist ? 'Join Waitlist' : 'Register For This Seva'}
-                          <ChevronRightIcon className="h-4 w-4" />
-                        </button>
-                        {joinWaitlist && !alreadyRegistered && item.isOpen ? (
-                          <p className="mt-1 text-xs font-semibold text-amber-700">This seva is full, but waitlist is open.</p>
-                        ) : null}
-                        {alreadyRegistered && item.isOpen ? (
-                          <p className="mt-2 text-xs font-semibold leading-snug text-red-700">You can&apos;t register since you have already registered for this seva.</p>
-                        ) : null}
-                      </div>
+                      <>
+                        <div className="mt-auto pt-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isAuthenticated && profilePhoneMissing) {
+                                window.alert('Please add your phone number in profile before registering for seva.');
+                                return;
+                              }
+                              if (!item.isOpen || alreadyRegistered) {
+                                return;
+                              }
+                              setRegisterOpportunityId(String(item.id));
+                              setIsRegisterModalOpen(true);
+                            }}
+                            disabled={!item.isOpen || alreadyRegistered || (isAuthenticated && profilePhoneMissing)}
+                            className="mt-2.5 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-brand-blue via-blue-600 to-brand-saffron px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white transition hover:from-amber-200 hover:via-amber-300 hover:to-brand-saffron hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {joinWaitlist ? 'Join Waitlist' : 'Register For This Seva'}
+                            <ChevronRightIcon className="h-4 w-4" />
+                          </button>
+                        </div>
+                        <div className="mt-1 min-h-[2.75rem]">
+                          {joinWaitlist && !alreadyRegistered && item.isOpen ? (
+                            <p className="text-xs font-semibold text-amber-700">This seva is full, but waitlist is open.</p>
+                          ) : null}
+                          {alreadyRegistered && item.isOpen ? (
+                            <p className="text-xs font-semibold leading-snug text-red-700">You can&apos;t register since you have already registered for this seva.</p>
+                          ) : null}
+                        </div>
+                      </>
                     ) : null}
                   </Card>
                 );
