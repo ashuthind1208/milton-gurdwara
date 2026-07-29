@@ -260,6 +260,25 @@
   background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
 }
 
+@media (max-width: 640px) {
+  .events-calendar-shell .rbc-month-view {
+    min-height: 700px;
+  }
+
+  .events-calendar-shell .rbc-month-row {
+    min-height: 124px;
+  }
+
+  .events-calendar-shell .rbc-row-content {
+    min-height: 112px;
+  }
+
+  .events-calendar-shell .rbc-date-cell {
+    padding-top: 5px;
+    padding-right: 4px;
+  }
+}
+
 .events-calendar-shell .rbc-day-bg + .rbc-day-bg {
   border-left: 1px solid #e2e8f0;
 }
@@ -317,7 +336,7 @@
   max-width: 100%;
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 1279px) {
   .admin-dashboard-shell {
     overflow-x: clip;
   }
@@ -422,7 +441,7 @@
     }
   }
 
-  @media (max-width: 1023px) {
+  @media (max-width: 1279px) {
     .admin-seva-mobile-hidden {
       display: none !important;
     }
@@ -501,3 +520,13 @@
     width: 14px;
   }
 }
+
+  /* Apply a consistent blurred backdrop to full-screen modal overlays. */
+  :where(
+    .fixed.inset-0[class*='bg-slate-'][class*='/'],
+    .fixed.inset-0[class*='bg-black/'],
+    .fixed.inset-0[class*='bg-neutral-'][class*='/']
+  ) {
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }

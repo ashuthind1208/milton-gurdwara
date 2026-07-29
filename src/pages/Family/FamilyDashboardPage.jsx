@@ -91,6 +91,7 @@ const FamilyDashboardPage = () => {
   const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const [donationPage, setDonationPage] = useState(1);
+  const [calendarNotice, setCalendarNotice] = useState({ type: '', message: '' });
   const donationsPerPage = 6;
   const userDisplayName = String(user?.name || 'Member').trim() || 'Member';
   const userAvatarUrl = String(user?.avatarUrl || user?.picture || user?.photoURL || user?.imageUrl || user?.profileImageUrl || '').trim();
@@ -374,6 +375,18 @@ const FamilyDashboardPage = () => {
     }
   }, [donationPage, totalDonationPages]);
 
+  useEffect(() => {
+    if (!calendarNotice.message) {
+      return undefined;
+    }
+
+    const timerId = window.setTimeout(() => {
+      setCalendarNotice({ type: '', message: '' });
+    }, 4200);
+
+    return () => window.clearTimeout(timerId);
+  }, [calendarNotice]);
+
   if (!isAuthenticated) {
     return (
       <div className="space-y-6">
@@ -393,6 +406,38 @@ const FamilyDashboardPage = () => {
       return String(value || '-');
     }
     return format(parsed, 'EEE, MMM d yyyy');
+  };
+
+  const handleAddEventToCalendar = async (entry) => {
+    if (!entry?.eventId) {
+      setCalendarNotice({ type: 'error', message: 'Unable to add this event to calendar right now.' });
+      return;
+    }
+
+    try {
+      const response = await eventService.downloadEventCalendar(entry.eventId);
+      const source = response?.data;
+      const blob = source instanceof Blob
+        ? source
+        : new Blob([source], { type: 'text/calendar;charset=utf-8' });
+      const fileUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = fileUrl;
+      const safeTitle = String(entry.eventTitle || 'event')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '') || 'event';
+      link.download = `${safeTitle}.ics`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => window.URL.revokeObjectURL(fileUrl), 1200);
+
+      setCalendarNotice({ type: 'success', message: 'Calendar file downloaded. Open it to add the event.' });
+    } catch {
+      setCalendarNotice({ type: 'error', message: 'Unable to download calendar file. Please try again.' });
+    }
   };
 
   const exportButtons = (
@@ -455,20 +500,20 @@ const FamilyDashboardPage = () => {
             </p>
             <div className="mt-3">
               <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Quick Links</p>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                <Link to="/events" className="rounded-lg border border-slate-200 bg-white/90 px-3 py-2 transition hover:border-brand-blue/40 hover:bg-blue-50">
+              <div className="mt-2 grid auto-rows-fr gap-2 sm:grid-cols-2">
+                <Link to="/events" className="flex h-full min-h-[88px] flex-col justify-between rounded-lg border border-slate-200 bg-white/90 px-3 py-2 transition hover:border-brand-blue/40 hover:bg-blue-50">
                   <p className="text-sm font-bold text-brand-blue">View Events</p>
                   <p className="text-xs text-slate-600">Check upcoming programs and register your family.</p>
                 </Link>
-                <Link to="/seva" className="rounded-lg border border-slate-200 bg-white/90 px-3 py-2 transition hover:border-brand-blue/40 hover:bg-blue-50">
+                <Link to="/seva" className="flex h-full min-h-[88px] flex-col justify-between rounded-lg border border-slate-200 bg-white/90 px-3 py-2 transition hover:border-brand-blue/40 hover:bg-blue-50">
                   <p className="text-sm font-bold text-brand-blue">Explore Seva</p>
                   <p className="text-xs text-slate-600">Find seva opportunities and apply in a few steps.</p>
                 </Link>
-                <Link to="/donation" className="rounded-lg border border-slate-200 bg-white/90 px-3 py-2 transition hover:border-brand-blue/40 hover:bg-blue-50">
+                <Link to="/donation" className="flex h-full min-h-[88px] flex-col justify-between rounded-lg border border-slate-200 bg-white/90 px-3 py-2 transition hover:border-brand-blue/40 hover:bg-blue-50">
                   <p className="text-sm font-bold text-brand-blue">Give Donation</p>
                   <p className="text-xs text-slate-600">Support active campaigns and continue your contribution.</p>
                 </Link>
-                <Link to="/contact" className="rounded-lg border border-slate-200 bg-white/90 px-3 py-2 transition hover:border-brand-blue/40 hover:bg-blue-50">
+                <Link to="/contact" className="flex h-full min-h-[88px] flex-col justify-between rounded-lg border border-slate-200 bg-white/90 px-3 py-2 transition hover:border-brand-blue/40 hover:bg-blue-50">
                   <p className="text-sm font-bold text-brand-blue">Contact Committee</p>
                   <p className="text-xs text-slate-600">Reach out for membership, seva, or donation help.</p>
                 </Link>
@@ -484,6 +529,11 @@ const FamilyDashboardPage = () => {
           <article className="rounded-2xl border border-brand-blue/20 bg-gradient-to-br from-blue-50 via-white to-blue-100 p-5">
             <h2 className="text-2xl font-black text-brand-blue">Event Registrations</h2>
             <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Total RSVPs: {familyEventRegistrations.length}</p>
+            {calendarNotice.message ? (
+              <p className={`mt-2 rounded-lg border px-3 py-2 text-xs font-semibold ${calendarNotice.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-700'}`}>
+                {calendarNotice.message}
+              </p>
+            ) : null}
             <div className="mt-3 space-y-2">
               {familyEventRegistrations.map((entry, index) => (
                 <div key={`${entry.eventId}-${index}`} className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 text-sm">
@@ -506,9 +556,15 @@ const FamilyDashboardPage = () => {
                   <p className="text-xs text-slate-600">{entry.location || 'Location TBD'} • {format(new Date(entry.eventDate), 'EEE, MMM d yyyy, h:mm a')}</p>
                   <div className="mt-1 flex flex-wrap items-center gap-3">
                     {entry.eventId ? (
-                      <a href={eventService.getEventCalendarUrl(entry.eventId)} className="inline-flex text-[11px] font-semibold text-brand-blue underline underline-offset-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void handleAddEventToCalendar(entry);
+                        }}
+                        className="inline-flex text-[11px] font-semibold text-brand-blue underline underline-offset-2"
+                      >
                         Add to calendar
-                      </a>
+                      </button>
                     ) : null}
                   </div>
                 </div>

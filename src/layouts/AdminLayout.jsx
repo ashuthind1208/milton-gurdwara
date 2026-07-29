@@ -916,8 +916,8 @@ const AdminLayout = () => {
   );
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-950">
-      <div className="grid grid-cols-1 lg:min-h-screen lg:grid-cols-[270px_1fr]">
+    <div className="min-h-screen overflow-x-hidden bg-slate-100 dark:bg-slate-950">
+      <div className="grid min-w-0 grid-cols-1 lg:min-h-screen lg:grid-cols-[270px_1fr]">
       <aside className="hidden border-r border-slate-800 bg-slate-950 p-4 text-slate-100 lg:sticky lg:top-0 lg:block lg:h-screen lg:overflow-y-auto lg:self-start">
         <div className="flex items-center justify-between gap-2">
           <p className="flex items-center gap-2 font-heading text-xl font-bold text-white">
@@ -957,7 +957,7 @@ const AdminLayout = () => {
           ))}
         </nav>
       </aside>
-      <main className="admin-main-content p-4 md:p-8">
+      <main className="admin-main-content min-w-0 overflow-x-hidden p-4 md:p-8">
         <div className="mb-6 border-b border-slate-200 pb-3">
           <div className="flex items-center gap-3">
             <div className="flex min-w-0 flex-1 items-center gap-2">

@@ -1342,7 +1342,7 @@ const AdminUsersPage = () => {
                     className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5"
                   />
 
-                  <div className="rounded-2xl border border-slate-200 shadow-sm md:hidden">
+                  <div className="rounded-2xl border border-slate-200 shadow-sm xl:hidden">
                     {filteredMembershipFeeRecords.length === 0 ? (
                       <p className="px-4 py-4 text-center text-sm text-slate-500">No membership fee records found.</p>
                     ) : (
@@ -1385,7 +1385,7 @@ const AdminUsersPage = () => {
                     )}
                   </div>
 
-                  <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 shadow-sm md:block">
+                  <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 shadow-sm xl:block">
                     <table className="min-w-[900px] text-left text-sm">
                       <thead className="bg-slate-50 text-slate-500">
                         <tr>

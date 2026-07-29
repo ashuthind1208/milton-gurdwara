@@ -58,7 +58,7 @@ const AdminAuditTrailPage = () => {
       </Card>
 
       <Card className="border border-slate-200 bg-white">
-        <div className="overflow-x-auto">
+        <div className="hidden overflow-x-auto xl:block">
           <table className="min-w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
@@ -86,6 +86,22 @@ const AdminAuditTrailPage = () => {
               ) : null}
             </tbody>
           </table>
+        </div>
+
+        <div className="space-y-3 xl:hidden">
+          {pagedRows.length === 0 ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-4 text-center text-sm text-slate-500">No audit entries found.</div>
+          ) : (
+            pagedRows.map((entry) => (
+              <article key={entry.id} className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+                <p className="text-xs text-slate-500">{entry.createdAt ? new Date(entry.createdAt).toLocaleString() : '-'}</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">{entry.action || '-'}</p>
+                <p className="mt-1 text-xs text-slate-700">{entry.targetType || '-'} {entry.targetId ? `(${entry.targetId})` : ''}</p>
+                <p className="mt-1 text-xs text-slate-700">{entry.actorName || entry.actorEmail || '-'}{entry.actorRole ? ` • ${entry.actorRole}` : ''}</p>
+                <p className="mt-2 text-sm text-slate-700">{entry.description || '-'}</p>
+              </article>
+            ))
+          )}
         </div>
 
         <div className="mt-3 flex items-center justify-between">

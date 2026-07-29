@@ -427,6 +427,7 @@ const Navbar = () => {
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
   const [compactStreamsOpen, setCompactStreamsOpen] = useState(false);
+  const [isCompactProfileLanyardOpen, setIsCompactProfileLanyardOpen] = useState(false);
   const [dateInfoOpen, setDateInfoOpen] = useState(false);
   const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
   const [isProfilePopoverOpen, setIsProfilePopoverOpen] = useState(false);
@@ -459,6 +460,7 @@ const Navbar = () => {
   const [isKirtanPlaying, setIsKirtanPlaying] = useState(false);
   const [isKirtanLoading, setIsKirtanLoading] = useState(false);
   const [streamModalState, setStreamModalState] = useState({ open: false, id: '' });
+  const [selectedNanakshahiDateKey, setSelectedNanakshahiDateKey] = useState(() => toDateKey(new Date()));
   const liveAudioRef = useRef(null);
   const kirtanRetryTimeoutRef = useRef(null);
   const kirtanPlaybackRequestedRef = useRef(false);
@@ -467,6 +469,13 @@ const Navbar = () => {
   const kirtanReconnectInFlightRef = useRef(false);
   const datePopoverCloseTimeoutRef = useRef(null);
   const profilePopoverCloseTimeoutRef = useRef(null);
+  const viewportResetTimeoutRef = useRef(null);
+  const compactLanyardBackdropGuardRef = useRef(false);
+  const dateInfoBackdropGuardRef = useRef(false);
+  const searchBackdropGuardRef = useRef(false);
+  const compactLanyardBackdropGuardTimeoutRef = useRef(null);
+  const dateInfoBackdropGuardTimeoutRef = useRef(null);
+  const searchBackdropGuardTimeoutRef = useRef(null);
   const pdfFontCacheRef = useRef(null);
   const compactScrollRestoreRef = useRef(null);
   const compactRestoreFramesRef = useRef({ first: 0, second: 0 });
@@ -474,6 +483,7 @@ const Navbar = () => {
   const compactToggleCooldownUntilRef = useRef(0);
   const isCompactRef = useRef(false);
   const lastScrollYRef = useRef(0);
+  const mobileNanakshahiDetailsRef = useRef(null);
   const [calendarViewDate, setCalendarViewDate] = useState(() => new Date());
   const nanakshahiDate = useMemo(() => getNanakshahiDate(new Date()), []);
   const calendarViewNanakshahiYear = useMemo(
@@ -601,12 +611,12 @@ const Navbar = () => {
     [leftMenuBalanced, rightMenuBalanced]
   );
   const mobileMenuItems = useMemo(
-    () => publicNav.filter((item) => item.path !== '/gurbani-library' && item.path !== '/faq'),
+    () => publicNav.filter((item) => item.path !== '/gurbani-library' && item.path !== '/faq' && item.path !== '/family-dashboard'),
     []
   );
 
   const renderNanakshahiCalendar = (compact = false) => (
-    <div className={`rounded-2xl border border-brand-blue/35 bg-gradient-to-br from-blue-50 via-white to-amber-50 ${compact ? 'p-3' : 'p-4'}`}>
+    <div className={`overflow-visible rounded-2xl border border-brand-blue/35 bg-gradient-to-br from-blue-50 via-white to-amber-50 ${compact ? 'p-3 pb-24 sm:pb-28' : 'p-4 pb-24 sm:pb-28'}`}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">ਨਾਨਕਸ਼ਾਹੀ ਮਹੀਨਾ</p>
@@ -658,15 +668,28 @@ const Navbar = () => {
             year: 'numeric'
           }).format(cell.gregorianDate);
           const hasScrollableObservances = cell.observances.length > 2;
+          const isSelectedNanakshahiDate = selectedNanakshahiDateKey === cellGregorianKey;
 
           const uniqueTypeDots = Array.from(new Map(
             cell.observances.map((event) => [resolveObservanceTypeKey(event.type), getObservanceTypeStyles(event.type)])
           ).values()).slice(0, 4);
 
           return (
-            <span
+            <button
+              type="button"
               key={`${cell.day}-${cell.gregorianDate.toISOString()}`}
-              className={`group/date relative inline-flex h-8 w-8 items-center justify-center rounded-lg ${isGregorianToday ? 'ring-2 ring-cyan-400 shadow-[0_0_0_4px_rgba(34,211,238,0.24)] bg-cyan-100/55' : ''}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                setSelectedNanakshahiDateKey(cellGregorianKey);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  setSelectedNanakshahiDateKey(cellGregorianKey);
+                }
+              }}
+              className={`group/date relative inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border-0 bg-transparent p-0 text-left ${isGregorianToday ? 'ring-2 ring-cyan-400 shadow-[0_0_0_4px_rgba(34,211,238,0.24)] bg-cyan-100/55' : ''} ${isSelectedNanakshahiDate ? 'ring-2 ring-brand-saffron shadow-[0_0_0_4px_rgba(245,166,35,0.18)]' : ''}`}
+              aria-label={`Select Nanakshahi date ${cell.dayPa}`}
             >
               <span
                 className={`relative z-10 inline-flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold ${cell.isToday ? 'bg-brand-blue text-white shadow-[0_8px_18px_rgba(10,77,159,0.22)]' : cell.hasObservance ? (hasMultiTypeGradient ? 'ring-1 ring-slate-300/70 text-slate-900' : eventTone) : 'text-slate-700'} ${isGregorianToday ? '!bg-cyan-600 !text-white ring-2 ring-white/70 shadow-[0_10px_22px_rgba(8,145,178,0.45)] animate-pulse' : ''}`}
@@ -685,7 +708,7 @@ const Navbar = () => {
                 </span>
               ) : null}
               {cell.hasObservance ? (
-                <span className={`pointer-events-none invisible absolute left-1/2 top-[calc(100%+8px)] z-[999] w-64 -translate-x-1/2 rounded-2xl border border-brand-blue/30 bg-gradient-to-br from-amber-50 via-white to-blue-50 p-3 text-left opacity-0 shadow-[0_16px_38px_rgba(15,23,42,0.2)] transition duration-150 group-hover/date:visible group-hover/date:opacity-100 ${hasScrollableObservances ? 'max-h-72 overflow-y-auto pr-2' : ''}`}>
+                <span className={`pointer-events-none invisible absolute left-1/2 top-[calc(100%+8px)] z-[1200] hidden w-64 -translate-x-1/2 rounded-2xl border border-brand-blue/30 bg-gradient-to-br from-amber-50 via-white to-blue-50 p-3 text-left opacity-0 shadow-[0_16px_38px_rgba(15,23,42,0.2)] transition duration-150 group-hover/date:visible group-hover/date:opacity-100 xl:block ${hasScrollableObservances ? 'max-h-72 overflow-y-auto pr-2' : ''}`}>
                   {cell.observances.map((event, eventIndex) => {
                     const tone = getObservanceTypeStyles(event.type);
                     return (
@@ -707,7 +730,7 @@ const Navbar = () => {
                   })}
                 </span>
               ) : null}
-            </span>
+            </button>
           );
         })}
       </div>
@@ -952,6 +975,7 @@ const Navbar = () => {
 
   const handleLogout = async () => {
     setIsProfilePopoverOpen(false);
+    setIsCompactProfileLanyardOpen(false);
     await logout();
     setOpen(false);
     navigate('/', { replace: true });
@@ -1268,6 +1292,7 @@ const Navbar = () => {
 
   const handleProfileQuickLink = (targetPath) => (event) => {
     setIsProfilePopoverOpen(false);
+    setIsCompactProfileLanyardOpen(false);
     if (location.pathname === targetPath) {
       event.preventDefault();
       window.location.reload();
@@ -1463,6 +1488,11 @@ const Navbar = () => {
       window.clearTimeout(datePopoverCloseTimeoutRef.current);
       datePopoverCloseTimeoutRef.current = null;
     }
+    if (profilePopoverCloseTimeoutRef.current) {
+      window.clearTimeout(profilePopoverCloseTimeoutRef.current);
+      profilePopoverCloseTimeoutRef.current = null;
+    }
+    setIsProfilePopoverOpen(false);
     setIsDatePopoverOpen(true);
   };
 
@@ -1497,6 +1527,59 @@ const Navbar = () => {
   const handleCompactNavClick = () => {
     compactScrollRestoreRef.current = window.scrollY;
     preserveCompactUntilRef.current = Date.now() + 800;
+  };
+
+  const armBackdropGuard = (guardRef, timeoutRef) => {
+    guardRef.current = true;
+    if (timeoutRef.current) {
+      window.clearTimeout(timeoutRef.current);
+    }
+    timeoutRef.current = window.setTimeout(() => {
+      guardRef.current = false;
+      timeoutRef.current = null;
+    }, 280);
+  };
+
+  useEffect(() => {
+    if (!dateInfoOpen || !mobileNanakshahiDetailsRef.current) {
+      return undefined;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      mobileNanakshahiDetailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [dateInfoOpen, selectedNanakshahiDateKey]);
+
+  const closeSearchModal = () => {
+    setIsSearchModalOpen(false);
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+
+    const viewportMeta = document.querySelector('meta[name="viewport"]');
+    if (viewportMeta) {
+      const currentContent = viewportMeta.getAttribute('content') || 'width=device-width, initial-scale=1';
+      const normalizedContent = currentContent
+        .replace(/,\s*maximum-scale\s*=\s*[^,]+/gi, '')
+        .replace(/,\s*minimum-scale\s*=\s*[^,]+/gi, '')
+        .replace(/,\s*user-scalable\s*=\s*[^,]+/gi, '')
+        .trim();
+
+      viewportMeta.setAttribute('content', `${normalizedContent}, maximum-scale=1, minimum-scale=1, user-scalable=1`);
+
+      if (viewportResetTimeoutRef.current) {
+        window.clearTimeout(viewportResetTimeoutRef.current);
+      }
+
+      viewportResetTimeoutRef.current = window.setTimeout(() => {
+        viewportMeta.setAttribute('content', normalizedContent);
+      }, 180);
+    }
+
+    window.scrollTo({ top: window.scrollY, left: 0, behavior: 'auto' });
+    window.dispatchEvent(new Event('resize'));
   };
 
   const getImageDataUrl = async (source) => new Promise((resolve) => {
@@ -1934,16 +2017,28 @@ const Navbar = () => {
     if (profilePopoverCloseTimeoutRef.current) {
       window.clearTimeout(profilePopoverCloseTimeoutRef.current);
     }
+    if (viewportResetTimeoutRef.current) {
+      window.clearTimeout(viewportResetTimeoutRef.current);
+    }
+    if (compactLanyardBackdropGuardTimeoutRef.current) {
+      window.clearTimeout(compactLanyardBackdropGuardTimeoutRef.current);
+    }
+    if (dateInfoBackdropGuardTimeoutRef.current) {
+      window.clearTimeout(dateInfoBackdropGuardTimeoutRef.current);
+    }
+    if (searchBackdropGuardTimeoutRef.current) {
+      window.clearTimeout(searchBackdropGuardTimeoutRef.current);
+    }
   }, []);
 
   return (
     <header className={`sticky top-0 z-50 bg-slate-950/95 shadow-[0_10px_26px_-10px_rgba(2,6,23,0.65)] ring-1 ring-slate-700/80 backdrop-blur-md transition-all duration-300 ${isCompact ? 'pb-1' : ''}`}>
-      <div className="hidden border-b border-white/20 bg-[#0a1a33] px-4 py-1 text-xs text-blue-50 md:block">
+      <div className="hidden border-b border-white/20 bg-[#0a1a33] px-4 py-1 text-xs text-blue-50 xl:block">
         <div className="mx-auto flex max-w-7xl items-center justify-between md:px-2">
           <div className="flex items-center gap-2">
             <p>{siteConfig.contact.address}</p>
-            <span className="text-blue-200">|</span>
-            <div className="flex items-center gap-1.5">
+            <span className="hidden text-blue-200 xl:inline">|</span>
+            <div className="hidden items-center gap-1.5 xl:flex">
               <button
                 type="button"
                 className="inline-flex h-6 w-6 items-center justify-center rounded text-white hover:bg-blue-800/40"
@@ -1990,9 +2085,9 @@ const Navbar = () => {
                 }}
               />
             </div>
-            <span className="text-blue-200">|</span>
+            <span className="hidden text-blue-200 xl:inline">|</span>
             <div
-              className="group relative"
+              className="group relative hidden xl:block"
               onMouseEnter={openDatePopover}
               onMouseLeave={closeDatePopoverWithDelay}
               onFocus={openDatePopover}
@@ -2001,6 +2096,20 @@ const Navbar = () => {
               <button
                 type="button"
                 onClick={() => setDateInfoOpen(true)}
+                onMouseEnter={() => {
+                  if (profilePopoverCloseTimeoutRef.current) {
+                    window.clearTimeout(profilePopoverCloseTimeoutRef.current);
+                    profilePopoverCloseTimeoutRef.current = null;
+                  }
+                  setIsProfilePopoverOpen(false);
+                }}
+                onFocus={() => {
+                  if (profilePopoverCloseTimeoutRef.current) {
+                    window.clearTimeout(profilePopoverCloseTimeoutRef.current);
+                    profilePopoverCloseTimeoutRef.current = null;
+                  }
+                  setIsProfilePopoverOpen(false);
+                }}
                 className="max-w-[260px] truncate whitespace-nowrap rounded-full border border-blue-200/30 px-2 py-1 text-xs font-bold leading-none tracking-tight text-blue-50 transition hover:bg-blue-800/40"
                 title="View Nanakshahi date details"
                 aria-label="View Nanakshahi date details"
@@ -2043,7 +2152,7 @@ const Navbar = () => {
             <button
               type="button"
               onClick={() => setIsSearchModalOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-brand-blue/70 bg-brand-blue/20 px-2.5 py-0.5 text-[11px] font-bold text-blue-50 shadow-[0_6px_12px_rgba(10,77,159,0.28)] transition hover:bg-brand-blue/35"
+              className="hidden items-center gap-1.5 rounded-full border border-brand-blue/70 bg-brand-blue/20 px-2.5 py-0.5 text-[11px] font-bold text-blue-50 shadow-[0_6px_12px_rgba(10,77,159,0.28)] transition hover:bg-brand-blue/35 xl:inline-flex"
             >
               <MagnifyingGlassIcon className="h-3.5 w-3.5" />
               Search
@@ -2069,7 +2178,9 @@ const Navbar = () => {
                   type="button"
                   onClick={() => setIsProfilePopoverOpen((previous) => !previous)}
                   onMouseEnter={openProfilePopover}
+                  onMouseLeave={closeProfilePopoverWithDelay}
                   onFocus={openProfilePopover}
+                  onBlur={closeProfilePopoverWithDelay}
                   aria-expanded={isProfilePopoverOpen}
                   className="inline-flex items-center gap-1.5 rounded-full border border-brand-saffron bg-brand-saffron px-2.5 py-0.5 text-[11px] font-bold text-brand-navy shadow-[0_6px_12px_rgba(245,166,35,0.3)] transition hover:bg-amber-300"
                 >
@@ -2158,7 +2269,7 @@ const Navbar = () => {
         </div>
       </div>
 
-      <div className="mt-2 w-full bg-slate-900/92">
+      <div className="w-full bg-slate-900/92 xl:mt-2">
         <div className="mx-auto max-w-7xl px-4 md:px-6">
           <div className={`relative hidden items-center transition-[min-height,padding] duration-300 ease-in-out xl:flex ${isCompact ? 'min-h-[86px] py-2' : 'min-h-[146px] py-2'}`}>
           <Link
@@ -2257,34 +2368,129 @@ const Navbar = () => {
       </div>
       </div>
 
-      <div className="bg-slate-900/92 xl:hidden px-4 pb-4 pt-1">
-        <div className="flex items-center">
-          <div className="flex w-1/3 justify-start">
+      <div className="bg-slate-900/92 px-4 py-2 xl:hidden">
+        <div className="relative flex min-h-[3.7rem] items-center justify-between py-1">
+          <div className="flex items-center justify-start">
             <Link to="/" className="inline-flex items-center" aria-label="Go to homepage">
               <img
                 src={gurdwaraLogo}
                 alt="Gurdwara Singh Sabha Milton logo"
-                className="h-[4.05rem] w-[4.05rem] rounded-full border border-brand-saffron object-cover"
+                className="h-[3.55rem] w-[3.55rem] rounded-full border border-brand-saffron object-cover"
               />
             </Link>
           </div>
 
-          <div className="flex w-1/3 justify-center md:hidden">
-            {liveStreams.length > 0 ? (
+          <div className="pointer-events-none absolute inset-x-0 top-1/2 z-[205] -translate-y-1/2 px-[4.25rem] md:px-[5.5rem]">
+            <div className="pointer-events-auto flex items-center justify-center gap-1.5 whitespace-nowrap">
               <button
                 type="button"
-                onClick={() => setCompactStreamsOpen(true)}
-                className="rounded-full bg-brand-blue px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white shadow-[0_8px_18px_rgba(10,77,159,0.35)] [animation:pulse_2.1s_ease-in-out_infinite]"
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  armBackdropGuard(searchBackdropGuardRef, searchBackdropGuardTimeoutRef);
+                  setIsSearchModalOpen(true);
+                }}
+                onTouchStart={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  armBackdropGuard(searchBackdropGuardRef, searchBackdropGuardTimeoutRef);
+                  setIsSearchModalOpen(true);
+                }}
+                onClick={() => {
+                  armBackdropGuard(searchBackdropGuardRef, searchBackdropGuardTimeoutRef);
+                  setIsSearchModalOpen(true);
+                }}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-sky-300 bg-sky-100 text-sky-900 touch-manipulation select-none md:w-auto md:gap-1 md:px-2.5"
+                aria-label="Open search"
+                title="Search"
               >
-                Watch Live
+                <MagnifyingGlassIcon className="h-3.5 w-3.5" />
+                <span className="hidden text-[10px] font-bold md:inline">Search</span>
               </button>
-            ) : null}
+              <button
+                type="button"
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  armBackdropGuard(dateInfoBackdropGuardRef, dateInfoBackdropGuardTimeoutRef);
+                  setDateInfoOpen(true);
+                }}
+                onTouchStart={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  armBackdropGuard(dateInfoBackdropGuardRef, dateInfoBackdropGuardTimeoutRef);
+                  setDateInfoOpen(true);
+                }}
+                onClick={() => {
+                  armBackdropGuard(dateInfoBackdropGuardRef, dateInfoBackdropGuardTimeoutRef);
+                  setDateInfoOpen(true);
+                }}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-brand-blue/30 bg-gradient-to-r from-white via-blue-50 to-amber-50 text-brand-blue touch-manipulation select-none md:w-auto md:gap-1 md:px-2.5"
+                aria-label="Open calendar"
+                title="Calendar"
+              >
+                <CalendarDaysIcon className="h-3.5 w-3.5" />
+                <span className="hidden text-[10px] font-bold md:inline">Calendar</span>
+              </button>
+              {liveStreams.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setCompactStreamsOpen(true)}
+                  className="inline-flex items-center gap-1 rounded-full bg-brand-blue px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-[0_8px_18px_rgba(10,77,159,0.35)]"
+                >
+                  <LiveStreamGlyph />
+                  Live
+                </button>
+              ) : null}
+            </div>
           </div>
 
-          <div className="hidden w-1/3 justify-center md:flex">
+          <div className="relative z-[245] flex items-center justify-end gap-1.5">
+            {isAuthenticated ? (
+              <button
+                type="button"
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  armBackdropGuard(compactLanyardBackdropGuardRef, compactLanyardBackdropGuardTimeoutRef);
+                  setOpen(false);
+                  setIsCompactProfileLanyardOpen(true);
+                }}
+                onTouchStart={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  armBackdropGuard(compactLanyardBackdropGuardRef, compactLanyardBackdropGuardTimeoutRef);
+                  setOpen(false);
+                  setIsCompactProfileLanyardOpen(true);
+                }}
+                onClick={() => {
+                  armBackdropGuard(compactLanyardBackdropGuardRef, compactLanyardBackdropGuardTimeoutRef);
+                  setOpen(false);
+                  setIsCompactProfileLanyardOpen(true);
+                }}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/25 bg-white/10 p-0.5 touch-manipulation select-none"
+                aria-label="Open profile lanyard"
+                aria-expanded={isCompactProfileLanyardOpen}
+              >
+                <img
+                  src={userAvatarUrl}
+                  alt={userDisplayName}
+                  className="h-8 w-8 rounded-full border border-brand-saffron/80 object-cover shadow-[0_4px_10px_rgba(15,23,42,0.24)]"
+                  onError={(event) => {
+                    const fallback = getAvatarFallbackUrl(userDisplayName);
+                    if (event.currentTarget.src !== fallback) {
+                      event.currentTarget.src = fallback;
+                    }
+                  }}
+                />
+              </button>
+            ) : null}
             <button
               type="button"
-              onClick={() => setOpen((prev) => !prev)}
+              onClick={() => {
+                setIsCompactProfileLanyardOpen(false);
+                setOpen((prev) => !prev);
+              }}
               className="z-[240] rounded-lg p-2 text-white"
               aria-label="Open mobile menu"
               aria-expanded={open}
@@ -2292,45 +2498,6 @@ const Navbar = () => {
               {open ? <XMarkIcon className="h-6 w-6" /> : <Bars3Icon className="h-6 w-6" />}
             </button>
           </div>
-
-          <div className="flex w-1/3 justify-end">
-            {liveStreams.length > 0 ? (
-              <button
-                type="button"
-                onClick={() => setCompactStreamsOpen(true)}
-                className="hidden rounded-full bg-brand-blue px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white shadow-[0_8px_18px_rgba(10,77,159,0.35)] [animation:pulse_2.1s_ease-in-out_infinite] md:inline-flex"
-              >
-                Watch Live
-              </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => setOpen((prev) => !prev)}
-              className="z-[240] rounded-lg p-2 text-white md:hidden"
-              aria-label="Open mobile menu"
-              aria-expanded={open}
-            >
-              {open ? <XMarkIcon className="h-6 w-6" /> : <Bars3Icon className="h-6 w-6" />}
-            </button>
-          </div>
-        </div>
-        <div className="mt-3 pt-1 flex flex-wrap items-center justify-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIsSearchModalOpen(true)}
-            className="inline-flex items-center gap-2 rounded-full border border-sky-300 bg-sky-100 px-3 py-1 text-[11px] font-bold text-sky-900"
-          >
-            <MagnifyingGlassIcon className="h-3.5 w-3.5" />
-            Search
-          </button>
-          <button
-            type="button"
-            onClick={() => setDateInfoOpen(true)}
-            className="inline-flex items-center gap-2 rounded-full border border-brand-blue/30 bg-gradient-to-r from-white via-blue-50 to-amber-50 px-3 py-1 text-[11px] font-bold text-brand-blue"
-          >
-            <CalendarDaysIcon className="h-3.5 w-3.5" />
-            View Nanakshahi Date Details
-          </button>
         </div>
       </div>
 
@@ -2451,8 +2618,113 @@ const Navbar = () => {
         </div>
       , document.body) : null}
 
+      {isCompactProfileLanyardOpen ? createPortal(
+        <div className="fixed inset-0 z-[260] overflow-y-auto bg-slate-950/55 px-4 py-6 xl:hidden" onClick={() => {
+          if (compactLanyardBackdropGuardRef.current) {
+            compactLanyardBackdropGuardRef.current = false;
+            return;
+          }
+          setIsCompactProfileLanyardOpen(false);
+        }}>
+          <div className="flex min-h-full items-start justify-end pt-16 md:pt-20">
+            <div className="w-full max-w-sm rounded-3xl border border-brand-blue/35 bg-gradient-to-br from-blue-50/95 via-white to-amber-50/95 p-4 shadow-[0_24px_60px_rgba(15,23,42,0.24)]" onClick={(event) => event.stopPropagation()}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <img
+                    src={userAvatarUrl}
+                    alt={userDisplayName}
+                    className="h-12 w-12 rounded-full border-2 border-brand-saffron object-cover"
+                    onError={(event) => {
+                      const fallback = getAvatarFallbackUrl(userDisplayName);
+                      if (event.currentTarget.src !== fallback) {
+                        event.currentTarget.src = fallback;
+                      }
+                    }}
+                  />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-extrabold text-brand-blue">{userDisplayName}</p>
+                    <p className="truncate text-xs font-semibold text-slate-600">{userDisplayEmail}</p>
+                  </div>
+                </div>
+
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700"
+                  >
+                    <ArrowRightOnRectangleIcon className="h-3.5 w-3.5" />
+                    Logout
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsCompactProfileLanyardOpen(false)}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600"
+                    aria-label="Close profile lanyard"
+                    title="Close"
+                  >
+                    <XMarkIcon className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-2.5 grid grid-cols-2 gap-2">
+                <div className="rounded-xl border border-emerald-200 bg-white px-2.5 py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Donations</p>
+                  <p className="mt-1 text-xl font-black leading-none text-emerald-700">{formatCompactDonationTotal(familySummary.donationTotal)}</p>
+                </div>
+                <div className="rounded-xl border border-brand-blue/20 bg-white px-2.5 py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Event RSVPs</p>
+                  <p className="mt-1 text-lg font-black leading-none text-brand-blue">{familySummary.eventCount}</p>
+                  <p className="mt-0.5 text-[10px] text-amber-700">Waitlist: {familySummary.waitlistCount}</p>
+                </div>
+                <div className="col-span-2 rounded-xl border border-brand-blue/20 bg-white px-2.5 py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Seva Applications</p>
+                  <p className="mt-1 text-lg font-black leading-none text-brand-blue">{familySummary.sevaCount}</p>
+                </div>
+              </div>
+
+              <div className="mt-3 grid grid-cols-4 gap-2">
+                <button type="button" onClick={openProfileModal} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-2 py-1.5 text-[10px] font-bold text-brand-blue">
+                  <UserCircleIcon className="h-4.5 w-4.5" />
+                  Profile
+                </button>
+                <Link to="/events" onClick={handleProfileQuickLink('/events')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-2 py-1.5 text-[10px] font-bold text-brand-blue">
+                  <CalendarDaysIcon className="h-4.5 w-4.5" />
+                  Events
+                </Link>
+                <Link to="/seva" onClick={handleProfileQuickLink('/seva')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-2 py-1.5 text-[10px] font-bold text-brand-blue">
+                  <HandRaisedIcon className="h-4.5 w-4.5" />
+                  Seva
+                </Link>
+                <Link to="/donation" onClick={handleProfileQuickLink('/donation')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-2 py-1.5 text-[10px] font-bold text-brand-blue">
+                  <HeartIcon className="h-4.5 w-4.5" />
+                  Donate
+                </Link>
+              </div>
+
+              <Link to="/family-dashboard" onClick={handleProfileQuickLink('/family-dashboard')} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-brand-saffron bg-brand-saffron px-3 py-1.5 text-xs font-extrabold uppercase tracking-wide text-brand-navy transition hover:bg-amber-300">
+                <SparklesIcon className="h-4 w-4" />
+                Open Family Dashboard
+              </Link>
+              {canSeeAdminPortalButton ? (
+                <Link to="/admin" onClick={handleProfileQuickLink('/admin')} className="mt-2 inline-flex w-full items-center justify-center rounded-full border border-brand-blue/30 bg-gradient-to-r from-brand-blue via-blue-600 to-brand-saffron px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white shadow-[0_8px_20px_rgba(10,77,159,0.28)] transition hover:from-blue-700 hover:via-brand-blue hover:to-amber-500">
+                  Go to Admin Portal
+                </Link>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      , document.body) : null}
+
       {dateInfoOpen ? createPortal(
-        <div className="fixed inset-0 z-[230] overflow-y-auto bg-slate-950/65 px-4 py-6" onClick={() => setDateInfoOpen(false)}>
+        <div className="fixed inset-0 z-[230] overflow-y-auto bg-slate-950/65 px-4 py-6" onClick={() => {
+          if (dateInfoBackdropGuardRef.current) {
+            dateInfoBackdropGuardRef.current = false;
+            return;
+          }
+          setDateInfoOpen(false);
+        }}>
           <div className="flex min-h-full items-center justify-center">
             <div className="max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
               <div className="flex items-center justify-between border-b border-slate-200 bg-blue-50 px-4 py-3">
@@ -2475,18 +2747,71 @@ const Navbar = () => {
 
                 {renderNanakshahiCalendar()}
 
-                <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3">
+                <div ref={mobileNanakshahiDetailsRef} className="rounded-xl border border-amber-200 bg-amber-50 p-3 xl:hidden">
+                  <p className="text-sm font-semibold text-amber-900">Selected day</p>
+                  {(() => {
+                    const selectedCell = nanakshahiMonthCalendar.weeks.flat().find((cell) => {
+                      if (!cell) {
+                        return false;
+                      }
+
+                      const gregorianKey = `${cell.gregorianDate.getFullYear()}-${String(cell.gregorianDate.getMonth() + 1).padStart(2, '0')}-${String(cell.gregorianDate.getDate()).padStart(2, '0')}`;
+                      return gregorianKey === selectedNanakshahiDateKey;
+                    }) || nanakshahiMonthCalendar.weeks.flat().find((cell) => {
+                      if (!cell) {
+                        return false;
+                      }
+
+                      const gregorianKey = `${cell.gregorianDate.getFullYear()}-${String(cell.gregorianDate.getMonth() + 1).padStart(2, '0')}-${String(cell.gregorianDate.getDate()).padStart(2, '0')}`;
+                      return gregorianKey === todayGregorianKey;
+                    }) || null;
+
+                    if (!selectedCell || !selectedCell.hasObservance || selectedCell.observances.length === 0) {
+                      return <p className="mt-1 text-sm text-amber-800">No event for today.</p>;
+                    }
+
+                    const selectedEnglishDateLabel = new Intl.DateTimeFormat('en-US', {
+                      month: 'short',
+                      day: '2-digit',
+                      year: 'numeric'
+                    }).format(selectedCell.gregorianDate);
+
+                    return (
+                      <div className="mt-2 space-y-2">
+                        {selectedCell.observances.map((event, eventIndex) => {
+                          const tone = getObservanceTypeStyles(event.type);
+
+                          return (
+                            <div key={`${event.type}-${event.titlePa}-${eventIndex}`} className="rounded-xl border border-amber-200 bg-white p-3">
+                              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${tone.badge}`}>
+                                <CalendarDaysIcon className="h-3 w-3 flex-shrink-0" />
+                                {event.occasion}
+                              </span>
+                              <p className={`mt-2 text-sm font-bold ${tone.title}`}>{event.titlePa}</p>
+                              <p className="text-xs font-semibold text-slate-700">{event.title}</p>
+                              <p className="mt-1 text-[11px] font-semibold tracking-wide text-slate-600">{selectedEnglishDateLabel}</p>
+                              <p className="mt-1 text-xs leading-relaxed text-slate-600">{event.blurbPa}</p>
+                              <p className="mt-1 text-xs leading-relaxed text-slate-600">{event.blurb}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                <div className="hidden rounded-xl border border-blue-100 bg-blue-50/60 p-3 xl:block">
                   <p className="text-sm font-semibold text-slate-800">ਅੱਜ ਦੀ ਰੂਹਾਨੀ ਸੋਚ</p>
                   <p className="mt-1 text-sm leading-relaxed text-slate-700">{dateContext.insight.pa}</p>
                 </div>
 
-                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                <div className="hidden rounded-xl border border-slate-200 bg-white p-3 xl:block">
                   <p className="text-sm font-semibold text-slate-800">Today’s Significance</p>
                   <p className="mt-1 text-sm leading-relaxed text-slate-700">{dateContext.insight.en}</p>
                 </div>
 
                 {todayObservance ? (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                  <div className="hidden rounded-xl border border-amber-200 bg-amber-50 p-3 xl:block">
                     <p className="text-sm font-semibold text-amber-900">Today in Sikh Calendar</p>
                     <p className="mt-1 text-sm font-semibold text-amber-900">{todayObservance.titlePa}</p>
                     <p className="text-sm text-amber-800">{todayObservance.title}</p>
@@ -2499,7 +2824,7 @@ const Navbar = () => {
                     ) : null}
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <div className="hidden rounded-xl border border-slate-200 bg-slate-50 p-3 xl:block">
                     <p className="text-sm text-slate-700">No major fixed observance is listed for today in the current calendar set.</p>
                   </div>
                 )}
@@ -2718,15 +3043,21 @@ const Navbar = () => {
       , document.body) : null}
 
       {isSearchModalOpen ? createPortal(
-        <div className="fixed inset-0 z-[281] flex items-start justify-center bg-slate-950/45 px-5 py-20 backdrop-blur-sm sm:px-4" onClick={() => setIsSearchModalOpen(false)}>
-          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_30px_70px_-34px_rgba(15,23,42,0.75)]" onClick={(event) => event.stopPropagation()}>
+        <div className="fixed inset-0 z-[281] overflow-x-hidden bg-slate-950/45 px-3 py-10 backdrop-blur-sm sm:px-4 sm:py-20" onClick={() => {
+          if (searchBackdropGuardRef.current) {
+            searchBackdropGuardRef.current = false;
+            return;
+          }
+          closeSearchModal();
+        }}>
+          <div className="mx-auto w-full max-w-2xl box-border overflow-x-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_30px_70px_-34px_rgba(15,23,42,0.75)]" onClick={(event) => event.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <h3 className="font-heading text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Search</h3>
               </div>
               <button
                 type="button"
-                onClick={() => setIsSearchModalOpen(false)}
+                onClick={closeSearchModal}
                 className="rounded-full border border-slate-300 p-1.5 text-slate-600 transition hover:bg-slate-100"
                 aria-label="Close search modal"
               >
@@ -2734,13 +3065,14 @@ const Navbar = () => {
               </button>
             </div>
             <GlobalSearchBar
-              className="w-full px-2 sm:px-0"
-              inputClassName="py-2.5"
+              className="w-full min-w-0 max-w-full px-0"
+              panelClassName="max-w-full overflow-x-hidden"
+              inputClassName="py-2.5 text-[16px] md:text-sm"
               placeholder="Search website content"
               autoFocus
               inputId="global-search-modal-input"
               scope="public"
-              onResultSelect={() => setIsSearchModalOpen(false)}
+              onResultSelect={closeSearchModal}
             />
           </div>
         </div>
@@ -2748,7 +3080,7 @@ const Navbar = () => {
 
       {open ? (
         <div className="h-[calc(100dvh-6.5rem)] overflow-y-auto border-t border-slate-100 bg-gradient-to-b from-white to-slate-50 px-4 py-3 pb-10 xl:hidden">
-          <div className="mb-3 grid gap-2 sm:grid-cols-2">
+          <div className="mb-3 grid gap-2">
             {!isAuthenticated ? (
               <Link
                 to="/login?next=/family-dashboard"
@@ -2761,50 +3093,21 @@ const Navbar = () => {
                 Become Member
               </Link>
             ) : null}
-            <Link
+            {!isAuthenticated ? (
+              <Link
               to={isAuthenticated ? resolveLandingPathByRole(user?.role) : '/login'}
               onClick={(event) => {
                 handleSignInClick(event);
                 setOpen(false);
               }}
-              className={`inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-center text-sm font-semibold ${isAuthenticated ? 'border border-slate-200 bg-white text-slate-700' : 'border border-brand-blue bg-brand-blue text-white font-extrabold shadow-[0_8px_18px_rgba(10,77,159,0.34)]'}`}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-blue bg-brand-blue px-3 py-2 text-center text-sm font-extrabold text-white shadow-[0_8px_18px_rgba(10,77,159,0.34)]"
             >
-              {isAuthenticated ? (
-                <img
-                  src={userAvatarUrl}
-                  alt={userDisplayName}
-                  className="h-6 w-6 rounded-full border border-brand-saffron/70 object-cover"
-                  onError={(event) => {
-                    const fallback = getAvatarFallbackUrl(userDisplayName);
-                    if (event.currentTarget.src !== fallback) {
-                      event.currentTarget.src = fallback;
-                    }
-                  }}
-                />
-              ) : null}
-              {isAuthenticated ? `Welcome, ${userDisplayName}` : 'Sign In'}
-            </Link>
+              Sign In
+              </Link>
+            ) : null}
           </div>
           {isApprovalPending ? (
             <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">{PENDING_APPROVAL_MESSAGE}</p>
-          ) : null}
-          {isAuthenticated && canSeeAdminPortalButton ? (
-            <Link
-              to="/admin"
-              onClick={() => setOpen(false)}
-              className="mb-2 inline-flex w-full items-center justify-center rounded-xl border border-brand-blue/30 bg-gradient-to-r from-brand-blue via-blue-600 to-brand-saffron px-3 py-2 text-sm font-bold uppercase tracking-wide text-white shadow-[0_8px_20px_rgba(10,77,159,0.28)] transition hover:from-blue-700 hover:via-brand-blue hover:to-amber-500"
-            >
-              Go to Admin Portal
-            </Link>
-          ) : null}
-          {isAuthenticated ? (
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="mb-3 w-full rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700"
-            >
-              Logout
-            </button>
           ) : null}
           <div className="grid gap-2">
             {mobileMenuItems.map((item) => (

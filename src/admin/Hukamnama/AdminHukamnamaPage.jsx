@@ -163,6 +163,15 @@ const AdminHukamnamaPage = () => {
     setSelectedDate(next);
   };
 
+  const handleSubmitHukamnama = form.handleSubmit((values) => {
+    const payload = {
+      ...values,
+      date: toDateKey(values.date),
+      ang: Number(values.ang)
+    };
+    addMutation.mutate(payload);
+  });
+
   const tileContent = ({ date, view }) => {
     if (view !== 'month') {
       return null;
@@ -218,22 +227,25 @@ const AdminHukamnamaPage = () => {
       </div>
 
       {addModalOpen ? (
-        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6">
-          <div className="mx-auto flex min-h-full items-center justify-center">
-          <div className="w-full max-w-5xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
+        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-3 py-3 sm:px-4 sm:py-6">
+          <div className="mx-auto flex min-h-full items-start justify-center sm:items-center">
+          <div className="w-full max-w-5xl max-h-[calc(100dvh-1.5rem)] overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:max-h-[calc(100vh-3rem)] sm:p-5">
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-heading text-xl font-semibold">{editingDateKey ? 'Edit Hukamnama' : 'Add Hukamnama'}</h3>
               <button type="button" onClick={() => setAddModalOpen(false)} className="rounded-md border border-slate-300 px-2 py-1 text-sm">Close</button>
             </div>
 
-            <form className="mt-4 grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]" onSubmit={form.handleSubmit((values) => addMutation.mutate(values))}>
+            <form className="mt-4 grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]" onSubmit={handleSubmitHukamnama}>
               <div className="space-y-3">
                 <label className="text-sm">Date
                   <input type="date" {...form.register('date', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
                 </label>
                 <label className="text-sm">Ang
-                  <input type="number" min="1" max="1430" {...form.register('ang', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                  <input type="number" min="1" max="1430" {...form.register('ang', { required: true, valueAsNumber: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
                 </label>
+                {(form.formState.errors?.date || form.formState.errors?.ang) ? (
+                  <p className="rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-700">Date and Ang are required.</p>
+                ) : null}
                 <div className="flex flex-wrap items-center gap-2 pt-1">
                   <button
                     type="button"
@@ -244,7 +256,8 @@ const AdminHukamnamaPage = () => {
                     {previewMutation.isPending ? 'Loading...' : 'Load Preview'}
                   </button>
                   <button
-                    type="submit"
+                    type="button"
+                    onClick={handleSubmitHukamnama}
                     disabled={addMutation.isPending}
                     className="rounded-lg border border-brand-blue bg-brand-blue px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-blue/90 disabled:cursor-not-allowed disabled:opacity-60"
                   >

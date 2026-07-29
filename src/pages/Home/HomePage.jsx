@@ -100,7 +100,10 @@ const HomePage = () => {
   const [selectedSevaCategory, setSelectedSevaCategory] = useState('All');
   const [selectedSevaPage, setSelectedSevaPage] = useState(1);
   const [homeReadAlongStopToken, setHomeReadAlongStopToken] = useState(0);
+  const [tickerMotionSeed, setTickerMotionSeed] = useState(0);
   const previousSelectedContentTypeRef = useRef(null);
+  const homeTickerTrackRef = useRef(null);
+  const specialTickerTrackRef = useRef(null);
 
   const tickerItems = useMemo(() => (events.length > 0 ? events : []), [events]);
   const tickerLoopItems = useMemo(() => {
@@ -128,6 +131,71 @@ const HomePage = () => {
     const lastId = String(tickerLoopItems[tickerLoopItems.length - 1]?.id || 'na');
     return `${tickerLoopItems.length}-${firstId}-${lastId}`;
   }, [tickerLoopItems]);
+
+  const restartTickerTrack = (trackRef) => {
+    const node = trackRef?.current;
+    if (!(node instanceof HTMLElement)) {
+      return;
+    }
+
+    node.style.animation = 'none';
+    // Force layout so browsers re-apply animation timeline reliably.
+    void node.offsetHeight;
+    node.style.animation = '';
+    node.style.animationPlayState = 'running';
+  };
+
+  useEffect(() => {
+    if (tickerLoopItems.length === 0) {
+      return undefined;
+    }
+
+    const restartTicker = () => {
+      restartTickerTrack(homeTickerTrackRef);
+      restartTickerTrack(specialTickerTrackRef);
+      setTickerMotionSeed((value) => value + 1);
+    };
+
+    const rafId = window.requestAnimationFrame(restartTicker);
+    const timeoutId = window.setTimeout(restartTicker, 120);
+    const delayedTimeoutId = window.setTimeout(restartTicker, 480);
+    const onPageShow = () => restartTicker();
+    const onWindowLoad = () => restartTicker();
+    const onResize = () => restartTicker();
+    const onOrientationChange = () => restartTicker();
+    let touchedOnce = false;
+    const onFirstTouch = () => {
+      if (touchedOnce) {
+        return;
+      }
+      touchedOnce = true;
+      restartTicker();
+    };
+    const onVisibilityChange = () => {
+      if (!document.hidden) {
+        restartTicker();
+      }
+    };
+
+    window.addEventListener('pageshow', onPageShow);
+    window.addEventListener('load', onWindowLoad);
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onOrientationChange);
+    window.addEventListener('touchstart', onFirstTouch, { passive: true });
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.clearTimeout(timeoutId);
+      window.clearTimeout(delayedTimeoutId);
+      window.removeEventListener('pageshow', onPageShow);
+      window.removeEventListener('load', onWindowLoad);
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onOrientationChange);
+      window.removeEventListener('touchstart', onFirstTouch);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [tickerLoopItems.length]);
   const latestArticle = useMemo(
     () => (newsArticles || []).find((article) => newsService.isLiveArticle(article)) || null,
     [newsArticles]
@@ -314,7 +382,18 @@ const HomePage = () => {
 
       {tickerItems.length > 0 ? (
         <section className="ticker-shell ticker-shell-home overflow-hidden py-1">
-          <div key={tickerRenderKey} className="ticker-track ticker-force-motion">
+          <div
+            ref={homeTickerTrackRef}
+            key={`${tickerRenderKey}-${tickerMotionSeed}`}
+            className="ticker-track ticker-force-motion ticker-speed-medium"
+            style={{
+              animationName: 'ticker-scroll-left',
+              animationDuration: '34s',
+              animationTimingFunction: 'linear',
+              animationIterationCount: 'infinite',
+              animationPlayState: 'running'
+            }}
+          >
             {[0, 1, 2].map((groupIndex) => (
               <div key={groupIndex} className="ticker-group">
                 {tickerLoopItems.map((event) => (
@@ -421,7 +500,7 @@ const HomePage = () => {
               {specialDayTickerTextVisible ? (
                 <div className={`daily-schedule-special-ticker mt-2 w-full min-w-0 max-w-full overflow-hidden border-y ${isTodaySpecial ? 'border-brand-saffron/40 bg-brand-saffron' : 'border-brand-blue/20 bg-brand-blue/10'}`}>
                   <div className="ticker-mask px-3 py-1.5">
-                    <div className="ticker-track ticker-force-motion daily-schedule-special-track ticker-speed-fast ticker-no-pause">
+                    <div ref={specialTickerTrackRef} key={`special-track-${tickerMotionSeed}`} className="ticker-track ticker-force-motion daily-schedule-special-track ticker-speed-fast ticker-no-pause">
                       {[0, 1].map((groupIndex) => (
                         <div key={`special-day-note-${groupIndex}`} className="ticker-group">
                           {[0, 1, 2, 3].map((unitIndex) => (
@@ -687,8 +766,8 @@ const HomePage = () => {
 
       {selectedContentLink ? (
         <div className="fixed inset-0 z-[75] flex items-center justify-center bg-slate-900/45 px-3 py-4 sm:px-4">
-          <div className="w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-5">
-            <div className="flex items-start justify-between gap-3">
+          <div className={`w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-xl bg-white shadow-xl ${selectedContentLink.type === 'seva' ? 'overflow-hidden p-0' : 'p-4 sm:p-5'}`}>
+            <div className={`${selectedContentLink.type === 'seva' ? 'flex items-start justify-between gap-3 rounded-t-xl bg-slate-900 px-4 py-3 text-white' : '-mx-4 -mt-4 mb-4 flex items-start justify-between gap-3 rounded-t-xl px-4 py-3'}`}>
               <div className="min-w-0">
                 {selectedContentLink.type === 'hukamnama' ? (
                   <div>
@@ -719,6 +798,11 @@ const HomePage = () => {
                     </div>
                     {activeHukamnama?.ang ? <h3 className="mt-3 pt-1 font-heading text-3xl font-bold leading-tight text-slate-900 sm:text-4xl">ਅੰਗ {activeHukamnama.ang} | Ang {activeHukamnama.ang}</h3> : null}
                   </div>
+                ) : selectedContentLink.type === 'seva' ? (
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/65">Community Supplies</p>
+                    <h3 className="mt-1 font-heading text-2xl font-semibold text-white sm:text-3xl">Langar Seva Items</h3>
+                  </div>
                 ) : (
                   <>
                     <h3 className="font-heading text-xl font-semibold text-slate-900 sm:text-2xl">{selectedContentLink.title}</h3>
@@ -729,7 +813,7 @@ const HomePage = () => {
               <button
                 type="button"
                 onClick={() => setSelectedContentLink(null)}
-                className="inline-flex h-8 w-8 shrink-0 flex-none items-center justify-center rounded-full border border-brand-blue bg-brand-blue text-lg leading-none text-white shadow-[0_8px_18px_rgba(10,77,159,0.3)] transition hover:border-brand-saffron hover:bg-brand-saffron hover:text-white"
+                className={`inline-flex h-8 w-8 shrink-0 flex-none items-center justify-center rounded-full text-lg leading-none text-white shadow-[0_8px_18px_rgba(10,77,159,0.3)] transition hover:text-white ${selectedContentLink.type === 'seva' ? 'border border-white/25 bg-white/10 hover:bg-white/20' : 'border border-brand-blue bg-brand-blue hover:border-brand-saffron hover:bg-brand-saffron'}`}
                 aria-label="Close modal"
               >
                 ×
@@ -750,8 +834,7 @@ const HomePage = () => {
                 </div>
               </>
             ) : selectedContentLink.type === 'seva' ? (
-              <>
-                <h4 className="mt-4 text-sm font-semibold uppercase tracking-wide text-brand-blue">Langar Seva Items</h4>
+              <div className="px-4 pb-4 sm:px-5 sm:pb-5">
                 <div className="mt-3 flex flex-wrap gap-2">
                   {['All', ...Array.from(new Set((selectedContentLink.items || []).map((item) => item.category || 'General')))].map((category) => (
                     <button
@@ -802,7 +885,7 @@ const HomePage = () => {
                     );
                   })()}
                 </div>
-              </>
+              </div>
             ) : selectedContentLink.type === 'updates' ? (
               <div className="mt-4 max-h-[55vh] overflow-y-auto pr-1">
                 <ul className="divide-y divide-slate-100">
@@ -825,12 +908,6 @@ const HomePage = () => {
               </div>
             )}
 
-            {selectedContentLink.type !== 'hukamnama' ? (
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:gap-3">
-                {selectedContentLink.path ? <Link to={selectedContentLink.path} onClick={() => setSelectedContentLink(null)} className="rounded-md bg-brand-blue px-3 py-2 text-center text-sm font-semibold text-white">Open Full Page</Link> : null}
-                <button type="button" onClick={() => setSelectedContentLink(null)} className="rounded-md border border-slate-300 px-3 py-2 text-sm">Close</button>
-              </div>
-            ) : null}
           </div>
         </div>
       ) : null}

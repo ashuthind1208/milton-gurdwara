@@ -81,7 +81,7 @@ const PublicLayout = () => {
   }, [upcomingObservances]);
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 transition-colors">
+    <div className="min-h-screen overflow-x-hidden bg-white text-slate-900 transition-colors">
       <Navbar />
       {isHomePage ? (
         <section className="w-full overflow-hidden border-y border-brand-blue/70 bg-brand-blue py-2.5">
@@ -125,7 +125,7 @@ const PublicLayout = () => {
           100% { transform: translateX(-50%); }
         }
       `}</style>
-      <main className="mx-auto w-full max-w-7xl px-4 py-5 md:px-6 md:py-6">
+      <main className="mx-auto w-full max-w-7xl overflow-x-hidden px-4 py-5 md:px-6 md:py-6">
         <Outlet />
       </main>
       <Footer />

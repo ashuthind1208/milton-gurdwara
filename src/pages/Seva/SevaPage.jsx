@@ -650,7 +650,7 @@ const SevaPage = () => {
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <h3 className="font-heading text-xl font-semibold text-slate-900">Volunteer Registration</h3>
-                <p className="overflow-x-auto whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-slate-500">{activeRegisterOpportunity?.sevaType ? formatSevaOpportunityLabel(activeRegisterOpportunity) : 'Quick, signed-in registration'}</p>
+                <p className="truncate text-xs font-semibold uppercase tracking-wide text-slate-500">{activeRegisterOpportunity?.sevaType ? formatSevaOpportunityLabel(activeRegisterOpportunity) : 'Quick, signed-in registration'}</p>
               </div>
               <button
                 type="button"

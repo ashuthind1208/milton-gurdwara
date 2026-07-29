@@ -44,7 +44,7 @@ const GlobalSearchResultsPanel = ({
   }
 
   return (
-    <div className="max-h-[360px] overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-[0_18px_34px_-22px_rgba(15,23,42,0.5)]">
+    <div className="max-h-[360px] max-w-full overflow-x-hidden overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-[0_18px_34px_-22px_rgba(15,23,42,0.5)]">
       {groupedResults.map((group) => (
         <section key={group.type} className="mb-1.5 last:mb-0">
           <div className="px-2.5 pb-1 pt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
