@@ -3043,17 +3043,17 @@ const Navbar = () => {
       , document.body) : null}
 
       {isSearchModalOpen ? createPortal(
-        <div className="fixed inset-0 z-[281] overflow-x-hidden bg-slate-950/45 px-3 py-10 backdrop-blur-sm sm:px-4 sm:py-20" onClick={() => {
+        <div className="fixed inset-0 z-[281] overflow-x-hidden overflow-y-auto bg-slate-950/45 px-4 py-8 backdrop-blur-sm sm:px-8 sm:py-12" onClick={() => {
           if (searchBackdropGuardRef.current) {
             searchBackdropGuardRef.current = false;
             return;
           }
           closeSearchModal();
         }}>
-          <div className="mx-auto w-full max-w-2xl box-border overflow-x-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_30px_70px_-34px_rgba(15,23,42,0.75)]" onClick={(event) => event.stopPropagation()}>
+          <div className="mx-auto w-full max-w-lg box-border overflow-x-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_30px_70px_-34px_rgba(15,23,42,0.75)] sm:max-w-xl sm:p-4" onClick={(event) => event.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
-                <h3 className="font-heading text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Search</h3>
+                <h3 className="font-heading text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">Search</h3>
               </div>
               <button
                 type="button"
@@ -3066,7 +3066,7 @@ const Navbar = () => {
             </div>
             <GlobalSearchBar
               className="w-full min-w-0 max-w-full px-0"
-              panelClassName="max-w-full overflow-x-hidden"
+              panelClassName="!static !left-auto !right-auto !top-auto !z-10 mt-2 max-w-full overflow-x-hidden xl:!absolute xl:!left-0 xl:!right-0 xl:!top-[calc(100%+8px)] xl:!z-[260]"
               inputClassName="py-2.5 text-[16px] md:text-sm"
               placeholder="Search website content"
               autoFocus
