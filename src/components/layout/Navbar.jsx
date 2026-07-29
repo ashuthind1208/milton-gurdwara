@@ -3050,7 +3050,7 @@ const Navbar = () => {
           }
           closeSearchModal();
         }}>
-          <div className="mx-auto w-full max-w-lg box-border overflow-x-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_30px_70px_-34px_rgba(15,23,42,0.75)] sm:max-w-xl sm:p-4" onClick={(event) => event.stopPropagation()}>
+          <div className="mx-auto w-full max-w-lg box-border overflow-x-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_30px_70px_-34px_rgba(15,23,42,0.75)] sm:max-w-xl lg:max-w-2xl sm:p-4" onClick={(event) => event.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <h3 className="font-heading text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">Search</h3>
@@ -3066,7 +3066,7 @@ const Navbar = () => {
             </div>
             <GlobalSearchBar
               className="w-full min-w-0 max-w-full px-0"
-              panelClassName="!static !left-auto !right-auto !top-auto !z-10 mt-2 max-w-full overflow-x-hidden xl:!absolute xl:!left-0 xl:!right-0 xl:!top-[calc(100%+8px)] xl:!z-[260]"
+              panelClassName="!static !left-auto !right-auto !top-auto !z-10 mt-2 max-w-full overflow-x-hidden"
               inputClassName="py-2.5 text-[16px] md:text-sm"
               placeholder="Search website content"
               autoFocus
