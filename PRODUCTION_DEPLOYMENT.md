@@ -55,6 +55,13 @@ Set these in production (frontend and backend as applicable).
   - Live webhook secret.
 - `STRIPE_CURRENCY`
   - Example: `cad`.
+- `ZEFFY_API_KEY` or `ZEFFY_WEBHOOK_TOKEN`
+  - Server-only shared credential used to authenticate `payment.completed` webhooks.
+  - Never prefix this value with `REACT_APP_` or place it in frontend source.
+- `ZEFFY_CAMPAIGN_ID`
+  - Optional numeric ID of the matching local donation campaign.
+- `ZEFFY_CAMPAIGN_NAME`
+  - Local campaign-name fallback. Example: `Help Us Build Our Gurdwara`.
 - `YOUTUBE_API_KEY`
   - Server-side key with YouTube Data API access.
 - `VOLUNTEER_REMINDER_WEBHOOK_URL`
@@ -121,6 +128,26 @@ Operational note:
    - Complete payment
    - Confirm donation record persisted
    - Confirm campaign raised total updates
+
+## 4.1) Zeffy Production Setup
+
+The Donations page opens the Zeffy form in an on-site iframe modal. Payment completion is recorded only by the backend webhook; redirect query parameters never create donation records.
+
+1. Confirm the nonprofit account and campaign remain active in Zeffy.
+2. Keep the embedded form set to:
+  - `https://www.zeffy.com/embed/donation-form/help-us-build-our-gurdwara?modal=true`
+3. In Zeffy, set the post-payment redirect URL to:
+  - `https://<frontend-domain>/donation?zeffy=completed`
+4. Subscribe the webhook to `payment.completed` and set its endpoint to:
+  - `POST https://<backend-domain>/api/zeffy/webhook`
+5. Keep `ZEFFY_API_KEY` server-only. The webhook verifies each notified payment through Zeffy's authenticated API before saving it.
+  - Do not add the API key to the webhook URL or frontend.
+  - Set `ZEFFY_WEBHOOK_TOKEN` only if the webhook sender is configured to provide the same custom token.
+6. Send a test `payment.completed` event and verify:
+  - The endpoint returns `200`.
+  - One donation is stored with provider `ZEFFY` and status `PAID`.
+  - Re-delivering the same transaction updates the same record rather than creating a duplicate.
+  - The donation appears in Admin Donations and the campaign raised total updates.
 
 ## 5) Google OAuth Production Setup
 

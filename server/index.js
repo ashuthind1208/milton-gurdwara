@@ -7,6 +7,12 @@ const { URL } = require('url');
 const Stripe = require('stripe');
 const crypto = require('crypto');
 const ffmpegPath = require('ffmpeg-static');
+const {
+  extractZeffyPaymentId,
+  mapZeffyApiPayment,
+  normalizeEventType,
+  verifyZeffyWebhookToken
+} = require('./zeffyWebhook');
 
 const loadEnvFile = (filePath) => {
   if (!fs.existsSync(filePath)) {
@@ -96,6 +102,10 @@ const port = resolveServerPort();
 const stripeSecretKey = String(process.env.STRIPE_SECRET_KEY || '').trim();
 const stripeWebhookSecret = String(process.env.STRIPE_WEBHOOK_SECRET || '').trim();
 const stripeCurrency = String(process.env.STRIPE_CURRENCY || 'cad').toLowerCase();
+const zeffyApiKey = String(process.env.ZEFFY_API_KEY || '').trim();
+const zeffyWebhookToken = String(process.env.ZEFFY_WEBHOOK_TOKEN || '').trim();
+const zeffyCampaignId = Number(process.env.ZEFFY_CAMPAIGN_ID || 0);
+const zeffyCampaignName = String(process.env.ZEFFY_CAMPAIGN_NAME || 'Help Us Build Our Gurdwara').trim();
 const youtubeApiKey = String(process.env.YOUTUBE_API_KEY || '').trim();
 const dataDir = path.resolve(__dirname, 'data');
 const usersPath = path.join(dataDir, 'users.json');
@@ -406,7 +416,7 @@ const sendJson = (response, statusCode, payload) => {
   response.writeHead(statusCode, {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Stripe-Signature, Authorization, X-Actor-Email, X-Actor-Role, X-Actor-Name',
+    'Access-Control-Allow-Headers': 'Content-Type, Stripe-Signature, X-Zeffy-Webhook-Token, X-API-Key, Authorization, X-Actor-Email, X-Actor-Role, X-Actor-Name',
     'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS'
   });
   response.end(JSON.stringify(nextPayload));
@@ -1181,7 +1191,7 @@ const sendRateLimitExceeded = (response, retryAfterMs, message, scope = 'request
   response.writeHead(429, {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Stripe-Signature, Authorization, X-Actor-Email, X-Actor-Role, X-Actor-Name',
+    'Access-Control-Allow-Headers': 'Content-Type, Stripe-Signature, X-Zeffy-Webhook-Token, X-API-Key, Authorization, X-Actor-Email, X-Actor-Role, X-Actor-Name',
     'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
     'Retry-After': String(retryAfterSeconds),
     'X-RateLimit-Scope': scope
@@ -5053,6 +5063,86 @@ const server = http.createServer(async (request, response) => {
       sendJson(response, 400, {
         ok: false,
         message: `Webhook Error: ${error.message || 'Invalid webhook event.'}`
+      });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/zeffy/webhook' && request.method === 'POST') {
+    try {
+      if (!zeffyApiKey) {
+        sendJson(response, 500, { ok: false, message: 'ZEFFY_API_KEY is not configured on the server.' });
+        return;
+      }
+
+      if (zeffyWebhookToken) {
+        const authorization = String(request.headers.authorization || '').trim();
+        const bearerToken = authorization.toLowerCase().startsWith('bearer ') ? authorization.slice(7).trim() : '';
+        const providedToken = String(
+          request.headers['x-zeffy-webhook-token']
+          || request.headers['x-api-key']
+          || requestUrl.searchParams.get('token')
+          || bearerToken
+          || ''
+        ).trim();
+        if (!verifyZeffyWebhookToken(zeffyWebhookToken, providedToken)) {
+          sendJson(response, 401, { ok: false, message: 'Invalid Zeffy webhook token.' });
+          return;
+        }
+      }
+
+      const event = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
+      if (normalizeEventType(event) !== 'payment.completed') {
+        sendJson(response, 200, { ok: true, received: true, ignored: true });
+        return;
+      }
+
+      const paymentId = extractZeffyPaymentId(event);
+      assertInput(Boolean(paymentId), 'Zeffy payment.completed event is missing its payment id.');
+      const zeffyResponse = await fetch(`https://api.zeffy.com/api/v1/payments/${encodeURIComponent(paymentId)}`, {
+        headers: { Authorization: `Bearer ${zeffyApiKey}` }
+      });
+      const zeffyBody = await zeffyResponse.json().catch(() => ({}));
+      if (!zeffyResponse.ok) {
+        const error = new Error(`Unable to verify Zeffy payment (${zeffyResponse.status}).`);
+        error.status = zeffyResponse.status >= 500 || zeffyResponse.status === 429 ? 502 : 400;
+        throw error;
+      }
+      const donationRecord = mapZeffyApiPayment(zeffyBody.data || zeffyBody);
+
+      const campaigns = await getDonationCampaigns();
+      const eventCampaignName = String(donationRecord.campaignName || '').trim().toLowerCase();
+      const configuredCampaignName = zeffyCampaignName.toLowerCase();
+      const matchedCampaign = Number.isFinite(zeffyCampaignId) && zeffyCampaignId > 0
+        ? campaigns.find((entry) => Number(entry.id) === zeffyCampaignId)
+        : campaigns.find((entry) => {
+          const name = String(entry.name || '').trim().toLowerCase();
+          return name === eventCampaignName || name === configuredCampaignName;
+        });
+      const resolvedDonation = {
+        ...donationRecord,
+        campaignId: matchedCampaign ? Number(matchedCampaign.id) : null,
+        campaignName: matchedCampaign?.name || donationRecord.campaignName || zeffyCampaignName
+      };
+      const persistedDonation = await upsertDonation(resolvedDonation);
+      await syncCampaignRaisedTotal({
+        campaignId: persistedDonation.campaignId,
+        campaignName: persistedDonation.campaignName
+      });
+
+      sendJson(response, 200, {
+        ok: true,
+        received: true,
+        data: {
+          id: persistedDonation.id,
+          receiptId: persistedDonation.receiptId,
+          paymentStatus: persistedDonation.paymentStatus
+        }
+      });
+    } catch (error) {
+      sendJson(response, error.status || 400, {
+        ok: false,
+        message: error.message || 'Unable to process Zeffy webhook event.'
       });
     }
     return;

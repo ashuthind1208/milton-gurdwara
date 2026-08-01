@@ -2450,7 +2450,7 @@ const upsertDonation = async (record = {}) => {
       String(record.donorPhone || record.phone || ''),
       Number(record.amount || 0),
       String(record.frequency || 'one-time'),
-      ['STRIPE', 'PAYPAL', 'CASH'].includes(String(record.paymentProvider || '').toUpperCase())
+      ['STRIPE', 'PAYPAL', 'CASH', 'ZEFFY'].includes(String(record.paymentProvider || '').toUpperCase())
         ? String(record.paymentProvider).toUpperCase()
         : 'STRIPE',
       String(record.paymentStatus || 'PAID').toUpperCase(),

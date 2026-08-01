@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { BanknotesIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import PageHero from '../../components/common/PageHero';
 import DonationForm from '../../components/forms/DonationForm';
 import Card from '../../components/ui/Card';
@@ -15,8 +15,10 @@ import useSeoMeta from '../../hooks/useSeoMeta';
 import Seo from '../../components/common/Seo';
 import { useAuth } from '../../context/AuthContext';
 import PhoneNumberRequiredNotice from '../../components/common/PhoneNumberRequiredNotice';
+import ZeffyDonationModal from './ZeffyDonationModal';
 
 const DONATION_IDENTITY_SETTING_KEY = 'settings-donation-allow-custom-name-email';
+const ZEFFY_EMBED_URL = 'https://www.zeffy.com/embed/donation-form/help-us-build-our-gurdwara?modal=true';
 
 const DonationPage = () => {
   const location = useLocation();
@@ -28,6 +30,7 @@ const DonationPage = () => {
   const [formResetKey, setFormResetKey] = useState(0);
   const [selectedProgressItem, setSelectedProgressItem] = useState(null);
   const [enlargedProgressPhoto, setEnlargedProgressPhoto] = useState('');
+  const [isZeffyModalOpen, setIsZeffyModalOpen] = useState(false);
   const checkoutWindowRef = useRef(null);
 
   const { data: campaigns = [] } = useQuery({
@@ -52,8 +55,32 @@ const DonationPage = () => {
     const params = new URLSearchParams(location.search || '');
     return String(params.get('campaignId') || '').trim();
   }, [location.search]);
+  const returnedFromZeffy = useMemo(() => {
+    const params = new URLSearchParams(location.search || '');
+    return params.get('zeffy') === 'completed';
+  }, [location.search]);
   const allowIdentityOverride = Boolean(donationIdentitySettings?.enabled);
   const profilePhoneMissing = !String(user?.phone || '').trim();
+
+  useEffect(() => {
+    if (!returnedFromZeffy || window.parent === window) {
+      return;
+    }
+    window.parent.postMessage({ type: 'ssm:zeffy-payment-completed' }, window.location.origin);
+  }, [returnedFromZeffy]);
+
+  useEffect(() => {
+    const handleZeffyCompletion = (event) => {
+      if (event.origin !== window.location.origin || event.data?.type !== 'ssm:zeffy-payment-completed') {
+        return;
+      }
+      setIsZeffyModalOpen(false);
+      setStatusMessage('Thank you. Your Zeffy payment is complete and the donation is being added to our records.');
+    };
+
+    window.addEventListener('message', handleZeffyCompletion);
+    return () => window.removeEventListener('message', handleZeffyCompletion);
+  }, []);
 
   const openStripePopup = (checkoutUrl) => {
     if (!checkoutUrl) {
@@ -147,8 +174,29 @@ const DonationPage = () => {
       <Seo {...meta} />
       <PageHero
         title="Daswand | Donation"
-        description="Support the sangat through daswand. Fill details once, then pay securely with Stripe popup checkout."
+        description="Support the sangat through daswand and pay securely with Zeffy or Stripe."
+        titleActions={(
+          <button
+            type="button"
+            onClick={() => setIsZeffyModalOpen(true)}
+            aria-label="Donate securely with Zeffy"
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-brand-blue px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-brand-blue focus:ring-offset-2"
+          >
+            <BanknotesIcon className="h-5 w-5" aria-hidden="true" />
+            Donate with Zeffy
+          </button>
+        )}
       />
+      <ZeffyDonationModal
+        isOpen={isZeffyModalOpen}
+        formUrl={ZEFFY_EMBED_URL}
+        onClose={() => setIsZeffyModalOpen(false)}
+      />
+      {returnedFromZeffy ? (
+        <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900">
+          Thank you. Zeffy is confirming your payment, and the donation will appear in our records after its secure webhook is processed.
+        </p>
+      ) : null}
       {isAuthenticated && profilePhoneMissing ? <PhoneNumberRequiredNotice activityLabel="donations" /> : null}
 
       {donationTopAds.length > 0 ? (
