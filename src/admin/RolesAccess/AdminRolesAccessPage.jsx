@@ -390,7 +390,7 @@ const AdminRolesAccessPage = () => {
                   <button type="button" onClick={() => setViewRole(role)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 text-slate-700"><EyeIcon className="h-4 w-4" /></button>
                   <button type="button" onClick={() => openEditRole(role)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-200 text-blue-700"><PencilSquareIcon className="h-4 w-4" /></button>
                   {!role.isSystem ? (
-                    <button type="button" onClick={() => deleteRole(role.name)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-700"><TrashIcon className="h-4 w-4" /></button>
+                    <button type="button" onClick={() => deleteRole(role.name)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-700" aria-label="Delete role" title="Delete"><TrashIcon className="h-4 w-4" /></button>
                   ) : null}
                 </div>
               </div>

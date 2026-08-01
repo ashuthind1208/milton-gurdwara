@@ -3059,10 +3059,10 @@ const writeUsers = (records) => {
   fs.writeFileSync(usersPath, JSON.stringify(records.map(normalizeUser), null, 2), 'utf8');
 };
 
-const resolveMemberActivityFromFees = (user = {}) => {
+const hasCurrentPaidMembershipFee = (user = {}) => {
   const role = String(user.role || '').trim().toLowerCase();
   if (role !== 'member') {
-    return user.isActive !== false;
+    return false;
   }
 
   const schedule = String(user.membershipProfile?.donationSchedule || 'monthly').trim().toLowerCase();
@@ -3082,20 +3082,20 @@ const resolveMemberActivityFromFees = (user = {}) => {
 
 const enforceUserMembershipActivity = (user = {}, requestedBody = {}) => {
   const role = String(user.role || '').trim().toLowerCase();
-  if (role !== 'member') {
-    return user;
-  }
-
-  const feeDerivedActivity = resolveMemberActivityFromFees(user);
-  if (requestedBody.isActive === true && !feeDerivedActivity) {
-    const error = new Error('A Member cannot be activated without a current paid membership fee.');
-    error.status = 409;
-    throw error;
-  }
+  const approvalStatus = role === 'member' && !hasCurrentPaidMembershipFee(user)
+    ? 'pending'
+    : 'approved';
+  const previousApprovalStatus = String(user.approvalStatus || '').trim().toLowerCase();
 
   return {
     ...user,
-    isActive: requestedBody.isActive === false ? false : feeDerivedActivity
+    isActive: Object.prototype.hasOwnProperty.call(requestedBody, 'isActive')
+      ? requestedBody.isActive !== false
+      : user.isActive !== false,
+    approvalStatus,
+    approvalUpdatedAt: previousApprovalStatus === approvalStatus
+      ? user.approvalUpdatedAt
+      : new Date().toISOString()
   };
 };
 
@@ -4208,7 +4208,18 @@ const server = http.createServer(async (request, response) => {
   if (contentResourceMatch && request.method === 'GET') {
     try {
       const resource = String(contentResourceMatch[1]).toLowerCase();
-      const data = await eventsDb.listItems(resource);
+      let data = await eventsDb.listItems(resource);
+      if (resource === 'users') {
+        data = await Promise.all(data.map(async (user) => {
+          const reconciled = enforceUserMembershipActivity(user, {});
+          const approvalChanged = reconciled.approvalStatus !== user.approvalStatus;
+          const activeDefaultChanged = reconciled.isActive !== user.isActive;
+          if (!approvalChanged && !activeDefaultChanged) {
+            return user;
+          }
+          return eventsDb.updateItem('users', user.id, reconciled);
+        }));
+      }
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
       sendJson(response, 500, { ok: false, message: error.message || 'Unable to fetch content list.' });
@@ -4246,8 +4257,16 @@ const server = http.createServer(async (request, response) => {
       const body = await parseAndValidateGenericObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
       const existingUsers = resource === 'users' ? await eventsDb.listItems('users') : null;
       const existingUser = Array.isArray(existingUsers) ? existingUsers.find((entry) => String(entry?.id || '') === String(id)) : null;
+      const changedRoleToMember = resource === 'users'
+        && String(existingUser?.role || '').trim().toLowerCase() !== 'member'
+        && String(body?.role || '').trim().toLowerCase() === 'member';
       const validatedBody = resource === 'users'
-        ? enforceUserMembershipActivity({ ...(existingUser || {}), ...body, id }, body)
+        ? enforceUserMembershipActivity({
+          ...(existingUser || {}),
+          ...body,
+          ...(changedRoleToMember ? { membershipFeeRecords: [] } : {}),
+          id
+        }, body)
         : body;
       const data = await eventsDb.updateItem(resource, id, validatedBody);
 
@@ -5573,7 +5592,14 @@ const server = http.createServer(async (request, response) => {
       const targetUser = users.find((user) => user.id === id) || null;
       assertInput(Boolean(targetUser), 'User not found.');
 
-      const validatedBody = enforceUserMembershipActivity({ ...targetUser, ...body, id }, body);
+      const changedRoleToMember = String(targetUser?.role || '').trim().toLowerCase() !== 'member'
+        && String(body?.role || '').trim().toLowerCase() === 'member';
+      const validatedBody = enforceUserMembershipActivity({
+        ...targetUser,
+        ...body,
+        ...(changedRoleToMember ? { membershipFeeRecords: [] } : {}),
+        id
+      }, body);
 
       const next = users.map((user) => (
         user.id === id ? normalizeUser({ ...user, ...validatedBody, id, createdAt: user.createdAt }) : user

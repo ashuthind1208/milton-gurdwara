@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import AppRoutes from './routes/AppRoutes';
+import DeleteConfirmationGuard from './components/common/DeleteConfirmationGuard';
 
 function App() {
   useEffect(() => {
@@ -42,7 +43,12 @@ function App() {
     };
   }, []);
 
-  return <AppRoutes />;
+  return (
+    <>
+      <AppRoutes />
+      <DeleteConfirmationGuard />
+    </>
+  );
 }
 
 export default App;

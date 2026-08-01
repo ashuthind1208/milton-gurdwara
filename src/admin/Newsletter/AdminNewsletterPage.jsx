@@ -524,12 +524,6 @@ const AdminNewsletterPage = () => {
       return;
     }
 
-    const campaignTitle = String(campaign?.title || 'this campaign').trim();
-    const isConfirmed = window.confirm(`Delete "${campaignTitle}"? This cannot be undone.`);
-    if (!isConfirmed) {
-      return;
-    }
-
     deleteCampaignMutation.mutate(campaignId);
   };
 
@@ -572,12 +566,6 @@ const AdminNewsletterPage = () => {
   const handleDeleteSubscriber = (subscriber) => {
     const id = String(subscriber?.id || '').trim();
     if (!id) {
-      return;
-    }
-
-    const label = String(subscriber?.name || subscriber?.email || 'this subscriber').trim();
-    const isConfirmed = window.confirm(`Delete subscriber "${label}"?`);
-    if (!isConfirmed) {
       return;
     }
 

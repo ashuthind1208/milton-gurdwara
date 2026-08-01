@@ -215,11 +215,29 @@ const normalizeMembershipProfile = (profile = {}) => {
   };
 };
 
+const hasCurrentPaidMembershipFee = (records = [], schedule = 'monthly') => {
+  const validityDays = String(schedule || '').trim().toLowerCase() === 'yearly' ? 365 : 30;
+  const paidDates = records
+    .filter((entry) => String(entry?.status || '').trim().toLowerCase() === 'paid')
+    .map((entry) => new Date(entry?.paymentDate || entry?.updatedAt || '').getTime())
+    .filter(Number.isFinite);
+
+  if (paidDates.length === 0) {
+    return false;
+  }
+
+  return Date.now() <= Math.max(...paidDates) + (validityDays * 24 * 60 * 60 * 1000);
+};
+
 const normalizeUser = (user = {}, roleDefinitions = []) => {
   const role = normalizeRole(user.role);
   const memberType = resolveMemberType(role, user.memberType || '');
   const resolvedAvatarUrl = resolveAvatarUrl(user);
-  const isPrivilegedRole = role === 'Super Admin' || role === 'Admin' || memberType === 'Admin';
+  const membershipProfile = normalizeMembershipProfile(user.membershipProfile);
+  const membershipFeeRecords = normalizeMembershipFeeRecords(user.membershipFeeRecords);
+  const approvalStatus = role === 'Member' && !hasCurrentPaidMembershipFee(membershipFeeRecords, membershipProfile.donationSchedule)
+    ? 'pending'
+    : 'approved';
 
   return {
     id: user.id || `user-${Date.now()}`,
@@ -234,10 +252,10 @@ const normalizeUser = (user = {}, roleDefinitions = []) => {
     adminPageAccess: resolveRoleAdminPageAccess(role, user.adminPageAccess, roleDefinitions),
     registrationComplete: Boolean(user.registrationComplete),
     isActive: user.isActive !== false,
-    approvalStatus: user.approvalStatus || (isPrivilegedRole ? 'approved' : 'pending'),
+    approvalStatus,
     approvalUpdatedAt: user.approvalUpdatedAt || '',
-    membershipProfile: normalizeMembershipProfile(user.membershipProfile),
-    membershipFeeRecords: normalizeMembershipFeeRecords(user.membershipFeeRecords),
+    membershipProfile,
+    membershipFeeRecords,
     createdAt: user.createdAt || new Date().toISOString(),
     updatedAt: user.updatedAt || new Date().toISOString()
   };
@@ -286,6 +304,7 @@ const userService = {
     const hasMemberTypeInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'memberType');
     const hasApprovalStatusInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'approvalStatus');
     const hasRegistrationCompleteInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'registrationComplete');
+    const hasMembershipFeeRecordsInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'membershipFeeRecords');
     const nextRole = hasRoleInPayload ? normalizeRole(payload.role) : normalizeRole(existing?.role || normalized.role);
     const roleChanged = hasRoleInPayload && nextRole !== normalizeRole(existing?.role);
     const nextAdminPageAccess = hasAdminPageAccessInPayload
@@ -313,6 +332,9 @@ const userService = {
       approvalStatus: hasApprovalStatusInPayload ? normalized.approvalStatus : existing.approvalStatus,
       registrationComplete: hasRegistrationCompleteInPayload ? normalized.registrationComplete : existing.registrationComplete,
       adminPageAccess: resolveRoleAdminPageAccess(nextRole, nextAdminPageAccess, roleDefinitions),
+      membershipFeeRecords: roleChanged && nextRole === 'Member'
+        ? []
+        : (hasMembershipFeeRecordsInPayload ? normalized.membershipFeeRecords : existing.membershipFeeRecords),
       id: existing.id,
       createdAt: existing.createdAt,
       updatedAt: new Date().toISOString()
@@ -332,7 +354,6 @@ const userService = {
     const base = existing || normalizeUser({ email: normalizedEmail, name, avatarUrl }, roleDefinitions);
     const resolvedRole = normalizeRole(role || base.role);
     const resolvedMemberType = resolveMemberType(resolvedRole, memberType || base.memberType || 'Member');
-    const approvalStatus = resolvedRole === 'Super Admin' || resolvedRole === 'Admin' || resolvedMemberType === 'Admin' ? 'approved' : 'pending';
     const updated = normalizeUser({
       ...base,
       name: name || base.name,
@@ -342,7 +363,7 @@ const userService = {
       memberType: resolvedMemberType,
       avatarUrl: avatarUrl || base.avatarUrl,
       registrationComplete: true,
-      approvalStatus,
+      isActive: base.isActive !== false,
       approvalUpdatedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }, roleDefinitions);
@@ -384,9 +405,8 @@ const userService = {
       phone: String(payload?.phone || existing.phone || '').trim(),
       address: String(payload?.address || existing.address || '').trim(),
       membershipProfile: profile,
-      isActive: false,
+      isActive: existing.isActive !== false,
       registrationComplete: true,
-      approvalStatus: existing.approvalStatus || 'pending',
       approvalUpdatedAt: existing.approvalUpdatedAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }, roleDefinitions);
@@ -414,7 +434,6 @@ const userService = {
       avatarUrl: payload.avatarUrl,
       registrationComplete: Boolean(payload.registrationComplete),
       isActive: payload.isActive !== false,
-      approvalStatus: payload.approvalStatus || 'pending',
       approvalUpdatedAt: new Date().toISOString()
     }, roleDefinitions);
 
@@ -429,6 +448,7 @@ const userService = {
     const hasAccessInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'adminPageAccess');
     const hasApprovalInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'approvalStatus');
     const hasRoleInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'role');
+    const hasMembershipFeeRecordsInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'membershipFeeRecords');
     const nextRole = hasRoleInPayload ? normalizeRole(payload.role) : normalizeRole(existing.role);
     const roleChanged = hasRoleInPayload && nextRole !== normalizeRole(existing.role);
     const nextAdminPageAccess = hasAccessInPayload
@@ -439,6 +459,9 @@ const userService = {
       ...existing,
       ...payload,
       role: nextRole,
+      membershipFeeRecords: roleChanged && nextRole === 'Member'
+        ? []
+        : (hasMembershipFeeRecordsInPayload ? payload.membershipFeeRecords : existing.membershipFeeRecords),
       approvalStatus: hasApprovalInPayload ? payload.approvalStatus : existing.approvalStatus,
       adminPageAccess: resolveRoleAdminPageAccess(nextRole, nextAdminPageAccess, roleDefinitions),
       id,

@@ -41,7 +41,9 @@ import volunteerService from '../../services/volunteerService';
 import donationService from '../../services/donationService';
 import uploadService from '../../services/uploadService';
 import userService from '../../services/userService';
+import addressLookupService from '../../services/addressLookupService';
 import { useAuth } from '../../context/AuthContext';
+import { formatTenDigitPhone, isTenDigitPhone } from '../../utils/phone';
 import StreamingModal from '../common/StreamingModal';
 import AudioPillPlayer from '../common/AudioPillPlayer';
 import GlobalSearchBar from '../common/GlobalSearchBar';
@@ -446,6 +448,11 @@ const Navbar = () => {
   const [membershipPromptEnforced, setMembershipPromptEnforced] = useState(false);
   const [membershipPromptNotice, setMembershipPromptNotice] = useState('');
   const [membershipFormError, setMembershipFormError] = useState('');
+  const [addressSuggestions, setAddressSuggestions] = useState([]);
+  const [isAddressSearching, setIsAddressSearching] = useState(false);
+  const [addressSearchError, setAddressSearchError] = useState('');
+  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
+  const selectedAddressRef = useRef('');
   const [membershipForm, setMembershipForm] = useState({
     phone: '',
     address: '',
@@ -1056,7 +1063,17 @@ const Navbar = () => {
   };
 
   const membershipDetailsMutation = useMutation({
-    mutationFn: (payload) => userService.submitMembershipDetails(String(user?.id || ''), payload),
+    mutationFn: async (payload) => {
+      let userId = String(user?.id || '').trim();
+      if (!userId && user?.email) {
+        const response = await userService.getUserByEmail(user.email);
+        userId = String(response?.data?.id || '').trim();
+      }
+      if (!userId) {
+        throw new Error('Unable to find your registration record. Please sign in again.');
+      }
+      return userService.submitMembershipDetails(userId, payload);
+    },
     onSuccess: (response) => {
       if (response?.data) {
         persistUser(response.data);
@@ -1105,19 +1122,18 @@ const Navbar = () => {
   });
 
   const handleCancelMembershipRegistration = () => {
-    const proceed = window.confirm('Cancel membership registration and delete your pending member profile?');
-    if (!proceed) {
-      return;
-    }
-
     setMembershipFormError('');
     cancelMembershipMutation.mutate();
   };
 
   const openMembershipModal = useCallback(() => {
     setMembershipFormError('');
+    setAddressSuggestions([]);
+    setAddressSearchError('');
+    setShowAddressSuggestions(false);
+    selectedAddressRef.current = String(user?.address || '').trim();
     setMembershipForm({
-      phone: String(user?.phone || '').trim(),
+      phone: formatTenDigitPhone(user?.phone),
       address: String(user?.address || '').trim(),
       dateOfBirth: String(membershipProfile?.dateOfBirth || '').trim(),
       canadianStatus: String(membershipProfile?.canadianStatus || '').trim(),
@@ -1141,6 +1157,27 @@ const Navbar = () => {
   const handleMembershipFieldChange = (field) => (event) => {
     const nextValue = event?.target?.type === 'checkbox' ? event.target.checked : event.target.value;
     setMembershipForm((previous) => ({ ...previous, [field]: nextValue }));
+  };
+
+  const handleMembershipPhoneChange = (event) => {
+    setMembershipForm((previous) => ({
+      ...previous,
+      phone: formatTenDigitPhone(event.target.value)
+    }));
+  };
+
+  const handleMembershipAddressChange = (event) => {
+    selectedAddressRef.current = '';
+    setShowAddressSuggestions(true);
+    setMembershipForm((previous) => ({ ...previous, address: event.target.value }));
+  };
+
+  const handleMembershipAddressSelect = (address) => {
+    selectedAddressRef.current = address;
+    setMembershipForm((previous) => ({ ...previous, address }));
+    setAddressSuggestions([]);
+    setAddressSearchError('');
+    setShowAddressSuggestions(false);
   };
 
   const handleSignInClick = (event) => {
@@ -1217,6 +1254,11 @@ const Navbar = () => {
       return;
     }
 
+    if (!isTenDigitPhone(payload.phone)) {
+      setMembershipFormError('Enter a 10-digit phone number in the format (###)-###-####.');
+      return;
+    }
+
     if (!payload.membershipPledgeAccepted) {
       setMembershipFormError('Please accept the membership pledge to continue.');
       return;
@@ -1224,6 +1266,41 @@ const Navbar = () => {
 
     membershipDetailsMutation.mutate(payload);
   };
+
+  useEffect(() => {
+    const query = String(membershipForm.address || '').trim();
+    if (!isMembershipModalOpen || query.length < 3 || query === selectedAddressRef.current) {
+      setAddressSuggestions([]);
+      setIsAddressSearching(false);
+      setAddressSearchError('');
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    const timerId = window.setTimeout(async () => {
+      setIsAddressSearching(true);
+      setAddressSearchError('');
+      try {
+        const results = await addressLookupService.searchCanadianAddresses(query, { signal: controller.signal });
+        setAddressSuggestions(results);
+        setShowAddressSuggestions(true);
+      } catch (error) {
+        if (error?.name !== 'AbortError') {
+          setAddressSuggestions([]);
+          setAddressSearchError('Suggestions unavailable. You can still enter the full address manually.');
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsAddressSearching(false);
+        }
+      }
+    }, 700);
+
+    return () => {
+      window.clearTimeout(timerId);
+      controller.abort();
+    };
+  }, [isMembershipModalOpen, membershipForm.address]);
 
   useEffect(() => {
     if (!shouldShowPendingMembershipPrompt) {
@@ -2962,14 +3039,60 @@ const Navbar = () => {
                   <h4 className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-600">Personal Details</h4>
                   <div className="h-px w-full bg-slate-200" />
                   <label className="block text-sm font-semibold text-slate-700">Phone
-                    <input value={membershipForm.phone} onChange={handleMembershipFieldChange('phone')} required className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel"
+                      maxLength={14}
+                      placeholder="(905)-123-4567"
+                      value={membershipForm.phone}
+                      onChange={handleMembershipPhoneChange}
+                      required
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+                    />
                   </label>
                   <label className="block text-sm font-semibold text-slate-700">Date of Birth
                     <input type="date" value={membershipForm.dateOfBirth} onChange={handleMembershipFieldChange('dateOfBirth')} required className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
                   </label>
-                  <label className="block text-sm font-semibold text-slate-700">Address
-                    <textarea rows={2} value={membershipForm.address} onChange={handleMembershipFieldChange('address')} required className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
-                  </label>
+                  <div className="relative">
+                    <label htmlFor="membership-address" className="block text-sm font-semibold text-slate-700">Address</label>
+                    <input
+                      id="membership-address"
+                      type="search"
+                      autoComplete="street-address"
+                      role="combobox"
+                      aria-autocomplete="list"
+                      aria-expanded={showAddressSuggestions && addressSuggestions.length > 0}
+                      aria-controls="membership-address-suggestions"
+                      placeholder="Start typing your Canadian address"
+                      value={membershipForm.address}
+                      onChange={handleMembershipAddressChange}
+                      onFocus={() => setShowAddressSuggestions(true)}
+                      onBlur={() => window.setTimeout(() => setShowAddressSuggestions(false), 150)}
+                      required
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+                    />
+                    {isAddressSearching ? <p className="mt-1 text-xs font-medium text-slate-500">Searching addresses...</p> : null}
+                    {addressSearchError ? <p className="mt-1 text-xs font-medium text-amber-700">{addressSearchError}</p> : null}
+                    {showAddressSuggestions && addressSuggestions.length > 0 ? (
+                      <div id="membership-address-suggestions" role="listbox" className="absolute left-0 right-0 top-full z-30 mt-1 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
+                        {addressSuggestions.map((suggestion) => (
+                          <button
+                            key={suggestion.id}
+                            type="button"
+                            role="option"
+                            aria-selected={membershipForm.address === suggestion.label}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => handleMembershipAddressSelect(suggestion.label)}
+                            className="block w-full rounded-lg px-3 py-2 text-left text-xs leading-5 text-slate-700 hover:bg-blue-50 hover:text-brand-blue"
+                          >
+                            {suggestion.label}
+                          </button>
+                        ))}
+                        <p className="border-t border-slate-100 px-3 py-1.5 text-[10px] text-slate-400">Address data © OpenStreetMap contributors</p>
+                      </div>
+                    ) : null}
+                  </div>
                 </section>
 
                 <section className="space-y-2.5 rounded-2xl border border-slate-200 bg-white p-4">
@@ -3033,6 +3156,7 @@ const Navbar = () => {
                   <button
                     type="button"
                     onClick={handleCancelMembershipRegistration}
+                    aria-label="Delete pending member profile"
                     disabled={cancelMembershipMutation.isPending || membershipDetailsMutation.isPending}
                     className="rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 disabled:opacity-60"
                   >

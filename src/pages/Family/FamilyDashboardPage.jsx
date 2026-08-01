@@ -337,11 +337,6 @@ const FamilyDashboardPage = () => {
       return;
     }
 
-    const confirmed = window.confirm(`Remove your registration for ${entry.eventTitle || 'this event'}?`);
-    if (!confirmed) {
-      return;
-    }
-
     removeEventRegistrationMutation.mutate({
       eventId: entry.eventId,
       registrantId: entry.registrantId
@@ -351,11 +346,6 @@ const FamilyDashboardPage = () => {
   const handleNotAttendingSeva = (entry) => {
     if (!entry?.id) {
       window.alert('Unable to remove this seva application because details are missing.');
-      return;
-    }
-
-    const confirmed = window.confirm(`Remove your seva application for ${entry.sevaType || entry.area || 'this opportunity'}?`);
-    if (!confirmed) {
       return;
     }
 
@@ -542,6 +532,7 @@ const FamilyDashboardPage = () => {
                     <button
                       type="button"
                       onClick={() => handleNotGoing(entry)}
+                      aria-label="Remove event registration"
                       disabled={removeEventRegistrationMutation.isPending}
                       className="inline-flex shrink-0 items-center gap-1 rounded-full border border-red-300 px-2 py-0.5 text-[11px] font-semibold text-red-700 transition hover:border-red-400 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
@@ -587,6 +578,7 @@ const FamilyDashboardPage = () => {
                     <button
                       type="button"
                       onClick={() => handleNotAttendingSeva(entry)}
+                      aria-label="Remove seva application"
                       disabled={removeSevaApplicationMutation.isPending}
                       className="inline-flex shrink-0 items-center gap-1 rounded-full border border-red-300 px-2 py-0.5 text-[11px] font-semibold text-red-700 transition hover:border-red-400 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >

@@ -20,7 +20,6 @@ import { adminNav } from '../../constants/navigation';
 import { useAuth } from '../../context/AuthContext';
 import contentApiService from '../../services/contentApiService';
 import userService from '../../services/userService';
-import notificationService from '../../services/notificationService';
 import uploadService from '../../services/uploadService';
 import { siteConfig } from '../../constants/siteConfig';
 import { downloadMembershipFeeInformationPdf } from '../../utils/csvExport';
@@ -277,8 +276,7 @@ const AdminUsersPage = () => {
         ...values,
         role: resolvedRole,
         adminPageAccess: isCustomRole ? customRoleAccess : undefined,
-        approvalStatus: 'pending',
-        isActive: resolvedRole !== 'Member',
+        isActive: true,
         registrationComplete: true
       });
     },
@@ -312,19 +310,7 @@ const AdminUsersPage = () => {
   });
 
   const toggleActiveMutation = useMutation({
-    mutationFn: ({ id, isActive }) => {
-      const targetUser = users.find((entry) => entry.id === id);
-      if (isActive && String(targetUser?.role || '').trim() === 'Member') {
-        const reviewMeta = resolveMembershipReviewMeta({
-          records: targetUser?.membershipFeeRecords,
-          schedule: targetUser?.membershipProfile?.donationSchedule
-        });
-        if (!reviewMeta.isActive) {
-          throw new Error('Add a current paid membership fee before activating this Member.');
-        }
-      }
-      return userService.updateUser(id, { isActive });
-    },
+    mutationFn: ({ id, isActive }) => userService.updateUser(id, { isActive }),
     onSuccess: (response, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       if (currentUser?.id && currentUser.id === variables?.id && response?.data) {
@@ -333,32 +319,6 @@ const AdminUsersPage = () => {
     },
     onError: (error) => {
       setApprovalNotice(String(error?.message || 'Unable to update member status.'));
-    }
-  });
-
-  const approvalMutation = useMutation({
-    mutationFn: async ({ id, approvalStatus }) => {
-      const updateResponse = await userService.updateApprovalStatus(id, approvalStatus);
-      let emailResponse = null;
-
-      if (approvalStatus === 'approved' && updateResponse?.data) {
-        emailResponse = await notificationService.sendApprovalEmail(updateResponse.data);
-      }
-
-      return { updateResponse, emailResponse, approvalStatus, id };
-    },
-    onSuccess: ({ updateResponse, emailResponse, approvalStatus, id }) => {
-      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-      if (currentUser?.id && currentUser.id === id && updateResponse?.data) {
-        persistUser(updateResponse.data);
-      }
-
-      if (approvalStatus === 'approved') {
-        const sent = Boolean(emailResponse?.data?.sent);
-        setApprovalNotice(sent ? 'User approved and approval email sent.' : 'User approved. Approval email could not be sent.');
-      } else {
-        setApprovalNotice('User approval status updated.');
-      }
     }
   });
 
@@ -574,7 +534,7 @@ const AdminUsersPage = () => {
   }, [membershipFeeRecords, membershipSearchTerm]);
 
   const membershipFeeMutation = useMutation({
-    mutationFn: ({ id, values, editingId }) => {
+    mutationFn: async ({ id, values, editingId }) => {
       const userRecord = users.find((entry) => entry.id === id);
       if (!userRecord) {
         throw new Error('User not found.');
@@ -599,18 +559,24 @@ const AdminUsersPage = () => {
         ? existingFeeRecords.filter((entry) => String(entry?.id || '') !== targetId)
         : existingFeeRecords;
       const nextFeeRecords = sortMembershipFeeRecords([...filteredExisting, nextRecord]);
-      const nextReviewMeta = resolveMembershipReviewMeta({
-        records: nextFeeRecords,
-        schedule: userRecord?.membershipProfile?.donationSchedule,
-        startDate: userRecord?.membershipProfile?.submittedAt || userRecord?.createdAt || new Date().toISOString()
-      });
 
-      return userService.updateUser(id, {
-        membershipFeeRecords: nextFeeRecords,
-        isActive: nextReviewMeta.isActive
+      const response = await userService.updateUser(id, {
+        membershipFeeRecords: nextFeeRecords
       });
+      const savedRecords = Array.isArray(response?.data?.membershipFeeRecords)
+        ? response.data.membershipFeeRecords
+        : [];
+      if (!savedRecords.some((entry) => String(entry?.id || '') === nextRecord.id)) {
+        throw new Error('The membership fee was not saved. Please try again.');
+      }
+      return response;
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (response, variables) => {
+      if (response?.data) {
+        queryClient.setQueryData(['admin-users'], (current = []) => (
+          current.map((entry) => entry.id === response.data.id ? response.data : entry)
+        ));
+      }
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       membershipFeeForm.reset({
         ...membershipFeeFormDefaults,
@@ -619,8 +585,8 @@ const AdminUsersPage = () => {
       setMembershipFeeNotice({
         type: 'success',
         message: String(variables?.editingId || '').trim()
-          ? 'Membership fee entry updated. Member active status refreshed automatically.'
-          : 'Membership fee entry added. Member active status refreshed automatically.'
+          ? 'Membership fee entry updated. Member approval refreshed automatically.'
+          : 'Membership fee entry added. Member approval refreshed automatically.'
       });
       setEditingMembershipFeeId('');
       setMembershipFeeEntryOpen(false);
@@ -643,20 +609,14 @@ const AdminUsersPage = () => {
       const existingFeeRecords = Array.isArray(userRecord.membershipFeeRecords) ? userRecord.membershipFeeRecords : [];
       const nextFeeRecords = existingFeeRecords.filter((entry) => String(entry?.id || '') !== String(feeId || ''));
       const nextSortedFeeRecords = sortMembershipFeeRecords(nextFeeRecords);
-      const nextReviewMeta = resolveMembershipReviewMeta({
-        records: nextSortedFeeRecords,
-        schedule: userRecord?.membershipProfile?.donationSchedule,
-        startDate: userRecord?.membershipProfile?.submittedAt || userRecord?.createdAt || new Date().toISOString()
-      });
 
       return userService.updateUser(id, {
-        membershipFeeRecords: nextSortedFeeRecords,
-        isActive: nextReviewMeta.isActive
+        membershipFeeRecords: nextSortedFeeRecords
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-      setMembershipFeeNotice({ type: 'success', message: 'Membership fee entry removed. Member active status refreshed automatically.' });
+      setMembershipFeeNotice({ type: 'success', message: 'Membership fee entry removed. Member approval refreshed automatically.' });
       setConfirmDeleteMembershipFee(null);
     },
     onError: (error) => {
@@ -824,21 +784,9 @@ const AdminUsersPage = () => {
                     <td className="admin-compact-mobile-hidden px-3 py-2.5 text-slate-700">{user.role || '-'}</td>
                     <td className="admin-compact-mobile-hidden px-3 py-2.5 text-slate-700">{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '-'}</td>
                     <td className="admin-compact-mobile-hidden px-3 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${statusClassMap[approvalStatus] || statusClassMap.pending}`}>
-                          {approvalStatus}
-                        </span>
-                        {approvalStatus !== 'approved' ? (
-                          <button
-                            type="button"
-                            onClick={() => approvalMutation.mutate({ id: user.id, approvalStatus: 'approved' })}
-                            disabled={approvalMutation.isPending}
-                            className="rounded-md border border-emerald-200 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
-                          >
-                            Approve
-                          </button>
-                        ) : null}
-                      </div>
+                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${statusClassMap[approvalStatus] || statusClassMap.pending}`}>
+                        {approvalStatus}
+                      </span>
                     </td>
                     <td className="admin-compact-mobile-hidden px-3 py-2.5">{renderActivePill(user)}</td>
                     <td className="px-3 py-2.5">
@@ -1352,7 +1300,7 @@ const AdminUsersPage = () => {
                     </div>
                   ) : (
                     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                      No paid membership fee recorded yet. Add a paid fee entry to activate the member and show the review status.
+                      No paid membership fee recorded yet. Add a paid fee entry to approve the member for the current membership period and show the review status.
                     </div>
                   )}
                 </div>
@@ -1548,7 +1496,7 @@ const AdminUsersPage = () => {
                     <textarea rows={3} {...membershipFeeForm.register('notes')} className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5" />
                   </label>
                   <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                    Membership automation is based on the schedule shown above. Only paid entries activate the member and show the review card.
+                    Membership approval is based on the schedule shown above. Only current paid entries approve the member and show the review card.
                   </p>
                 </section>
               </div>
@@ -1563,7 +1511,7 @@ const AdminUsersPage = () => {
       ) : null}
 
       {membershipUserRecord && confirmDeleteMembershipFee ? (
-        <div className="fixed inset-0 z-[54] flex items-center justify-center px-4">
+        <div className="fixed inset-0 z-[54] flex items-center justify-center px-4" data-delete-guard-ignore="true">
           <div className="absolute inset-0 bg-slate-900/55" onClick={() => setConfirmDeleteMembershipFee(null)} aria-hidden="true" />
           <div className="relative z-10 w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
             <h3 className="font-heading text-lg font-semibold text-slate-900">Remove Fee Entry</h3>

@@ -151,10 +151,6 @@ const AdminHukamnamaPage = () => {
       return;
     }
 
-    if (!window.confirm(`Delete hukamnama for ${selectedDateKey}?`)) {
-      return;
-    }
-
     deleteMutation.mutate(selectedDateKey);
   };
 
