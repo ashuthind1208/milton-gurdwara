@@ -58,15 +58,15 @@
   }
 
   .ticker-speed-slow {
-    animation-duration: 38s;
+    animation-duration: 160s;
   }
 
   .ticker-speed-medium {
-    animation-duration: 34s;
+    animation-duration: 160s;
   }
 
   .ticker-speed-fast {
-    animation-duration: 14s;
+    animation-duration: 160s;
   }
 
   .daily-schedule-special-ticker {

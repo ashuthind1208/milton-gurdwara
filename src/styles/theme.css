@@ -60,7 +60,11 @@
 
 .ticker-shell-home .ticker-track {
   padding: 0.35rem 0.15rem;
-  animation-duration: 40s;
+  animation-duration: 160s;
+}
+
+.daily-schedule-special-track {
+  animation-duration: 160s !important;
 }
 
 .ticker-item-home {

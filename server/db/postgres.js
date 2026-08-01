@@ -594,6 +594,7 @@ const ensureEventsSchema = async () => {
       campaign_name TEXT NOT NULL,
       donor_name TEXT NOT NULL DEFAULT 'Anonymous',
       donor_email TEXT NOT NULL DEFAULT '',
+      donor_phone TEXT NOT NULL DEFAULT '',
       amount NUMERIC(12, 2),
       frequency TEXT NOT NULL DEFAULT 'one-time',
       payment_provider TEXT NOT NULL DEFAULT 'STRIPE',
@@ -601,6 +602,11 @@ const ensureEventsSchema = async () => {
       session_id TEXT NOT NULL DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `);
+
+  await pool.query(`
+    ALTER TABLE donations
+    ADD COLUMN IF NOT EXISTS donor_phone TEXT NOT NULL DEFAULT '';
   `);
 
   await pool.query(`
@@ -2346,6 +2352,7 @@ const mapDonationRow = (row) => ({
   campaignName: row.campaign_name || '',
   donorName: row.donor_name || 'Anonymous',
   donorEmail: row.donor_email || '',
+  donorPhone: row.donor_phone || '',
   amount: Number(row.amount || 0),
   frequency: row.frequency || 'one-time',
   paymentProvider: row.payment_provider || 'STRIPE',
@@ -2366,7 +2373,7 @@ const getDonations = async () => {
 
   const result = await pool.query(
     `
-    SELECT id, receipt_id, source_pending_id, campaign_id, campaign_name, donor_name, donor_email, amount,
+    SELECT id, receipt_id, source_pending_id, campaign_id, campaign_name, donor_name, donor_email, donor_phone, amount,
            frequency, payment_provider, payment_status, gateway_transaction_id, stripe_session_id, stripe_event_id,
            email_sent, source, created_at, updated_at
     FROM donations
@@ -2405,10 +2412,10 @@ const upsertDonation = async (record = {}) => {
   const result = await pool.query(
     `
     INSERT INTO donations
-    (id, receipt_id, source_pending_id, campaign_id, campaign_name, donor_name, donor_email, amount, frequency,
+        (id, receipt_id, source_pending_id, campaign_id, campaign_name, donor_name, donor_email, donor_phone, amount, frequency,
      payment_provider, payment_status, gateway_transaction_id, stripe_session_id, stripe_event_id, email_sent, source, created_at, updated_at)
-    VALUES ($1, $2, NULLIF($3, ''), $4, $5, $6, $7, $8, $9,
-            $10, $11, $12, $13, $14, $15, $16, COALESCE($17, NOW()), NOW())
+        VALUES ($1, $2, NULLIF($3, ''), $4, $5, $6, $7, $8, $9, $10,
+          $11, $12, $13, $14, $15, $16, $17, COALESCE($18, NOW()), NOW())
     ON CONFLICT (id)
     DO UPDATE SET
       receipt_id = EXCLUDED.receipt_id,
@@ -2417,6 +2424,7 @@ const upsertDonation = async (record = {}) => {
       campaign_name = EXCLUDED.campaign_name,
       donor_name = EXCLUDED.donor_name,
       donor_email = EXCLUDED.donor_email,
+      donor_phone = EXCLUDED.donor_phone,
       amount = EXCLUDED.amount,
       frequency = EXCLUDED.frequency,
       payment_provider = EXCLUDED.payment_provider,
@@ -2427,7 +2435,7 @@ const upsertDonation = async (record = {}) => {
       email_sent = EXCLUDED.email_sent,
       source = EXCLUDED.source,
       updated_at = NOW()
-    RETURNING id, receipt_id, source_pending_id, campaign_id, campaign_name, donor_name, donor_email, amount,
+    RETURNING id, receipt_id, source_pending_id, campaign_id, campaign_name, donor_name, donor_email, donor_phone, amount,
               frequency, payment_provider, payment_status, gateway_transaction_id, stripe_session_id, stripe_event_id,
               email_sent, source, created_at, updated_at;
     `,
@@ -2439,9 +2447,12 @@ const upsertDonation = async (record = {}) => {
       String(record.campaignName || ''),
       String(record.donorName || 'Anonymous'),
       String(record.donorEmail || ''),
+      String(record.donorPhone || record.phone || ''),
       Number(record.amount || 0),
       String(record.frequency || 'one-time'),
-      String(record.paymentProvider || 'STRIPE').toUpperCase() === 'PAYPAL' ? 'PAYPAL' : 'STRIPE',
+      ['STRIPE', 'PAYPAL', 'CASH'].includes(String(record.paymentProvider || '').toUpperCase())
+        ? String(record.paymentProvider).toUpperCase()
+        : 'STRIPE',
       String(record.paymentStatus || 'PAID').toUpperCase(),
       gatewayTransactionId,
       stripeSessionId,

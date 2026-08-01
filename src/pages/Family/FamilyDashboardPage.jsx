@@ -441,11 +441,11 @@ const FamilyDashboardPage = () => {
   };
 
   const exportButtons = (
-    <div className="flex flex-wrap justify-end gap-2">
+    <div className="grid w-full min-w-0 grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:justify-end">
       <button
         type="button"
         onClick={exportFamilyEventsCsv}
-        className="inline-flex items-center gap-1.5 rounded-lg bg-brand-blue px-3 py-1.5 text-xs font-bold text-white transition hover:bg-brand-saffron hover:text-brand-navy"
+        className="inline-flex w-full min-w-0 items-center justify-center gap-1.5 rounded-lg bg-brand-blue px-3 py-1.5 text-xs font-bold text-white transition hover:bg-brand-saffron hover:text-brand-navy sm:w-auto"
       >
         <CalendarDaysIcon className="h-3.5 w-3.5" />
         <span>Export Events CSV</span>
@@ -453,7 +453,7 @@ const FamilyDashboardPage = () => {
       <button
         type="button"
         onClick={exportFamilySevaCsv}
-        className="inline-flex items-center gap-1.5 rounded-lg bg-brand-blue px-3 py-1.5 text-xs font-bold text-white transition hover:bg-brand-saffron hover:text-brand-navy"
+        className="inline-flex w-full min-w-0 items-center justify-center gap-1.5 rounded-lg bg-brand-blue px-3 py-1.5 text-xs font-bold text-white transition hover:bg-brand-saffron hover:text-brand-navy sm:w-auto"
       >
         <HandRaisedIcon className="h-3.5 w-3.5" />
         <span>Export Seva CSV</span>
@@ -461,7 +461,7 @@ const FamilyDashboardPage = () => {
       <button
         type="button"
         onClick={exportFamilyDonationsCsv}
-        className="inline-flex items-center gap-1.5 rounded-lg bg-brand-blue px-3 py-1.5 text-xs font-bold text-white transition hover:bg-brand-saffron hover:text-brand-navy"
+        className="inline-flex w-full min-w-0 items-center justify-center gap-1.5 rounded-lg bg-brand-blue px-3 py-1.5 text-xs font-bold text-white transition hover:bg-brand-saffron hover:text-brand-navy sm:w-auto"
       >
         <BanknotesIcon className="h-3.5 w-3.5" />
         <span>Export Donations CSV</span>

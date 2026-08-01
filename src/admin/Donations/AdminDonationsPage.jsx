@@ -17,7 +17,9 @@ import {
   SparklesIcon,
   BuildingLibraryIcon,
   BanknotesIcon,
-  PowerIcon
+  PowerIcon,
+  ArrowPathIcon,
+  CheckCircleIcon
 } from '@heroicons/react/24/outline';
 import Card from '../../components/ui/Card';
 import donationService from '../../services/donationService';
@@ -56,13 +58,22 @@ const campaignDefaults = {
   stripePublishableKey: ''
 };
 
-const cashDonationDefaults = {
-  campaignId: '',
-  donorDetails: '',
-  amount: 0,
-  receiptId: '',
-  paidAt: new Date().toISOString().slice(0, 10)
+const createCashReceiptId = () => {
+  const now = new Date();
+  const datePart = now.toISOString().slice(0, 10).replace(/-/g, '');
+  const uniquePart = `${now.getTime()}`.slice(-7);
+  return `GRC-${datePart}-${uniquePart}`;
 };
+
+const createCashDonationDefaults = () => ({
+  campaignId: '',
+  donorName: '',
+  donorEmail: '',
+  donorPhone: '',
+  amount: 0,
+  receiptId: createCashReceiptId(),
+  paidAt: new Date().toISOString().slice(0, 10)
+});
 
 const sortOptions = [
   { value: 'newest', label: 'Newest first' },
@@ -234,6 +245,8 @@ const AdminDonationsPage = () => {
   const [campaignDonorPage, setCampaignDonorPage] = useState(1);
   const [campaignDonorSearchTerm, setCampaignDonorSearchTerm] = useState('');
   const [cashDonationOpen, setCashDonationOpen] = useState(false);
+  const [cashDonationError, setCashDonationError] = useState('');
+  const [cashDonationSuccess, setCashDonationSuccess] = useState('');
   const [invoiceEmailStatus, setInvoiceEmailStatus] = useState({ type: 'success', message: '' });
   const [invoiceEmailSendingId, setInvoiceEmailSendingId] = useState('');
   const [openCampaignActionMenuId, setOpenCampaignActionMenuId] = useState('');
@@ -241,7 +254,7 @@ const AdminDonationsPage = () => {
   const form = useForm({ defaultValues: campaignDefaults });
   const editForm = useForm({ defaultValues: campaignDefaults });
   const progressItemForm = useForm({ defaultValues: progressItemDefaults });
-  const cashDonationForm = useForm({ defaultValues: cashDonationDefaults });
+  const cashDonationForm = useForm({ defaultValues: createCashDonationDefaults() });
   const { data: campaigns = [] } = useQuery({
     queryKey: ['admin-campaigns'],
     queryFn: () => donationService.getAllCampaigns().then((res) => res.data),
@@ -445,6 +458,10 @@ const AdminDonationsPage = () => {
   });
 
   const addCashDonationMutation = useMutation({
+    onMutate: () => {
+      setCashDonationError('');
+      setCashDonationSuccess('');
+    },
     mutationFn: async (values) => {
       const campaign = campaigns.find((entry) => String(entry.id) === String(values.campaignId));
       if (!campaign) {
@@ -455,7 +472,9 @@ const AdminDonationsPage = () => {
         campaign,
         amount: Number(values.amount || 0),
         receiptId: String(values.receiptId || '').trim(),
-        donorName: String(values.donorDetails || '').trim(),
+        donorName: String(values.donorName || '').trim(),
+        donorEmail: String(values.donorEmail || '').trim(),
+        donorPhone: String(values.donorPhone || '').trim(),
         paidAt: values.paidAt
       });
     },
@@ -463,8 +482,12 @@ const AdminDonationsPage = () => {
       queryClient.invalidateQueries({ queryKey: ['admin-campaigns'] });
       queryClient.invalidateQueries({ queryKey: ['admin-donations'] });
       queryClient.invalidateQueries({ queryKey: ['campaigns'] });
-      cashDonationForm.reset(cashDonationDefaults);
-      setCashDonationOpen(false);
+      cashDonationForm.reset(createCashDonationDefaults());
+      setCashDonationError('');
+      setCashDonationSuccess('Cash donation saved successfully.');
+    },
+    onError: (error) => {
+      setCashDonationError(String(error?.message || 'Unable to save this cash donation.'));
     }
   });
 
@@ -496,7 +519,9 @@ const AdminDonationsPage = () => {
   };
 
   const openCashDonation = () => {
-    cashDonationForm.reset(cashDonationDefaults);
+    cashDonationForm.reset(createCashDonationDefaults());
+    setCashDonationError('');
+    setCashDonationSuccess('');
     setCashDonationOpen(true);
   };
 
@@ -1585,13 +1610,36 @@ const AdminDonationsPage = () => {
                 <label className="text-sm">Payment Mode
                   <input value="Cash" disabled className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700" />
                 </label>
-                <label className="text-sm sm:col-span-2">Details
-                  <textarea rows={2} {...cashDonationForm.register('donorDetails')} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" placeholder="Donor details / note (optional)" />
+                <label className="text-sm sm:col-span-2">Donor Name
+                  <input {...cashDonationForm.register('donorName', { required: true })} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
                 </label>
-                <p className="text-xs text-slate-500 sm:col-span-2">Email is not captured for cash entries by design.</p>
+                <label className="text-sm">Donor Email (optional)
+                  <input type="email" {...cashDonationForm.register('donorEmail')} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
+                </label>
+                <label className="text-sm">Donor Phone (optional)
+                  <input type="tel" {...cashDonationForm.register('donorPhone')} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
+                </label>
+                {cashDonationError ? (
+                  <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 sm:col-span-2" role="alert">
+                    {cashDonationError}
+                  </p>
+                ) : null}
+                {cashDonationSuccess ? (
+                  <p className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 sm:col-span-2" role="status">
+                    <CheckCircleIcon className="h-5 w-5 shrink-0" />
+                    {cashDonationSuccess}
+                  </p>
+                ) : null}
                 <div className="h-px bg-slate-200 sm:col-span-2" />
                 <div className="flex gap-2 sm:col-span-2">
-                  <Button type="submit" disabled={addCashDonationMutation.isPending}>{addCashDonationMutation.isPending ? 'Saving...' : 'Save Cash Donation'}</Button>
+                  <Button type="submit" disabled={addCashDonationMutation.isPending}>
+                    {addCashDonationMutation.isPending ? (
+                      <span className="inline-flex items-center gap-2">
+                        <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                        Saving...
+                      </span>
+                    ) : 'Save Cash Donation'}
+                  </Button>
                   <Button type="button" variant="ghost" onClick={() => setCashDonationOpen(false)}>Cancel</Button>
                 </div>
               </form>

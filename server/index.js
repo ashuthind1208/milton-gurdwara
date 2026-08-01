@@ -6,6 +6,7 @@ const { spawn } = require('child_process');
 const { URL } = require('url');
 const Stripe = require('stripe');
 const crypto = require('crypto');
+const ffmpegPath = require('ffmpeg-static');
 
 const loadEnvFile = (filePath) => {
   if (!fs.existsSync(filePath)) {
@@ -172,6 +173,9 @@ let volunteerReminderLastRunDateKey = '';
 let eventReminderSweepRunning = false;
 let eventReminderLastRunDateKey = '';
 const darbarSahibStreamSource = String(process.env.DARBAR_SAHIB_STREAM_PROXY_TARGET || 'http://live.sgpc.net:4835/;').trim();
+const darbarSahibHlsDir = path.join(process.env.TMPDIR || dataDir, 'singhsabha-darbar-hls');
+const darbarSahibHlsPlaylistPath = path.join(darbarSahibHlsDir, 'stream.m3u8');
+let darbarSahibHlsProcess = null;
 const adOrganicViewCooldownMs = Number(process.env.AD_ORGANIC_VIEW_COOLDOWN_MS || (24 * 60 * 60 * 1000));
 
 const resolveClientIp = (request) => {
@@ -1308,61 +1312,83 @@ if (typeof rateLimitPruneTimer?.unref === 'function') {
   rateLimitPruneTimer.unref();
 }
 
-const proxyAudioStream = (request, response, targetUrlString) => {
-  const targetUrl = new URL(targetUrlString);
-  const client = targetUrl.protocol === 'https:' ? https : http;
-  const upstreamMethod = request.method === 'HEAD' ? 'HEAD' : 'GET';
+const startDarbarSahibHls = () => {
+  if (darbarSahibHlsProcess && darbarSahibHlsProcess.exitCode == null) {
+    return;
+  }
 
-  const proxyRequest = client.request(targetUrl, {
-    method: upstreamMethod,
-    headers: {
-      'User-Agent': request.headers['user-agent'] || 'Mozilla/5.0',
-      Accept: '*/*'
+  fs.rmSync(darbarSahibHlsDir, { recursive: true, force: true });
+  fs.mkdirSync(darbarSahibHlsDir, { recursive: true });
+  const segmentPattern = path.join(darbarSahibHlsDir, 'segment-%08d.m4s');
+  const processHandle = spawn(ffmpegPath, [
+    '-hide_banner',
+    '-loglevel', 'error',
+    '-reconnect', '1',
+    '-reconnect_streamed', '1',
+    '-reconnect_delay_max', '5',
+    '-i', darbarSahibStreamSource,
+    '-map', '0:a:0',
+    '-vn',
+    '-codec:a', 'aac',
+    '-profile:a', 'aac_low',
+    '-b:a', '48k',
+    '-ar', '44100',
+    '-f', 'hls',
+    '-hls_time', '2',
+    '-hls_list_size', '6',
+    '-hls_flags', 'delete_segments+omit_endlist+independent_segments',
+    '-hls_segment_type', 'fmp4',
+    '-hls_fmp4_init_filename', 'init.mp4',
+    '-hls_segment_filename', segmentPattern,
+    darbarSahibHlsPlaylistPath
+  ], { stdio: ['ignore', 'ignore', 'pipe'] });
+  darbarSahibHlsProcess = processHandle;
+  let errorOutput = '';
+
+  processHandle.stderr.on('data', (chunk) => {
+    if (errorOutput.length < 4000) {
+      errorOutput += chunk.toString();
     }
-  }, (proxyResponse) => {
-    const headers = {
-      'Content-Type': proxyResponse.headers['content-type'] || 'audio/aacp',
-      'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Content-Type, Range, Icy-MetaData',
-      'Access-Control-Allow-Methods': 'GET,HEAD,OPTIONS'
-    };
-
-    ['icy-notice1', 'icy-notice2', 'icy-name', 'icy-genre', 'icy-br', 'icy-sr', 'icy-url', 'icy-pub'].forEach((headerName) => {
-      if (proxyResponse.headers[headerName]) {
-        headers[headerName] = proxyResponse.headers[headerName];
-      }
-    });
-
-    response.writeHead(proxyResponse.statusCode || 200, headers);
-
-    if (request.method === 'HEAD') {
-      response.end();
-      proxyResponse.destroy();
-      return;
+  });
+  processHandle.once('close', (code, signal) => {
+    if (darbarSahibHlsProcess === processHandle) {
+      darbarSahibHlsProcess = null;
     }
-
-    proxyResponse.pipe(response);
-  });
-
-  proxyRequest.setTimeout(15000, () => {
-    proxyRequest.destroy(new Error('Stream request timed out'));
-  });
-
-  proxyRequest.on('error', (error) => {
-    if (!response.headersSent) {
-      sendJson(response, 502, {
-        ok: false,
-        message: error.message || 'Unable to proxy the live stream.'
-      });
-      return;
+    if (code !== 0 && signal !== 'SIGTERM') {
+      console.error('Darbar Sahib HLS transcoder failed:', errorOutput.trim() || `exit code ${code}`);
     }
-
-    response.destroy(error);
   });
-
-  proxyRequest.end();
 };
+
+const waitForDarbarSahibHlsFile = async (filePath, timeoutMs = 12000) => {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    try {
+      if (fs.statSync(filePath).size > 0) {
+        return true;
+      }
+    } catch {
+      // The first playlist and segment are created after FFmpeg receives enough audio.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return false;
+};
+
+const stopDarbarSahibHls = () => {
+  if (darbarSahibHlsProcess && darbarSahibHlsProcess.exitCode == null) {
+    darbarSahibHlsProcess.kill('SIGTERM');
+  }
+  darbarSahibHlsProcess = null;
+};
+
+process.once('exit', stopDarbarSahibHls);
+['SIGINT', 'SIGTERM'].forEach((signal) => {
+  process.once(signal, () => {
+    stopDarbarSahibHls();
+    process.exit(0);
+  });
+});
 
 const ensureStorage = () => {
   if (!fs.existsSync(dataDir)) {
@@ -1664,15 +1690,21 @@ const getVolunteerRegistrationsForReminder = async () => {
 };
 
 const formatSevaDateLabel = (value) => {
-  if (!value) {
+  const rawValue = String(value || '').trim();
+  if (!rawValue) {
     return 'Date TBD';
   }
 
-  try {
-    return new Date(`${value}T00:00:00`).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' });
-  } catch {
-    return value;
+  const dateOnlyMatch = rawValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const parsedDate = dateOnlyMatch
+    ? new Date(Number(dateOnlyMatch[1]), Number(dateOnlyMatch[2]) - 1, Number(dateOnlyMatch[3]))
+    : new Date(rawValue);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return 'Date TBD';
   }
+
+  return parsedDate.toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' });
 };
 
 const escapeHtml = (value) => String(value || '')
@@ -3027,6 +3059,46 @@ const writeUsers = (records) => {
   fs.writeFileSync(usersPath, JSON.stringify(records.map(normalizeUser), null, 2), 'utf8');
 };
 
+const resolveMemberActivityFromFees = (user = {}) => {
+  const role = String(user.role || '').trim().toLowerCase();
+  if (role !== 'member') {
+    return user.isActive !== false;
+  }
+
+  const schedule = String(user.membershipProfile?.donationSchedule || 'monthly').trim().toLowerCase();
+  const validityDays = schedule === 'yearly' ? 365 : 30;
+  const paidDates = (Array.isArray(user.membershipFeeRecords) ? user.membershipFeeRecords : [])
+    .filter((entry) => String(entry?.status || '').trim().toLowerCase() === 'paid')
+    .map((entry) => new Date(entry?.paymentDate || entry?.updatedAt || '').getTime())
+    .filter(Number.isFinite);
+
+  if (paidDates.length === 0) {
+    return false;
+  }
+
+  const latestPaidAt = Math.max(...paidDates);
+  return Date.now() <= latestPaidAt + (validityDays * 24 * 60 * 60 * 1000);
+};
+
+const enforceUserMembershipActivity = (user = {}, requestedBody = {}) => {
+  const role = String(user.role || '').trim().toLowerCase();
+  if (role !== 'member') {
+    return user;
+  }
+
+  const feeDerivedActivity = resolveMemberActivityFromFees(user);
+  if (requestedBody.isActive === true && !feeDerivedActivity) {
+    const error = new Error('A Member cannot be activated without a current paid membership fee.');
+    error.status = 409;
+    throw error;
+  }
+
+  return {
+    ...user,
+    isActive: requestedBody.isActive === false ? false : feeDerivedActivity
+  };
+};
+
 const getUserByEmail = (email) => {
   const normalizedEmail = String(email || '').trim().toLowerCase();
   if (!normalizedEmail) {
@@ -3815,12 +3887,49 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (/^\/api\/streaming\/darbar-sahib\/live\/?$/i.test(requestUrl.pathname) && (request.method === 'GET' || request.method === 'HEAD')) {
+    response.writeHead(302, {
+      Location: '/api/streaming/darbar-sahib/hls/stream.m3u8',
+      'Cache-Control': 'no-store',
+      'Access-Control-Allow-Origin': '*'
+    });
+    response.end();
+    return;
+  }
+
+  const darbarHlsMatch = requestUrl.pathname.match(/^\/api\/streaming\/darbar-sahib\/hls\/(stream\.m3u8|init\.mp4|segment-\d+\.m4s)$/i);
+  if (darbarHlsMatch && (request.method === 'GET' || request.method === 'HEAD')) {
     try {
-      proxyAudioStream(request, response, darbarSahibStreamSource);
+      startDarbarSahibHls();
+      const fileName = darbarHlsMatch[1];
+      const filePath = path.join(darbarSahibHlsDir, fileName);
+      const exists = await waitForDarbarSahibHlsFile(filePath);
+      if (!exists) {
+        sendJson(response, 503, { ok: false, message: 'Live Kirtan is starting. Please try again shortly.' });
+        return;
+      }
+
+      const contentType = fileName.endsWith('.m3u8')
+        ? 'application/vnd.apple.mpegurl'
+        : fileName.endsWith('.mp4')
+          ? 'video/mp4'
+          : 'video/iso.segment';
+      const stat = fs.statSync(filePath);
+      response.writeHead(200, {
+        'Content-Type': contentType,
+        'Content-Length': stat.size,
+        'Cache-Control': fileName.endsWith('.m3u8') ? 'no-store' : 'public, max-age=30',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET,HEAD,OPTIONS'
+      });
+      if (request.method === 'HEAD') {
+        response.end();
+        return;
+      }
+      fs.createReadStream(filePath).pipe(response);
     } catch (error) {
       sendJson(response, 500, {
         ok: false,
-        message: error.message || 'Unable to start the Darbar Sahib live stream.'
+        message: error.message || 'Unable to serve the Darbar Sahib live stream.'
       });
     }
     return;
@@ -4111,14 +4220,15 @@ const server = http.createServer(async (request, response) => {
     try {
       const resource = String(contentResourceMatch[1]).toLowerCase();
       const body = await parseAndValidateGenericObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
-      const data = await eventsDb.createItem(resource, body);
+      const validatedBody = resource === 'users' ? enforceUserMembershipActivity(body, body) : body;
+      const data = await eventsDb.createItem(resource, validatedBody);
       if (resource !== 'audit_logs') {
         await appendAuditLog(request, {
           action: 'content.create',
           targetType: resource,
           targetId: String(data?.id || ''),
           description: `Created ${resource} item`,
-          payload: body
+          payload: validatedBody
         });
       }
       sendJson(response, 200, { ok: true, data });
@@ -4136,13 +4246,16 @@ const server = http.createServer(async (request, response) => {
       const body = await parseAndValidateGenericObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
       const existingUsers = resource === 'users' ? await eventsDb.listItems('users') : null;
       const existingUser = Array.isArray(existingUsers) ? existingUsers.find((entry) => String(entry?.id || '') === String(id)) : null;
-      const data = await eventsDb.updateItem(resource, id, body);
+      const validatedBody = resource === 'users'
+        ? enforceUserMembershipActivity({ ...(existingUser || {}), ...body, id }, body)
+        : body;
+      const data = await eventsDb.updateItem(resource, id, validatedBody);
 
       if (resource === 'users' && eventsDb.hasDatabaseConnection) {
         const mergedUser = {
           ...(existingUser || {}),
           ...(data || {}),
-          ...(body || {}),
+          ...(validatedBody || {}),
           id: String(id)
         };
         const becameInactive = (existingUser?.isActive !== false) && (mergedUser?.isActive === false);
@@ -4161,7 +4274,7 @@ const server = http.createServer(async (request, response) => {
           targetType: resource,
           targetId: String(id || ''),
           description: `Updated ${resource} item`,
-          payload: body
+          payload: validatedBody
         });
       }
       sendJson(response, 200, { ok: true, data });
@@ -4973,7 +5086,13 @@ const server = http.createServer(async (request, response) => {
       await syncCampaignRaisedTotal({ campaignId: data?.campaignId, campaignName: data?.campaignName });
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
-      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to upsert donation.' });
+      const isDuplicateReceipt = error?.code === '23505' && String(error?.constraint || '') === 'uq_donations_receipt_id';
+      sendJson(response, isDuplicateReceipt ? 409 : (error.status || 500), {
+        ok: false,
+        message: isDuplicateReceipt
+          ? 'This receipt number already exists. Enter a unique Gurdwara receipt number.'
+          : (error.message || 'Unable to upsert donation.')
+      });
     }
     return;
   }
@@ -5454,8 +5573,10 @@ const server = http.createServer(async (request, response) => {
       const targetUser = users.find((user) => user.id === id) || null;
       assertInput(Boolean(targetUser), 'User not found.');
 
+      const validatedBody = enforceUserMembershipActivity({ ...targetUser, ...body, id }, body);
+
       const next = users.map((user) => (
-        user.id === id ? normalizeUser({ ...user, ...body, id, createdAt: user.createdAt }) : user
+        user.id === id ? normalizeUser({ ...user, ...validatedBody, id, createdAt: user.createdAt }) : user
       ));
       const updatedUser = next.find((user) => user.id === id) || null;
 

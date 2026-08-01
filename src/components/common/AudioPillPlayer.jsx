@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PauseIcon, PlayIcon } from '@heroicons/react/24/solid';
+import Hls from 'hls.js';
 
 const AudioPillPlayer = ({
   label,
@@ -14,6 +15,12 @@ const AudioPillPlayer = ({
 }) => {
   const audioRef = useRef(null);
   const seekAppliedRef = useRef(false);
+  const retryTimeoutRef = useRef(null);
+  const retryStreamRef = useRef(() => {});
+  const playbackRequestedRef = useRef(false);
+  const hlsRef = useRef(null);
+  const touchPlaybackHandledRef = useRef(false);
+  const touchPlaybackTimeoutRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -27,6 +34,43 @@ const AudioPillPlayer = ({
     const separator = src.includes('?') ? '&' : '?';
     return `${src}${separator}t=${Date.now()}`;
   }, [src, stream]);
+  const usesHlsJs = stream && /\.m3u8(?:$|\?)/i.test(resolvedSrc) && Hls.isSupported();
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !usesHlsJs) {
+      return undefined;
+    }
+
+    const hls = new Hls({
+      enableWorker: true,
+      lowLatencyMode: true,
+      liveSyncDurationCount: 3
+    });
+    hlsRef.current = hls;
+    hls.attachMedia(audio);
+    hls.on(Hls.Events.MEDIA_ATTACHED, () => hls.loadSource(resolvedSrc));
+    hls.on(Hls.Events.ERROR, (_event, data) => {
+      if (!data.fatal) {
+        return;
+      }
+      if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+        hls.startLoad();
+        return;
+      }
+      if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+        hls.recoverMediaError();
+        return;
+      }
+      setHasError(true);
+      setIsPlaying(false);
+    });
+
+    return () => {
+      hlsRef.current = null;
+      hls.destroy();
+    };
+  }, [resolvedSrc, usesHlsJs]);
 
   useEffect(() => {
     seekAppliedRef.current = false;
@@ -70,7 +114,45 @@ const AudioPillPlayer = ({
       seekAppliedRef.current = true;
     };
 
-    const onPlay = () => setIsPlaying(true);
+    const clearRetry = () => {
+      if (retryTimeoutRef.current) {
+        window.clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
+    };
+    const retryStream = () => {
+      if (!stream || !playbackRequestedRef.current || retryTimeoutRef.current) {
+        return;
+      }
+      retryTimeoutRef.current = window.setTimeout(async () => {
+        retryTimeoutRef.current = null;
+        if (!playbackRequestedRef.current) {
+          return;
+        }
+        if (hlsRef.current) {
+          hlsRef.current.startLoad();
+        } else {
+          audio.load();
+        }
+        try {
+          await audio.play();
+        } catch {
+          retryStream();
+        }
+      }, 1800);
+    };
+    retryStreamRef.current = retryStream;
+    const resumeRequestedPlayback = () => {
+      if (!stream || !playbackRequestedRef.current || !audio.paused) {
+        return;
+      }
+      audio.play().catch(retryStream);
+    };
+    const onPlay = () => {
+      clearRetry();
+      setHasError(false);
+      setIsPlaying(true);
+    };
     const onPause = () => setIsPlaying(false);
     const onEnded = () => setIsPlaying(false);
     const onLoadedMetadata = () => setDuration(Number(audio.duration) || 0);
@@ -79,7 +161,9 @@ const AudioPillPlayer = ({
     const onError = () => {
       setHasError(true);
       setIsPlaying(false);
+      retryStream();
     };
+    const onStalled = () => retryStream();
 
     audio.addEventListener('play', onPlay);
     audio.addEventListener('pause', onPause);
@@ -88,7 +172,10 @@ const AudioPillPlayer = ({
     audio.addEventListener('durationchange', onDurationChange);
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('error', onError);
+    audio.addEventListener('stalled', onStalled);
     audio.addEventListener('loadedmetadata', tryApplySeek);
+    audio.addEventListener('loadedmetadata', resumeRequestedPlayback);
+    audio.addEventListener('canplay', resumeRequestedPlayback);
 
     if (audio.readyState >= 1) {
       tryApplySeek();
@@ -96,6 +183,8 @@ const AudioPillPlayer = ({
 
     return () => {
       audio.pause();
+      clearRetry();
+      retryStreamRef.current = () => {};
       audio.removeEventListener('play', onPlay);
       audio.removeEventListener('pause', onPause);
       audio.removeEventListener('ended', onEnded);
@@ -103,9 +192,18 @@ const AudioPillPlayer = ({
       audio.removeEventListener('durationchange', onDurationChange);
       audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('error', onError);
+      audio.removeEventListener('stalled', onStalled);
       audio.removeEventListener('loadedmetadata', tryApplySeek);
+      audio.removeEventListener('loadedmetadata', resumeRequestedPlayback);
+      audio.removeEventListener('canplay', resumeRequestedPlayback);
     };
-  }, [startAtSeconds, resolvedSrc]);
+  }, [startAtSeconds, resolvedSrc, stream]);
+
+  useEffect(() => () => {
+    if (touchPlaybackTimeoutRef.current) {
+      window.clearTimeout(touchPlaybackTimeoutRef.current);
+    }
+  }, []);
 
   const togglePlayback = async () => {
     const audio = audioRef.current;
@@ -116,16 +214,57 @@ const AudioPillPlayer = ({
     setHasError(false);
 
     if (audio.paused) {
+      playbackRequestedRef.current = true;
       try {
+        if (hlsRef.current) {
+          hlsRef.current.startLoad();
+        } else if (stream && audio.error) {
+          audio.load();
+        }
         await audio.play();
       } catch (error) {
-        setHasError(true);
         setIsPlaying(false);
+        if (stream) {
+          retryStreamRef.current();
+        } else {
+          setHasError(true);
+        }
       }
       return;
     }
 
+    playbackRequestedRef.current = false;
+    if (retryTimeoutRef.current) {
+      window.clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
     audio.pause();
+  };
+
+  const handlePlaybackTouchEnd = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    touchPlaybackHandledRef.current = true;
+    if (touchPlaybackTimeoutRef.current) {
+      window.clearTimeout(touchPlaybackTimeoutRef.current);
+    }
+    touchPlaybackTimeoutRef.current = window.setTimeout(() => {
+      touchPlaybackHandledRef.current = false;
+      touchPlaybackTimeoutRef.current = null;
+    }, 500);
+    togglePlayback();
+  };
+
+  const handlePlaybackClick = () => {
+    if (touchPlaybackHandledRef.current) {
+      touchPlaybackHandledRef.current = false;
+      if (touchPlaybackTimeoutRef.current) {
+        window.clearTimeout(touchPlaybackTimeoutRef.current);
+        touchPlaybackTimeoutRef.current = null;
+      }
+      return;
+    }
+    togglePlayback();
   };
 
   const toneClasses = accent === 'dark'
@@ -139,12 +278,13 @@ const AudioPillPlayer = ({
 
   return (
     <div className={`rounded-2xl border px-3 py-2 shadow-lg ${toneClasses} ${className}`}>
-      <audio ref={audioRef} preload="none" src={resolvedSrc} />
+      <audio ref={audioRef} preload="none" src={usesHlsJs ? undefined : resolvedSrc} />
       <div className="flex items-center gap-3">
         <button
           type="button"
-          onClick={togglePlayback}
-          className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${accent === 'dark' ? 'bg-white text-brand-blue' : 'bg-brand-blue text-white'}`}
+          onTouchEnd={handlePlaybackTouchEnd}
+          onClick={handlePlaybackClick}
+          className={`inline-flex h-10 w-10 items-center justify-center rounded-full touch-manipulation select-none ${accent === 'dark' ? 'bg-white text-brand-blue' : 'bg-brand-blue text-white'}`}
           aria-label={`${isPlaying ? 'Pause' : 'Play'} ${label}`}
         >
           {isPlaying ? <PauseIcon className="h-4 w-4" /> : <PlayIcon className="h-4 w-4" />}

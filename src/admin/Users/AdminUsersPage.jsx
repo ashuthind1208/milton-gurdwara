@@ -22,6 +22,8 @@ import contentApiService from '../../services/contentApiService';
 import userService from '../../services/userService';
 import notificationService from '../../services/notificationService';
 import uploadService from '../../services/uploadService';
+import { siteConfig } from '../../constants/siteConfig';
+import { downloadMembershipFeeInformationPdf } from '../../utils/csvExport';
 
 const FILTERS = ['All', 'Pending', 'Approved', 'Rejected'];
 
@@ -276,7 +278,7 @@ const AdminUsersPage = () => {
         role: resolvedRole,
         adminPageAccess: isCustomRole ? customRoleAccess : undefined,
         approvalStatus: 'pending',
-        isActive: true,
+        isActive: resolvedRole !== 'Member',
         registrationComplete: true
       });
     },
@@ -310,12 +312,27 @@ const AdminUsersPage = () => {
   });
 
   const toggleActiveMutation = useMutation({
-    mutationFn: ({ id, isActive }) => userService.updateUser(id, { isActive }),
+    mutationFn: ({ id, isActive }) => {
+      const targetUser = users.find((entry) => entry.id === id);
+      if (isActive && String(targetUser?.role || '').trim() === 'Member') {
+        const reviewMeta = resolveMembershipReviewMeta({
+          records: targetUser?.membershipFeeRecords,
+          schedule: targetUser?.membershipProfile?.donationSchedule
+        });
+        if (!reviewMeta.isActive) {
+          throw new Error('Add a current paid membership fee before activating this Member.');
+        }
+      }
+      return userService.updateUser(id, { isActive });
+    },
     onSuccess: (response, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       if (currentUser?.id && currentUser.id === variables?.id && response?.data) {
         persistUser(response.data);
       }
+    },
+    onError: (error) => {
+      setApprovalNotice(String(error?.message || 'Unable to update member status.'));
     }
   });
 
@@ -1271,6 +1288,19 @@ const AdminUsersPage = () => {
                 <p className="mt-1 truncate text-sm text-white/85">{membershipUserRecord.name || 'Member'} • {membershipUserRecord.email || '-'}</p>
               </div>
               <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+                <Button
+                  type="button"
+                  className="min-w-0 rounded-full border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20"
+                  onClick={() => downloadMembershipFeeInformationPdf({
+                    user: membershipUserRecord,
+                    organizationName: siteConfig.name,
+                    address: siteConfig.contact?.address,
+                    phone: siteConfig.contact?.phone,
+                    email: siteConfig.contact?.email
+                  })}
+                >
+                  Download Fee PDF
+                </Button>
                 <Button
                   type="button"
                   className="min-w-0 rounded-full border border-white/25 bg-emerald-950 px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-emerald-950/25 hover:bg-emerald-900"

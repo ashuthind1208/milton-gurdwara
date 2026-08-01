@@ -1,6 +1,7 @@
 import { serviceResponse } from './serviceResponse';
 import contentApiService from './contentApiService';
 import { siteConfig } from '../constants/siteConfig';
+import { createMembershipFeeInformationPdfBlob } from '../utils/csvExport';
 
 const RESOURCE = 'subscribers';
 const NEWSLETTER_RESOURCE = 'newsletter_campaigns';
@@ -482,7 +483,7 @@ const buildApprovalEmailHtml = (user = {}) => {
         <td style="padding:24px 24px 14px;">
           <div style="font-size:22px;line-height:1.35;font-weight:800;color:#0f172a;">Welcome, ${safeMemberName}.</div>
           <div style="margin-top:12px;font-size:15px;line-height:1.8;color:#334155;">
-            Your registration has been approved. You can now sign in to access member features, register for events, and stay connected with the sangat.
+            Your registration has been approved. Your Member account becomes active when a current membership fee is recorded as paid. You can sign in to review your profile and stay connected with the sangat.
           </div>
         </td>
       </tr>
@@ -519,6 +520,28 @@ const buildApprovalEmailHtml = (user = {}) => {
       </tr>
     </table>
   </div>`;
+};
+
+const buildMembershipFeeInformationAttachment = async (user = {}) => {
+  const blob = await createMembershipFeeInformationPdfBlob({
+    user,
+    organizationName: siteConfig.name,
+    address: siteConfig.contact?.address,
+    phone: siteConfig.contact?.phone,
+    email: siteConfig.contact?.email
+  });
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(String(reader.result || ''));
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+  return {
+    filename: 'membership-fee-information.pdf',
+    contentType: 'application/pdf',
+    content: dataUrl.split(',')[1] || '',
+    disposition: 'attachment'
+  };
 };
 
 const notificationService = {
@@ -853,13 +876,14 @@ const notificationService = {
     ).trim();
 
     const approvalBodyHtml = buildApprovalEmailHtml(user);
-    const plainMessage = 'Your registration has been approved. You can now sign in and continue.';
+    const plainMessage = 'Your registration has been approved. Your Member account becomes active when a current membership fee is recorded as paid.';
+    const feeAttachment = await buildMembershipFeeInformationAttachment(user);
 
     const payload = {
       type: 'approval',
       to: targetEmail,
       name: user?.name || 'Member',
-      subject: 'Your registration is approved',
+      subject: 'Registration approved - membership payment status',
       message: plainMessage,
       text: plainMessage,
       bodyText: plainMessage,
@@ -867,6 +891,7 @@ const notificationService = {
       bodyHtml: approvalBodyHtml,
       body: approvalBodyHtml,
       content: approvalBodyHtml,
+      attachments: feeAttachment.content ? [feeAttachment] : [],
       approvedAt: new Date().toISOString()
     };
 

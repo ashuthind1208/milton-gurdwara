@@ -388,7 +388,7 @@ const HomePage = () => {
             className="ticker-track ticker-force-motion ticker-speed-medium"
             style={{
               animationName: 'ticker-scroll-left',
-              animationDuration: '34s',
+              animationDuration: '160s',
               animationTimingFunction: 'linear',
               animationIterationCount: 'infinite',
               animationPlayState: 'running'

@@ -413,6 +413,7 @@ const userService = {
       authProvider: payload.authProvider || 'LOCAL',
       avatarUrl: payload.avatarUrl,
       registrationComplete: Boolean(payload.registrationComplete),
+      isActive: payload.isActive !== false,
       approvalStatus: payload.approvalStatus || 'pending',
       approvalUpdatedAt: new Date().toISOString()
     }, roleDefinitions);

@@ -237,6 +237,142 @@ export const createDonationInvoicePdfBlob = async ({
   return doc.output('blob');
 };
 
+export const createMembershipFeeInformationPdfBlob = async ({ user = {}, organizationName, address, phone, email }) => {
+  const records = Array.isArray(user?.membershipFeeRecords) ? user.membershipFeeRecords : [];
+  const latestPaidRecord = records
+    .filter((entry) => String(entry?.status || '').trim().toLowerCase() === 'paid')
+    .sort((left, right) => (
+      new Date(right?.paymentDate || right?.updatedAt || 0).getTime()
+      - new Date(left?.paymentDate || left?.updatedAt || 0).getTime()
+    ))[0];
+  const schedule = String(user?.membershipProfile?.donationSchedule || 'monthly').trim().toLowerCase() === 'yearly'
+    ? 'Yearly'
+    : 'Monthly';
+  const validityDays = schedule === 'Yearly' ? 365 : 30;
+  const paymentDate = latestPaidRecord ? new Date(latestPaidRecord.paymentDate || latestPaidRecord.updatedAt || '') : null;
+  const hasValidPaymentDate = paymentDate && !Number.isNaN(paymentDate.getTime());
+  const validUntil = hasValidPaymentDate
+    ? new Date(paymentDate.getTime() + (validityDays * 24 * 60 * 60 * 1000))
+    : null;
+  const isCurrent = validUntil ? validUntil.getTime() >= Date.now() : false;
+  const formatDate = (value) => value
+    ? value.toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })
+    : 'Not recorded';
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const logoDataUrl = await loadLogoDataUrl();
+
+  doc.setFillColor(...LOGO_BLUE_RGB);
+  doc.rect(0, 0, pageWidth, 112, 'F');
+  if (logoDataUrl) {
+    doc.addImage(logoDataUrl, 'PNG', 34, 24, 62, 62);
+  }
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.text(organizationName || 'Singh Sabha Milton Gurdwara', 112, 43);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.text(address || '', 112, 61);
+  doc.text([phone, email].filter(Boolean).join('  |  '), 112, 77);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(15);
+  doc.text('Membership Fee', pageWidth - 34, 38, { align: 'right' });
+  doc.text('Information', pageWidth - 34, 55, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text(`Prepared ${formatDate(new Date())}`, pageWidth - 34, 75, { align: 'right' });
+
+  doc.setTextColor(15, 23, 42);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(17);
+  doc.text(`Welcome, ${String(user?.name || 'Member').trim()}.`, 40, 148);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10.5);
+  doc.setTextColor(51, 65, 85);
+  const welcomeText = latestPaidRecord
+    ? 'Thank you for supporting the programs, services, and community work of Singh Sabha Milton. This document summarizes your membership profile and the latest fee payment recorded on your account.'
+    : 'Your registration has been approved. A current paid membership fee activates Member access and helps support programs, services, and community work at Singh Sabha Milton.';
+  doc.text(welcomeText, 40, 171, { maxWidth: pageWidth - 80, lineHeightFactor: 1.45 });
+
+  const statusY = 220;
+  doc.setFillColor(isCurrent ? 232 : 255, isCurrent ? 248 : 247, isCurrent ? 239 : 237);
+  doc.setDrawColor(isCurrent ? 74 : 245, isCurrent ? 180 : 166, isCurrent ? 116 : 35);
+  doc.roundedRect(40, statusY, pageWidth - 80, 48, 7, 7, 'FD');
+  doc.setTextColor(isCurrent ? 22 : 154, isCurrent ? 101 : 52, isCurrent ? 52 : 18);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text(isCurrent ? 'Membership fee status: CURRENT' : 'Membership fee status: PAYMENT REQUIRED', 55, statusY + 20);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.text(
+    isCurrent ? `Current through ${formatDate(validUntil)}.` : 'No current paid membership fee is recorded on this account.',
+    55,
+    statusY + 36
+  );
+
+  autoTable(doc, {
+    startY: statusY + 70,
+    head: [['Member Information', 'Details']],
+    body: [
+      ['Member Name', String(user?.name || 'Member').trim()],
+      ['Email Address', String(user?.email || '').trim() || '-'],
+      ['Phone', String(user?.phone || '').trim() || '-'],
+      ['Membership Schedule', schedule],
+      ['Registration Status', String(user?.approvalStatus || 'approved').replace(/^./, (value) => value.toUpperCase())]
+    ],
+    styles: { fontSize: 10, cellPadding: 7, valign: 'top' },
+    headStyles: { fillColor: LOGO_BLUE_RGB, textColor: 255, fontStyle: 'bold' },
+    columnStyles: {
+      0: { cellWidth: 145, fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [30, 41, 59] },
+      1: { cellWidth: 'auto' }
+    },
+    theme: 'grid',
+    margin: { left: 40, right: 40 }
+  });
+
+  const paymentTableY = (doc.lastAutoTable?.finalY || 430) + 24;
+  autoTable(doc, {
+    startY: paymentTableY,
+    head: [['Latest Fee Record', 'Details']],
+    body: [
+      ['Payment Status', latestPaidRecord ? 'Paid' : 'Payment required'],
+      ['Payment Date', formatDate(hasValidPaymentDate ? paymentDate : null)],
+      ['Amount', latestPaidRecord ? `${String(latestPaidRecord.currency || 'CAD')} ${Number(latestPaidRecord.amount || 0).toFixed(2)}` : '-'],
+      ['Receipt Number', String(latestPaidRecord?.receiptNumber || '').trim() || '-'],
+      ['Payment Method', String(latestPaidRecord?.paymentMethod || '').trim() || '-'],
+      ['Valid Until', formatDate(validUntil)]
+    ],
+    styles: { fontSize: 10, cellPadding: 7, valign: 'top' },
+    headStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold' },
+    columnStyles: {
+      0: { cellWidth: 145, fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [30, 41, 59] },
+      1: { cellWidth: 'auto' }
+    },
+    theme: 'grid',
+    margin: { left: 40, right: 40 }
+  });
+
+  const footerY = Math.min((doc.lastAutoTable?.finalY || 620) + 36, pageHeight - 62);
+  doc.setDrawColor(203, 213, 225);
+  doc.line(40, footerY - 16, pageWidth - 40, footerY - 16);
+  doc.setTextColor(71, 85, 105);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text('Please retain this document for your records. Contact the Gurdwara office if any information needs correction.', 40, footerY, { maxWidth: pageWidth - 80 });
+  doc.text('Thank you for your continued participation and seva in the sangat.', 40, footerY + 18);
+
+  return doc.output('blob');
+};
+
+export const downloadMembershipFeeInformationPdf = async (payload) => {
+  const blob = await createMembershipFeeInformationPdfBlob(payload);
+  const memberName = String(payload?.user?.name || 'member').trim().replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase();
+  triggerFileDownload(blob, `membership-fee-${memberName || 'member'}.pdf`);
+};
+
 export const downloadDonationInvoicePdf = async (payload) => {
   const blob = await createDonationInvoicePdfBlob(payload);
   const fileName = payload?.fileName || `invoice-${payload?.donation?.receiptId || payload?.donation?.id || 'donation'}.pdf`;

@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createPortal } from 'react-dom';
 import jsPDF from 'jspdf';
+import Hls from 'hls.js';
 import {
   Bars3Icon,
   XMarkIcon,
@@ -56,7 +57,6 @@ const mobileDrawerNavClass = ({ isActive }) =>
 
 const iconClass = 'h-4.5 w-4.5';
 const streamGlyphClass = 'h-6 w-6';
-const darbarSahibDirectFallbackUrl = 'https://live.sgpc.net:8442/';
 const NANAKSHAHI_WEEKDAY_LABELS_PA = ['ਐ', 'ਸੋ', 'ਮੰ', 'ਬੁੱ', 'ਵੀ', 'ਸ਼ੁੱ', 'ਸ਼ੱ'];
 const CALENDAR_NAV_DAY_MS = 24 * 60 * 60 * 1000;
 const PDF_HEADER_BG = [0, 64, 129];
@@ -462,17 +462,19 @@ const Navbar = () => {
   const [streamModalState, setStreamModalState] = useState({ open: false, id: '' });
   const [selectedNanakshahiDateKey, setSelectedNanakshahiDateKey] = useState(() => toDateKey(new Date()));
   const liveAudioRef = useRef(null);
+  const kirtanHlsRef = useRef(null);
   const kirtanRetryTimeoutRef = useRef(null);
   const kirtanPlaybackRequestedRef = useRef(false);
   const kirtanPausedByUserRef = useRef(false);
-  const kirtanUseDirectFallbackRef = useRef(false);
   const kirtanReconnectInFlightRef = useRef(false);
   const datePopoverCloseTimeoutRef = useRef(null);
   const profilePopoverCloseTimeoutRef = useRef(null);
   const viewportResetTimeoutRef = useRef(null);
+  const compactStreamsBackdropGuardRef = useRef(false);
   const compactLanyardBackdropGuardRef = useRef(false);
   const dateInfoBackdropGuardRef = useRef(false);
   const searchBackdropGuardRef = useRef(false);
+  const compactStreamsBackdropGuardTimeoutRef = useRef(null);
   const compactLanyardBackdropGuardTimeoutRef = useRef(null);
   const dateInfoBackdropGuardTimeoutRef = useRef(null);
   const searchBackdropGuardTimeoutRef = useRef(null);
@@ -518,7 +520,9 @@ const Navbar = () => {
     ? user.adminPageAccess.map((path) => String(path || '').trim()).filter(Boolean)
     : [];
   const hasRoleBasedAdminAccess = hasFullAccess || assignedAdminPages.length > 0;
-  const canSeeAdminPortalButton = hasRoleBasedAdminAccess;
+  const canSeeAdminPortalButton = hasRoleBasedAdminAccess
+    && approvalStatus === 'approved'
+    && user?.isActive !== false;
   const isApprovalPending = isAuthenticated && userRole !== 'Family' && approvalStatus === 'pending';
   const membershipProfile = user?.membershipProfile && typeof user.membershipProfile === 'object' ? user.membershipProfile : {};
   const isMembershipProfileCompleted = membershipProfile.completed === true;
@@ -1299,6 +1303,18 @@ const Navbar = () => {
     }
   };
 
+  const handleCompactProfileLinkTouch = (targetPath) => (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsProfilePopoverOpen(false);
+    setIsCompactProfileLanyardOpen(false);
+    if (location.pathname === targetPath) {
+      window.location.reload();
+      return;
+    }
+    navigate(targetPath);
+  };
+
   const dateContext = useMemo(() => {
     const weekdayEn = new Date().toLocaleDateString('en-CA', { weekday: 'long' });
     const monthInsight = {
@@ -1371,11 +1387,16 @@ const Navbar = () => {
   };
 
   const resolveKirtanStreamUrl = () => {
-    const configured = String(siteConfig.liveKirtanStreamUrl || '').trim();
-    if (kirtanUseDirectFallbackRef.current && /^\/api\/streaming\/darbar-sahib\/live\/?$/i.test(configured)) {
-      return darbarSahibDirectFallbackUrl;
+    return String(siteConfig.liveKirtanStreamUrl || '').trim();
+  };
+
+  const loadKirtanStream = (streamUrl) => {
+    if (kirtanHlsRef.current) {
+      kirtanHlsRef.current.startLoad();
+      return;
     }
-    return configured;
+    liveAudioRef.current.src = streamUrl;
+    liveAudioRef.current.load();
   };
 
   const scheduleKirtanReconnect = () => {
@@ -1402,16 +1423,10 @@ const Navbar = () => {
 
       try {
         kirtanReconnectInFlightRef.current = true;
-        const separator = baseStreamUrl.includes('?') ? '&' : '?';
-        const refreshedUrl = `${baseStreamUrl}${separator}t=${Date.now()}`;
         setIsKirtanLoading(true);
-        liveAudioRef.current.src = refreshedUrl;
-        liveAudioRef.current.load();
+        loadKirtanStream(baseStreamUrl);
         await liveAudioRef.current.play();
       } catch {
-        if (!kirtanUseDirectFallbackRef.current && /^\/api\/streaming\/darbar-sahib\/live\/?$/i.test(String(siteConfig.liveKirtanStreamUrl || '').trim())) {
-          kirtanUseDirectFallbackRef.current = true;
-        }
         setIsKirtanPlaying(false);
         setIsKirtanLoading(false);
         kirtanReconnectInFlightRef.current = false;
@@ -1422,6 +1437,36 @@ const Navbar = () => {
       kirtanReconnectInFlightRef.current = false;
     }, 2200);
   };
+
+  useEffect(() => {
+    const audio = liveAudioRef.current;
+    const streamUrl = resolveKirtanStreamUrl();
+    if (!audio || !/\.m3u8(?:$|\?)/i.test(streamUrl) || !Hls.isSupported()) {
+      return undefined;
+    }
+
+    const hls = new Hls({ enableWorker: true, lowLatencyMode: true, liveSyncDurationCount: 3 });
+    kirtanHlsRef.current = hls;
+    hls.attachMedia(audio);
+    hls.on(Hls.Events.MEDIA_ATTACHED, () => hls.loadSource(streamUrl));
+    hls.on(Hls.Events.ERROR, (_event, data) => {
+      if (!data.fatal) {
+        return;
+      }
+      setIsKirtanPlaying(false);
+      setIsKirtanLoading(false);
+      if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+        hls.startLoad();
+      } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+        hls.recoverMediaError();
+      }
+    });
+
+    return () => {
+      kirtanHlsRef.current = null;
+      hls.destroy();
+    };
+  }, []);
 
   useEffect(() => () => {
     clearKirtanRetryTimer();
@@ -1455,21 +1500,14 @@ const Navbar = () => {
     try {
       kirtanPlaybackRequestedRef.current = true;
       kirtanPausedByUserRef.current = false;
-      kirtanUseDirectFallbackRef.current = false;
       clearKirtanRetryTimer();
       kirtanReconnectInFlightRef.current = false;
-      const separator = baseStreamUrl.includes('?') ? '&' : '?';
-      const refreshedUrl = `${baseStreamUrl}${separator}t=${Date.now()}`;
       setIsKirtanLoading(true);
-      liveAudioRef.current.src = refreshedUrl;
-      liveAudioRef.current.load();
+      loadKirtanStream(baseStreamUrl);
       await liveAudioRef.current.play();
       setIsKirtanPlaying(true);
       setIsKirtanLoading(false);
     } catch {
-      if (!kirtanUseDirectFallbackRef.current && /^\/api\/streaming\/darbar-sahib\/live\/?$/i.test(String(siteConfig.liveKirtanStreamUrl || '').trim())) {
-        kirtanUseDirectFallbackRef.current = true;
-      }
       setIsKirtanPlaying(false);
       setIsKirtanLoading(false);
       scheduleKirtanReconnect();
@@ -1538,6 +1576,11 @@ const Navbar = () => {
       guardRef.current = false;
       timeoutRef.current = null;
     }, 280);
+  };
+
+  const openCompactStreams = () => {
+    armBackdropGuard(compactStreamsBackdropGuardRef, compactStreamsBackdropGuardTimeoutRef);
+    setCompactStreamsOpen(true);
   };
 
   useEffect(() => {
@@ -2020,6 +2063,9 @@ const Navbar = () => {
     if (viewportResetTimeoutRef.current) {
       window.clearTimeout(viewportResetTimeoutRef.current);
     }
+    if (compactStreamsBackdropGuardTimeoutRef.current) {
+      window.clearTimeout(compactStreamsBackdropGuardTimeoutRef.current);
+    }
     if (compactLanyardBackdropGuardTimeoutRef.current) {
       window.clearTimeout(compactLanyardBackdropGuardTimeoutRef.current);
     }
@@ -2051,7 +2097,7 @@ const Navbar = () => {
               <span className="text-[11px] font-semibold text-blue-50">Live Kirtan from Darbar Sahib</span>
               <audio
                 ref={liveAudioRef}
-                src={siteConfig.liveKirtanStreamUrl}
+                src={Hls.isSupported() ? undefined : siteConfig.liveKirtanStreamUrl}
                 preload="none"
                 onPlaying={() => {
                   clearKirtanRetryTimer();
@@ -2351,7 +2397,17 @@ const Navbar = () => {
                 {liveStreams.length > 0 ? (
                   <button
                     type="button"
-                    onClick={() => setCompactStreamsOpen(true)}
+                    onPointerDown={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      openCompactStreams();
+                    }}
+                    onTouchStart={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      openCompactStreams();
+                    }}
+                    onClick={openCompactStreams}
                     className="inline-flex shrink-0 items-center gap-1 rounded-full border border-blue-100/35 bg-white/95 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-brand-blue shadow-[0_4px_14px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-blue-100/70"
                   >
                     <span className="inline-flex h-4.5 w-4.5 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-amber-100 text-brand-blue shadow-inner">
@@ -2435,8 +2491,18 @@ const Navbar = () => {
               {liveStreams.length > 0 ? (
                 <button
                   type="button"
-                  onClick={() => setCompactStreamsOpen(true)}
-                  className="inline-flex items-center gap-1 rounded-full bg-brand-blue px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-[0_8px_18px_rgba(10,77,159,0.35)]"
+                  onPointerDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    openCompactStreams();
+                  }}
+                  onTouchStart={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    openCompactStreams();
+                  }}
+                  onClick={openCompactStreams}
+                  className="inline-flex items-center gap-1 rounded-full bg-brand-blue px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-[0_8px_18px_rgba(10,77,159,0.35)] touch-manipulation select-none"
                 >
                   <LiveStreamGlyph />
                   Live
@@ -2544,7 +2610,13 @@ const Navbar = () => {
       ) : null}
 
       {compactStreamsOpen ? createPortal(
-        <div className="fixed inset-0 z-[220] overflow-y-auto bg-slate-950/60 px-4 py-6" onClick={() => setCompactStreamsOpen(false)}>
+        <div className="fixed inset-0 z-[220] overflow-y-auto bg-slate-950/60 px-4 py-6" onClick={() => {
+          if (compactStreamsBackdropGuardRef.current) {
+            compactStreamsBackdropGuardRef.current = false;
+            return;
+          }
+          setCompactStreamsOpen(false);
+        }}>
           <div className="flex min-h-full items-center justify-center">
             <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
               <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
@@ -2568,6 +2640,7 @@ const Navbar = () => {
                   label="Live Kirtan"
                   subtitle="Sri Darbar Sahib audio"
                   src={siteConfig.liveKirtanStreamUrl}
+                  stream
                   className="w-full"
                 />
               </div>
@@ -2703,12 +2776,12 @@ const Navbar = () => {
                 </Link>
               </div>
 
-              <Link to="/family-dashboard" onClick={handleProfileQuickLink('/family-dashboard')} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-brand-saffron bg-brand-saffron px-3 py-1.5 text-xs font-extrabold uppercase tracking-wide text-brand-navy transition hover:bg-amber-300">
+              <Link to="/family-dashboard" onTouchEnd={handleCompactProfileLinkTouch('/family-dashboard')} onClick={handleProfileQuickLink('/family-dashboard')} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-brand-saffron bg-brand-saffron px-3 py-1.5 text-xs font-extrabold uppercase tracking-wide text-brand-navy transition hover:bg-amber-300 touch-manipulation select-none">
                 <SparklesIcon className="h-4 w-4" />
                 Open Family Dashboard
               </Link>
               {canSeeAdminPortalButton ? (
-                <Link to="/admin" onClick={handleProfileQuickLink('/admin')} className="mt-2 inline-flex w-full items-center justify-center rounded-full border border-brand-blue/30 bg-gradient-to-r from-brand-blue via-blue-600 to-brand-saffron px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white shadow-[0_8px_20px_rgba(10,77,159,0.28)] transition hover:from-blue-700 hover:via-brand-blue hover:to-amber-500">
+                <Link to="/admin" onTouchEnd={handleCompactProfileLinkTouch('/admin')} onClick={handleProfileQuickLink('/admin')} className="mt-2 inline-flex w-full items-center justify-center rounded-full border border-brand-blue/30 bg-gradient-to-r from-brand-blue via-blue-600 to-brand-saffron px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white shadow-[0_8px_20px_rgba(10,77,159,0.28)] transition hover:from-blue-700 hover:via-brand-blue hover:to-amber-500 touch-manipulation select-none">
                   Go to Admin Portal
                 </Link>
               ) : null}
@@ -2727,12 +2800,12 @@ const Navbar = () => {
         }}>
           <div className="flex min-h-full items-center justify-center">
             <div className="max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
-              <div className="flex items-center justify-between border-b border-slate-200 bg-blue-50 px-4 py-3">
-                <h3 className="text-lg font-bold text-brand-blue">Nanakshahi Date Details</h3>
+              <div className="sticky top-0 z-20 flex items-center justify-between border-b border-blue-900 bg-brand-blue px-4 py-3">
+                <h3 className="text-lg font-bold text-white">Nanakshahi Date Details</h3>
                 <button
                   type="button"
                   onClick={() => setDateInfoOpen(false)}
-                  className="rounded-full border border-brand-blue/40 bg-blue-50 p-1.5 text-brand-blue transition hover:border-brand-saffron hover:bg-amber-100 hover:text-amber-700"
+                  className="rounded-full border border-white/60 bg-blue-900/30 p-1.5 text-white transition hover:border-brand-saffron hover:bg-amber-100 hover:text-amber-700"
                   aria-label="Close Nanakshahi date details"
                 >
                   <XMarkIcon className="h-4 w-4" />
@@ -3112,7 +3185,7 @@ const Navbar = () => {
           <div className="grid gap-2">
             {mobileMenuItems.map((item) => (
               <NavLink key={item.path} to={item.path} className={mobileDrawerNavClass} onClick={() => setOpen(false)}>
-                {item.label}
+                {item.path === '/hukamnama' ? 'Hukamnama' : item.label}
               </NavLink>
             ))}
           </div>

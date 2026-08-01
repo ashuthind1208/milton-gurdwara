@@ -918,7 +918,7 @@ const AdminLayout = () => {
   return (
     <div className="min-h-screen overflow-x-hidden bg-slate-100 dark:bg-slate-950">
       <div className="grid min-w-0 grid-cols-1 lg:min-h-screen lg:grid-cols-[270px_1fr]">
-      <aside className="hidden border-r border-slate-800 bg-slate-950 p-4 text-slate-100 lg:sticky lg:top-0 lg:block lg:h-screen lg:overflow-y-auto lg:self-start">
+      <aside className="hidden border-r border-slate-800 bg-slate-950 p-4 text-slate-100 lg:block lg:min-h-full lg:self-stretch">
         <div className="flex items-center justify-between gap-2">
           <p className="flex items-center gap-2 font-heading text-xl font-bold text-white">
             <img src={gurdwaraLogo} alt="Singh Sabha logo" className="h-8 w-8 rounded-full border border-brand-saffron/70 object-cover" />

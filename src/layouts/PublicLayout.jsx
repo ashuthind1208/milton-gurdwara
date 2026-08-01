@@ -81,14 +81,16 @@ const PublicLayout = () => {
   }, [upcomingObservances]);
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-white text-slate-900 transition-colors">
+    <div className="min-h-screen overflow-x-clip bg-white text-slate-900 transition-colors">
       <Navbar />
       {isHomePage ? (
         <section className="w-full overflow-hidden border-y border-brand-blue/70 bg-brand-blue py-2.5">
-          <div className="public-observance-ticker flex min-w-max items-center gap-10 whitespace-nowrap px-4 md:px-8">
-            {tickerItems.length > 0
-              ? tickerItems.map((event, index) => (
-                <span key={`${event.id}-${index}`} className="inline-flex items-center gap-2.5">
+          <div className="public-observance-ticker public-observance-ticker-force-motion whitespace-nowrap">
+            {[0, 1].map((groupIndex) => (
+              <div key={groupIndex} className="public-observance-ticker-group" aria-hidden={groupIndex === 1 ? 'true' : undefined}>
+                {tickerItems.length > 0
+                  ? tickerItems.map((event, index) => (
+                    <span key={`${groupIndex}-${event.id}-${index}`} className="inline-flex items-center gap-2.5">
                   <span className="text-sm font-black text-white" title={event.calendarNoteEn || ''}>{event.dateLabel}</span>
                   <span className="text-sm font-black text-white" title={event.calendarNoteEn || ''}>{event.nanakshahiLabel}</span>
                   {event.hasAlternateNanakshahiLabel ? (
@@ -105,24 +107,49 @@ const PublicLayout = () => {
                     ({event.dateLabelPa} | {event.nanakshahiLabelPa})
                   </span>
                   <span className="text-white/80">|</span>
-                </span>
-              ))
-              : (
-                <span className="text-base font-black text-white">No Punjabi holidays, Sangrand, Gurpurab, or Shaheedi observances in the next month.</span>
-              )}
+                    </span>
+                  ))
+                  : (
+                    <span className="text-base font-black text-white">No Punjabi holidays, Sangrand, Gurpurab, or Shaheedi observances in the next month.</span>
+                  )}
+              </div>
+            ))}
           </div>
         </section>
       ) : null}
       <style>{`
         .public-observance-ticker {
+          display: flex;
+          width: max-content;
           animation: publicObservanceFlow 160s linear infinite;
+          -webkit-animation: publicObservanceFlow 160s linear infinite;
+          will-change: transform;
+          transform: translate3d(0, 0, 0);
+          -webkit-transform: translate3d(0, 0, 0);
+        }
+        .public-observance-ticker-group {
+          display: inline-flex;
+          flex: 0 0 auto;
+          align-items: center;
+          gap: 2.5rem;
+          padding: 0 2rem 0 1rem;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .public-observance-ticker-force-motion {
+            animation: publicObservanceFlow 160s linear infinite !important;
+            -webkit-animation: publicObservanceFlow 160s linear infinite !important;
+          }
         }
         .public-observance-ticker:hover {
           animation-play-state: paused;
         }
         @keyframes publicObservanceFlow {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
+          0% { transform: translate3d(0, 0, 0); }
+          100% { transform: translate3d(-50%, 0, 0); }
+        }
+        @-webkit-keyframes publicObservanceFlow {
+          0% { -webkit-transform: translate3d(0, 0, 0); }
+          100% { -webkit-transform: translate3d(-50%, 0, 0); }
         }
       `}</style>
       <main className="mx-auto w-full max-w-7xl overflow-x-hidden px-4 py-5 md:px-6 md:py-6">

@@ -150,6 +150,7 @@ const normalizeDonation = (record = {}) => {
     campaignName: String(record.campaignName ?? record.campaign_name ?? ''),
     donorName: String(record.donorName ?? record.donor_name ?? 'Anonymous'),
     donorEmail: String(record.donorEmail ?? record.donor_email ?? ''),
+    donorPhone: String(record.donorPhone ?? record.donor_phone ?? record.phone ?? ''),
     amount: Number.isFinite(amountValue) ? amountValue : 0,
     frequency: String(record.frequency || 'one-time'),
     paymentProvider: String(record.paymentProvider ?? record.payment_provider ?? 'STRIPE').toUpperCase(),
@@ -574,7 +575,7 @@ const donationService = {
     return serviceResponse({ success: true, cleared: true });
   },
 
-  addCashDonation: async ({ campaign, amount, receiptId, donorName = '', paidAt }) => {
+  addCashDonation: async ({ campaign, amount, receiptId, donorName = '', donorEmail = '', donorPhone = '', paidAt }) => {
     const normalizedAmount = Number(amount || 0);
     if (!campaign?.id) {
       throw new Error('Campaign is required.');
@@ -585,20 +586,24 @@ const donationService = {
 
     const createdAt = paidAt ? new Date(`${String(paidAt)}T12:00:00`).toISOString() : new Date().toISOString();
     const normalizedReceiptId = String(receiptId || '').trim() || `CASH-${Date.now()}`;
+    const uniqueRecordId = typeof window !== 'undefined' && typeof window.crypto?.randomUUID === 'function'
+      ? window.crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
     const donationRecord = {
-      id: `cash-${Date.now()}`,
+      id: `cash-${uniqueRecordId}`,
       receiptId: normalizedReceiptId,
       sourcePendingId: '',
       campaignId: Number(campaign.id),
       campaignName: String(campaign.name || ''),
       donorName: String(donorName || '').trim() || 'Walk-in Donor',
-      donorEmail: '',
+      donorEmail: String(donorEmail || '').trim(),
+      phone: String(donorPhone || '').trim(),
       amount: normalizedAmount,
       frequency: 'one-time',
       paymentProvider: 'CASH',
       paymentStatus: 'PAID',
-      gatewayTransactionId: normalizedReceiptId,
+      gatewayTransactionId: '',
       createdAt,
       emailSent: false,
       source: 'admin-cash'
