@@ -428,6 +428,7 @@ CREATE TABLE IF NOT EXISTS donation_campaigns (
       payment_link TEXT NOT NULL DEFAULT '',
       stripe_buy_button_id TEXT NOT NULL DEFAULT '',
       stripe_publishable_key TEXT NOT NULL DEFAULT '',
+      zeffy_api_key TEXT NOT NULL DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
@@ -449,6 +450,9 @@ ALTER TABLE donation_campaigns
 
 ALTER TABLE donation_campaigns
     ADD COLUMN IF NOT EXISTS story_blocks JSONB NOT NULL DEFAULT '[]'::jsonb;
+
+ALTER TABLE donation_campaigns
+  ADD COLUMN IF NOT EXISTS zeffy_api_key TEXT NOT NULL DEFAULT '';
 
 CREATE INDEX IF NOT EXISTS idx_donation_campaigns_active ON donation_campaigns(is_active);
 

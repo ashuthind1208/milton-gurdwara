@@ -548,6 +548,7 @@ const ensureEventsSchema = async () => {
       payment_link TEXT NOT NULL DEFAULT '',
       stripe_buy_button_id TEXT NOT NULL DEFAULT '',
       stripe_publishable_key TEXT NOT NULL DEFAULT '',
+      zeffy_api_key TEXT NOT NULL DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
@@ -581,6 +582,11 @@ const ensureEventsSchema = async () => {
   await pool.query(`
     ALTER TABLE donation_campaigns
     ADD COLUMN IF NOT EXISTS story_blocks JSONB NOT NULL DEFAULT '[]'::jsonb;
+  `);
+
+  await pool.query(`
+    ALTER TABLE donation_campaigns
+    ADD COLUMN IF NOT EXISTS zeffy_api_key TEXT NOT NULL DEFAULT '';
   `);
 
   await pool.query(`
@@ -2200,10 +2206,13 @@ const mapCampaignRow = (row) => {
     target,
     isActive: row.is_active !== false,
     isClosed: target > 0 && raised >= target,
-    paymentProvider: String(row.payment_provider || 'STRIPE').toUpperCase() === 'PAYPAL' ? 'PAYPAL' : 'STRIPE',
+    paymentProvider: ['STRIPE', 'PAYPAL', 'ZEFFY'].includes(String(row.payment_provider || '').toUpperCase())
+      ? String(row.payment_provider).toUpperCase()
+      : 'STRIPE',
     paymentLink: row.payment_link || '',
     stripeBuyButtonId: row.stripe_buy_button_id || '',
-    stripePublishableKey: row.stripe_publishable_key || ''
+    stripePublishableKey: row.stripe_publishable_key || '',
+    hasZeffyApiKey: Boolean(String(row.zeffy_api_key || '').trim())
   };
 };
 
@@ -2214,13 +2223,33 @@ const getDonationCampaigns = async () => {
 
   const result = await pool.query(
     `
-    SELECT id, name, description, progress_title, progress_description, progress_photos, progress_updates, progress_items, story_blocks, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key
+    SELECT id, name, description, progress_title, progress_description, progress_photos, progress_updates, progress_items, story_blocks, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key, zeffy_api_key
     FROM donation_campaigns
     ORDER BY created_at DESC;
     `
   );
 
   return result.rows.map(mapCampaignRow);
+};
+
+const getZeffyDonationCampaigns = async () => {
+  if (!pool) {
+    throw new Error('Database is not configured.');
+  }
+
+  const result = await pool.query(
+    `
+    SELECT id, name, description, progress_title, progress_description, progress_photos, progress_updates, progress_items, story_blocks, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key, zeffy_api_key
+    FROM donation_campaigns
+    WHERE payment_provider = 'ZEFFY' AND zeffy_api_key <> ''
+    ORDER BY created_at DESC;
+    `
+  );
+
+  return result.rows.map((row) => ({
+    ...mapCampaignRow(row),
+    zeffyApiKey: String(row.zeffy_api_key || '').trim()
+  }));
 };
 
 const createDonationCampaign = async (payload = {}) => {
@@ -2231,9 +2260,9 @@ const createDonationCampaign = async (payload = {}) => {
   const result = await pool.query(
     `
     INSERT INTO donation_campaigns
-    (name, description, progress_title, progress_description, progress_photos, progress_updates, progress_items, story_blocks, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key)
-    VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, $14, $15)
-    RETURNING id, name, description, progress_title, progress_description, progress_photos, progress_updates, progress_items, story_blocks, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key;
+    (name, description, progress_title, progress_description, progress_photos, progress_updates, progress_items, story_blocks, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key, zeffy_api_key)
+    VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, $14, $15, $16)
+    RETURNING id, name, description, progress_title, progress_description, progress_photos, progress_updates, progress_items, story_blocks, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key, zeffy_api_key;
     `,
     [
       String(payload.name || '').trim(),
@@ -2247,10 +2276,13 @@ const createDonationCampaign = async (payload = {}) => {
       Number(payload.raised || 0),
       Number(payload.target || 0),
       payload.isActive !== false,
-      String(payload.paymentProvider || 'STRIPE').toUpperCase() === 'PAYPAL' ? 'PAYPAL' : 'STRIPE',
+      ['STRIPE', 'PAYPAL', 'ZEFFY'].includes(String(payload.paymentProvider || '').toUpperCase())
+        ? String(payload.paymentProvider).toUpperCase()
+        : 'STRIPE',
       String(payload.paymentLink || '').trim(),
       String(payload.stripeBuyButtonId || '').trim(),
-      String(payload.stripePublishableKey || '').trim()
+      String(payload.stripePublishableKey || '').trim(),
+      String(payload.zeffyApiKey || '').trim()
     ]
   );
 
@@ -2287,7 +2319,8 @@ const updateDonationCampaign = async (id, payload = {}) => {
     paymentProvider: payload.paymentProvider ?? current.payment_provider,
     paymentLink: payload.paymentLink ?? current.payment_link,
     stripeBuyButtonId: payload.stripeBuyButtonId ?? current.stripe_buy_button_id,
-    stripePublishableKey: payload.stripePublishableKey ?? current.stripe_publishable_key
+    stripePublishableKey: payload.stripePublishableKey ?? current.stripe_publishable_key,
+    zeffyApiKey: String(payload.zeffyApiKey || '').trim() || current.zeffy_api_key
   };
 
   const result = await pool.query(
@@ -2308,9 +2341,10 @@ const updateDonationCampaign = async (id, payload = {}) => {
         payment_link = $14,
         stripe_buy_button_id = $15,
         stripe_publishable_key = $16,
+        zeffy_api_key = $17,
         updated_at = NOW()
     WHERE id = $1
-      RETURNING id, name, description, progress_title, progress_description, progress_photos, progress_updates, progress_items, story_blocks, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key;
+      RETURNING id, name, description, progress_title, progress_description, progress_photos, progress_updates, progress_items, story_blocks, raised, target, is_active, payment_provider, payment_link, stripe_buy_button_id, stripe_publishable_key, zeffy_api_key;
     `,
     [
       id,
@@ -2325,10 +2359,13 @@ const updateDonationCampaign = async (id, payload = {}) => {
       Number(next.raised || 0),
       Number(next.target || 0),
       next.isActive !== false,
-      String(next.paymentProvider || 'STRIPE').toUpperCase() === 'PAYPAL' ? 'PAYPAL' : 'STRIPE',
+      ['STRIPE', 'PAYPAL', 'ZEFFY'].includes(String(next.paymentProvider || '').toUpperCase())
+        ? String(next.paymentProvider).toUpperCase()
+        : 'STRIPE',
       String(next.paymentLink || '').trim(),
       String(next.stripeBuyButtonId || '').trim(),
-      String(next.stripePublishableKey || '').trim()
+      String(next.stripePublishableKey || '').trim(),
+      String(next.zeffyApiKey || '').trim()
     ]
   );
 
@@ -3180,6 +3217,7 @@ module.exports = {
   getQuizBankFile,
   upsertQuizBankFile,
   getDonationCampaigns,
+  getZeffyDonationCampaigns,
   createDonationCampaign,
   updateDonationCampaign,
   removeDonationCampaign,

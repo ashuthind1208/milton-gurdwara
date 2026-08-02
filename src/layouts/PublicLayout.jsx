@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { Suspense, useEffect, useMemo, useRef } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import Navbar from '../components/layout/Navbar';
@@ -153,7 +153,9 @@ const PublicLayout = () => {
         }
       `}</style>
       <main className="mx-auto w-full max-w-7xl overflow-x-hidden px-4 py-5 md:px-6 md:py-6">
-        <Outlet />
+        <Suspense fallback={<div className="py-20 text-center text-slate-600">Loading page...</div>}>
+          <Outlet />
+        </Suspense>
       </main>
       <Footer />
     </div>

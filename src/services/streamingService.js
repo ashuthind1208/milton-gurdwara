@@ -15,7 +15,11 @@ const defaultStreaming = {
   checkedAt: new Date().toISOString()
 };
 
-const isYouTubeSource = (value = '') => /youtube\.com|youtu\.be|^@|\bUC[A-Za-z0-9_-]{20,}\b/i.test(String(value || '').trim());
+const isYouTubeSource = (value = '') => {
+  const input = String(value || '').trim();
+  const plainChannel = Boolean(input && !/^https?:\/\//i.test(input) && !input.includes('/'));
+  return /youtube\.com|youtu\.be|^@|\bUC[A-Za-z0-9_-]{20,}\b/i.test(input) || plainChannel;
+};
 
 const normalizeBoolean = (value, fallback = false) => {
   if (typeof value === 'boolean') {

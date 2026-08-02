@@ -35,9 +35,6 @@ Set these in production (frontend and backend as applicable).
   - `true`/`false`.
 - `REACT_APP_HUKAMNAMA_READ_ALONG_EXACT_BASE_URL`
   - Base URL for read-along audio.
-- `REACT_APP_DONATION_PUBLIC_URL`
-  - Required for donation-board QR correctness.
-  - Example: `https://yourdomain.com`
 - `REACT_APP_SIKHNET_GURPURAB_CALENDAR_URL`
   - Source page for Sikh Gurpurab / Nanakshahi calendar observances.
   - Example: `https://sikhnet.com/pages/sikh-gurpurab-calendar`
@@ -55,9 +52,11 @@ Set these in production (frontend and backend as applicable).
   - Live webhook secret.
 - `STRIPE_CURRENCY`
   - Example: `cad`.
-- `ZEFFY_API_KEY` or `ZEFFY_WEBHOOK_TOKEN`
-  - Server-only shared credential used to authenticate `payment.completed` webhooks.
+- `ZEFFY_API_KEY`
+  - Optional legacy/default server-only credential used when a campaign-specific key has not been saved in Admin Donations.
   - Never prefix this value with `REACT_APP_` or place it in frontend source.
+- `ZEFFY_WEBHOOK_TOKEN`
+  - Optional. Set only when the webhook sender is configured to provide the same custom token.
 - `ZEFFY_CAMPAIGN_ID`
   - Optional numeric ID of the matching local donation campaign.
 - `ZEFFY_CAMPAIGN_NAME`
@@ -131,23 +130,27 @@ Operational note:
 
 ## 4.1) Zeffy Production Setup
 
-The Donations page opens the Zeffy form in an on-site iframe modal. Payment completion is recorded only by the backend webhook; redirect query parameters never create donation records.
+The Donations page opens each configured Zeffy campaign in an on-site iframe modal. Payment completion is recorded only after backend verification through Zeffy's API, using webhook notifications or API reconciliation; redirect query parameters never create donation records.
 
 1. Confirm the nonprofit account and campaign remain active in Zeffy.
-2. Keep the embedded form set to:
-  - `https://www.zeffy.com/embed/donation-form/help-us-build-our-gurdwara?modal=true`
+2. In Admin Donations, create or edit the campaign:
+  - Select `Zeffy` as the payment provider.
+  - Enter its public Zeffy donation-form link.
+  - Enter the Zeffy API key. The key is stored only on the backend and is never returned by campaign APIs.
 3. In Zeffy, set the post-payment redirect URL to:
   - `https://<frontend-domain>/donation?zeffy=completed`
 4. Subscribe the webhook to `payment.completed` and set its endpoint to:
   - `POST https://<backend-domain>/api/zeffy/webhook`
-5. Keep `ZEFFY_API_KEY` server-only. The webhook verifies each notified payment through Zeffy's authenticated API before saving it.
-  - Do not add the API key to the webhook URL or frontend.
+5. Keep all Zeffy API keys server-only. The webhook verifies each notified payment through Zeffy's authenticated API before saving it.
+  - Do not add API keys to webhook URLs or frontend environment variables.
   - Set `ZEFFY_WEBHOOK_TOKEN` only if the webhook sender is configured to provide the same custom token.
 6. Send a test `payment.completed` event and verify:
   - The endpoint returns `200`.
   - One donation is stored with provider `ZEFFY` and status `PAID`.
   - Re-delivering the same transaction updates the same record rather than creating a duplicate.
   - The donation appears in Admin Donations and the campaign raised total updates.
+
+The backend also reconciles succeeded Zeffy payments from each configured campaign at startup, every minute, and when donations are read. Zeffy's campaign ID is used to associate donor name, email, amount, and raised totals with the correct local campaign. This recovers payments missed while a temporary tunnel or deployment was unavailable.
 
 ## 5) Google OAuth Production Setup
 
@@ -169,7 +172,8 @@ If storage is ephemeral, sponsor/advertisement banners may disappear after deplo
 ## 7) Donation Board Production Checks
 
 1. Confirm QR resolves to production donation URL:
-   - Set `REACT_APP_DONATION_PUBLIC_URL=https://<frontend-domain>`
+  - Open the board from the production domain and confirm the QR uses that same origin with `/donation`.
+  - No donation URL environment variable is required.
 2. Validate donation-board route:
    - `/donation-board`
 3. Validate TV-readonly data behavior:
@@ -233,8 +237,8 @@ Run this smoke test after each production deployment:
 
 ## 12) Common Pitfalls
 
-- QR shows localhost in production
-  - Fix `REACT_APP_DONATION_PUBLIC_URL`.
+- QR shows an unexpected host
+  - Confirm the board itself was opened from the intended public domain; the QR automatically uses the board's current origin.
 - OAuth fails after deploy
   - Redirect URI mismatch between Google config and env URL.
 - Missing sponsor/advertisement images after redeploy

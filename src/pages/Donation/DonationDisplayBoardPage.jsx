@@ -471,10 +471,7 @@ const DonationDisplayBoardPage = () => {
   }, [advertisements, sponsors]);
 
   const donationUrl = useMemo(() => {
-    const configuredBase = String(process.env.REACT_APP_DONATION_PUBLIC_URL || '').trim();
-    const root = configuredBase || window.location.origin;
-    const normalizedRoot = root.endsWith('/') ? root.slice(0, -1) : root;
-    return `${normalizedRoot}/donation`;
+    return new URL('/donation', window.location.origin).toString();
   }, []);
 
   const qrImageUrl = useMemo(() => {
@@ -775,7 +772,7 @@ const DonationDisplayBoardPage = () => {
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-100">Scan To Donate</p>
                   <h2 className="mt-1 text-2xl font-semibold text-white sm:text-3xl">Choose Campaign On Your Phone</h2>
-                  <p className="mt-1 break-all text-xs text-slate-200">http://localhost:3001/donation</p>
+                  <p className="mt-1 break-all text-xs text-slate-200">{donationUrl}</p>
                 </div>
                 <span className="inline-flex items-center gap-1 rounded-full border border-brand-saffron/30 bg-brand-saffron/10 px-3 py-1 text-xs font-semibold text-brand-saffron">
                   <QrCodeIcon className="h-4 w-4" />

@@ -1,5 +1,6 @@
 import { serviceResponse } from './serviceResponse';
 import { normalizeErrorMessage } from './publicError';
+import { withZeffyDonorDetails } from '../utils/zeffy';
 
 const LAST_PENDING_DONATION_KEY = 'ssm-donation-last-pending-id';
 
@@ -116,10 +117,11 @@ const normalizeCampaign = (campaign = {}) => {
     target,
     isActive: isClosed ? false : Boolean(campaign.isActive ?? campaign.is_active ?? true),
     isClosed,
-    paymentProvider: provider === 'PAYPAL' ? 'PAYPAL' : 'STRIPE',
+    paymentProvider: ['STRIPE', 'PAYPAL', 'ZEFFY'].includes(provider) ? provider : 'STRIPE',
     paymentLink: campaign.paymentLink || campaign.payment_link || '',
     stripeBuyButtonId: campaign.stripeBuyButtonId || campaign.stripe_buy_button_id || '',
-    stripePublishableKey: campaign.stripePublishableKey || campaign.stripe_publishable_key || ''
+    stripePublishableKey: campaign.stripePublishableKey || campaign.stripe_publishable_key || '',
+    hasZeffyApiKey: Boolean(campaign.hasZeffyApiKey ?? campaign.has_zeffy_api_key)
   };
 };
 
@@ -437,7 +439,7 @@ const resolveStripePaymentDetails = async ({ sessionId = '', paymentIntentId = '
 const resolveCheckoutUrl = async ({ campaign, amount, donorName, donorEmail, pendingId }) => {
   const paymentLink = String(campaign.paymentLink || '').trim();
   if (!paymentLink) {
-    throw new Error('Payment setup missing. Add Stripe/PayPal checkout URL in admin campaign settings.');
+    throw new Error('Payment setup missing. Add a checkout URL in admin campaign settings.');
   }
 
   const hasAmount = Number.isFinite(Number(amount)) && Number(amount) > 0;
@@ -487,14 +489,19 @@ const resolveCheckoutUrl = async ({ campaign, amount, donorName, donorEmail, pen
     });
   }
 
-  return withQueryParams(templated, {
+  const checkoutUrl = withQueryParams(templated, {
     amount: hasAmount ? amount : undefined,
     amount_decimal: hasAmount ? amount : undefined,
     amount_cents: hasAmount ? Math.round(amount * 100) : undefined,
     prefilled_amount: hasAmount ? amount : undefined,
-    prefilled_email: donorEmail,
     client_reference_id: pendingId
   });
+
+  if (campaign.paymentProvider === 'ZEFFY') {
+    return withZeffyDonorDetails(checkoutUrl, { donorName, donorEmail });
+  }
+
+  return checkoutUrl;
 };
 
 const donationService = {
@@ -737,7 +744,8 @@ const donationService = {
       amount: createdPending.amount,
       donorName: createdPending.donorName,
       donorEmail: createdPending.donorEmail,
-      frequency: createdPending.frequency
+      frequency: createdPending.frequency,
+      paymentProvider: createdPending.paymentProvider
     });
   },
 

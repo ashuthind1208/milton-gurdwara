@@ -164,7 +164,7 @@ const AdminStreamingPage = () => {
     <div className="space-y-6">
       <div>
         <h1 className="sr-only">Streaming</h1>
-        <p className="mt-1 text-sm text-slate-600">Manage the single live source used by the header preview and the sangat stream page. Enter a YouTube channel URL, handle, or channel ID so the app can resolve the current live video only.</p>
+        <p className="mt-1 text-sm text-slate-600">Manage the live sources used by the header preview and the sangat stream page. Enter only a YouTube channel name or @handle; the current live video is resolved automatically.</p>
       </div>
 
       <Card>
@@ -339,8 +339,8 @@ const AdminStreamingPage = () => {
                   <input {...form.register('text', { required: true })} maxLength={48} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
                 </label>
                 <label className="text-sm font-semibold text-slate-700 md:col-span-2">
-                  YouTube channel URL / handle / channel ID
-                  <input {...form.register('streamUrl', { required: true })} placeholder="https://www.youtube.com/@SinghSabhaMilton or UC..." className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+                  YouTube channel name or @handle
+                  <input {...form.register('streamUrl', { required: true })} placeholder="SinghSabhaMilton or @SinghSabhaMilton" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
                 </label>
                 <p className="-mt-1 text-xs text-slate-500 md:col-span-2">Do not paste the live watch URL. Paste the channel source so the site always resolves the current live broadcast and avoids VOD playback.</p>
                 <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 md:col-span-2">

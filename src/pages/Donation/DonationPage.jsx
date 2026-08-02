@@ -1,7 +1,7 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BanknotesIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { BanknotesIcon, CreditCardIcon, ShieldCheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import PageHero from '../../components/common/PageHero';
 import DonationForm from '../../components/forms/DonationForm';
 import Card from '../../components/ui/Card';
@@ -16,12 +16,13 @@ import Seo from '../../components/common/Seo';
 import { useAuth } from '../../context/AuthContext';
 import PhoneNumberRequiredNotice from '../../components/common/PhoneNumberRequiredNotice';
 import ZeffyDonationModal from './ZeffyDonationModal';
+import { toZeffyEmbedUrl } from '../../utils/zeffy';
 
 const DONATION_IDENTITY_SETTING_KEY = 'settings-donation-allow-custom-name-email';
-const ZEFFY_EMBED_URL = 'https://www.zeffy.com/embed/donation-form/help-us-build-our-gurdwara?modal=true';
 
 const DonationPage = () => {
   const location = useLocation();
+  const queryClient = useQueryClient();
   const meta = useSeoMeta('Donation', 'Daswand contribution page with Stripe popup checkout.');
   const { user, isAuthenticated } = useAuth();
   const [statusMessage, setStatusMessage] = useState('');
@@ -31,6 +32,8 @@ const DonationPage = () => {
   const [selectedProgressItem, setSelectedProgressItem] = useState(null);
   const [enlargedProgressPhoto, setEnlargedProgressPhoto] = useState('');
   const [isZeffyModalOpen, setIsZeffyModalOpen] = useState(false);
+  const [zeffyFormUrl, setZeffyFormUrl] = useState('');
+  const [zeffyCompletionVersion, setZeffyCompletionVersion] = useState(0);
   const checkoutWindowRef = useRef(null);
 
   const { data: campaigns = [] } = useQuery({
@@ -75,12 +78,37 @@ const DonationPage = () => {
         return;
       }
       setIsZeffyModalOpen(false);
-      setStatusMessage('Thank you. Your Zeffy payment is complete and the donation is being added to our records.');
+      setStatusMessage('Thank you. Your Zeffy payment is complete. The campaign total is being updated.');
+      setZeffyCompletionVersion((current) => current + 1);
     };
 
     window.addEventListener('message', handleZeffyCompletion);
     return () => window.removeEventListener('message', handleZeffyCompletion);
   }, []);
+
+  useEffect(() => {
+    if (!returnedFromZeffy && zeffyCompletionVersion === 0) {
+      return undefined;
+    }
+
+    let active = true;
+    const refreshCampaignTotals = async () => {
+      await donationService.getDonations().catch(() => null);
+      if (active) {
+        await queryClient.refetchQueries({ queryKey: ['campaigns'], type: 'active' }).catch(() => null);
+      }
+    };
+
+    void refreshCampaignTotals();
+    const timers = [2500, 7500, 15000, 32000].map((delay) => (
+      window.setTimeout(() => void refreshCampaignTotals(), delay)
+    ));
+
+    return () => {
+      active = false;
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, [queryClient, returnedFromZeffy, zeffyCompletionVersion]);
 
   const openStripePopup = (checkoutUrl) => {
     if (!checkoutUrl) {
@@ -145,13 +173,30 @@ const DonationPage = () => {
     },
     onSuccess: (response) => {
       const pending = response.data;
-      setPendingCheckout(pending);
+      const selectedCampaign = openCampaigns.find((campaign) => Number(campaign.id) === Number(pending.campaignId));
+      const paymentProvider = String(
+        pending.campaign?.paymentProvider || selectedCampaign?.paymentProvider || pending.paymentProvider || 'STRIPE'
+      ).toUpperCase();
+      setPendingCheckout({ ...pending, paymentProvider });
+
+      if (paymentProvider === 'ZEFFY') {
+        const configuredUrl = toZeffyEmbedUrl(pending.checkoutUrl);
+        if (!configuredUrl) {
+          setStatusMessage('This Zeffy campaign does not have a valid donation form link.');
+          return;
+        }
+        setZeffyFormUrl(configuredUrl);
+        setIsZeffyModalOpen(true);
+        setPopupBlocked(false);
+        setStatusMessage('');
+        return;
+      }
 
       const opened = navigateCheckoutWindow(pending.checkoutUrl);
       setPopupBlocked(!opened);
 
       if (opened) {
-        setStatusMessage('Stripe checkout opened. Complete payment there.');
+        setStatusMessage('');
       } else {
         if (pending.checkoutUrl) {
           window.location.href = pending.checkoutUrl;
@@ -175,21 +220,10 @@ const DonationPage = () => {
       <PageHero
         title="Daswand | Donation"
         description="Support the sangat through daswand and pay securely with Zeffy or Stripe."
-        titleActions={(
-          <button
-            type="button"
-            onClick={() => setIsZeffyModalOpen(true)}
-            aria-label="Donate securely with Zeffy"
-            className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-brand-blue px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-brand-blue focus:ring-offset-2"
-          >
-            <BanknotesIcon className="h-5 w-5" aria-hidden="true" />
-            Donate with Zeffy
-          </button>
-        )}
       />
       <ZeffyDonationModal
         isOpen={isZeffyModalOpen}
-        formUrl={ZEFFY_EMBED_URL}
+        formUrl={zeffyFormUrl}
         onClose={() => setIsZeffyModalOpen(false)}
       />
       {returnedFromZeffy ? (
@@ -250,8 +284,11 @@ const DonationPage = () => {
                       return;
                     }
                     setStatusMessage('');
-                    const opened = openPlaceholderPopup();
-                    setPopupBlocked(!opened);
+                    const selectedCampaign = openCampaigns.find((campaign) => String(campaign.id) === String(values.campaignId));
+                    if (selectedCampaign?.paymentProvider !== 'ZEFFY') {
+                      const opened = openPlaceholderPopup();
+                      setPopupBlocked(!opened);
+                    }
                     initiateDonationMutation.mutate(values);
                   }}
                   loading={initiateDonationMutation.isPending}
@@ -274,7 +311,22 @@ const DonationPage = () => {
                 <p className="text-sm font-semibold text-slate-900">Payment ready for {formatCurrency(pendingCheckout.amount || 0)}</p>
                 <p className="mt-1 text-xs text-slate-600">Email: {pendingCheckout.donorEmail || '-'}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Button type="button" onClick={() => openStripePopup(pendingCheckout.checkoutUrl)}>Open Stripe Payment</Button>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      if (pendingCheckout.paymentProvider === 'ZEFFY') {
+                        const configuredUrl = toZeffyEmbedUrl(pendingCheckout.checkoutUrl);
+                        if (configuredUrl) {
+                          setZeffyFormUrl(configuredUrl);
+                          setIsZeffyModalOpen(true);
+                        }
+                        return;
+                      }
+                      openStripePopup(pendingCheckout.checkoutUrl);
+                    }}
+                  >
+                    {pendingCheckout.paymentProvider === 'ZEFFY' ? 'Open Zeffy Donation' : 'Open Payment'}
+                  </Button>
                   <Button type="button" variant="ghost" onClick={resetForm}>Reset Donation Form</Button>
                 </div>
                 {popupBlocked ? <p className="mt-2 text-xs text-amber-700">Popup was blocked by browser. Use the button above.</p> : null}
@@ -290,9 +342,22 @@ const DonationPage = () => {
             const progress = target > 0 ? Math.min((raised / target) * 100, 100) : 0;
             const activeProgressItems = (Array.isArray(campaign.progressItems) ? campaign.progressItems : []).filter((item) => item?.isActive !== false);
             const activeStoryBlocks = (Array.isArray(campaign.storyBlocks) ? campaign.storyBlocks : []).filter((item) => item?.isActive !== false);
+            const paymentProvider = String(campaign.paymentProvider || 'STRIPE').toUpperCase();
+            const PaymentProviderIcon = paymentProvider === 'ZEFFY'
+              ? ShieldCheckIcon
+              : paymentProvider === 'PAYPAL' ? BanknotesIcon : CreditCardIcon;
+            const paymentProviderLabel = paymentProvider === 'ZEFFY'
+              ? 'Zeffy'
+              : paymentProvider === 'PAYPAL' ? 'PayPal' : 'Stripe';
             return (
               <Card key={campaign.id} className="border border-slate-200 bg-white">
-                <h3 className="font-heading text-lg font-semibold text-slate-900">{campaign.name}</h3>
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="min-w-0 font-heading text-lg font-semibold text-slate-900">{campaign.name}</h3>
+                  <span className="inline-flex flex-none items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-bold uppercase text-slate-600" title={`Payments routed through ${paymentProviderLabel}`}>
+                    <PaymentProviderIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                    {paymentProviderLabel}
+                  </span>
+                </div>
                 {campaign.description ? <p className="mt-1 text-sm text-slate-600">{campaign.description}</p> : null}
                 <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Raised so far</p>
                 <p className="mt-1 text-3xl font-extrabold leading-none text-brand-blue">{formatCurrency(raised)}</p>

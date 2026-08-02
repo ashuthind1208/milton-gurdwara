@@ -55,7 +55,8 @@ const campaignDefaults = {
   paymentProvider: 'STRIPE',
   paymentLink: '',
   stripeBuyButtonId: '',
-  stripePublishableKey: ''
+  stripePublishableKey: '',
+  zeffyApiKey: ''
 };
 
 const createCashReceiptId = () => {
@@ -177,10 +178,13 @@ const toCampaignPayload = (values = {}) => {
     raised: Number(values.raised || 0),
     target: Number(values.target || 0),
     isActive: values.isActive !== false,
-    paymentProvider: String(values.paymentProvider || 'STRIPE').toUpperCase() === 'PAYPAL' ? 'PAYPAL' : 'STRIPE',
+    paymentProvider: ['STRIPE', 'PAYPAL', 'ZEFFY'].includes(String(values.paymentProvider || '').toUpperCase())
+      ? String(values.paymentProvider).toUpperCase()
+      : 'STRIPE',
     paymentLink: String(values.paymentLink || '').trim(),
     stripeBuyButtonId: String(values.stripeBuyButtonId || '').trim(),
-    stripePublishableKey: String(values.stripePublishableKey || '').trim()
+    stripePublishableKey: String(values.stripePublishableKey || '').trim(),
+    zeffyApiKey: String(values.zeffyApiKey || '').trim()
   };
 };
 
@@ -191,6 +195,14 @@ const progressItemDefaults = {
   date: '',
   isActive: true,
   photosText: ''
+};
+
+const progressOverviewDefaults = {
+  progressTitle: '',
+  progressDescription: '',
+  storyBlocksText: '',
+  progressPhotosText: '',
+  progressUpdatesText: ''
 };
 
 const parseProgressItemPhotosText = (value = '') => {
@@ -231,8 +243,6 @@ const AdminDonationsPage = () => {
   const [campaignFilter, setCampaignFilter] = useState('all');
   const [sortMode, setSortMode] = useState('newest');
   const [page, setPage] = useState(1);
-  const [createPhotoUploadPending, setCreatePhotoUploadPending] = useState(false);
-  const [createPhotoUploadProgress, setCreatePhotoUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState({ type: 'success', message: '' });
   const [progressManagerOpen, setProgressManagerOpen] = useState(false);
   const [progressManagerCampaign, setProgressManagerCampaign] = useState(null);
@@ -242,6 +252,8 @@ const AdminDonationsPage = () => {
   const [progressItemUploadPending, setProgressItemUploadPending] = useState(false);
   const [progressItemUploadProgress, setProgressItemUploadProgress] = useState(0);
   const [progressManagerStatus, setProgressManagerStatus] = useState({ type: 'success', message: '' });
+  const [progressOverviewUploadPending, setProgressOverviewUploadPending] = useState(false);
+  const [progressOverviewUploadProgress, setProgressOverviewUploadProgress] = useState(0);
   const [campaignDonorPage, setCampaignDonorPage] = useState(1);
   const [campaignDonorSearchTerm, setCampaignDonorSearchTerm] = useState('');
   const [cashDonationOpen, setCashDonationOpen] = useState(false);
@@ -254,7 +266,10 @@ const AdminDonationsPage = () => {
   const form = useForm({ defaultValues: campaignDefaults });
   const editForm = useForm({ defaultValues: campaignDefaults });
   const progressItemForm = useForm({ defaultValues: progressItemDefaults });
+  const progressOverviewForm = useForm({ defaultValues: progressOverviewDefaults });
   const cashDonationForm = useForm({ defaultValues: createCashDonationDefaults() });
+  const createPaymentProvider = form.watch('paymentProvider');
+  const editPaymentProvider = editForm.watch('paymentProvider');
   const { data: campaigns = [] } = useQuery({
     queryKey: ['admin-campaigns'],
     queryFn: () => donationService.getAllCampaigns().then((res) => res.data),
@@ -449,6 +464,28 @@ const AdminDonationsPage = () => {
     }
   });
 
+  const saveProgressOverviewMutation = useMutation({
+    mutationFn: ({ campaignId, values }) => donationService.updateCampaign(campaignId, {
+      progressTitle: String(values.progressTitle || '').trim(),
+      progressDescription: String(values.progressDescription || '').trim(),
+      storyBlocks: parseStoryBlocksText(values.storyBlocksText || ''),
+      progressPhotos: parseProgressPhotosText(values.progressPhotosText || ''),
+      progressUpdates: parseProgressUpdatesText(values.progressUpdatesText || '')
+    }),
+    onSuccess: (response) => {
+      const updatedCampaign = response?.data || null;
+      queryClient.invalidateQueries({ queryKey: ['admin-campaigns'] });
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+      if (updatedCampaign) {
+        setProgressManagerCampaign(updatedCampaign);
+      }
+      setProgressManagerStatus({ type: 'success', message: 'Progress overview saved successfully.' });
+    },
+    onError: (error) => {
+      setProgressManagerStatus({ type: 'error', message: error?.message || 'Unable to save the progress overview.' });
+    }
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id) => donationService.removeCampaign(id),
     onSuccess: () => {
@@ -508,7 +545,8 @@ const AdminDonationsPage = () => {
       paymentProvider: campaign.paymentProvider || 'STRIPE',
       paymentLink: campaign.paymentLink || '',
       stripeBuyButtonId: campaign.stripeBuyButtonId || '',
-      stripePublishableKey: campaign.stripePublishableKey || ''
+      stripePublishableKey: campaign.stripePublishableKey || '',
+      zeffyApiKey: ''
     });
   };
 
@@ -531,6 +569,13 @@ const AdminDonationsPage = () => {
     setProgressManagerPage(1);
     setProgressItemModalState({ open: false, mode: 'create', index: -1 });
     progressItemForm.reset(progressItemDefaults);
+    progressOverviewForm.reset({
+      progressTitle: campaign?.progressTitle || '',
+      progressDescription: campaign?.progressDescription || '',
+      storyBlocksText: formatStoryBlocksText(campaign?.storyBlocks),
+      progressPhotosText: formatProgressPhotosText(campaign?.progressPhotos),
+      progressUpdatesText: formatProgressUpdatesText(campaign?.progressUpdates)
+    });
     setProgressManagerStatus({ type: 'success', message: '' });
     setProgressManagerOpen(true);
   };
@@ -542,6 +587,9 @@ const AdminDonationsPage = () => {
     setProgressManagerPage(1);
     setProgressItemModalState({ open: false, mode: 'create', index: -1 });
     progressItemForm.reset(progressItemDefaults);
+    progressOverviewForm.reset(progressOverviewDefaults);
+    setProgressOverviewUploadPending(false);
+    setProgressOverviewUploadProgress(0);
     setProgressManagerStatus({ type: 'success', message: '' });
   };
 
@@ -702,59 +750,49 @@ const AdminDonationsPage = () => {
     }
   };
 
-  const appendCampaignPhotosToForm = async ({ files }) => {
+  const appendPhotosToProgressOverview = async (files) => {
     const selectedFiles = Array.from(files || []).filter(Boolean);
     if (selectedFiles.length === 0) {
       return;
     }
 
     try {
-      setUploadStatus({ type: 'success', message: '' });
-      setCreatePhotoUploadPending(true);
-      setCreatePhotoUploadProgress(0);
-
+      setProgressManagerStatus({ type: 'success', message: '' });
+      setProgressOverviewUploadPending(true);
+      setProgressOverviewUploadProgress(0);
       const uploadedUrls = [];
 
       for (let index = 0; index < selectedFiles.length; index += 1) {
-        const file = selectedFiles[index];
         const uploaded = await uploadService.uploadFile({
           service: 'donations',
-          file,
+          file: selectedFiles[index],
           allowedMimeTypes: ['image/*'],
           maxSizeMB: 15,
           onProgress: (percent) => {
-            const overall = Math.round(((index + (percent / 100)) / selectedFiles.length) * 100);
-            setCreatePhotoUploadProgress(overall);
+            setProgressOverviewUploadProgress(Math.round(((index + (percent / 100)) / selectedFiles.length) * 100));
           }
         });
-
-        const nextUrl = String(uploaded?.url || '').trim();
-        if (nextUrl) {
-          uploadedUrls.push(nextUrl);
+        const uploadedUrl = String(uploaded?.url || '').trim();
+        if (uploadedUrl) {
+          uploadedUrls.push(uploadedUrl);
         }
       }
 
-      if (uploadedUrls.length === 0) {
-        throw new Error('Upload did not return file URLs.');
-      }
-
-      const existingUrls = parseProgressPhotosText(form.getValues('progressPhotosText') || '');
-      const uniqueUrls = Array.from(new Set([...existingUrls, ...uploadedUrls]));
-
-      form.setValue('progressPhotosText', formatProgressPhotosText(uniqueUrls), {
-        shouldDirty: true,
-        shouldValidate: true
-      });
-
-      setUploadStatus({
+      const existingUrls = parseProgressPhotosText(progressOverviewForm.getValues('progressPhotosText') || '');
+      progressOverviewForm.setValue(
+        'progressPhotosText',
+        formatProgressPhotosText(Array.from(new Set([...existingUrls, ...uploadedUrls]))),
+        { shouldDirty: true, shouldValidate: true }
+      );
+      setProgressManagerStatus({
         type: 'success',
-        message: `${uploadedUrls.length} photo${uploadedUrls.length === 1 ? '' : 's'} uploaded successfully.`
+        message: `${uploadedUrls.length} progress photo${uploadedUrls.length === 1 ? '' : 's'} uploaded.`
       });
     } catch (error) {
-      setUploadStatus({ type: 'error', message: error.message || 'Unable to upload campaign photos.' });
+      setProgressManagerStatus({ type: 'error', message: error?.message || 'Unable to upload progress photos.' });
     } finally {
-      setCreatePhotoUploadPending(false);
-      setCreatePhotoUploadProgress(0);
+      setProgressOverviewUploadPending(false);
+      setProgressOverviewUploadProgress(0);
     }
   };
 
@@ -1088,16 +1126,7 @@ const AdminDonationsPage = () => {
             <div className="w-full max-w-5xl rounded-xl bg-white p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-heading text-xl font-semibold">Campaign Progress Manager</h3>
-                    <button
-                      type="button"
-                      onClick={() => openProgressItemModal({ mode: 'create' })}
-                      className="inline-flex items-center rounded-full border border-brand-blue/30 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-brand-blue transition hover:border-brand-blue hover:bg-blue-100"
-                    >
-                      Add Progress Update
-                    </button>
-                  </div>
+                  <h3 className="font-heading text-xl font-semibold">Campaign Progress Manager</h3>
                   <p className="mt-1 text-xs text-slate-500">{progressManagerCampaign.name}</p>
                 </div>
                 <button type="button" onClick={closeProgressManager} className="rounded-full border border-brand-blue/40 bg-blue-50 p-2 text-brand-blue transition hover:border-brand-saffron hover:bg-amber-100 hover:text-amber-700" aria-label="Close progress manager">
@@ -1108,6 +1137,69 @@ const AdminDonationsPage = () => {
               <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
                 <StatusAlert type={progressManagerStatus.type} message={progressManagerStatus.message} />
                 {saveProgressItemsMutation.isPending ? <p className="text-xs font-medium text-slate-500">Saving...</p> : null}
+              </div>
+
+              <form
+                className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4"
+                onSubmit={progressOverviewForm.handleSubmit((values) => saveProgressOverviewMutation.mutate({
+                  campaignId: progressManagerCampaign.id,
+                  values
+                }))}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">Progress Overview</p>
+                    <p className="text-xs text-slate-500">Campaign story, gallery, and milestone summary.</p>
+                  </div>
+                  <Button type="submit" disabled={saveProgressOverviewMutation.isPending}>
+                    {saveProgressOverviewMutation.isPending ? 'Saving...' : 'Save Overview'}
+                  </Button>
+                </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <label className="text-sm font-semibold text-slate-700">Progress Title
+                    <input {...progressOverviewForm.register('progressTitle')} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 font-normal" />
+                  </label>
+                  <label className="text-sm font-semibold text-slate-700 md:col-span-2">Progress Description
+                    <textarea rows={2} {...progressOverviewForm.register('progressDescription')} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 font-normal" />
+                  </label>
+                  <label className="text-sm font-semibold text-slate-700 md:col-span-2">Story Blocks <span className="font-normal text-slate-500">(title|summary|quote|beneficiary|impact metric|image URL)</span>
+                    <textarea rows={3} {...progressOverviewForm.register('storyBlocksText')} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 font-normal" />
+                  </label>
+                  <label className="text-sm font-semibold text-slate-700 md:col-span-2">Progress Photos <span className="font-normal text-slate-500">(one URL per line)</span>
+                    <textarea rows={3} {...progressOverviewForm.register('progressPhotosText')} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 font-normal" />
+                  </label>
+                  <label className="text-sm font-semibold text-slate-700 md:col-span-2">Upload Progress Photos
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      disabled={progressOverviewUploadPending}
+                      className="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:font-semibold"
+                      onChange={(event) => {
+                        void appendPhotosToProgressOverview(event.target.files);
+                        event.target.value = '';
+                      }}
+                    />
+                    <p className="mt-1 text-xs font-normal text-slate-500">{progressOverviewUploadPending ? `Uploading photos... ${progressOverviewUploadProgress}%` : 'Upload one or more images (max 15MB each).'}</p>
+                  </label>
+                  <label className="text-sm font-semibold text-slate-700 md:col-span-2">Progress Updates <span className="font-normal text-slate-500">(date|title|description|amount)</span>
+                    <textarea rows={3} {...progressOverviewForm.register('progressUpdatesText')} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 font-normal" />
+                  </label>
+                </div>
+              </form>
+
+              <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-200 pt-4">
+                <div>
+                  <p className="text-sm font-bold text-slate-900">Progress Details</p>
+                  <p className="text-xs text-slate-500">Individual dated updates shown on the donation page.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openProgressItemModal({ mode: 'create' })}
+                  className="inline-flex items-center rounded-full border border-brand-blue/30 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-brand-blue transition hover:border-brand-blue hover:bg-blue-100"
+                >
+                  Add Progress Update
+                </button>
               </div>
 
               <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200">
@@ -1485,84 +1577,88 @@ const AdminDonationsPage = () => {
       {createCampaignOpen ? (
         <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6" onClick={() => setCreateCampaignOpen(false)}>
           <div className="mx-auto flex min-h-full items-center justify-center">
-          <div className="w-full max-w-3xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-xl" onClick={(event) => event.stopPropagation()}>
-            <div className="flex items-center justify-between gap-3">
+          <div className="w-full max-w-3xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-brand-blue px-5 py-5 text-white sm:px-7">
               <div>
-                <h3 className="font-heading text-xl font-semibold">Create Donation Campaign</h3>
-                <p className="mt-1 text-xs text-slate-500">Use checkout URL, URL template tokens, or backend endpoint.</p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/65">Campaign Setup</p>
+                <h3 className="mt-1 font-heading text-2xl font-semibold">Create Donation Campaign</h3>
               </div>
-              <button type="button" onClick={() => setCreateCampaignOpen(false)} className="rounded-full border border-brand-blue/40 bg-blue-50 p-2 text-brand-blue transition hover:border-brand-saffron hover:bg-amber-100 hover:text-amber-700" aria-label="Close create campaign modal">
+              <button type="button" onClick={() => setCreateCampaignOpen(false)} className="rounded-full border border-white/20 bg-white/10 p-2 text-white transition hover:bg-white/20" aria-label="Close create campaign modal">
                 <XMarkIcon className="h-4 w-4" />
               </button>
             </div>
-            <form className="mt-4 grid gap-3 md:grid-cols-3" onSubmit={form.handleSubmit((values) => createMutation.mutate(values))}>
+            <form className="px-5 py-5 sm:px-7" onSubmit={form.handleSubmit((values) => createMutation.mutate(values))}>
               <StatusAlert type={uploadStatus.type} message={uploadStatus.message} />
-              <label className="text-sm">Campaign Name
-                <input {...form.register('name', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-              </label>
-              <label className="text-sm">Payment Provider
-                <select {...form.register('paymentProvider')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
-                  <option value="STRIPE">Stripe</option>
-                  <option value="PAYPAL">PayPal</option>
-                </select>
-              </label>
-              <label className="text-sm">Raised
-                <input type="number" min="0" step="0.01" {...form.register('raised', { valueAsNumber: true, min: 0 })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-              </label>
-              <label className="text-sm">Target
-                <input type="number" min="0" step="0.01" {...form.register('target', { required: true, valueAsNumber: true, min: 0 })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-              </label>
-              <label className="text-sm md:col-span-2">Description
-                <textarea rows={2} {...form.register('description')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-              </label>
-              <label className="text-sm md:col-span-2">Progress Title
-                <input {...form.register('progressTitle')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" placeholder="Kitchen Expansion Progress" />
-              </label>
-              <label className="text-sm md:col-span-3">Progress Description
-                <textarea rows={2} {...form.register('progressDescription')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" placeholder="Highlight milestones and campaign impact." />
-              </label>
-              <label className="text-sm md:col-span-3">Story Blocks (one per line: title|summary|quote|beneficiary|impactMetric|imageUrl)
-                <textarea rows={4} {...form.register('storyBlocksText')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" placeholder="Langar seniors support|Warm meals reached 200 seniors|Their smiles are our strength.|Seniors Program|200 meals/week|https://..." />
-              </label>
-              <label className="text-sm md:col-span-3">Progress Photos (one URL per line)
-                <textarea rows={3} {...form.register('progressPhotosText')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" placeholder="https://..." />
-              </label>
-              <label className="text-sm md:col-span-3">Upload Progress Photos (multiple)
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  disabled={createPhotoUploadPending}
-                  className="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:font-semibold"
-                  onChange={(event) => {
-                    void appendCampaignPhotosToForm({ files: event.target.files });
-                    event.target.value = '';
-                  }}
-                />
-                <p className="mt-1 text-xs text-slate-500">{createPhotoUploadPending ? `Uploading photos... ${createPhotoUploadProgress}%` : 'Upload one or more images (max 15MB each). Uploaded URLs will be appended above.'}</p>
-                {createPhotoUploadPending ? (
-                  <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
-                    <div className="h-full bg-brand-blue transition-all" style={{ width: `${createPhotoUploadProgress}%` }} />
-                  </div>
-                ) : null}
-              </label>
-              <label className="text-sm md:col-span-3">Progress Updates (one per line: date|title|description|amount)
-                <textarea rows={4} {...form.register('progressUpdatesText')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" placeholder="2026-07-10|Milestone reached|First kitchen unit installed|12500" />
-              </label>
-              <label className="text-sm">Checkout Link (optional)
-                <input {...form.register('paymentLink')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" placeholder="https://buy.stripe.com/... or /api/payments/create-session" />
-              </label>
-              <label className="text-sm">Stripe Buy Button ID (optional)
-                <input {...form.register('stripeBuyButtonId')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" placeholder="buy_btn_..." />
-              </label>
-              <label className="text-sm md:col-span-2">Stripe Publishable Key (optional)
-                <input {...form.register('stripePublishableKey')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" placeholder="pk_test_... or pk_live_..." />
-              </label>
-              <label className="flex items-center gap-2 text-sm md:col-span-3">
-                <input type="checkbox" {...form.register('isActive')} />
-                Active campaign
-              </label>
-              <div className="flex gap-2 md:col-span-3">
+              <section>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-blue">Campaign Details</p>
+                <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                  <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Campaign Name
+                    <input {...form.register('name', { required: true })} className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-blue-100" />
+                  </label>
+                  <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Description
+                    <textarea rows={3} {...form.register('description')} className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-blue-100" />
+                  </label>
+                </div>
+              </section>
+
+              <section className="mt-5 border-t border-slate-200 pt-5">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-blue">Funding Goal</p>
+                <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                  <label className="text-sm font-semibold text-slate-700">Target Amount (CAD)
+                    <input type="number" min="0" step="0.01" {...form.register('target', { required: true, valueAsNumber: true, min: 0 })} className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-blue-100" />
+                  </label>
+                  <label className="text-sm font-semibold text-slate-700">Starting Amount Raised (CAD)
+                    <input type="number" min="0" step="0.01" {...form.register('raised', { valueAsNumber: true, min: 0 })} className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-blue-100" />
+                  </label>
+                </div>
+              </section>
+
+              <section className="mt-5 border-t border-slate-200 pt-5">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-blue">Payment Setup</p>
+                <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                  <label className="text-sm font-semibold text-slate-700">Payment Provider
+                    <select {...form.register('paymentProvider')} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-blue-100">
+                      <option value="STRIPE">Stripe</option>
+                      <option value="PAYPAL">PayPal</option>
+                      <option value="ZEFFY">Zeffy</option>
+                    </select>
+                  </label>
+                  <label className="text-sm font-semibold text-slate-700 sm:col-span-2">{createPaymentProvider === 'ZEFFY' ? 'Zeffy Donation Form Link' : createPaymentProvider === 'PAYPAL' ? 'PayPal Checkout Link' : 'Stripe Checkout Link (optional)'}
+                    <input
+                      type="url"
+                      required={createPaymentProvider === 'ZEFFY' || createPaymentProvider === 'PAYPAL'}
+                      {...form.register('paymentLink')}
+                      className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-blue-100"
+                      placeholder={createPaymentProvider === 'ZEFFY' ? 'https://www.zeffy.com/en-CA/donation-form/...' : 'https://...'}
+                    />
+                  </label>
+                  {createPaymentProvider === 'ZEFFY' ? (
+                    <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Zeffy API Key
+                      <input type="password" autoComplete="new-password" required {...form.register('zeffyApiKey')} className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-blue-100" />
+                    </label>
+                  ) : null}
+                  {createPaymentProvider === 'STRIPE' ? (
+                    <>
+                      <label className="text-sm font-semibold text-slate-700">Stripe Buy Button ID (optional)
+                        <input {...form.register('stripeBuyButtonId')} className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-blue-100" placeholder="buy_btn_..." />
+                      </label>
+                      <label className="text-sm font-semibold text-slate-700">Stripe Publishable Key (optional)
+                        <input {...form.register('stripePublishableKey')} className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-blue-100" placeholder="pk_test_... or pk_live_..." />
+                      </label>
+                    </>
+                  ) : null}
+                </div>
+              </section>
+
+              <section className="mt-5 border-t border-slate-200 pt-5">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-blue">Campaign Status</p>
+                <label className="mt-3 flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700">
+                  <input type="checkbox" {...form.register('isActive')} />
+                  Active campaign
+                </label>
+              </section>
+
+              <div className="mt-5 flex gap-2 border-t border-slate-200 pt-5">
                 <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? 'Creating...' : 'Create Campaign'}</Button>
                 <Button type="button" variant="ghost" onClick={() => setCreateCampaignOpen(false)}>Cancel</Button>
               </div>
@@ -1797,6 +1893,7 @@ const AdminDonationsPage = () => {
                 <select {...editForm.register('paymentProvider')} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue">
                   <option value="STRIPE">Stripe</option>
                   <option value="PAYPAL">PayPal</option>
+                  <option value="ZEFFY">Zeffy</option>
                 </select>
               </label>
               <label className="text-sm">Raised
@@ -1808,15 +1905,31 @@ const AdminDonationsPage = () => {
               <label className="text-sm sm:col-span-2">Description
                 <textarea rows={2} {...editForm.register('description')} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
               </label>
-              <label className="text-sm sm:col-span-2">Checkout Link (optional)
-                <input {...editForm.register('paymentLink')} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
+              <label className="text-sm sm:col-span-2">{editPaymentProvider === 'ZEFFY' ? 'Zeffy Donation Form Link' : editPaymentProvider === 'PAYPAL' ? 'PayPal Checkout Link' : 'Stripe Checkout Link (optional)'}
+                <input type="url" required={editPaymentProvider === 'ZEFFY' || editPaymentProvider === 'PAYPAL'} {...editForm.register('paymentLink')} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
               </label>
-              <label className="text-sm">Stripe Buy Button ID (optional)
-                <input {...editForm.register('stripeBuyButtonId')} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
-              </label>
-              <label className="text-sm">Stripe Publishable Key (optional)
-                <input {...editForm.register('stripePublishableKey')} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
-              </label>
+              {editPaymentProvider === 'STRIPE' ? (
+                <>
+                  <label className="text-sm">Stripe Buy Button ID (optional)
+                    <input {...editForm.register('stripeBuyButtonId')} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
+                  </label>
+                  <label className="text-sm">Stripe Publishable Key (optional)
+                    <input {...editForm.register('stripePublishableKey')} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
+                  </label>
+                </>
+              ) : null}
+              {editPaymentProvider === 'ZEFFY' ? (
+                <label className="text-sm sm:col-span-2">Zeffy API Key {editingCampaign.hasZeffyApiKey ? <span className="ml-2 text-xs font-semibold text-emerald-700">Configured</span> : null}
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    required={!editingCampaign.hasZeffyApiKey}
+                    {...editForm.register('zeffyApiKey')}
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue"
+                    placeholder={editingCampaign.hasZeffyApiKey ? 'Leave blank to keep the saved key' : ''}
+                  />
+                </label>
+              ) : null}
               <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 sm:col-span-2">
                 <input type="checkbox" {...editForm.register('isActive')} />
                 Active campaign

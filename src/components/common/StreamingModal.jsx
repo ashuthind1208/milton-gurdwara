@@ -36,7 +36,13 @@ const startPlaybackWithVolume = (iframe, volume = 50) => {
   sendYouTubeCommand(iframe, 'playVideo');
 };
 
-const isYouTubeSource = (value = '') => /youtube\.com|youtu\.be|^@|\bUC[A-Za-z0-9_-]{20,}\b/i.test(String(value || '').trim());
+const isPlainYouTubeChannel = (value = '') => {
+  const input = String(value || '').trim();
+  return Boolean(input && !/^https?:\/\//i.test(input) && !input.includes('/'));
+};
+
+const isYouTubeSource = (value = '') => /youtube\.com|youtu\.be|^@|\bUC[A-Za-z0-9_-]{20,}\b/i.test(String(value || '').trim())
+  || isPlainYouTubeChannel(value);
 
 const isChannelLikeSource = (value = '') => {
   const input = String(value || '').trim();
@@ -44,7 +50,7 @@ const isChannelLikeSource = (value = '') => {
     return false;
   }
 
-  if (/^@/i.test(input) || /^UC[A-Za-z0-9_-]{20,}$/i.test(input)) {
+  if (/^@/i.test(input) || /^UC[A-Za-z0-9_-]{20,}$/i.test(input) || isPlainYouTubeChannel(input)) {
     return true;
   }
 
@@ -245,6 +251,7 @@ const StreamingModal = ({ open, streams = [], initialStreamId = '', onClose }) =
                       title={selectedStream?.title || 'Live stream'}
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                       allowFullScreen
+                      referrerPolicy="strict-origin-when-cross-origin"
                       ref={(iframe) => {
                         setStreamFrameNode(iframe || null);
                         if (!iframe) {

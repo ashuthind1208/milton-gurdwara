@@ -3207,6 +3207,10 @@ const getDonationCampaigns = async () => {
   return eventsDb.getDonationCampaigns();
 };
 
+const getZeffyDonationCampaigns = async () => {
+  return eventsDb.getZeffyDonationCampaigns();
+};
+
 const createDonationCampaign = async (payload) => {
   return eventsDb.createDonationCampaign(payload);
 };
@@ -3242,6 +3246,204 @@ const syncCampaignRaisedTotal = async ({ campaignId, campaignName } = {}) => {
   const nextRaised = Math.max(0, Number.isFinite(byId) ? byId : 0, Number.isFinite(byName) ? byName : 0);
 
   return updateDonationCampaign(Number(matchedCampaign.id), { raised: nextRaised });
+};
+
+const resolveZeffyCampaign = (donationRecord, campaigns = []) => {
+  const eventCampaignName = String(donationRecord?.campaignName || '').trim().toLowerCase();
+  const configuredCampaignName = zeffyCampaignName.toLowerCase();
+  return Number.isFinite(zeffyCampaignId) && zeffyCampaignId > 0
+    ? campaigns.find((entry) => Number(entry.id) === zeffyCampaignId)
+    : campaigns.find((entry) => {
+      const name = String(entry.name || '').trim().toLowerCase();
+      return name === eventCampaignName || name === configuredCampaignName;
+    });
+};
+
+const normalizeZeffyCampaignSlug = (value = '') => {
+  try {
+    const url = new URL(String(value || '').trim());
+    const hostname = url.hostname.toLowerCase();
+    if (hostname !== 'zeffy.com' && !hostname.endsWith('.zeffy.com')) {
+      return '';
+    }
+    const segments = url.pathname.split('/').filter(Boolean);
+    const donationFormIndex = segments.indexOf('donation-form');
+    return String(segments[donationFormIndex + 1] || '').trim().toLowerCase();
+  } catch {
+    return '';
+  }
+};
+
+const fetchZeffyCampaigns = async (apiKey) => {
+  const response = await fetch('https://api.zeffy.com/api/v1/campaigns?limit=100', {
+    headers: { Authorization: `Bearer ${apiKey}` }
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(`Unable to load Zeffy campaigns (${response.status}).`);
+    error.status = response.status >= 500 || response.status === 429 ? 502 : 400;
+    throw error;
+  }
+  return Array.isArray(body.data) ? body.data : [];
+};
+
+const resolveRemoteZeffyCampaign = (campaign, remoteCampaigns = []) => {
+  const configuredSlug = normalizeZeffyCampaignSlug(campaign?.paymentLink);
+  const configuredName = String(campaign?.name || zeffyCampaignName).trim().toLowerCase();
+  return remoteCampaigns.find((entry) => (
+    configuredSlug && normalizeZeffyCampaignSlug(entry?.url) === configuredSlug
+  )) || remoteCampaigns.find((entry) => {
+    const remoteName = String(entry?.title || entry?.description || '').trim().toLowerCase();
+    return remoteName && remoteName === configuredName;
+  }) || (remoteCampaigns.length === 1 ? remoteCampaigns[0] : null);
+};
+
+const validateZeffyCampaignConfiguration = async ({ name, paymentLink, apiKey }) => {
+  assertInput(Boolean(normalizeZeffyCampaignSlug(paymentLink)), 'paymentLink must be a valid Zeffy donation form URL.');
+  const remoteCampaigns = await fetchZeffyCampaigns(apiKey);
+  const remoteCampaign = resolveRemoteZeffyCampaign({ name, paymentLink }, remoteCampaigns);
+  assertInput(Boolean(remoteCampaign), 'The Zeffy API key does not provide access to the configured donation form.');
+  return remoteCampaign;
+};
+
+const getConfiguredZeffyCampaigns = async () => {
+  const campaigns = await getDonationCampaigns();
+  const storedConfigurations = await getZeffyDonationCampaigns();
+  const configurations = storedConfigurations.map((campaign) => ({
+    apiKey: campaign.zeffyApiKey,
+    campaign
+  }));
+
+  if (zeffyApiKey) {
+    const environmentCampaign = resolveZeffyCampaign({ campaignName: zeffyCampaignName }, campaigns) || null;
+    const alreadyConfigured = configurations.some((entry) => (
+      entry.apiKey === zeffyApiKey && Number(entry.campaign?.id || 0) === Number(environmentCampaign?.id || 0)
+    ));
+    if (!alreadyConfigured) {
+      configurations.push({ apiKey: zeffyApiKey, campaign: environmentCampaign });
+    }
+  }
+
+  const remoteCampaignCache = new Map();
+  const hydrated = [];
+  for (const configuration of configurations) {
+    if (!configuration.apiKey) {
+      continue;
+    }
+    let remoteCampaigns = remoteCampaignCache.get(configuration.apiKey);
+    if (!remoteCampaigns) {
+      remoteCampaigns = await fetchZeffyCampaigns(configuration.apiKey);
+      remoteCampaignCache.set(configuration.apiKey, remoteCampaigns);
+    }
+    const remoteCampaign = resolveRemoteZeffyCampaign(configuration.campaign, remoteCampaigns);
+    hydrated.push({
+      ...configuration,
+      remoteCampaignId: String(remoteCampaign?.id || '').trim()
+    });
+  }
+
+  return { campaigns, configurations: hydrated };
+};
+
+const zeffyPaymentMatchesConfiguration = (payment, configuration, configurationCount) => {
+  const paymentCampaignId = String(payment?.campaign_id || '').trim();
+  if (configuration.remoteCampaignId) {
+    return paymentCampaignId === configuration.remoteCampaignId;
+  }
+
+  const paymentCampaignName = String(payment?.description || '').trim().toLowerCase();
+  const localCampaignName = String(configuration.campaign?.name || '').trim().toLowerCase();
+  return Boolean(localCampaignName && paymentCampaignName === localCampaignName) || configurationCount === 1;
+};
+
+const persistVerifiedZeffyPayment = async (payment, campaigns = [], campaignOverride = null) => {
+  const donationRecord = mapZeffyApiPayment(payment);
+  const matchedCampaign = campaignOverride || resolveZeffyCampaign(donationRecord, campaigns);
+  return upsertDonation({
+    ...donationRecord,
+    campaignId: matchedCampaign ? Number(matchedCampaign.id) : null,
+    campaignName: matchedCampaign?.name || donationRecord.campaignName || zeffyCampaignName
+  });
+};
+
+let zeffyReconciliationPromise = null;
+let lastZeffyReconciliationAt = 0;
+
+const reconcileZeffyDonations = async ({ force = false } = {}) => {
+  if (!force && Date.now() - lastZeffyReconciliationAt < 30 * 1000) {
+    return { imported: 0, checked: 0, skipped: 'throttled' };
+  }
+  if (zeffyReconciliationPromise) {
+    return zeffyReconciliationPromise;
+  }
+
+  zeffyReconciliationPromise = (async () => {
+    const { campaigns, configurations } = await getConfiguredZeffyCampaigns();
+    if (configurations.length === 0) {
+      return { imported: 0, checked: 0, skipped: 'not-configured' };
+    }
+    const existingTransactionIds = new Set(
+      (await readDonations()).map((entry) => String(entry.gatewayTransactionId || '').trim()).filter(Boolean)
+    );
+    const touchedCampaigns = new Map();
+    let imported = 0;
+    let checked = 0;
+
+    for (const configuration of configurations) {
+      let cursor = '';
+      for (let page = 0; page < 5; page += 1) {
+        const url = new URL('https://api.zeffy.com/api/v1/payments');
+        url.searchParams.set('status', 'succeeded');
+        url.searchParams.set('limit', '100');
+        if (cursor) {
+          url.searchParams.set('starting_after', cursor);
+        }
+
+        const zeffyResponse = await fetch(url, {
+          headers: { Authorization: `Bearer ${configuration.apiKey}` }
+        });
+        const zeffyBody = await zeffyResponse.json().catch(() => ({}));
+        if (!zeffyResponse.ok) {
+          throw new Error(`Unable to reconcile Zeffy payments (${zeffyResponse.status}).`);
+        }
+
+        const payments = Array.isArray(zeffyBody.data) ? zeffyBody.data : [];
+        for (const payment of payments) {
+          if (!zeffyPaymentMatchesConfiguration(payment, configuration, configurations.length)) {
+            continue;
+          }
+          checked += 1;
+          const persistedDonation = await persistVerifiedZeffyPayment(payment, campaigns, configuration.campaign);
+          if (!existingTransactionIds.has(String(payment.id || '').trim())) {
+            imported += 1;
+          }
+          existingTransactionIds.add(String(payment.id || '').trim());
+          const campaignKey = persistedDonation.campaignId || persistedDonation.campaignName;
+          touchedCampaigns.set(campaignKey, persistedDonation);
+        }
+
+        cursor = String(zeffyBody.next_cursor || '').trim();
+        if (!zeffyBody.has_more || !cursor) {
+          break;
+        }
+      }
+    }
+
+    for (const donation of touchedCampaigns.values()) {
+      await syncCampaignRaisedTotal({
+        campaignId: donation.campaignId,
+        campaignName: donation.campaignName
+      });
+    }
+    lastZeffyReconciliationAt = Date.now();
+    return { imported, checked };
+  })();
+
+  try {
+    return await zeffyReconciliationPromise;
+  } finally {
+    zeffyReconciliationPromise = null;
+  }
 };
 
 const reconcilePaidPendingDonations = async () => {
@@ -3390,10 +3592,6 @@ const parseYouTubeChannelSource = (value = '') => {
       return '';
     }
 
-    if (/^[A-Za-z0-9_-]{11}$/.test(raw)) {
-      return raw;
-    }
-
     try {
       const parsed = new URL(raw);
       const host = parsed.hostname.toLowerCase();
@@ -3441,6 +3639,13 @@ const parseYouTubeChannelSource = (value = '') => {
   const handleMatch = input.match(/youtube\.com\/@([A-Za-z0-9._-]+)/i) || input.match(/^@([A-Za-z0-9._-]+)$/i);
   if (handleMatch) {
     return { type: 'handle', value: handleMatch[1] };
+  }
+
+  if (!/^https?:\/\//i.test(input) && !input.includes('/')) {
+    if (/^[A-Za-z0-9._-]+$/.test(input)) {
+      return { type: 'handle', value: input.replace(/^@/, '') };
+    }
+    return { type: 'channelName', value: input };
   }
 
   return null;
@@ -3576,6 +3781,9 @@ const resolveYouTubeLiveVideo = async (source) => {
     if (sourceType === 'handle' && sourceValue) {
       candidates.push(`https://www.youtube.com/@${sourceValue}`);
     }
+    if (sourceType === 'channelName' && sourceValue) {
+      candidates.push(`https://www.youtube.com/results?search_query=${encodeURIComponent(sourceValue)}`);
+    }
 
     for (const candidate of candidates) {
       try {
@@ -3669,6 +3877,31 @@ const resolveYouTubeLiveVideo = async (source) => {
 
     if (!channelId) {
       const error = new Error('Unable to resolve the YouTube channel handle.');
+      error.status = 404;
+      throw error;
+    }
+  }
+
+  if (parsedSource.type === 'channelName') {
+    if (youtubeApiKey) {
+      const channelSearchUrl = new URL('https://www.googleapis.com/youtube/v3/search');
+      channelSearchUrl.searchParams.set('part', 'snippet');
+      channelSearchUrl.searchParams.set('q', parsedSource.value);
+      channelSearchUrl.searchParams.set('type', 'channel');
+      channelSearchUrl.searchParams.set('maxResults', '1');
+      channelSearchUrl.searchParams.set('key', youtubeApiKey);
+
+      const channelSearchResponse = await fetch(channelSearchUrl);
+      const channelSearchPayload = await channelSearchResponse.json().catch(() => ({}));
+      channelId = channelSearchPayload?.items?.[0]?.id?.channelId || '';
+    }
+
+    if (!channelId) {
+      channelId = await resolveChannelIdFromSourcePage(parsedSource.type, parsedSource.value, channelId);
+    }
+
+    if (!channelId) {
+      const error = new Error('Unable to resolve the YouTube channel name. Try its @handle instead.');
       error.status = 404;
       throw error;
     }
@@ -5070,11 +5303,6 @@ const server = http.createServer(async (request, response) => {
 
   if (requestUrl.pathname === '/api/zeffy/webhook' && request.method === 'POST') {
     try {
-      if (!zeffyApiKey) {
-        sendJson(response, 500, { ok: false, message: 'ZEFFY_API_KEY is not configured on the server.' });
-        return;
-      }
-
       if (zeffyWebhookToken) {
         const authorization = String(request.headers.authorization || '').trim();
         const bearerToken = authorization.toLowerCase().startsWith('bearer ') ? authorization.slice(7).trim() : '';
@@ -5099,32 +5327,38 @@ const server = http.createServer(async (request, response) => {
 
       const paymentId = extractZeffyPaymentId(event);
       assertInput(Boolean(paymentId), 'Zeffy payment.completed event is missing its payment id.');
-      const zeffyResponse = await fetch(`https://api.zeffy.com/api/v1/payments/${encodeURIComponent(paymentId)}`, {
-        headers: { Authorization: `Bearer ${zeffyApiKey}` }
-      });
-      const zeffyBody = await zeffyResponse.json().catch(() => ({}));
-      if (!zeffyResponse.ok) {
-        const error = new Error(`Unable to verify Zeffy payment (${zeffyResponse.status}).`);
-        error.status = zeffyResponse.status >= 500 || zeffyResponse.status === 429 ? 502 : 400;
+      const { campaigns, configurations } = await getConfiguredZeffyCampaigns();
+      assertInput(configurations.length > 0, 'No Zeffy API key is configured.');
+
+      let verifiedPayment = null;
+      let matchedConfiguration = null;
+      let verificationStatus = 400;
+      for (const configuration of configurations) {
+        const zeffyResponse = await fetch(`https://api.zeffy.com/api/v1/payments/${encodeURIComponent(paymentId)}`, {
+          headers: { Authorization: `Bearer ${configuration.apiKey}` }
+        });
+        const zeffyBody = await zeffyResponse.json().catch(() => ({}));
+        verificationStatus = zeffyResponse.status;
+        if (!zeffyResponse.ok) {
+          continue;
+        }
+        const payment = zeffyBody.data || zeffyBody;
+        if (zeffyPaymentMatchesConfiguration(payment, configuration, configurations.length)) {
+          verifiedPayment = payment;
+          matchedConfiguration = configuration;
+          break;
+        }
+      }
+      if (!verifiedPayment) {
+        const error = new Error(`Unable to verify Zeffy payment (${verificationStatus}).`);
+        error.status = verificationStatus >= 500 || verificationStatus === 429 ? 502 : 400;
         throw error;
       }
-      const donationRecord = mapZeffyApiPayment(zeffyBody.data || zeffyBody);
-
-      const campaigns = await getDonationCampaigns();
-      const eventCampaignName = String(donationRecord.campaignName || '').trim().toLowerCase();
-      const configuredCampaignName = zeffyCampaignName.toLowerCase();
-      const matchedCampaign = Number.isFinite(zeffyCampaignId) && zeffyCampaignId > 0
-        ? campaigns.find((entry) => Number(entry.id) === zeffyCampaignId)
-        : campaigns.find((entry) => {
-          const name = String(entry.name || '').trim().toLowerCase();
-          return name === eventCampaignName || name === configuredCampaignName;
-        });
-      const resolvedDonation = {
-        ...donationRecord,
-        campaignId: matchedCampaign ? Number(matchedCampaign.id) : null,
-        campaignName: matchedCampaign?.name || donationRecord.campaignName || zeffyCampaignName
-      };
-      const persistedDonation = await upsertDonation(resolvedDonation);
+      const persistedDonation = await persistVerifiedZeffyPayment(
+        verifiedPayment,
+        campaigns,
+        matchedConfiguration?.campaign || null
+      );
       await syncCampaignRaisedTotal({
         campaignId: persistedDonation.campaignId,
         campaignName: persistedDonation.campaignName
@@ -5150,6 +5384,11 @@ const server = http.createServer(async (request, response) => {
 
   if (requestUrl.pathname === '/api/donations' && request.method === 'GET') {
     await reconcilePaidPendingDonations();
+    try {
+      await reconcileZeffyDonations();
+    } catch (error) {
+      logServerError(error, '[donations] Zeffy reconciliation failed');
+    }
     const data = (await readDonations()).sort((left, right) => {
       const l = new Date(left.createdAt || 0).getTime();
       const r = new Date(right.createdAt || 0).getTime();
@@ -5263,7 +5502,7 @@ const server = http.createServer(async (request, response) => {
       ensureNoUnknownKeys(body, [
         'name', 'description', 'target', 'raised', 'startDate', 'endDate', 'active', 'isActive',
         'progressTitle', 'progressDescription', 'progressPhotos', 'progressUpdates', 'progressItems', 'storyBlocks',
-        'paymentProvider', 'paymentLink', 'stripeBuyButtonId', 'stripePublishableKey'
+        'paymentProvider', 'paymentLink', 'stripeBuyButtonId', 'stripePublishableKey', 'zeffyApiKey'
       ]);
       readStringField(body, 'name', { required: true, min: 2, max: 180 });
       readStringField(body, 'description', { max: 1000 });
@@ -5307,7 +5546,7 @@ const server = http.createServer(async (request, response) => {
       const paymentProviderRaw = readStringField(body, 'paymentProvider', { max: 20 });
       const paymentProvider = String(paymentProviderRaw || '').trim().toUpperCase();
       if (paymentProvider) {
-        assertInput(['STRIPE', 'PAYPAL'].includes(paymentProvider), 'paymentProvider must be STRIPE or PAYPAL.');
+        assertInput(['STRIPE', 'PAYPAL', 'ZEFFY'].includes(paymentProvider), 'paymentProvider must be STRIPE, PAYPAL, or ZEFFY.');
       }
       const paymentLink = readStringField(body, 'paymentLink', { max: 1200 });
       if (paymentLink) {
@@ -5315,6 +5554,16 @@ const server = http.createServer(async (request, response) => {
       }
       readStringField(body, 'stripeBuyButtonId', { max: 180 });
       readStringField(body, 'stripePublishableKey', { max: 240 });
+      const zeffyApiKeyValue = readStringField(body, 'zeffyApiKey', { max: 1200 });
+      if (paymentProvider === 'ZEFFY') {
+        assertInput(Boolean(paymentLink), 'paymentLink is required for Zeffy campaigns.');
+        assertInput(Boolean(zeffyApiKeyValue), 'zeffyApiKey is required for Zeffy campaigns.');
+        await validateZeffyCampaignConfiguration({
+          name: body.name,
+          paymentLink,
+          apiKey: zeffyApiKeyValue
+        });
+      }
       readBooleanField(body, 'active');
       readBooleanField(body, 'isActive');
       const data = await createDonationCampaign(body);
@@ -5323,7 +5572,10 @@ const server = http.createServer(async (request, response) => {
         targetType: 'donation-campaign',
         targetId: String(data?.id || ''),
         description: `Created campaign ${String(data?.name || '')}`,
-        payload: body
+        payload: {
+          ...body,
+          ...(body.zeffyApiKey ? { zeffyApiKey: '[REDACTED]' } : {})
+        }
       });
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
@@ -5340,7 +5592,7 @@ const server = http.createServer(async (request, response) => {
       ensureNoUnknownKeys(body, [
         'name', 'description', 'target', 'raised', 'startDate', 'endDate', 'active', 'isActive',
         'progressTitle', 'progressDescription', 'progressPhotos', 'progressUpdates', 'progressItems', 'storyBlocks',
-        'paymentProvider', 'paymentLink', 'stripeBuyButtonId', 'stripePublishableKey'
+        'paymentProvider', 'paymentLink', 'stripeBuyButtonId', 'stripePublishableKey', 'zeffyApiKey'
       ]);
       readStringField(body, 'name', { min: 2, max: 180 });
       readStringField(body, 'description', { max: 1000 });
@@ -5384,7 +5636,7 @@ const server = http.createServer(async (request, response) => {
       const paymentProviderRaw = readStringField(body, 'paymentProvider', { max: 20 });
       const paymentProvider = String(paymentProviderRaw || '').trim().toUpperCase();
       if (paymentProvider) {
-        assertInput(['STRIPE', 'PAYPAL'].includes(paymentProvider), 'paymentProvider must be STRIPE or PAYPAL.');
+        assertInput(['STRIPE', 'PAYPAL', 'ZEFFY'].includes(paymentProvider), 'paymentProvider must be STRIPE, PAYPAL, or ZEFFY.');
       }
       const paymentLink = readStringField(body, 'paymentLink', { max: 1200 });
       if (paymentLink) {
@@ -5392,6 +5644,17 @@ const server = http.createServer(async (request, response) => {
       }
       readStringField(body, 'stripeBuyButtonId', { max: 180 });
       readStringField(body, 'stripePublishableKey', { max: 240 });
+      const zeffyApiKeyValue = readStringField(body, 'zeffyApiKey', { max: 1200 });
+      if (paymentProvider === 'ZEFFY') {
+        assertInput(Boolean(normalizeZeffyCampaignSlug(paymentLink)), 'paymentLink must be a valid Zeffy donation form URL.');
+      }
+      if (paymentProvider === 'ZEFFY' && zeffyApiKeyValue) {
+        await validateZeffyCampaignConfiguration({
+          name: body.name,
+          paymentLink,
+          apiKey: zeffyApiKeyValue
+        });
+      }
       readBooleanField(body, 'active');
       readBooleanField(body, 'isActive');
       const data = await updateDonationCampaign(id, body);
@@ -5400,7 +5663,10 @@ const server = http.createServer(async (request, response) => {
         targetType: 'donation-campaign',
         targetId: String(id),
         description: `Updated campaign ${String(id)}`,
-        payload: body
+        payload: {
+          ...body,
+          ...(body.zeffyApiKey ? { zeffyApiKey: '[REDACTED]' } : {})
+        }
       });
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
@@ -5789,6 +6055,23 @@ const bootstrap = async () => {
 
   runScheduledEventReminderSweep().catch((error) => {
     logServerError(error, 'Initial event reminder scheduler check failed');
+  });
+
+  const zeffyReconciliationTimer = setInterval(() => {
+    reconcileZeffyDonations().catch((error) => {
+      logServerError(error, 'Zeffy donation reconciliation failed');
+    });
+  }, 60 * 1000);
+  if (typeof zeffyReconciliationTimer.unref === 'function') {
+    zeffyReconciliationTimer.unref();
+  }
+
+  reconcileZeffyDonations({ force: true }).then((result) => {
+    if (result.imported > 0) {
+      console.log(`Imported ${result.imported} missing Zeffy donation(s).`);
+    }
+  }).catch((error) => {
+    logServerError(error, 'Initial Zeffy donation reconciliation failed');
   });
 };
 

@@ -14,7 +14,7 @@ Recent member-facing improvements now included in the app:
 
 This project now supports webhook-based Stripe donation recording so successful payments are saved even if a donor closes the browser after checkout.
 
-The Donations page also supports the Zeffy campaign in an on-site iframe modal. Zeffy `payment.completed` events are accepted at `POST /api/zeffy/webhook`, authenticated with the server-only `ZEFFY_API_KEY` or `ZEFFY_WEBHOOK_TOKEN`, and persisted into the same donation ledger. See `PRODUCTION_DEPLOYMENT.md` for redirect and webhook setup.
+The Donations page supports campaign-managed Zeffy forms in an on-site iframe modal. Admins can select Zeffy when creating a campaign, provide its donation-form link and API key, and track verified donor names, emails, amounts, and raised totals in the shared donation ledger. API keys remain server-side. Zeffy `payment.completed` events are accepted at `POST /api/zeffy/webhook`, and periodic API reconciliation recovers missed webhook deliveries. See `PRODUCTION_DEPLOYMENT.md` for redirect and webhook setup.
 
 ### What was added
 

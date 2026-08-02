@@ -465,8 +465,9 @@ const AdminLayout = () => {
     queryKey: ['admin-audit-logs'],
     queryFn: () => auditService.getLogs().then((res) => res.data),
     staleTime: 5 * 1000,
-    refetchInterval: 5 * 1000,
-    refetchIntervalInBackground: true,
+    retry: false,
+    refetchInterval: (query) => (query.state.status === 'error' || query.state.fetchFailureCount > 0 ? false : 5 * 1000),
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true
   });
@@ -474,8 +475,11 @@ const AdminLayout = () => {
     queryKey: ['admin-users'],
     queryFn: () => userService.getUsers().then((res) => res.data),
     staleTime: 10 * 1000,
-    refetchInterval: 5 * 1000,
-    refetchIntervalInBackground: true
+    retry: false,
+    refetchInterval: (query) => (query.state.status === 'error' || query.state.fetchFailureCount > 0 ? false : 5 * 1000),
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true
   });
   const effectiveUser = useMemo(() => {
     const currentEmail = String(user?.email || '').trim().toLowerCase();
