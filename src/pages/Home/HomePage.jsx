@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
+import {
+  ArchiveBoxIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  GiftIcon,
+  ListBulletIcon,
+  ShoppingBagIcon,
+  SparklesIcon
+} from '@heroicons/react/24/outline';
 import AudioPillPlayer from '../../components/common/AudioPillPlayer';
 import HomeHeroBanner from '../../components/common/HomeHeroBanner';
 import SectionTitle from '../../components/common/SectionTitle';
@@ -83,6 +92,25 @@ const resolveScheduleStartMinutes = (timeEn) => {
   const parts = input.split(/\s*-\s*/);
   const startMinutes = parseTimeToken(parts[0]);
   return startMinutes == null ? Number.POSITIVE_INFINITY : startMinutes;
+};
+
+const resolveLangarCategoryIcon = (category = '') => {
+  const normalizedCategory = String(category || '').toLowerCase();
+
+  if (normalizedCategory.includes('clean')) {
+    return SparklesIcon;
+  }
+  if (normalizedCategory.includes('kitchen') || normalizedCategory.includes('serv') || normalizedCategory.includes('supply')) {
+    return ArchiveBoxIcon;
+  }
+  return ShoppingBagIcon;
+};
+
+const resolvePublicLangarNeedLabel = (item = {}) => {
+  if (item.stockStatus === 'custom' && String(item.customStatusLabel || '').trim()) {
+    return String(item.customStatusLabel).trim();
+  }
+  return 'Needed now';
 };
 
 const HomePage = () => {
@@ -200,7 +228,39 @@ const HomePage = () => {
     [newsArticles]
   );
 
-  const langarItems = cmsData?.langarItems || [];
+  const langarItems = useMemo(
+    () => (Array.isArray(cmsData?.langarItems) ? cmsData.langarItems : []),
+    [cmsData?.langarItems]
+  );
+  const publicLangarNeeds = useMemo(
+    () => langarItems.filter((item) => item?.needed === true),
+    [langarItems]
+  );
+  const langarNeedsSummary = useMemo(() => {
+    const sortedItems = [...publicLangarNeeds]
+      .sort((first, second) => String(second?.addedOn || '').localeCompare(String(first?.addedOn || '')));
+    const categoryCounts = sortedItems.reduce((counts, item) => {
+      const category = String(item?.category || 'General').trim() || 'General';
+      counts.set(category, (counts.get(category) || 0) + 1);
+      return counts;
+    }, new Map());
+    const latestAddedOn = sortedItems.find((item) => String(item?.addedOn || '').trim())?.addedOn || '';
+    const latestDate = latestAddedOn ? new Date(`${latestAddedOn}T12:00:00`) : null;
+    const latestUpdateLabel = latestDate && !Number.isNaN(latestDate.getTime())
+      ? latestDate.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })
+      : 'Current';
+    const featuredItems = sortedItems
+      .slice(0, 4);
+
+    return {
+      neededCount: publicLangarNeeds.length,
+      categoryCount: categoryCounts.size,
+      categoryCounts: [...categoryCounts.entries()].sort((first, second) => second[1] - first[1]),
+      latestUpdateLabel,
+      hiddenCount: Math.max(0, publicLangarNeeds.length - featuredItems.length),
+      featuredItems
+    };
+  }, [publicLangarNeeds]);
   const activeHukamnama = dailyHukamnama?.entry || null;
   const resolvedScheduleDay = useMemo(() => {
     const scheduleDays = Array.isArray(cmsData?.scheduleDays) ? cmsData.scheduleDays : [];
@@ -322,11 +382,10 @@ const HomePage = () => {
         path: '/seva',
         description: 'Choose seva and register your participation with the sangat.',
         tickerItems: volunteerOptions,
-        items: langarItems.map((entry) => ({
+        items: publicLangarNeeds.map((entry) => ({
           primary: entry.name,
           category: entry.category || 'General',
-          needed: Boolean(entry.needed),
-          secondary: `${entry.addedOn} • ${entry.displayStatusLabel || (entry.needed ? 'Required Soon' : 'Stock Available')}`
+          secondary: `${entry.addedOn || 'Current request'} • ${resolvePublicLangarNeedLabel(entry)}`
         }))
       },
       '/donation': {
@@ -588,21 +647,119 @@ const HomePage = () => {
           </div>
 
           <div className="min-w-0 space-y-3 self-start">
-            <aside className="rounded-xl border border-brand-blue/15 bg-white px-4 py-4">
-              <h3 className="font-heading text-2xl font-bold text-brand-blue">Langar Seva Items</h3>
-              <ul className="mt-3 divide-y divide-slate-100 text-sm">
-                {langarItems.slice(0, 5).map((entry) => (
-                  <li key={entry.id} className="flex items-center justify-between gap-3 py-2">
-                    <div>
-                      <p className="font-medium text-slate-700">{entry.name}</p>
-                      <p className="text-xs text-slate-500">{entry.addedOn}</p>
+            <aside className="overflow-hidden rounded-xl border border-brand-blue/20 bg-white shadow-[0_18px_45px_-34px_rgba(11,78,162,0.65)]">
+              <div className="bg-gradient-to-r from-brand-blue to-blue-700 px-4 py-4 text-white">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-100">Langar needs board</p>
+                    <h3 className="mt-1 font-heading text-2xl font-bold">Help stock the kitchen</h3>
+                  </div>
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white/15" aria-hidden="true">
+                    <ShoppingBagIcon className="h-6 w-6" />
+                  </span>
+                </div>
+                <p className="mt-2 text-xs leading-relaxed text-blue-100">Only supplies currently requested by the Langar team are shown here.</p>
+              </div>
+
+              <div className="px-4 py-4">
+                <div className="grid grid-cols-3 divide-x divide-slate-200 border-b border-slate-200 pb-3 text-center">
+                  <div className="px-1">
+                    <p className="text-xl font-black text-amber-600">{langarNeedsSummary.neededCount}</p>
+                    <p className="text-[10px] font-bold uppercase text-slate-500">Required now</p>
+                  </div>
+                  <div className="px-1">
+                    <p className="text-xl font-black text-brand-blue">{langarNeedsSummary.categoryCount}</p>
+                    <p className="text-[10px] font-bold uppercase text-slate-500">Categories</p>
+                  </div>
+                  <div className="px-1">
+                    <p className="text-base font-black leading-7 text-emerald-700">{langarNeedsSummary.latestUpdateLabel}</p>
+                    <p className="text-[10px] font-bold uppercase text-slate-500">Updated</p>
+                  </div>
+                </div>
+
+                {langarNeedsSummary.featuredItems.length > 0 ? (
+                  <>
+                    <div className="mt-3 flex flex-wrap gap-1.5" aria-label="Required items by category">
+                      {langarNeedsSummary.categoryCounts.map(([category, count]) => (
+                        <button
+                          key={category}
+                          type="button"
+                          onClick={() => {
+                            openContentModal('/seva');
+                            setSelectedSevaCategory(category);
+                          }}
+                          className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600 transition hover:bg-blue-100 hover:text-brand-blue"
+                        >
+                          {category}
+                          <span className="text-brand-blue">{count}</span>
+                        </button>
+                      ))}
                     </div>
-                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase ${entry.needed ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'}`}>{entry.displayStatusLabel || (entry.needed ? 'Required Soon' : 'Stock Available')}</span>
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-3 flex justify-end">
-                <button type="button" onClick={() => openContentModal('/seva')} className="inline-flex items-center gap-1 text-xs font-semibold text-brand-blue hover:underline"><span>&gt;</span> See all seva items</button>
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <p className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-amber-700">
+                        <span className="h-2 w-2 rounded-full bg-amber-500 shadow-[0_0_0_4px_rgba(245,158,11,0.15)]" />
+                        Current requests
+                      </p>
+                      <p className="text-[11px] font-semibold text-slate-500">Updated {langarNeedsSummary.latestUpdateLabel}</p>
+                    </div>
+                    <ul className="mt-1 divide-y divide-slate-100">
+                      {langarNeedsSummary.featuredItems.map((entry) => {
+                        const CategoryIcon = resolveLangarCategoryIcon(entry.category);
+                        const category = String(entry.category || 'General').trim() || 'General';
+
+                        return (
+                          <li key={entry.id}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                openContentModal('/seva');
+                                setSelectedSevaCategory(category);
+                              }}
+                              className="group flex w-full items-center gap-3 py-2.5 text-left"
+                              aria-label={`View ${category} Langar items`}
+                            >
+                              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-amber-100 text-amber-700">
+                                <CategoryIcon className="h-5 w-5" />
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-sm font-bold text-slate-800 group-hover:text-brand-blue">{entry.name}</span>
+                                <span className="block text-[11px] text-slate-500">{category}</span>
+                              </span>
+                              <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-bold text-amber-700">
+                                <ExclamationTriangleIcon className="h-3.5 w-3.5" />
+                                <span className="max-w-[76px] text-right leading-tight">{resolvePublicLangarNeedLabel(entry)}</span>
+                              </span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    {langarNeedsSummary.hiddenCount > 0 ? (
+                      <button type="button" onClick={() => openContentModal('/seva')} className="mt-1 w-full py-1 text-center text-[11px] font-bold text-brand-blue hover:underline">
+                        +{langarNeedsSummary.hiddenCount} more required item{langarNeedsSummary.hiddenCount === 1 ? '' : 's'}
+                      </button>
+                    ) : null}
+                  </>
+                ) : (
+                  <div className="mt-4 flex items-start gap-3 border-y border-emerald-100 bg-emerald-50 px-3 py-3">
+                    <CheckCircleIcon className="h-5 w-5 shrink-0 text-emerald-700" />
+                    <div>
+                      <p className="text-sm font-bold text-emerald-900">No supplies are currently requested</p>
+                      <p className="mt-0.5 text-xs text-emerald-800">The Langar team will update this board when new items are needed.</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-200 pt-3">
+                  <button type="button" onClick={() => openContentModal('/seva')} className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-brand-blue/25 bg-blue-50 px-2 py-2 text-xs font-bold text-brand-blue transition hover:border-brand-blue hover:bg-blue-100">
+                    <ListBulletIcon className="h-4 w-4" />
+                    Required list
+                  </button>
+                  <Link to="/donation" className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-brand-saffron px-2 py-2 text-xs font-bold text-slate-950 transition hover:bg-amber-500">
+                    <GiftIcon className="h-4 w-4" />
+                    Support Langar
+                  </Link>
+                </div>
               </div>
             </aside>
 
@@ -799,7 +956,8 @@ const HomePage = () => {
                 ) : selectedContentLink.type === 'seva' ? (
                   <div>
                     <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/65">Community Supplies</p>
-                    <h3 className="mt-1 font-heading text-2xl font-semibold text-white sm:text-3xl">Langar Seva Items</h3>
+                    <h3 className="mt-1 font-heading text-2xl font-semibold text-white sm:text-3xl">Langar Items Needed</h3>
+                    <p className="mt-1 text-xs text-white/70">Only supplies currently requested by the Gurdwara are listed.</p>
                   </div>
                 ) : (
                   <>
@@ -859,26 +1017,35 @@ const HomePage = () => {
 
                     return (
                       <>
-                        <ul className="divide-y divide-slate-100">
-                          {pageItems.map((item) => (
-                            <li key={`${item.primary}-${item.secondary}`} className="py-1.5">
-                              <div className="space-y-0.5">
-                                <p className="text-sm font-semibold leading-tight text-slate-800">{item.primary}</p>
-                                <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] leading-tight text-slate-600">
-                                  <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">{item.category}</span>
-                                  <span>{item.secondary}</span>
-                                </p>
+                        {pageItems.length > 0 ? (
+                          <>
+                            <ul className="divide-y divide-slate-100">
+                              {pageItems.map((item) => (
+                                <li key={`${item.primary}-${item.secondary}`} className="py-1.5">
+                                  <div className="space-y-0.5">
+                                    <p className="text-sm font-semibold leading-tight text-slate-800">{item.primary}</p>
+                                    <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] leading-tight text-slate-600">
+                                      <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">{item.category}</span>
+                                      <span>{item.secondary}</span>
+                                    </p>
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                            <div className="mt-3 flex items-center justify-between gap-2">
+                              <p className="text-xs text-slate-500">Page {safePage} of {totalPages}</p>
+                              <div className="flex gap-2">
+                                <button type="button" disabled={safePage === 1} onClick={() => setSelectedSevaPage((prev) => Math.max(1, prev - 1))} className="rounded-md border border-slate-300 px-2 py-1 text-xs disabled:opacity-50">Prev</button>
+                                <button type="button" disabled={safePage === totalPages} onClick={() => setSelectedSevaPage((prev) => Math.min(totalPages, prev + 1))} className="rounded-md border border-slate-300 px-2 py-1 text-xs disabled:opacity-50">Next</button>
                               </div>
-                            </li>
-                          ))}
-                        </ul>
-                        <div className="mt-3 flex items-center justify-between gap-2">
-                          <p className="text-xs text-slate-500">Page {safePage} of {totalPages}</p>
-                          <div className="flex gap-2">
-                            <button type="button" disabled={safePage === 1} onClick={() => setSelectedSevaPage((prev) => Math.max(1, prev - 1))} className="rounded-md border border-slate-300 px-2 py-1 text-xs disabled:opacity-50">Prev</button>
-                            <button type="button" disabled={safePage === totalPages} onClick={() => setSelectedSevaPage((prev) => Math.min(totalPages, prev + 1))} className="rounded-md border border-slate-300 px-2 py-1 text-xs disabled:opacity-50">Next</button>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex items-start gap-3 bg-emerald-50 px-3 py-4">
+                            <CheckCircleIcon className="h-5 w-5 shrink-0 text-emerald-700" />
+                            <p className="text-sm font-semibold text-emerald-900">No supplies are currently requested in this category.</p>
                           </div>
-                        </div>
+                        )}
                       </>
                     );
                   })()}
