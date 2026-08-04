@@ -343,13 +343,13 @@ const AdminLangarPage = () => {
             </div>
             <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={form.handleSubmit((values) => addMutation.mutate(values))}>
               <label className="text-sm">Item Name
-                <input {...form.register('name', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <input {...form.register('name', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
               <label className="text-sm">Category
-                <input {...form.register('category', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <input {...form.register('category', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
               <label className="text-sm">Added Date
-                <input type="date" {...form.register('addedOn', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <input type="date" {...form.register('addedOn', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
               <label className="text-sm">Expiry Date
                 <input type="date" {...form.register('expiryDate')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
@@ -364,7 +364,7 @@ const AdminLangarPage = () => {
               {createStatusType === 'custom' ? (
                 <>
                   <label className="text-sm md:col-span-2">Custom Status Label
-                    <input {...form.register('customStatusLabel', { required: createStatusType === 'custom' })} placeholder="Ex: Seasonal shortage" className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                    <input {...form.register('customStatusLabel', { required: createStatusType === 'custom' })} required={createStatusType === 'custom'} placeholder="Ex: Seasonal shortage" className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
                   </label>
                   <label className="text-sm md:col-span-2">Base Status Tone
                     <select {...form.register('customNeeded')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
@@ -418,13 +418,13 @@ const AdminLangarPage = () => {
             </div>
             <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={editForm.handleSubmit((values) => updateMutation.mutate({ id: editingItem.id, values }))}>
               <label className="text-sm">Item Name
-                <input {...editForm.register('name', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <input {...editForm.register('name', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
               <label className="text-sm">Category
-                <input {...editForm.register('category', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <input {...editForm.register('category', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
               <label className="text-sm">Added Date
-                <input type="date" {...editForm.register('addedOn', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <input type="date" {...editForm.register('addedOn', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
               <label className="text-sm">Expiry Date
                 <input type="date" {...editForm.register('expiryDate')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
@@ -439,7 +439,7 @@ const AdminLangarPage = () => {
               {editStatusType === 'custom' ? (
                 <>
                   <label className="text-sm md:col-span-2">Custom Status Label
-                    <input {...editForm.register('customStatusLabel', { required: editStatusType === 'custom' })} placeholder="Ex: Limited stock until Friday" className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                    <input {...editForm.register('customStatusLabel', { required: editStatusType === 'custom' })} required={editStatusType === 'custom'} placeholder="Ex: Limited stock until Friday" className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
                   </label>
                   <label className="text-sm md:col-span-2">Base Status Tone
                     <select {...editForm.register('customNeeded')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">

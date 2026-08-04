@@ -1,6 +1,8 @@
 import { serviceResponse } from './serviceResponse';
 import { normalizeErrorMessage } from './publicError';
 import { withZeffyDonorDetails } from '../utils/zeffy';
+import { isCampaignProgressVisible, normalizeCampaignProgressStatus } from '../constants/campaignProgress';
+import apiClient from './apiClient';
 
 const LAST_PENDING_DONATION_KEY = 'ssm-donation-last-pending-id';
 
@@ -46,6 +48,7 @@ const normalizeCampaignProgressItem = (item = {}, index = 0) => {
   }
 
   const photosSource = Array.isArray(item.photos) ? item.photos : [];
+  const status = normalizeCampaignProgressStatus(item.status, item.isActive);
 
   return {
     id: String(item.id || `progress-${index + 1}`),
@@ -53,7 +56,8 @@ const normalizeCampaignProgressItem = (item = {}, index = 0) => {
     description: String(item.description || '').trim(),
     details: String(item.details || '').trim(),
     date: String(item.date || '').trim(),
-    isActive: item.isActive !== false,
+    status,
+    isActive: isCampaignProgressVisible(status),
     photos: photosSource.map((photo) => normalizeCampaignProgressPhoto(photo)).filter(Boolean)
   };
 };
@@ -580,6 +584,11 @@ const donationService = {
     pendingCache = [];
     writeLastPendingDonationId('');
     return serviceResponse({ success: true, cleared: true });
+  },
+
+  removeDonation: async (id) => {
+    const response = await apiClient.delete(`/donations/${encodeURIComponent(String(id || ''))}`);
+    return serviceResponse(normalizeDonation(response.data?.data || {}));
   },
 
   addCashDonation: async ({ campaign, amount, receiptId, donorName = '', donorEmail = '', donorPhone = '', paidAt }) => {

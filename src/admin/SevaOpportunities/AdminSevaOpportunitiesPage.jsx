@@ -1020,13 +1020,13 @@ const AdminSevaOpportunitiesPage = () => {
             </div>
             <form className={`${modalBodyClass} grid gap-3 md:grid-cols-2`} onSubmit={createForm.handleSubmit((values) => createMutation.mutate(toOpportunityPayload(values)))}>
               <label className={modalLabelClass}>Seva Type
-                <input {...createForm.register('sevaType', { required: true })} className={slimInputClass} />
+                <input {...createForm.register('sevaType', { required: true })} required className={slimInputClass} />
               </label>
               <div className={`${sectionCardClass} md:col-span-2`}>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Start Date and Time</p>
                 <div className="mt-3 grid gap-3 md:grid-cols-4">
                   <label className={`${modalLabelClass} md:col-span-2`}>Date
-                    <input type="date" {...createForm.register('date', { required: true })} className={`${slimInputClass} p-2.5`} />
+                    <input type="date" {...createForm.register('date', { required: true })} required className={`${slimInputClass} p-2.5`} />
                   </label>
                   <label className={modalLabelClass}>Start
                     <div className="mt-1 grid grid-cols-2 gap-2">
@@ -1054,7 +1054,7 @@ const AdminSevaOpportunitiesPage = () => {
                 <input type="number" min="1" {...createForm.register('totalVolunteersRequired', { valueAsNumber: true, min: 1 })} className={slimInputClass} />
               </label>
               <label className={modalLabelClass}>Expiry Date
-                <input type="date" {...createForm.register('expiryDate', { required: true })} className={slimInputClass} />
+                <input type="date" {...createForm.register('expiryDate', { required: true })} required className={slimInputClass} />
               </label>
               <label className="mt-1 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-700 md:col-span-2">
                 <input type="checkbox" {...createForm.register('waitlistEnabled')} />
@@ -1217,13 +1217,13 @@ const AdminSevaOpportunitiesPage = () => {
             </div>
             <form className={`${modalBodyClass} grid gap-3 md:grid-cols-2`} onSubmit={editForm.handleSubmit((values) => updateMutation.mutate({ id: editing.id, values: toOpportunityPayload(values) }))}>
               <label className={modalLabelClass}>Seva Type
-                <input {...editForm.register('sevaType', { required: true })} className={slimInputClass} />
+                <input {...editForm.register('sevaType', { required: true })} required className={slimInputClass} />
               </label>
               <div className={`${sectionCardClass} md:col-span-2`}>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Start Date and Time</p>
                 <div className="mt-3 grid gap-3 md:grid-cols-4">
                   <label className={`${modalLabelClass} md:col-span-2`}>Date
-                    <input type="date" {...editForm.register('date', { required: true })} className={`${slimInputClass} p-2.5`} />
+                    <input type="date" {...editForm.register('date', { required: true })} required className={`${slimInputClass} p-2.5`} />
                   </label>
                   <label className={modalLabelClass}>Start
                     <div className="mt-1 grid grid-cols-2 gap-2">
@@ -1251,7 +1251,7 @@ const AdminSevaOpportunitiesPage = () => {
                 <input type="number" min="1" {...editForm.register('totalVolunteersRequired', { valueAsNumber: true, min: 1 })} className={slimInputClass} />
               </label>
               <label className={modalLabelClass}>Expiry Date
-                <input type="date" {...editForm.register('expiryDate', { required: true })} className={slimInputClass} />
+                <input type="date" {...editForm.register('expiryDate', { required: true })} required className={slimInputClass} />
               </label>
               <label className="mt-1 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-700 md:col-span-2">
                 <input type="checkbox" {...editForm.register('waitlistEnabled')} />

@@ -36,6 +36,16 @@ import {
   downloadDonationInvoicePdf
 } from '../../utils/csvExport';
 import { siteConfig } from '../../constants/siteConfig';
+import {
+  CAMPAIGN_PROGRESS_STATUSES,
+  getCampaignProgressStatusClassName,
+  getCampaignProgressStatusLabel,
+  isCampaignProgressVisible,
+  normalizeCampaignProgressStatus
+} from '../../constants/campaignProgress';
+import { useAuth } from '../../context/AuthContext';
+import PhoneInput from '../../components/forms/PhoneInput';
+import { isTenDigitPhone, TEN_DIGIT_PHONE_ERROR } from '../../utils/phone';
 
 const DONATIONS_PAGE_SIZE = 6;
 const PROGRESS_ITEMS_PAGE_SIZE = 10;
@@ -191,18 +201,8 @@ const toCampaignPayload = (values = {}) => {
 const progressItemDefaults = {
   title: '',
   description: '',
-  details: '',
-  date: '',
-  isActive: true,
+  status: 'started',
   photosText: ''
-};
-
-const progressOverviewDefaults = {
-  progressTitle: '',
-  progressDescription: '',
-  storyBlocksText: '',
-  progressPhotosText: '',
-  progressUpdatesText: ''
 };
 
 const parseProgressItemPhotosText = (value = '') => {
@@ -227,7 +227,8 @@ const normalizeProgressItems = (items = []) => {
       description: String(item?.description || '').trim(),
       details: String(item?.details || '').trim(),
       date: String(item?.date || '').trim(),
-      isActive: item?.isActive !== false,
+      status: normalizeCampaignProgressStatus(item?.status, item?.isActive),
+      isActive: isCampaignProgressVisible(item?.status, item?.isActive),
       photos: parseProgressItemPhotosText(formatProgressItemPhotosText(item?.photos || []))
     }))
     .filter((item) => item.title);
@@ -235,6 +236,7 @@ const normalizeProgressItems = (items = []) => {
 
 const AdminDonationsPage = () => {
   const { setHeaderAction } = useOutletContext();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [createCampaignOpen, setCreateCampaignOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState(null);
@@ -252,8 +254,6 @@ const AdminDonationsPage = () => {
   const [progressItemUploadPending, setProgressItemUploadPending] = useState(false);
   const [progressItemUploadProgress, setProgressItemUploadProgress] = useState(0);
   const [progressManagerStatus, setProgressManagerStatus] = useState({ type: 'success', message: '' });
-  const [progressOverviewUploadPending, setProgressOverviewUploadPending] = useState(false);
-  const [progressOverviewUploadProgress, setProgressOverviewUploadProgress] = useState(0);
   const [campaignDonorPage, setCampaignDonorPage] = useState(1);
   const [campaignDonorSearchTerm, setCampaignDonorSearchTerm] = useState('');
   const [cashDonationOpen, setCashDonationOpen] = useState(false);
@@ -263,13 +263,15 @@ const AdminDonationsPage = () => {
   const [invoiceEmailSendingId, setInvoiceEmailSendingId] = useState('');
   const [openCampaignActionMenuId, setOpenCampaignActionMenuId] = useState('');
   const [openDonorActionMenuId, setOpenDonorActionMenuId] = useState('');
+  const [donationPendingDelete, setDonationPendingDelete] = useState(null);
   const form = useForm({ defaultValues: campaignDefaults });
   const editForm = useForm({ defaultValues: campaignDefaults });
   const progressItemForm = useForm({ defaultValues: progressItemDefaults });
-  const progressOverviewForm = useForm({ defaultValues: progressOverviewDefaults });
+  const progressItemPhotoUrls = parseProgressItemPhotosText(progressItemForm.watch('photosText') || '');
   const cashDonationForm = useForm({ defaultValues: createCashDonationDefaults() });
   const createPaymentProvider = form.watch('paymentProvider');
   const editPaymentProvider = editForm.watch('paymentProvider');
+  const canDeleteDonations = ['Admin', 'Super Admin'].includes(String(user?.role || '').trim());
   const { data: campaigns = [] } = useQuery({
     queryKey: ['admin-campaigns'],
     queryFn: () => donationService.getAllCampaigns().then((res) => res.data),
@@ -464,33 +466,27 @@ const AdminDonationsPage = () => {
     }
   });
 
-  const saveProgressOverviewMutation = useMutation({
-    mutationFn: ({ campaignId, values }) => donationService.updateCampaign(campaignId, {
-      progressTitle: String(values.progressTitle || '').trim(),
-      progressDescription: String(values.progressDescription || '').trim(),
-      storyBlocks: parseStoryBlocksText(values.storyBlocksText || ''),
-      progressPhotos: parseProgressPhotosText(values.progressPhotosText || ''),
-      progressUpdates: parseProgressUpdatesText(values.progressUpdatesText || '')
-    }),
-    onSuccess: (response) => {
-      const updatedCampaign = response?.data || null;
-      queryClient.invalidateQueries({ queryKey: ['admin-campaigns'] });
-      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
-      if (updatedCampaign) {
-        setProgressManagerCampaign(updatedCampaign);
-      }
-      setProgressManagerStatus({ type: 'success', message: 'Progress overview saved successfully.' });
-    },
-    onError: (error) => {
-      setProgressManagerStatus({ type: 'error', message: error?.message || 'Unable to save the progress overview.' });
-    }
-  });
-
   const deleteMutation = useMutation({
     mutationFn: (id) => donationService.removeCampaign(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-campaigns'] });
       queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+    }
+  });
+
+  const deleteDonationMutation = useMutation({
+    mutationFn: (id) => donationService.removeDonation(id),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ['admin-donations'] }),
+        queryClient.refetchQueries({ queryKey: ['admin-campaigns'] }),
+        queryClient.invalidateQueries({ queryKey: ['campaigns'] })
+      ]);
+      setDonationPendingDelete(null);
+      setInvoiceEmailStatus({ type: 'success', message: 'Donation deleted and campaign raised total updated.' });
+    },
+    onError: (error) => {
+      setInvoiceEmailStatus({ type: 'error', message: error?.message || 'Unable to delete this donation.' });
     }
   });
 
@@ -569,13 +565,6 @@ const AdminDonationsPage = () => {
     setProgressManagerPage(1);
     setProgressItemModalState({ open: false, mode: 'create', index: -1 });
     progressItemForm.reset(progressItemDefaults);
-    progressOverviewForm.reset({
-      progressTitle: campaign?.progressTitle || '',
-      progressDescription: campaign?.progressDescription || '',
-      storyBlocksText: formatStoryBlocksText(campaign?.storyBlocks),
-      progressPhotosText: formatProgressPhotosText(campaign?.progressPhotos),
-      progressUpdatesText: formatProgressUpdatesText(campaign?.progressUpdates)
-    });
     setProgressManagerStatus({ type: 'success', message: '' });
     setProgressManagerOpen(true);
   };
@@ -587,9 +576,6 @@ const AdminDonationsPage = () => {
     setProgressManagerPage(1);
     setProgressItemModalState({ open: false, mode: 'create', index: -1 });
     progressItemForm.reset(progressItemDefaults);
-    progressOverviewForm.reset(progressOverviewDefaults);
-    setProgressOverviewUploadPending(false);
-    setProgressOverviewUploadProgress(0);
     setProgressManagerStatus({ type: 'success', message: '' });
   };
 
@@ -621,9 +607,7 @@ const AdminDonationsPage = () => {
     progressItemForm.reset({
       title: nextItem.title || '',
       description: nextItem.description || '',
-      details: nextItem.details || '',
-      date: nextItem.date || '',
-      isActive: nextItem.isActive !== false,
+      status: normalizeCampaignProgressStatus(nextItem.status, nextItem.isActive),
       photosText: formatProgressItemPhotosText(nextItem.photos || [])
     });
     setProgressItemModalState({ open: true, mode, index });
@@ -637,13 +621,13 @@ const AdminDonationsPage = () => {
   };
 
   const handleSaveProgressItem = async (values) => {
+    const status = normalizeCampaignProgressStatus(values.status);
     const nextItem = {
       id: progressItemModalState.mode === 'edit' ? (progressItemsDraft[progressItemModalState.index]?.id || `progress-${Date.now()}`) : `progress-${Date.now()}`,
       title: String(values.title || '').trim(),
       description: String(values.description || '').trim(),
-      details: String(values.details || '').trim(),
-      date: String(values.date || '').trim(),
-      isActive: values.isActive !== false,
+      status,
+      isActive: isCampaignProgressVisible(status),
       photos: parseProgressItemPhotosText(values.photosText || '')
     };
 
@@ -677,21 +661,6 @@ const AdminDonationsPage = () => {
     try {
       await persistProgressItems(nextItems, {
         successMessage: 'Progress update deleted and saved.'
-      });
-    } catch {
-      // Error message is set in mutation handler.
-    }
-  };
-
-  const toggleProgressItemStatus = async (indexToToggle) => {
-    const nextItems = progressItemsDraft.map((item, index) => (
-      index === indexToToggle ? { ...item, isActive: item.isActive === false } : item
-    ));
-    setProgressItemsDraft(nextItems);
-
-    try {
-      await persistProgressItems(nextItems, {
-        successMessage: 'Progress status updated and saved.'
       });
     } catch {
       // Error message is set in mutation handler.
@@ -747,52 +716,6 @@ const AdminDonationsPage = () => {
     } finally {
       setProgressItemUploadPending(false);
       setProgressItemUploadProgress(0);
-    }
-  };
-
-  const appendPhotosToProgressOverview = async (files) => {
-    const selectedFiles = Array.from(files || []).filter(Boolean);
-    if (selectedFiles.length === 0) {
-      return;
-    }
-
-    try {
-      setProgressManagerStatus({ type: 'success', message: '' });
-      setProgressOverviewUploadPending(true);
-      setProgressOverviewUploadProgress(0);
-      const uploadedUrls = [];
-
-      for (let index = 0; index < selectedFiles.length; index += 1) {
-        const uploaded = await uploadService.uploadFile({
-          service: 'donations',
-          file: selectedFiles[index],
-          allowedMimeTypes: ['image/*'],
-          maxSizeMB: 15,
-          onProgress: (percent) => {
-            setProgressOverviewUploadProgress(Math.round(((index + (percent / 100)) / selectedFiles.length) * 100));
-          }
-        });
-        const uploadedUrl = String(uploaded?.url || '').trim();
-        if (uploadedUrl) {
-          uploadedUrls.push(uploadedUrl);
-        }
-      }
-
-      const existingUrls = parseProgressPhotosText(progressOverviewForm.getValues('progressPhotosText') || '');
-      progressOverviewForm.setValue(
-        'progressPhotosText',
-        formatProgressPhotosText(Array.from(new Set([...existingUrls, ...uploadedUrls]))),
-        { shouldDirty: true, shouldValidate: true }
-      );
-      setProgressManagerStatus({
-        type: 'success',
-        message: `${uploadedUrls.length} progress photo${uploadedUrls.length === 1 ? '' : 's'} uploaded.`
-      });
-    } catch (error) {
-      setProgressManagerStatus({ type: 'error', message: error?.message || 'Unable to upload progress photos.' });
-    } finally {
-      setProgressOverviewUploadPending(false);
-      setProgressOverviewUploadProgress(0);
     }
   };
 
@@ -873,6 +796,24 @@ const AdminDonationsPage = () => {
     } finally {
       setInvoiceEmailSendingId('');
     }
+  };
+
+  const handleDeleteDonation = (entry) => {
+    if (!canDeleteDonations || deleteDonationMutation.isPending) {
+      return;
+    }
+
+    setOpenDonorActionMenuId('');
+    setDonationPendingDelete(entry);
+  };
+
+  const confirmDeleteDonation = () => {
+    if (!donationPendingDelete?.id || deleteDonationMutation.isPending) {
+      return;
+    }
+
+    const donationId = donationPendingDelete.id;
+    deleteDonationMutation.mutate(donationId);
   };
 
   const handleDownloadCampaignCsv = () => {
@@ -1124,14 +1065,19 @@ const AdminDonationsPage = () => {
         <div className="fixed inset-0 z-[98] overflow-y-auto bg-slate-900/55 px-4 py-6" onClick={closeProgressManager}>
           <div className="mx-auto flex min-h-full items-center justify-center">
             <div className="w-full max-w-5xl rounded-xl bg-white p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-4">
                 <div>
                   <h3 className="font-heading text-xl font-semibold">Campaign Progress Manager</h3>
                   <p className="mt-1 text-xs text-slate-500">{progressManagerCampaign.name}</p>
                 </div>
-                <button type="button" onClick={closeProgressManager} className="rounded-full border border-brand-blue/40 bg-blue-50 p-2 text-brand-blue transition hover:border-brand-saffron hover:bg-amber-100 hover:text-amber-700" aria-label="Close progress manager">
-                  <XMarkIcon className="h-4 w-4" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => openProgressItemModal({ mode: 'create' })} className="inline-flex items-center rounded-lg bg-brand-blue px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-800">
+                    Add Progress Update
+                  </button>
+                  <button type="button" onClick={closeProgressManager} className="rounded-full border border-brand-blue/40 bg-blue-50 p-2 text-brand-blue transition hover:border-brand-saffron hover:bg-amber-100 hover:text-amber-700" aria-label="Close progress manager">
+                    <XMarkIcon className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
 
               <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
@@ -1139,67 +1085,11 @@ const AdminDonationsPage = () => {
                 {saveProgressItemsMutation.isPending ? <p className="text-xs font-medium text-slate-500">Saving...</p> : null}
               </div>
 
-              <form
-                className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4"
-                onSubmit={progressOverviewForm.handleSubmit((values) => saveProgressOverviewMutation.mutate({
-                  campaignId: progressManagerCampaign.id,
-                  values
-                }))}
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-bold text-slate-900">Progress Overview</p>
-                    <p className="text-xs text-slate-500">Campaign story, gallery, and milestone summary.</p>
-                  </div>
-                  <Button type="submit" disabled={saveProgressOverviewMutation.isPending}>
-                    {saveProgressOverviewMutation.isPending ? 'Saving...' : 'Save Overview'}
-                  </Button>
-                </div>
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <label className="text-sm font-semibold text-slate-700">Progress Title
-                    <input {...progressOverviewForm.register('progressTitle')} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 font-normal" />
-                  </label>
-                  <label className="text-sm font-semibold text-slate-700 md:col-span-2">Progress Description
-                    <textarea rows={2} {...progressOverviewForm.register('progressDescription')} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 font-normal" />
-                  </label>
-                  <label className="text-sm font-semibold text-slate-700 md:col-span-2">Story Blocks <span className="font-normal text-slate-500">(title|summary|quote|beneficiary|impact metric|image URL)</span>
-                    <textarea rows={3} {...progressOverviewForm.register('storyBlocksText')} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 font-normal" />
-                  </label>
-                  <label className="text-sm font-semibold text-slate-700 md:col-span-2">Progress Photos <span className="font-normal text-slate-500">(one URL per line)</span>
-                    <textarea rows={3} {...progressOverviewForm.register('progressPhotosText')} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 font-normal" />
-                  </label>
-                  <label className="text-sm font-semibold text-slate-700 md:col-span-2">Upload Progress Photos
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      disabled={progressOverviewUploadPending}
-                      className="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:font-semibold"
-                      onChange={(event) => {
-                        void appendPhotosToProgressOverview(event.target.files);
-                        event.target.value = '';
-                      }}
-                    />
-                    <p className="mt-1 text-xs font-normal text-slate-500">{progressOverviewUploadPending ? `Uploading photos... ${progressOverviewUploadProgress}%` : 'Upload one or more images (max 15MB each).'}</p>
-                  </label>
-                  <label className="text-sm font-semibold text-slate-700 md:col-span-2">Progress Updates <span className="font-normal text-slate-500">(date|title|description|amount)</span>
-                    <textarea rows={3} {...progressOverviewForm.register('progressUpdatesText')} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 font-normal" />
-                  </label>
-                </div>
-              </form>
-
-              <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-200 pt-4">
+              <div className="mt-5">
                 <div>
                   <p className="text-sm font-bold text-slate-900">Progress Details</p>
-                  <p className="text-xs text-slate-500">Individual dated updates shown on the donation page.</p>
+                  <p className="text-xs text-slate-500">Updates shown on the donation page.</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => openProgressItemModal({ mode: 'create' })}
-                  className="inline-flex items-center rounded-full border border-brand-blue/30 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-brand-blue transition hover:border-brand-blue hover:bg-blue-100"
-                >
-                  Add Progress Update
-                </button>
               </div>
 
               <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200">
@@ -1207,7 +1097,8 @@ const AdminDonationsPage = () => {
                   <thead className="bg-slate-50 text-slate-500">
                     <tr>
                       <th className="px-3 py-2">Title</th>
-                      <th className="px-3 py-2">Date</th>
+                      <th className="px-3 py-2">Description</th>
+                      <th className="px-3 py-2">Photos</th>
                       <th className="px-3 py-2">Status</th>
                       <th className="px-3 py-2 text-right">Actions</th>
                     </tr>
@@ -1218,15 +1109,12 @@ const AdminDonationsPage = () => {
                         <td className="px-3 py-2">
                           <p className="font-semibold text-slate-900">{item.title || 'Untitled progress'}</p>
                         </td>
-                        <td className="px-3 py-2 text-slate-600">{item.date || '-'}</td>
+                        <td className="max-w-sm px-3 py-2 text-slate-600"><p className="line-clamp-2">{item.description || '-'}</p></td>
+                        <td className="px-3 py-2 text-slate-600">{Array.isArray(item.photos) ? item.photos.length : 0}</td>
                         <td className="px-3 py-2">
-                          <button
-                            type="button"
-                            onClick={() => toggleProgressItemStatus(index)}
-                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${item.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}
-                          >
-                            {item.isActive ? 'Active' : 'Inactive'}
-                          </button>
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getCampaignProgressStatusClassName(item.status, item.isActive)}`}>
+                            {getCampaignProgressStatusLabel(item.status, item.isActive)}
+                          </span>
                         </td>
                         <td className="px-3 py-2">
                           <div className="flex items-center gap-2">
@@ -1245,7 +1133,7 @@ const AdminDonationsPage = () => {
                     ))}
                     {progressItemsDraft.length === 0 ? (
                       <tr>
-                        <td className="px-3 py-3 text-slate-500" colSpan={4}>No progress updates yet. Add your first item.</td>
+                        <td className="px-3 py-3 text-slate-500" colSpan={5}>No progress updates yet. Add your first item.</td>
                       </tr>
                     ) : null}
                   </tbody>
@@ -1300,13 +1188,12 @@ const AdminDonationsPage = () => {
                       {progressItemModalState.mode === 'view' ? (
                         <div className="mt-4 space-y-4 px-4 pb-4 sm:px-6 sm:pb-6">
                           <div className="grid gap-4 lg:grid-cols-2">
-                            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                            <div className={`rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5 ${Array.isArray(selectedProgressItem?.photos) && selectedProgressItem.photos.length > 0 ? '' : 'lg:col-span-2'}`}>
                               <div className="mt-1 space-y-3">
                                 <div>
                                   <div className="flex justify-end gap-2">
-                                    <span className="inline-flex rounded-full border border-brand-blue/20 bg-brand-blue/10 px-3 py-1 text-xs font-semibold text-brand-blue">{selectedProgressItem?.date || 'No date'}</span>
-                                    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${selectedProgressItem?.isActive !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}>
-                                      {selectedProgressItem?.isActive !== false ? 'Active' : 'Inactive'}
+                                    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getCampaignProgressStatusClassName(selectedProgressItem?.status, selectedProgressItem?.isActive)}`}>
+                                      {getCampaignProgressStatusLabel(selectedProgressItem?.status, selectedProgressItem?.isActive)}
                                     </span>
                                   </div>
                                   <p className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Title</p>
@@ -1319,24 +1206,16 @@ const AdminDonationsPage = () => {
                                     <p className="mt-1 text-[11px] leading-5 text-slate-700">{selectedProgressItem.description}</p>
                                   </div>
                                 ) : null}
-                                {selectedProgressItem?.details ? (
-                                  <div>
-                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Details</p>
-                                    <p className="mt-1 leading-6 text-slate-700">{selectedProgressItem.details}</p>
-                                  </div>
-                                ) : null}
                               </div>
                             </div>
 
-                            <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+                            {Array.isArray(selectedProgressItem?.photos) && selectedProgressItem.photos.length > 0 ? <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
                               <div className="flex items-center justify-between gap-3">
                                 <div>
                                   <p className="text-sm font-semibold text-slate-900">Image Gallery</p>
-                                  <p className="text-xs text-slate-500">Responsive grid for progress photos.</p>
                                 </div>
                               </div>
-                              {(Array.isArray(selectedProgressItem?.photos) && selectedProgressItem.photos.length > 0) ? (
-                                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6">
+                                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
                                   {selectedProgressItem.photos.map((photoUrl, index) => (
                                     <a
                                       key={`${photoUrl}-${index}`}
@@ -1349,12 +1228,7 @@ const AdminDonationsPage = () => {
                                     </a>
                                   ))}
                                 </div>
-                              ) : (
-                                <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                                  No progress photos attached.
-                                </div>
-                              )}
-                            </div>
+                            </div> : null}
                           </div>
 
                           <div className="flex justify-end">
@@ -1364,19 +1238,15 @@ const AdminDonationsPage = () => {
                       ) : (
                         <form className="mt-4 grid gap-3 px-4 pb-4 sm:px-6 sm:pb-6 md:grid-cols-2" onSubmit={progressItemForm.handleSubmit(handleSaveProgressItem)}>
                           <label className="text-sm md:col-span-2">Title
-                            <input disabled={progressItemModalState.mode === 'view'} {...progressItemForm.register('title', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
-                          </label>
-                          <label className="text-sm md:col-span-2">Date
-                            <input type="date" disabled={progressItemModalState.mode === 'view'} {...progressItemForm.register('date')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
+                            <input disabled={progressItemModalState.mode === 'view'} {...progressItemForm.register('title', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
                           </label>
                           <label className="text-sm md:col-span-2">Description
-                            <textarea rows={2} disabled={progressItemModalState.mode === 'view'} {...progressItemForm.register('description')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
-                          </label>
-                          <label className="text-sm md:col-span-2">Photos (one URL per line)
-                            <textarea rows={3} disabled={progressItemModalState.mode === 'view'} {...progressItemForm.register('photosText')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
+                            <textarea rows={5} disabled={progressItemModalState.mode === 'view'} {...progressItemForm.register('description')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
                           </label>
                           {progressItemModalState.mode !== 'view' ? (
-                            <label className="text-sm md:col-span-2">Upload Photos (multiple)
+                            <div className="text-sm md:col-span-2">
+                              <label>Photos
+                              <input type="hidden" {...progressItemForm.register('photosText')} />
                               <input
                                 type="file"
                                 accept="image/*"
@@ -1394,11 +1264,36 @@ const AdminDonationsPage = () => {
                                   <div className="h-full bg-brand-blue transition-all" style={{ width: `${progressItemUploadProgress}%` }} />
                                 </div>
                               ) : null}
-                            </label>
+                              </label>
+                              {progressItemPhotoUrls.length > 0 ? (
+                                <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+                                  {progressItemPhotoUrls.map((photoUrl, photoIndex) => (
+                                    <div key={`${photoUrl}-${photoIndex}`} className="group relative aspect-square overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                                      <img src={photoUrl} alt={`Progress upload ${photoIndex + 1}`} className="h-full w-full object-cover" />
+                                      <button
+                                        type="button"
+                                        onClick={() => progressItemForm.setValue(
+                                          'photosText',
+                                          formatProgressItemPhotosText(progressItemPhotoUrls.filter((_, index) => index !== photoIndex)),
+                                          { shouldDirty: true }
+                                        )}
+                                        className="absolute right-1 top-1 rounded-full bg-slate-950/75 p-1 text-white opacity-90 transition hover:bg-rose-700"
+                                        aria-label={`Remove photo ${photoIndex + 1}`}
+                                      >
+                                        <XMarkIcon className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </div>
                           ) : null}
-                          <label className="flex items-center gap-2 text-sm md:col-span-2">
-                            <input type="checkbox" disabled={progressItemModalState.mode === 'view'} {...progressItemForm.register('isActive')} />
-                            Active progress item
+                          <label className="text-sm md:col-span-2">Status
+                            <select {...progressItemForm.register('status')} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5">
+                              {CAMPAIGN_PROGRESS_STATUSES.map((option) => (
+                                <option key={option.value} value={option.value}>{option.label}</option>
+                              ))}
+                            </select>
                           </label>
                           <div className="md:col-span-2 h-px bg-slate-200" />
                           <div className="md:col-span-2 flex gap-2 pt-1">
@@ -1514,6 +1409,17 @@ const AdminDonationsPage = () => {
                           >
                             {invoiceEmailSendingId === String(entry.id || '') ? 'Sending...' : 'Email Invoice'}
                           </button>
+                          {canDeleteDonations ? (
+                            <button
+                              type="button"
+                              data-delete-guard-ignore="true"
+                              onClick={() => handleDeleteDonation(entry)}
+                              disabled={deleteDonationMutation.isPending}
+                              className="w-full rounded-md px-2 py-1.5 text-left text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              {deleteDonationMutation.isPending && String(deleteDonationMutation.variables) === String(entry.id) ? 'Deleting...' : 'Delete Donation'}
+                            </button>
+                          ) : null}
                         </div>
                       ) : null}
                     </div>
@@ -1536,6 +1442,19 @@ const AdminDonationsPage = () => {
                       >
                         <EnvelopeIcon className="h-4 w-4" />
                       </button>
+                      {canDeleteDonations ? (
+                        <button
+                          type="button"
+                          data-delete-guard-ignore="true"
+                          onClick={() => handleDeleteDonation(entry)}
+                          disabled={deleteDonationMutation.isPending}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-rose-300 bg-rose-50 text-rose-700 transition hover:border-rose-400 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          title="Delete donation"
+                          aria-label="Delete donation"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      ) : null}
                     </div>
                   </td>
                 </tr>
@@ -1574,6 +1493,43 @@ const AdminDonationsPage = () => {
         </div>
       </Card>
 
+      {donationPendingDelete && canDeleteDonations ? (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/60 px-4 py-6" onClick={() => {
+          if (!deleteDonationMutation.isPending) setDonationPendingDelete(null);
+        }}>
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="delete-donation-title" onClick={(event) => event.stopPropagation()}>
+            {deleteDonationMutation.isPending ? (
+              <div className="flex min-h-44 flex-col items-center justify-center text-center" role="status" aria-live="polite">
+                <ArrowPathIcon className="h-9 w-9 animate-spin text-brand-blue" />
+                <h3 id="delete-donation-title" className="mt-4 font-heading text-lg font-semibold text-slate-900">Deleting Donation...</h3>
+                <p className="mt-2 text-sm text-slate-600">Updating the donor list and campaign raised total.</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 id="delete-donation-title" className="font-heading text-lg font-semibold text-slate-900">Delete Donation?</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      Delete the {formatCurrency(donationPendingDelete.amount)} donation from {donationPendingDelete.donorName || 'this donor'}? This will reduce the campaign raised total.
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-red-700">This action cannot be undone.</p>
+                  </div>
+                  <button type="button" onClick={() => setDonationPendingDelete(null)} className="rounded-full border border-slate-300 p-1.5 text-slate-600 hover:bg-slate-100" aria-label="Close delete donation prompt">
+                    <XMarkIcon className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="mt-5 flex justify-end gap-2 border-t border-slate-200 pt-4">
+                  <Button type="button" variant="ghost" onClick={() => setDonationPendingDelete(null)}>No</Button>
+                  <button type="button" onClick={confirmDeleteDonation} className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-800">
+                    Yes, Delete
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      ) : null}
+
       {createCampaignOpen ? (
         <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6" onClick={() => setCreateCampaignOpen(false)}>
           <div className="mx-auto flex min-h-full items-center justify-center">
@@ -1593,7 +1549,7 @@ const AdminDonationsPage = () => {
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-blue">Campaign Details</p>
                 <div className="mt-3 grid gap-4 sm:grid-cols-2">
                   <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Campaign Name
-                    <input {...form.register('name', { required: true })} className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-blue-100" />
+                    <input {...form.register('name', { required: true })} required className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-blue-100" />
                   </label>
                   <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Description
                     <textarea rows={3} {...form.register('description')} className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-blue-100" />
@@ -1605,7 +1561,7 @@ const AdminDonationsPage = () => {
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-blue">Funding Goal</p>
                 <div className="mt-3 grid gap-4 sm:grid-cols-2">
                   <label className="text-sm font-semibold text-slate-700">Target Amount (CAD)
-                    <input type="number" min="0" step="0.01" {...form.register('target', { required: true, valueAsNumber: true, min: 0 })} className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-blue-100" />
+                    <input type="number" min="0" step="0.01" {...form.register('target', { required: true, valueAsNumber: true, min: 0 })} required className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-blue-100" />
                   </label>
                   <label className="text-sm font-semibold text-slate-700">Starting Amount Raised (CAD)
                     <input type="number" min="0" step="0.01" {...form.register('raised', { valueAsNumber: true, min: 0 })} className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-blue-100" />
@@ -1687,7 +1643,7 @@ const AdminDonationsPage = () => {
                 onSubmit={cashDonationForm.handleSubmit((values) => addCashDonationMutation.mutate(values))}
               >
                 <label className="text-sm sm:col-span-2">Campaign
-                  <select {...cashDonationForm.register('campaignId', { required: true })} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue">
+                  <select {...cashDonationForm.register('campaignId', { required: true })} required className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue">
                     <option value="">Select campaign</option>
                     {activeCampaigns.map((campaign) => (
                       <option key={campaign.id} value={String(campaign.id)}>{campaign.name}</option>
@@ -1695,25 +1651,25 @@ const AdminDonationsPage = () => {
                   </select>
                 </label>
                 <label className="text-sm">Amount
-                  <input type="number" min="0" step="0.01" {...cashDonationForm.register('amount', { required: true, valueAsNumber: true, min: 0.01 })} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
+                  <input type="number" min="0" step="0.01" {...cashDonationForm.register('amount', { required: true, valueAsNumber: true, min: 0.01 })} required className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
                 </label>
                 <label className="text-sm">Gurdwara Receipt Number
-                  <input {...cashDonationForm.register('receiptId', { required: true })} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" placeholder="e.g. GRC-2026-0043" />
+                  <input {...cashDonationForm.register('receiptId', { required: true })} required className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" placeholder="e.g. GRC-2026-0043" />
                 </label>
                 <label className="text-sm">Date
-                  <input type="date" {...cashDonationForm.register('paidAt', { required: true })} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
+                  <input type="date" {...cashDonationForm.register('paidAt', { required: true })} required className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
                 </label>
                 <label className="text-sm">Payment Mode
                   <input value="Cash" disabled className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700" />
                 </label>
                 <label className="text-sm sm:col-span-2">Donor Name
-                  <input {...cashDonationForm.register('donorName', { required: true })} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
+                  <input {...cashDonationForm.register('donorName', { required: true })} required className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
                 </label>
                 <label className="text-sm">Donor Email (optional)
                   <input type="email" {...cashDonationForm.register('donorEmail')} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
                 </label>
                 <label className="text-sm">Donor Phone (optional)
-                  <input type="tel" {...cashDonationForm.register('donorPhone')} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
+                  <PhoneInput {...cashDonationForm.register('donorPhone', { validate: (value) => !value || isTenDigitPhone(value) || TEN_DIGIT_PHONE_ERROR })} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
                 </label>
                 {cashDonationError ? (
                   <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 sm:col-span-2" role="alert">
@@ -1887,7 +1843,7 @@ const AdminDonationsPage = () => {
             <form className="grid gap-3 px-4 py-4 sm:grid-cols-2 sm:px-6" onSubmit={editForm.handleSubmit((values) => updateMutation.mutate({ id: editingCampaign.id, values }))}>
               <StatusAlert type={uploadStatus.type} message={uploadStatus.message} />
               <label className="text-sm sm:col-span-2">Campaign Name
-                <input {...editForm.register('name', { required: true })} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
+                <input {...editForm.register('name', { required: true })} required className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
               </label>
               <label className="text-sm">Payment Provider
                 <select {...editForm.register('paymentProvider')} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue">
@@ -1900,7 +1856,7 @@ const AdminDonationsPage = () => {
                 <input type="number" min="0" step="0.01" disabled {...editForm.register('raised', { valueAsNumber: true, min: 0 })} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 shadow-sm" />
               </label>
               <label className="text-sm">Target
-                <input type="number" min="0" step="0.01" {...editForm.register('target', { required: true, valueAsNumber: true, min: 0 })} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
+                <input type="number" min="0" step="0.01" {...editForm.register('target', { required: true, valueAsNumber: true, min: 0 })} required className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
               </label>
               <label className="text-sm sm:col-span-2">Description
                 <textarea rows={2} {...editForm.register('description')} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />

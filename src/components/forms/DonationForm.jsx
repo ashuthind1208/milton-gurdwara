@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import Button from '../ui/Button';
+import PhoneInput from './PhoneInput';
+import { formatTenDigitPhone, isTenDigitPhone, TEN_DIGIT_PHONE_ERROR } from '../../utils/phone';
 
 const DonationForm = ({
   onSubmit,
@@ -16,7 +18,7 @@ const DonationForm = ({
     defaultValues: {
       donorName: user?.name || '',
       donorEmail: user?.email || '',
-      donorPhone: user?.phone || '',
+      donorPhone: formatTenDigitPhone(user?.phone),
       frequency: 'one-time',
       campaignId: preferredCampaignId || defaultCampaign?.id || '',
       amount: ''
@@ -61,6 +63,7 @@ const DonationForm = ({
                 <input
                   type="text"
                   {...register('donorName', { required: true })}
+                  required
                   placeholder="Enter your full name"
                   className="mt-1.5 h-10 w-full rounded-xl border border-slate-300 bg-white/95 px-3 py-2 text-sm font-bold shadow-sm"
                 />
@@ -70,16 +73,19 @@ const DonationForm = ({
                 <input
                   type="email"
                   {...register('donorEmail', { required: true })}
+                  required
                   placeholder="name@example.com"
                   className="mt-1.5 h-10 w-full rounded-xl border border-slate-300 bg-white/95 px-3 py-2 text-sm font-bold shadow-sm"
                 />
               </label>
               <label className="block text-sm font-semibold text-slate-700">
                 Phone
-                <input
-                  type="tel"
-                  {...register('donorPhone', { required: true })}
-                  placeholder="Phone number"
+                <PhoneInput
+                  {...register('donorPhone', {
+                    required: true,
+                    validate: (value) => isTenDigitPhone(value) || TEN_DIGIT_PHONE_ERROR
+                  })}
+                  required
                   className="mt-1.5 h-10 w-full rounded-xl border border-slate-300 bg-white/95 px-3 py-2 text-sm font-bold shadow-sm"
                 />
               </label>
@@ -118,8 +124,9 @@ const DonationForm = ({
                   type="number"
                   min="1"
                   step="0.01"
+                  required
                   placeholder="e.g. 25"
-                  className="mt-1 h-10 w-full rounded-xl border border-slate-300 bg-white/95 px-3 py-2 text-sm font-bold"
+                  required className="mt-1 h-10 w-full rounded-xl border border-slate-300 bg-white/95 px-3 py-2 text-sm font-bold"
                 />
               </label>
 
@@ -134,7 +141,7 @@ const DonationForm = ({
 
             <label className="text-sm font-semibold text-slate-700">
               Campaign
-              <select {...register('campaignId', { required: true })} className="mt-1 h-10 w-full rounded-xl border border-slate-300 bg-white/95 px-3 py-2 text-sm font-bold">
+              <select {...register('campaignId', { required: true })} required className="mt-1 h-10 w-full rounded-xl border border-slate-300 bg-white/95 px-3 py-2 text-sm font-bold">
                 {campaigns.map((campaign) => (
                   <option key={campaign.id} value={campaign.id}>{campaign.name}</option>
                 ))}

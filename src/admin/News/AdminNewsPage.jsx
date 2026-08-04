@@ -372,7 +372,7 @@ const AdminNewsPage = () => {
                 <StatusAlert type={uploadStatus.type} message={uploadStatus.message} />
               </div>
               <label className="text-sm md:col-span-2">Heading
-                <input {...createForm.register('heading', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <input {...createForm.register('heading', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
               <label className="text-sm md:col-span-2">Content
                 <div className="mt-1">
@@ -380,7 +380,7 @@ const AdminNewsPage = () => {
                 </div>
               </label>
               <label className="text-sm">Publishing Date
-                <input type="date" {...createForm.register('publishedAt', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <input type="date" {...createForm.register('publishedAt', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
               <label className="text-sm">Expiry Date
                 <input type="date" {...createForm.register('expiryDate')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
@@ -488,7 +488,7 @@ const AdminNewsPage = () => {
                 <StatusAlert type={uploadStatus.type} message={uploadStatus.message} />
               </div>
               <label className="text-sm md:col-span-2">Heading
-                <input {...editForm.register('heading', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <input {...editForm.register('heading', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
               <label className="text-sm md:col-span-2">Content
                 <div className="mt-1">
@@ -496,7 +496,7 @@ const AdminNewsPage = () => {
                 </div>
               </label>
               <label className="text-sm">Publishing Date
-                <input type="date" {...editForm.register('publishedAt', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <input type="date" {...editForm.register('publishedAt', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
               <label className="text-sm">Expiry Date
                 <input type="date" {...editForm.register('expiryDate')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />

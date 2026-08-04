@@ -43,7 +43,8 @@ import uploadService from '../../services/uploadService';
 import userService from '../../services/userService';
 import addressLookupService from '../../services/addressLookupService';
 import { useAuth } from '../../context/AuthContext';
-import { formatTenDigitPhone, isTenDigitPhone } from '../../utils/phone';
+import { formatTenDigitPhone, isTenDigitPhone, TEN_DIGIT_PHONE_ERROR } from '../../utils/phone';
+import PhoneInput from '../forms/PhoneInput';
 import StreamingModal from '../common/StreamingModal';
 import AudioPillPlayer from '../common/AudioPillPlayer';
 import GlobalSearchBar from '../common/GlobalSearchBar';
@@ -62,8 +63,8 @@ const streamGlyphClass = 'h-6 w-6';
 const NANAKSHAHI_WEEKDAY_LABELS_PA = ['ਐ', 'ਸੋ', 'ਮੰ', 'ਬੁੱ', 'ਵੀ', 'ਸ਼ੁੱ', 'ਸ਼ੱ'];
 const CALENDAR_NAV_DAY_MS = 24 * 60 * 60 * 1000;
 const PDF_HEADER_BG = [0, 64, 129];
-const COMPACT_ENTER_SCROLL_Y = 72;
-const COMPACT_EXIT_SCROLL_Y = 36;
+const COMPACT_ENTER_SCROLL_Y = 220;
+const COMPACT_EXIT_SCROLL_Y = 48;
 const COMPACT_TOGGLE_COOLDOWN_MS = 220;
 const PDF_HOLIDAY_PILL_PALETTE = [
   { bg: [220, 252, 231], text: [22, 101, 52] },
@@ -998,7 +999,7 @@ const Navbar = () => {
     setProfileImageUploadProgress(0);
     setProfileForm({
       name: String(user?.name || ''),
-      phone: String(user?.phone || ''),
+      phone: formatTenDigitPhone(user?.phone),
       address: String(user?.address || ''),
       avatarUrl: String(user?.avatarUrl || user?.picture || user?.photoURL || '')
     });
@@ -1041,6 +1042,11 @@ const Navbar = () => {
 
     if (!nextName || !nextPhone) {
       setProfileError('Name and phone are required.');
+      return;
+    }
+
+    if (!isTenDigitPhone(nextPhone)) {
+      setProfileError(TEN_DIGIT_PHONE_ERROR);
       return;
     }
 
@@ -1255,7 +1261,7 @@ const Navbar = () => {
     }
 
     if (!isTenDigitPhone(payload.phone)) {
-      setMembershipFormError('Enter a 10-digit phone number in the format (###)-###-####.');
+      setMembershipFormError(TEN_DIGIT_PHONE_ERROR);
       return;
     }
 
@@ -2218,7 +2224,6 @@ const Navbar = () => {
             >
               <button
                 type="button"
-                onClick={() => setDateInfoOpen(true)}
                 onMouseEnter={() => {
                   if (profilePopoverCloseTimeoutRef.current) {
                     window.clearTimeout(profilePopoverCloseTimeoutRef.current);
@@ -2644,9 +2649,14 @@ const Navbar = () => {
         </div>
       </div>
 
-      {!isCompact ? (
-        <div className="hidden border-b-2 border-brand-blue/45 bg-slate-900/92 pb-5 pt-1 xl:block">
-        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 md:px-6">
+      <div
+        className={`hidden transition-[grid-template-rows,opacity] duration-300 ease-in-out xl:grid ${isCompact ? 'pointer-events-none grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'}`}
+        aria-hidden={isCompact}
+        inert={isCompact}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className="border-b-2 border-brand-blue/45 bg-slate-900/92 pb-5 pt-1">
+            <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 md:px-6">
               {miltonPrimaryStream ? (
                 <div className="flex justify-center pt-0.5 pb-3">
                   <button
@@ -2682,9 +2692,10 @@ const Navbar = () => {
               })
             : null}
               </div>
+            </div>
+          </div>
         </div>
-        </div>
-      ) : null}
+      </div>
 
       {compactStreamsOpen ? createPortal(
         <div className="fixed inset-0 z-[220] overflow-y-auto bg-slate-950/60 px-4 py-6" onClick={() => {
@@ -3039,12 +3050,7 @@ const Navbar = () => {
                   <h4 className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-600">Personal Details</h4>
                   <div className="h-px w-full bg-slate-200" />
                   <label className="block text-sm font-semibold text-slate-700">Phone
-                    <input
-                      type="tel"
-                      inputMode="numeric"
-                      autoComplete="tel"
-                      maxLength={14}
-                      placeholder="(905)-123-4567"
+                    <PhoneInput
                       value={membershipForm.phone}
                       onChange={handleMembershipPhoneChange}
                       required
@@ -3220,7 +3226,7 @@ const Navbar = () => {
               </label>
               <label className="block text-sm font-semibold text-slate-700">
                 Phone
-                <input value={profileForm.phone} onChange={handleProfileFormChange('phone')} required className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-extrabold text-slate-900" />
+                <PhoneInput value={profileForm.phone} onChange={handleProfileFormChange('phone')} required className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-extrabold text-slate-900" />
               </label>
               <label className="block text-sm font-semibold text-slate-700">
                 Address (optional)

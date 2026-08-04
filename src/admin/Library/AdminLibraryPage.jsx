@@ -9,6 +9,8 @@ import uploadService from '../../services/uploadService';
 import { getYouTubeEmbedUrl, getYouTubeThumbnail } from '../../services/videoService';
 import { siteConfig } from '../../constants/siteConfig';
 import { downloadRegistrationCsv, downloadRegistrationPdf } from '../../utils/csvExport';
+import PhoneInput from '../../components/forms/PhoneInput';
+import { isTenDigitPhone, TEN_DIGIT_PHONE_ERROR } from '../../utils/phone';
 
 const actionIconClass = 'h-4 w-4';
 const PAGE_SIZE = 10;
@@ -1184,7 +1186,7 @@ const AdminLibraryPage = () => {
                 {isbnStatus ? <p className="mt-1 text-[11px] text-slate-500">{isbnStatus}</p> : null}
               </label>
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Book Title
-                <input {...physicalForm.register('title', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
+                <input {...physicalForm.register('title', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
               </label>
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Author
                 <input {...physicalForm.register('author')} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
@@ -1226,7 +1228,7 @@ const AdminLibraryPage = () => {
             </div>
             <form className="mt-4 grid gap-2.5 md:grid-cols-2" onSubmit={digitalForm.handleSubmit(onSubmitDigital)}>
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Resource Title
-                <input {...digitalForm.register('title', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
+                <input {...digitalForm.register('title', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
               </label>
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Type
                 <select {...digitalForm.register('fileType')} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm">
@@ -1241,7 +1243,7 @@ const AdminLibraryPage = () => {
                 <textarea rows={2} {...digitalForm.register('description')} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
               </label>
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 md:col-span-2">Download Link
-                <input {...digitalForm.register('downloadUrl', { required: true })} placeholder="https://example.com/file.pdf" className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
+                <input {...digitalForm.register('downloadUrl', { required: true })} placeholder="https://example.com/file.pdf" required className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
               </label>
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 md:col-span-2">Cover Image Link
                 <input {...digitalForm.register('coverImageUrl')} placeholder="https://example.com/cover.jpg" className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
@@ -1302,7 +1304,7 @@ const AdminLibraryPage = () => {
                 <h4 className="text-xs font-bold uppercase tracking-wider text-brand-blue">Session Details</h4>
                 <div className="mt-2 grid gap-3">
                   <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">Title
-                    <input disabled={programModal.mode === 'view'} {...programForm.register('title', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" />
+                    <input disabled={programModal.mode === 'view'} {...programForm.register('title', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" />
                   </label>
                   <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">Audience
                     <select
@@ -1433,16 +1435,16 @@ const AdminLibraryPage = () => {
                 </select>
               </label>
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Issuer Name
-                <input {...issueForm.register('issuerName', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" disabled={availableCopyNumbers.length === 0} />
+                <input {...issueForm.register('issuerName', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" disabled={availableCopyNumbers.length === 0} />
               </label>
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Phone
-                <input {...issueForm.register('issuerPhone')} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" disabled={availableCopyNumbers.length === 0} />
+                <PhoneInput {...issueForm.register('issuerPhone', { validate: (value) => !value || isTenDigitPhone(value) || TEN_DIGIT_PHONE_ERROR })} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" disabled={availableCopyNumbers.length === 0} />
               </label>
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Issue Date
-                <input type="date" {...issueForm.register('issueDate', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" disabled={availableCopyNumbers.length === 0} />
+                <input type="date" {...issueForm.register('issueDate', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" disabled={availableCopyNumbers.length === 0} />
               </label>
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Return Date
-                <input type="date" {...issueForm.register('returnDate', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" disabled={availableCopyNumbers.length === 0} />
+                <input type="date" {...issueForm.register('returnDate', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" disabled={availableCopyNumbers.length === 0} />
               </label>
 
               <div className="md:col-span-5">
@@ -1667,10 +1669,10 @@ const AdminLibraryPage = () => {
                   </select>
                 </label>
                 <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Title
-                  <input {...mediaForm.register('title', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
+                  <input {...mediaForm.register('title', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
                 </label>
                 <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 md:col-span-2">URL
-                  <input {...mediaForm.register('url', { required: true })} placeholder="https://www.youtube.com/watch?v=..." className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
+                  <input {...mediaForm.register('url', { required: true })} placeholder="https://www.youtube.com/watch?v=..." required className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
                 </label>
                 <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 md:col-span-2">Thumbnail Image URL (optional)
                   <input {...mediaForm.register('thumbnailUrl')} placeholder="Leave blank to auto-fetch from YouTube" className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />

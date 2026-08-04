@@ -648,6 +648,11 @@ const ensureEventsSchema = async () => {
   `);
 
   await pool.query(`
+    ALTER TABLE donations
+    ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+  `);
+
+  await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_donations_campaign_id ON donations(campaign_id);
   `);
 
@@ -2153,19 +2158,52 @@ const parseJsonArrayField = (value) => {
   return [];
 };
 
+const CAMPAIGN_PROGRESS_STATUSES = new Set([
+  'draft',
+  'planned',
+  'started',
+  'in-progress',
+  'under-development',
+  'awaiting-materials',
+  'awaiting-approval',
+  'on-hold',
+  'delayed',
+  'completed',
+  'cancelled',
+  'archived'
+]);
+
+const normalizeCampaignProgressStatus = (value, isActive = true) => {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, '-');
+
+  if (CAMPAIGN_PROGRESS_STATUSES.has(normalized)) {
+    return normalized;
+  }
+
+  return isActive === false ? 'archived' : 'started';
+};
+
 const normalizeCampaignProgressItems = (value = []) => {
   return parseJsonArrayField(value)
-    .map((item, index) => ({
-      id: String(item?.id || `progress-${Date.now()}-${index}`),
-      title: String(item?.title || '').trim(),
-      description: String(item?.description || '').trim(),
-      details: String(item?.details || '').trim(),
-      date: String(item?.date || '').trim(),
-      isActive: item?.isActive !== false,
-      photos: parseJsonArrayField(item?.photos)
-        .map((photo) => String(photo || '').trim())
-        .filter(Boolean)
-    }))
+    .map((item, index) => {
+      const status = normalizeCampaignProgressStatus(item?.status, item?.isActive);
+
+      return {
+        id: String(item?.id || `progress-${Date.now()}-${index}`),
+        title: String(item?.title || '').trim(),
+        description: String(item?.description || '').trim(),
+        details: String(item?.details || '').trim(),
+        date: String(item?.date || '').trim(),
+        status,
+        isActive: status !== 'draft' && status !== 'archived',
+        photos: parseJsonArrayField(item?.photos)
+          .map((photo) => String(photo || '').trim())
+          .filter(Boolean)
+      };
+    })
     .filter((item) => item.title);
 };
 
@@ -2414,6 +2452,7 @@ const getDonations = async () => {
            frequency, payment_provider, payment_status, gateway_transaction_id, stripe_session_id, stripe_event_id,
            email_sent, source, created_at, updated_at
     FROM donations
+    WHERE deleted_at IS NULL
     ORDER BY created_at DESC;
     `
   );
@@ -2503,6 +2542,61 @@ const upsertDonation = async (record = {}) => {
   return mapDonationRow(result.rows[0]);
 };
 
+const removeDonation = async (id) => {
+  if (!pool) {
+    throw new Error('Database is not configured.');
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const removedResult = await client.query(
+      `
+      UPDATE donations
+      SET deleted_at = NOW(), updated_at = NOW()
+      WHERE id = $1 AND deleted_at IS NULL
+      RETURNING id, receipt_id, source_pending_id, campaign_id, campaign_name, donor_name, donor_email, donor_phone, amount,
+                frequency, payment_provider, payment_status, gateway_transaction_id, stripe_session_id, stripe_event_id,
+                email_sent, source, created_at, updated_at;
+      `,
+      [String(id || '')]
+    );
+
+    if (removedResult.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+
+    const removed = mapDonationRow(removedResult.rows[0]);
+    await client.query(
+      `
+      UPDATE donation_campaigns AS campaign
+      SET raised = GREATEST(0, COALESCE((
+        SELECT SUM(donation.amount)
+        FROM donations AS donation
+        WHERE donation.deleted_at IS NULL
+          AND (
+            donation.campaign_id = campaign.id
+            OR (donation.campaign_id IS NULL AND LOWER(donation.campaign_name) = LOWER(campaign.name))
+          )
+      ), 0)),
+      updated_at = NOW()
+      WHERE campaign.id = $1
+         OR ($1 IS NULL AND LOWER(campaign.name) = LOWER($2));
+      `,
+      [removed.campaignId, removed.campaignName]
+    );
+
+    await client.query('COMMIT');
+    return removed;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
 const summarizeDonationsByCampaign = async () => {
   if (!pool) {
     throw new Error('Database is not configured.');
@@ -2512,6 +2606,7 @@ const summarizeDonationsByCampaign = async () => {
     `
     SELECT campaign_id, LOWER(campaign_name) AS campaign_name_key, SUM(amount)::numeric AS total_amount
     FROM donations
+    WHERE deleted_at IS NULL
     GROUP BY campaign_id, LOWER(campaign_name);
     `
   );
@@ -3223,6 +3318,7 @@ module.exports = {
   removeDonationCampaign,
   getDonations,
   upsertDonation,
+  removeDonation,
   summarizeDonationsByCampaign,
   getPendingDonations,
   createPendingDonation,

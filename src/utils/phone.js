@@ -1,5 +1,9 @@
 export const getPhoneDigits = (value) => String(value || '').replace(/\D/g, '').slice(0, 10);
 
+export const TEN_DIGIT_PHONE_PATTERN = '\\(\\d{3}\\)-\\d{3}-\\d{4}';
+export const TEN_DIGIT_PHONE_PLACEHOLDER = '(905)-123-4567';
+export const TEN_DIGIT_PHONE_ERROR = 'Enter exactly 10 numbers in the format (905)-123-4567.';
+
 export const formatTenDigitPhone = (value) => {
   const digits = getPhoneDigits(value);
   if (!digits) {

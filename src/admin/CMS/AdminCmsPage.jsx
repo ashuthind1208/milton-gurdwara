@@ -7,6 +7,8 @@ import Button from '../../components/ui/Button';
 import cmsService from '../../services/cmsService';
 import uploadService from '../../services/uploadService';
 import StatusAlert from '../../components/common/StatusAlert';
+import PhoneInput from '../../components/forms/PhoneInput';
+import { isTenDigitPhone, TEN_DIGIT_PHONE_ERROR } from '../../utils/phone';
 
 const emptySlide = {
   image: '',
@@ -378,7 +380,7 @@ const AdminCmsPage = () => {
             {selectedPage === 'contact' ? (
               <>
                 <label className="text-sm">Phone
-                  <input {...pageForm.register('phone')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                  <PhoneInput {...pageForm.register('phone', { validate: (value) => !value || isTenDigitPhone(value) || TEN_DIGIT_PHONE_ERROR })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
                 </label>
                 <label className="text-sm">Email
                   <input {...pageForm.register('email')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />

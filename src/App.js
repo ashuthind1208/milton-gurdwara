@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import AppRoutes from './routes/AppRoutes';
 import DeleteConfirmationGuard from './components/common/DeleteConfirmationGuard';
+import FormValidationGuard from './components/common/FormValidationGuard';
 
 function App() {
   useEffect(() => {
@@ -46,6 +47,7 @@ function App() {
   return (
     <>
       <AppRoutes />
+      <FormValidationGuard />
       <DeleteConfirmationGuard />
     </>
   );

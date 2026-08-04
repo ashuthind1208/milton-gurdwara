@@ -186,6 +186,7 @@ const darbarSahibStreamSource = String(process.env.DARBAR_SAHIB_STREAM_PROXY_TAR
 const darbarSahibHlsDir = path.join(process.env.TMPDIR || dataDir, 'singhsabha-darbar-hls');
 const darbarSahibHlsPlaylistPath = path.join(darbarSahibHlsDir, 'stream.m3u8');
 let darbarSahibHlsProcess = null;
+let darbarSahibHlsStartedAt = 0;
 const adOrganicViewCooldownMs = Number(process.env.AD_ORGANIC_VIEW_COOLDOWN_MS || (24 * 60 * 60 * 1000));
 
 const resolveClientIp = (request) => {
@@ -867,6 +868,20 @@ const readStringField = (payload, key, options = {}) => {
   return options.toLowerCase === true ? normalized.toLowerCase() : normalized;
 };
 
+const readPhoneField = (payload, key, options = {}) => {
+  const value = readStringField(payload, key, { required: options.required === true, max: 40 });
+  if (!value) {
+    return '';
+  }
+
+  assertInput(/^[0-9()\-\s]+$/.test(value), `${key} may contain numbers only.`);
+  const digits = value.replace(/\D/g, '');
+  assertInput(digits.length === 10, `${key} must contain exactly 10 numbers in the format (905)-123-4567.`);
+  const normalized = `(${digits.slice(0, 3)})-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  payload[key] = normalized;
+  return normalized;
+};
+
 const readNumberField = (payload, key, options = {}) => {
   const value = payload?.[key];
   const required = options.required === true;
@@ -1324,7 +1339,22 @@ if (typeof rateLimitPruneTimer?.unref === 'function') {
 
 const startDarbarSahibHls = () => {
   if (darbarSahibHlsProcess && darbarSahibHlsProcess.exitCode == null) {
-    return;
+    const now = Date.now();
+    let playlistUpdatedAt = 0;
+    try {
+      playlistUpdatedAt = fs.statSync(darbarSahibHlsPlaylistPath).mtimeMs;
+    } catch {
+      // A new transcoder needs time to create its first playlist.
+    }
+
+    const processIsStarting = now - darbarSahibHlsStartedAt < 15 * 1000;
+    const playlistIsCurrent = playlistUpdatedAt > 0 && now - playlistUpdatedAt < 15 * 1000;
+    if (processIsStarting || playlistIsCurrent) {
+      return;
+    }
+
+    darbarSahibHlsProcess.kill('SIGTERM');
+    darbarSahibHlsProcess = null;
   }
 
   fs.rmSync(darbarSahibHlsDir, { recursive: true, force: true });
@@ -1353,6 +1383,7 @@ const startDarbarSahibHls = () => {
     darbarSahibHlsPlaylistPath
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
   darbarSahibHlsProcess = processHandle;
+  darbarSahibHlsStartedAt = Date.now();
   let errorOutput = '';
 
   processHandle.stderr.on('data', (chunk) => {
@@ -1363,6 +1394,7 @@ const startDarbarSahibHls = () => {
   processHandle.once('close', (code, signal) => {
     if (darbarSahibHlsProcess === processHandle) {
       darbarSahibHlsProcess = null;
+      darbarSahibHlsStartedAt = 0;
     }
     if (code !== 0 && signal !== 'SIGTERM') {
       console.error('Darbar Sahib HLS transcoder failed:', errorOutput.trim() || `exit code ${code}`);
@@ -1390,6 +1422,7 @@ const stopDarbarSahibHls = () => {
     darbarSahibHlsProcess.kill('SIGTERM');
   }
   darbarSahibHlsProcess = null;
+  darbarSahibHlsStartedAt = 0;
 };
 
 process.once('exit', stopDarbarSahibHls);
@@ -1609,6 +1642,11 @@ const getRequestActor = (request) => {
   const role = String(request.headers['x-actor-role'] || '').trim();
   const name = String(request.headers['x-actor-name'] || '').trim();
   return { email, role, name };
+};
+
+const canManageDonations = (request) => {
+  const role = String(getRequestActor(request).role || '').trim().toLowerCase();
+  return role === 'admin' || role === 'super admin';
 };
 
 const appendAuditLog = async (request, details = {}) => {
@@ -3203,6 +3241,10 @@ const upsertDonation = async (record) => {
   return eventsDb.upsertDonation(record);
 };
 
+const removeDonation = async (id) => {
+  return eventsDb.removeDonation(id);
+};
+
 const getDonationCampaigns = async () => {
   return eventsDb.getDonationCampaigns();
 };
@@ -4021,7 +4063,7 @@ const server = http.createServer(async (request, response) => {
 
       const name = readStringField(payload, 'name', { required: true, min: 2, max: 140 });
       const senderEmail = readEmailField(payload, 'email', { required: true });
-      const phone = readStringField(payload, 'phone', { max: 40 });
+      const phone = readPhoneField(payload, 'phone');
       const message = readStringField(payload, 'message', { required: true, min: 8, max: 5000 });
       const subject = readStringField(payload, 'subject', { max: 200 }) || `Contact Us Inquiry from ${name}`;
       const requestedRecipient = readStringField(payload, 'to', { max: 254, toLowerCase: true });
@@ -4871,11 +4913,8 @@ const server = http.createServer(async (request, response) => {
       const eventId = readStringField(body, 'eventId', { required: true, max: 12, pattern: /^\d{1,12}$/ });
       const name = readStringField(body, 'name', { required: true, min: 2, max: 120 });
       const email = readEmailField(body, 'email', { required: false });
-      const contact = readStringField(body, 'contact', { max: 40 });
+      const contact = readPhoneField(body, 'contact');
       assertInput(Boolean(email || contact), 'Either email or contact is required.');
-      if (contact) {
-        assertInput(/^[0-9+()\-\s]{7,40}$/.test(contact), 'contact has an invalid format.');
-      }
       readStringField(body, 'status', { max: 40 });
       readStringField(body, 'notes', { max: 1000 });
       const wantsEventEmails = readBooleanField(body, 'wantsEventEmails');
@@ -5426,7 +5465,7 @@ const server = http.createServer(async (request, response) => {
       }
       readBooleanField(body, 'emailSent');
       readStringField(body, 'source', { max: 80 });
-      readStringField(body, 'phone', { max: 40 });
+      readPhoneField(body, 'phone');
       readStringField(body, 'address', { max: 240 });
       readStringField(body, 'donationPurpose', { max: 240 });
       readStringField(body, 'notes', { max: 1000 });
@@ -5457,7 +5496,7 @@ const server = http.createServer(async (request, response) => {
       readStringField(body, 'campaignDescription', { max: 500 });
       readStringField(body, 'organizationName', { max: 180 });
       readStringField(body, 'address', { max: 300 });
-      readStringField(body, 'phone', { max: 40 });
+      readPhoneField(body, 'phone');
       readStringField(body, 'fileName', { max: 180, pattern: /^[A-Za-z0-9._-]+$/ });
       readStringField(body, 'attachmentBase64', { required: true, max: maxUploadBytes * 3 });
       const data = await sendDonationInvoiceEmail(body || {});
@@ -5467,6 +5506,38 @@ const server = http.createServer(async (request, response) => {
         ok: false,
         message: error.message || 'Unable to send donation invoice email.'
       });
+    }
+    return;
+  }
+
+  const donationIdMatch = requestUrl.pathname.match(/^\/api\/donations\/([^/]+)$/);
+  if (donationIdMatch && request.method === 'DELETE') {
+    if (!canManageDonations(request)) {
+      sendJson(response, 403, { ok: false, message: 'Only Admin and Super Admin can delete donations.' });
+      return;
+    }
+
+    try {
+      const id = parseStringPathId(decodeURIComponent(donationIdMatch[1]), 'donation id');
+      const data = await removeDonation(id);
+      if (!data) {
+        sendJson(response, 404, { ok: false, message: 'Donation not found.' });
+        return;
+      }
+      await appendAuditLog(request, {
+        action: 'donation.delete',
+        targetType: 'donation',
+        targetId: String(id),
+        description: `Deleted donation ${String(data.receiptId || id)}`,
+        payload: {
+          campaignId: data.campaignId,
+          campaignName: data.campaignName,
+          amount: data.amount
+        }
+      });
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to delete donation.' });
     }
     return;
   }
@@ -5794,7 +5865,7 @@ const server = http.createServer(async (request, response) => {
       readStringField(body, 'name', { max: 140 });
       readStringField(body, 'role', { max: 40 });
       readEmailField(body, 'email', { required: true });
-      readStringField(body, 'phone', { max: 40 });
+      readPhoneField(body, 'phone');
       readStringField(body, 'address', { max: 240 });
       readStringField(body, 'memberType', { max: 40 });
       readStringField(body, 'authProvider', { max: 40 });
@@ -5828,7 +5899,7 @@ const server = http.createServer(async (request, response) => {
       ensureNoUnknownKeys(body, ['email', 'name', 'phone', 'address', 'role', 'memberType', 'avatarUrl']);
       readEmailField(body, 'email', { required: true });
       readStringField(body, 'name', { min: 2, max: 140 });
-      readStringField(body, 'phone', { max: 40 });
+      readPhoneField(body, 'phone');
       readStringField(body, 'address', { max: 240 });
       readStringField(body, 'role', { max: 40 });
       readStringField(body, 'memberType', { max: 40 });
@@ -5852,7 +5923,7 @@ const server = http.createServer(async (request, response) => {
       readStringField(body, 'name', { required: true, min: 2, max: 140 });
       readStringField(body, 'role', { max: 40 });
       readEmailField(body, 'email', { required: true });
-      readStringField(body, 'phone', { max: 40 });
+      readPhoneField(body, 'phone');
       readStringField(body, 'address', { max: 240 });
       readStringField(body, 'memberType', { max: 40 });
       readStringField(body, 'authProvider', { max: 40 });
@@ -5928,7 +5999,7 @@ const server = http.createServer(async (request, response) => {
       readStringField(body, 'name', { min: 2, max: 140 });
       readStringField(body, 'role', { max: 40 });
       readEmailField(body, 'email', { required: false });
-      readStringField(body, 'phone', { max: 40 });
+      readPhoneField(body, 'phone');
       readStringField(body, 'address', { max: 240 });
       readStringField(body, 'memberType', { max: 40 });
       readStringField(body, 'authProvider', { max: 40 });

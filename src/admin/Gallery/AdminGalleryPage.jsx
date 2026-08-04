@@ -120,7 +120,7 @@ const AdminGalleryPage = () => {
             </div>
             <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={createForm.handleSubmit((values) => createMutation.mutate(values))}>
               <label className="text-sm">Title
-                <input {...createForm.register('title', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <input {...createForm.register('title', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
               <label className="text-sm">Date
                 <input type="date" {...createForm.register('eventDate')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
@@ -162,7 +162,7 @@ const AdminGalleryPage = () => {
 
             <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={editForm.handleSubmit((values) => updateMutation.mutate({ id: editingAlbum.id, values }))}>
                 <label className="text-sm">Title
-                  <input {...editForm.register('title', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                  <input {...editForm.register('title', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
                 </label>
                 <label className="text-sm">Date
                   <input type="date" {...editForm.register('eventDate')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />

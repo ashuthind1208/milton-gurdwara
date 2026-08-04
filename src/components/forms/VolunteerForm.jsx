@@ -1,6 +1,8 @@
 import { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import Button from '../ui/Button';
+import PhoneInput from './PhoneInput';
+import { formatTenDigitPhone, isTenDigitPhone, TEN_DIGIT_PHONE_ERROR } from '../../utils/phone';
 
 const getDefaultOpportunityId = (options = []) => options.find((option) => option?.disabled !== true)?.id || options[0]?.id || '';
 
@@ -19,7 +21,7 @@ const VolunteerForm = ({
   const defaultValues = useMemo(() => ({
     name: String(initialValues?.name || ''),
     email: String(initialValues?.email || ''),
-    phone: String(initialValues?.phone || ''),
+    phone: formatTenDigitPhone(initialValues?.phone),
     contactPreference: 'Email',
     wantsEventEmails: true,
     opportunityId: lockedOpportunityId || getDefaultOpportunityId(options)
@@ -79,6 +81,7 @@ const VolunteerForm = ({
                 <input
                   type="text"
                   {...register('name', { required: true })}
+                  required
                   placeholder="Enter your full name"
                   className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-sm"
                 />
@@ -88,16 +91,15 @@ const VolunteerForm = ({
                 <input
                   type="email"
                   {...register('email', { required: true })}
+                  required
                   placeholder="name@example.com"
                   className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-sm"
                 />
               </label>
               <label className="block text-sm font-medium">
                 Phone (optional)
-                <input
-                  type="tel"
-                  {...register('phone')}
-                  placeholder="Phone number"
+                <PhoneInput
+                  {...register('phone', { validate: (value) => !value || isTenDigitPhone(value) || TEN_DIGIT_PHONE_ERROR })}
                   className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-sm"
                 />
               </label>
@@ -132,7 +134,7 @@ const VolunteerForm = ({
             ) : (
               <label className="block text-sm font-medium">
                 Seva Opportunity
-                <select {...register('opportunityId', { required: true })} disabled={disableSubmit || options.length === 0} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-900">
+                <select {...register('opportunityId', { required: true })} required disabled={disableSubmit || options.length === 0} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-900">
                   {options.length === 0 ? <option value="">No open seva opportunities</option> : options.map((option) => <option key={option.id} value={option.id} disabled={Boolean(option.disabled)}>{option.label}</option>)}
                 </select>
               </label>

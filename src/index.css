@@ -31,6 +31,14 @@
     font-family: 'Crimson Text', serif;
   }
 
+  .form-validation-attempted input:not([type='hidden']):invalid,
+  .form-validation-attempted select:invalid,
+  .form-validation-attempted textarea:invalid,
+  [data-validation-error='true'] {
+    border-color: #dc2626 !important;
+    box-shadow: 0 0 0 1px #dc2626 !important;
+  }
+
   .font-gurmukhi {
     font-family: 'Noto Sans Gurmukhi', sans-serif;
   }

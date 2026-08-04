@@ -802,7 +802,7 @@ const AdminSchedulePage = () => {
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Content</p>
                 <div className="mt-3 grid gap-3">
                   <label className="text-sm">Content (English)
-                    <textarea {...form.register('titleEn', { required: true })} rows={3} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                    <textarea {...form.register('titleEn', { required: true })} rows={3} required className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
                   </label>
                   <label className="text-sm">Content (Punjabi)
                     <textarea {...form.register('titlePa')} rows={3} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm" />

@@ -291,11 +291,11 @@ const AdminVideosPage = () => {
                 })}
               >
                 <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 md:col-span-2">Video URL (YouTube or Facebook)
-                  <input {...form.register('videoUrl', { required: true })} placeholder="https://www.youtube.com/watch?v=... or Facebook link" className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
+                  <input {...form.register('videoUrl', { required: true })} placeholder="https://www.youtube.com/watch?v=... or Facebook link" required className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
                   <p className="mt-0.5 text-[11px] text-slate-500">YouTube: auto-embeds on site. Facebook: shows Watch button (Facebook restricts cross-site embeds).</p>
                 </label>
                 <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 md:col-span-2">Title
-                  <input {...form.register('title', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
+                  <input {...form.register('title', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" />
                 </label>
                 <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Category
                   <select {...form.register('category')} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm">

@@ -493,8 +493,12 @@ CREATE TABLE IF NOT EXISTS donations (
       source TEXT NOT NULL DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      deleted_at TIMESTAMPTZ,
       CONSTRAINT uq_donations_receipt_id UNIQUE (receipt_id)
     );
+
+ALTER TABLE donations
+  ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_donations_campaign_id ON donations(campaign_id);
 

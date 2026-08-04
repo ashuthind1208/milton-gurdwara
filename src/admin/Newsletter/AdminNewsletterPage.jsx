@@ -1038,7 +1038,7 @@ const AdminNewsletterPage = () => {
 
                   <div className="grid gap-3">
                     <label className="text-sm font-semibold text-slate-700">Week
-                      <select {...campaignForm.register('weekRange', { required: true })} className="mt-1 h-9 w-full rounded-xl border border-slate-300 px-3 text-sm">
+                      <select {...campaignForm.register('weekRange', { required: true })} required className="mt-1 h-9 w-full rounded-xl border border-slate-300 px-3 text-sm">
                         <option value="">Select week range</option>
                         {weekOptions.map((week) => (
                           <option key={week.value} value={week.value}>{week.label}</option>
@@ -1058,7 +1058,7 @@ const AdminNewsletterPage = () => {
                 <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
                   <div className="grid gap-3">
                     <label className="text-sm font-semibold text-slate-700">Topic
-                      <select {...campaignForm.register('topic', { required: true })} className="mt-1 h-9 w-full rounded-xl border border-slate-300 px-3 text-sm">
+                      <select {...campaignForm.register('topic', { required: true })} required className="mt-1 h-9 w-full rounded-xl border border-slate-300 px-3 text-sm">
                         <option value="">Select topic</option>
                         {topicOptions.map((topic) => (
                           <option key={topic} value={topic}>{topic} ({topicSubscriberCounts.get(normalizeTopicLabel(topic)) || 0})</option>
@@ -1068,11 +1068,11 @@ const AdminNewsletterPage = () => {
                     </label>
                     {selectedTopic === CUSTOM_TOPIC_VALUE ? (
                       <label className="text-sm font-semibold text-slate-700">Custom Topic
-                        <input {...campaignForm.register('customTopic', { required: true })} placeholder="Enter new topic" className="mt-1 h-9 w-full rounded-xl border border-slate-300 px-3 text-sm" />
+                        <input {...campaignForm.register('customTopic', { required: true })} placeholder="Enter new topic" required className="mt-1 h-9 w-full rounded-xl border border-slate-300 px-3 text-sm" />
                       </label>
                     ) : null}
                     <label className="text-sm font-semibold text-slate-700">Title
-                      <input {...campaignForm.register('title', { required: true })} className="mt-1 h-9 w-full rounded-xl border border-slate-300 px-3 text-sm" />
+                      <input {...campaignForm.register('title', { required: true })} required className="mt-1 h-9 w-full rounded-xl border border-slate-300 px-3 text-sm" />
                     </label>
                   </div>
 

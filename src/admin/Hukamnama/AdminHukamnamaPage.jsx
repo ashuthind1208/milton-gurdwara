@@ -234,10 +234,10 @@ const AdminHukamnamaPage = () => {
             <form className="mt-4 grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]" onSubmit={handleSubmitHukamnama}>
               <div className="space-y-3">
                 <label className="text-sm">Date
-                  <input type="date" {...form.register('date', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                  <input type="date" {...form.register('date', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
                 </label>
                 <label className="text-sm">Ang
-                  <input type="number" min="1" max="1430" {...form.register('ang', { required: true, valueAsNumber: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                  <input type="number" min="1" max="1430" {...form.register('ang', { required: true, valueAsNumber: true })} required className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
                 </label>
                 {(form.formState.errors?.date || form.formState.errors?.ang) ? (
                   <p className="rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-700">Date and Ang are required.</p>

@@ -167,7 +167,7 @@ const NewsletterSignupPage = () => {
                       <input
                         {...form.register('name', { required: true })}
                         readOnly={isAuthenticated}
-                        className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5"
+                        required className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5"
                       />
                     </label>
                     <label className="text-sm font-semibold text-slate-700">Email
@@ -175,7 +175,7 @@ const NewsletterSignupPage = () => {
                         type="email"
                         {...form.register('email', { required: true })}
                         readOnly={isAuthenticated}
-                        className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5"
+                        required className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5"
                       />
                     </label>
                     <div ref={topicDropdownRef} className="text-sm font-semibold text-slate-700 md:col-span-2">

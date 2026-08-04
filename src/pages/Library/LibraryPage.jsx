@@ -33,6 +33,8 @@ import kidsQuizBankService from '../../services/kidsQuizBankService';
 import { getYouTubeEmbedUrl, getYouTubeThumbnail } from '../../services/videoService';
 import Button from '../../components/ui/Button';
 import { useAuth } from '../../context/AuthContext';
+import PhoneInput from '../../components/forms/PhoneInput';
+import { formatTenDigitPhone, isTenDigitPhone, TEN_DIGIT_PHONE_ERROR } from '../../utils/phone';
 
 const PAGE_SIZE = 10;
 
@@ -205,7 +207,7 @@ const LibraryPage = () => {
   const registrationDefaults = useMemo(() => ({
     name: String(user?.name || ''),
     email: String(user?.email || ''),
-    contact: String(user?.phone || '')
+    contact: formatTenDigitPhone(user?.phone)
   }), [user?.email, user?.name, user?.phone]);
   const registrationForm = useForm({ defaultValues: { name: '', email: '', contact: '' } });
   const watchedRegistrationEmail = registrationForm.watch('email');
@@ -1055,6 +1057,7 @@ const LibraryPage = () => {
                             <span className="inline-flex items-center gap-1"><UserIcon className="h-4 w-4 text-brand-blue" />Name</span>
                             <input
                               {...registrationForm.register('name', { required: true })}
+                              required
                               className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
                               placeholder="Enter your name"
                             />
@@ -1064,16 +1067,16 @@ const LibraryPage = () => {
                             <input
                               type="email"
                               {...registrationForm.register('email', { required: true })}
+                              required
                               className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
                               placeholder="name@example.com"
                             />
                           </label>
                           <label className="text-sm font-medium text-slate-700">
                             <span className="inline-flex items-center gap-1"><PhoneIcon className="h-4 w-4 text-brand-blue" />Contact (optional)</span>
-                            <input
-                              {...registrationForm.register('contact')}
+                            <PhoneInput
+                              {...registrationForm.register('contact', { validate: (value) => !value || isTenDigitPhone(value) || TEN_DIGIT_PHONE_ERROR })}
                               className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
-                              placeholder="Phone number"
                             />
                           </label>
                         </div>

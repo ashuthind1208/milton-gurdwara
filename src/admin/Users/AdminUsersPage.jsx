@@ -23,6 +23,8 @@ import userService from '../../services/userService';
 import uploadService from '../../services/uploadService';
 import { siteConfig } from '../../constants/siteConfig';
 import { downloadMembershipFeeInformationPdf } from '../../utils/csvExport';
+import PhoneInput from '../../components/forms/PhoneInput';
+import { isTenDigitPhone, TEN_DIGIT_PHONE_ERROR } from '../../utils/phone';
 
 const FILTERS = ['All', 'Pending', 'Approved', 'Rejected'];
 
@@ -968,13 +970,13 @@ const AdminUsersPage = () => {
             <div className="flex-1 overflow-y-auto px-5 py-4">
               <form className="grid gap-3 md:grid-cols-3" onSubmit={form.handleSubmit((values) => createMutation.mutate(values))}>
                 <label className="text-sm">Name
-                  <input {...form.register('name', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                  <input {...form.register('name', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
                 </label>
                 <label className="text-sm">Email
-                  <input type="email" {...form.register('email', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                  <input type="email" {...form.register('email', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
                 </label>
                 <label className="text-sm">Phone
-                  <input {...form.register('phone')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                  <PhoneInput {...form.register('phone', { validate: (value) => !value || isTenDigitPhone(value) || TEN_DIGIT_PHONE_ERROR })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
                 </label>
                 <label className="text-sm md:col-span-2">Address
                   <input {...form.register('address')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
@@ -1188,13 +1190,13 @@ const AdminUsersPage = () => {
 
                   <div className="grid gap-3 md:grid-cols-3">
                     <label className="text-sm font-semibold text-slate-700">Name
-                      <input {...editForm.register('name', { required: true })} className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 shadow-sm outline-none transition focus:border-brand-blue" />
+                      <input {...editForm.register('name', { required: true })} required className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 shadow-sm outline-none transition focus:border-brand-blue" />
                     </label>
                     <label className="text-sm font-semibold text-slate-700">Email
-                      <input type="email" {...editForm.register('email', { required: true })} className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 shadow-sm outline-none transition focus:border-brand-blue" />
+                      <input type="email" {...editForm.register('email', { required: true })} required className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 shadow-sm outline-none transition focus:border-brand-blue" />
                     </label>
                     <label className="text-sm font-semibold text-slate-700">Phone
-                      <input {...editForm.register('phone')} className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 shadow-sm outline-none transition focus:border-brand-blue" />
+                      <PhoneInput {...editForm.register('phone', { validate: (value) => !value || isTenDigitPhone(value) || TEN_DIGIT_PHONE_ERROR })} className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 shadow-sm outline-none transition focus:border-brand-blue" />
                     </label>
                   </div>
 
@@ -1447,16 +1449,16 @@ const AdminUsersPage = () => {
                   <div className="h-px w-full bg-slate-200" />
                   <div className="grid gap-3 md:grid-cols-2">
                     <label className="text-sm font-semibold text-slate-700">Amount
-                      <input type="number" min="0" step="0.01" {...membershipFeeForm.register('amount', { required: true })} className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5" />
+                      <input type="number" min="0" step="0.01" {...membershipFeeForm.register('amount', { required: true })} required className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5" />
                     </label>
                     <label className="text-sm font-semibold text-slate-700">Currency
-                      <input {...membershipFeeForm.register('currency', { required: true })} className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5" />
+                      <input {...membershipFeeForm.register('currency', { required: true })} required className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5" />
                     </label>
                     <label className="text-sm font-semibold text-slate-700">Receipt Number
                       <input {...membershipFeeForm.register('receiptNumber')} className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5" />
                     </label>
                     <label className="text-sm font-semibold text-slate-700">Payment Date
-                      <input type="date" {...membershipFeeForm.register('paymentDate', { required: true })} className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5" />
+                      <input type="date" {...membershipFeeForm.register('paymentDate', { required: true })} required className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5" />
                     </label>
                     <label className="text-sm font-semibold text-slate-700">Payment Method
                       <select {...membershipFeeForm.register('paymentMethod')} className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5">

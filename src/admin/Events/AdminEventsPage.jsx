@@ -830,7 +830,7 @@ const AdminEventsPage = () => {
                 <StatusAlert type={uploadStatus.type} message={uploadStatus.message} />
               </div>
               <label className="text-sm">Title
-                <input {...createForm.register('title', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <input {...createForm.register('title', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
               <label className="text-sm md:col-span-2">Description
                 <textarea
@@ -876,7 +876,7 @@ const AdminEventsPage = () => {
                 />
               </div>
               <label className="text-sm">Location
-                <input {...createForm.register('location', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <input {...createForm.register('location', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
               <label className="text-sm">Category
                 <select {...createForm.register('category')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
@@ -933,7 +933,7 @@ const AdminEventsPage = () => {
                 <StatusAlert type={uploadStatus.type} message={uploadStatus.message} />
               </div>
               <label className="text-sm">Title
-                <input {...editForm.register('title', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <input {...editForm.register('title', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
               <label className="text-sm md:col-span-2">Description
                 <textarea
@@ -979,7 +979,7 @@ const AdminEventsPage = () => {
                 />
               </div>
               <label className="text-sm">Location
-                <input {...editForm.register('location', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <input {...editForm.register('location', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
               <label className="text-sm">Category
                 <select {...editForm.register('category')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">

@@ -474,7 +474,7 @@ const AdminAdvertisementsPage = () => {
                 <StatusAlert type={uploadStatus.type} message={uploadStatus.message} />
               </div>
               <label className="text-sm">Advertiser Name
-                <input disabled={isViewMode} {...form.register('title', { required: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
+                <input disabled={isViewMode} {...form.register('title', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
               </label>
               <label className="text-sm">Placement
                 <select disabled={isViewMode} {...form.register('placement')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50">

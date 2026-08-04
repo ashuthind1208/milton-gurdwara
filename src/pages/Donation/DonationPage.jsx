@@ -6,7 +6,6 @@ import PageHero from '../../components/common/PageHero';
 import DonationForm from '../../components/forms/DonationForm';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
-import gurdwaraLogo from '../../assets/gurdwara-logo.webp';
 import donationService from '../../services/donationService';
 import advertisementService from '../../services/advertisementService';
 import contentApiService from '../../services/contentApiService';
@@ -17,6 +16,11 @@ import { useAuth } from '../../context/AuthContext';
 import PhoneNumberRequiredNotice from '../../components/common/PhoneNumberRequiredNotice';
 import ZeffyDonationModal from './ZeffyDonationModal';
 import { toZeffyEmbedUrl } from '../../utils/zeffy';
+import {
+  getCampaignProgressStatusClassName,
+  getCampaignProgressStatusLabel,
+  isCampaignProgressVisible
+} from '../../constants/campaignProgress';
 
 const DONATION_IDENTITY_SETTING_KEY = 'settings-donation-allow-custom-name-email';
 
@@ -340,8 +344,8 @@ const DonationPage = () => {
             const raised = Number.isFinite(Number(campaign.raised)) ? Math.max(0, Number(campaign.raised)) : 0;
             const target = Number.isFinite(Number(campaign.target)) ? Math.max(0, Number(campaign.target)) : 0;
             const progress = target > 0 ? Math.min((raised / target) * 100, 100) : 0;
-            const activeProgressItems = (Array.isArray(campaign.progressItems) ? campaign.progressItems : []).filter((item) => item?.isActive !== false);
-            const activeStoryBlocks = (Array.isArray(campaign.storyBlocks) ? campaign.storyBlocks : []).filter((item) => item?.isActive !== false);
+            const activeProgressItems = (Array.isArray(campaign.progressItems) ? campaign.progressItems : [])
+              .filter((item) => isCampaignProgressVisible(item?.status, item?.isActive));
             const paymentProvider = String(campaign.paymentProvider || 'STRIPE').toUpperCase();
             const PaymentProviderIcon = paymentProvider === 'ZEFFY'
               ? ShieldCheckIcon
@@ -373,24 +377,13 @@ const DonationPage = () => {
                         key={item.id}
                         type="button"
                         onClick={() => setSelectedProgressItem({ campaignName: campaign.name, item })}
-                        className="inline-flex rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 transition hover:border-emerald-400 hover:bg-emerald-100"
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold transition hover:opacity-80 ${getCampaignProgressStatusClassName(item.status, item.isActive)}`}
                         title={item.title || 'Progress update'}
                       >
-                        {String(item.title || 'Progress update').slice(0, 25)}
+                        <span>{String(item.title || 'Progress update').slice(0, 25)}</span>
+                        <span aria-hidden="true">·</span>
+                        <span>{getCampaignProgressStatusLabel(item.status, item.isActive)}</span>
                       </button>
-                    ))}
-                  </div>
-                ) : null}
-                {activeStoryBlocks.length > 0 ? (
-                  <div className="mt-3 space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5">
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-amber-800">Impact Stories</p>
-                    {activeStoryBlocks.slice(0, 2).map((story) => (
-                      <div key={story.id} className="rounded-md border border-amber-200/80 bg-white px-2.5 py-2">
-                        <p className="text-sm font-semibold text-slate-900">{story.title || 'Community Story'}</p>
-                        {story.summary ? <p className="mt-0.5 text-xs text-slate-700">{story.summary}</p> : null}
-                        {story.quote ? <p className="mt-1 text-xs italic text-brand-blue">"{story.quote}"</p> : null}
-                        {(story.beneficiary || story.impactMetric) ? <p className="mt-1 text-[11px] font-semibold text-slate-600">{story.beneficiary || '-'} {story.impactMetric ? `• ${story.impactMetric}` : ''}</p> : null}
-                      </div>
                     ))}
                   </div>
                 ) : null}
@@ -426,22 +419,12 @@ const DonationPage = () => {
 
       {selectedProgressItem ? (
         <div className="fixed inset-0 z-[122] overflow-y-auto bg-slate-900/70 px-4 py-6" onClick={() => setSelectedProgressItem(null)}>
-          <div className="mx-auto flex min-h-full max-w-3xl items-center justify-center">
-            <div className="relative w-full max-h-[90vh] overflow-y-auto rounded-2xl border border-brand-blue/20 bg-gradient-to-br from-blue-50/80 via-white to-amber-50/75 p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-              <div className="pointer-events-none absolute inset-0">
-                <img
-                  src={gurdwaraLogo}
-                  alt=""
-                  aria-hidden="true"
-                  className="absolute right-4 top-4 h-44 w-44 rounded-full opacity-[0.07]"
-                />
-              </div>
+          <div className="mx-auto flex min-h-full max-w-5xl items-center justify-center">
+            <div className="relative max-h-[90vh] w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl sm:p-6" onClick={(event) => event.stopPropagation()}>
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Progress Detail</p>
-                  <h3 className="mt-1 font-heading text-2xl font-semibold text-slate-900">{selectedProgressItem.item.title || 'Progress Item'}</h3>
                   <p className="mt-1 text-xs font-semibold text-slate-500">{selectedProgressItem.campaignName}</p>
-                  <span className="mt-2 inline-flex rounded-full border border-brand-blue/25 bg-blue-50 px-3 py-1 text-sm font-bold text-brand-blue">{selectedProgressItem.item.date || '-'}</span>
                 </div>
                 <button
                   type="button"
@@ -453,29 +436,36 @@ const DonationPage = () => {
                 </button>
               </div>
 
-              <div className="relative z-10 mt-3 grid gap-3 text-sm text-slate-700">
-                <p>{selectedProgressItem.item.description || '-'}</p>
-              </div>
+              <div className="mt-5 grid gap-5 lg:grid-cols-2">
+                <section className={`rounded-xl border border-slate-200 bg-slate-50 p-5 ${Array.isArray(selectedProgressItem.item.photos) && selectedProgressItem.item.photos.length > 0 ? '' : 'lg:col-span-2'}`}>
+                  <div className="flex items-start justify-between gap-4">
+                    <h3 className="min-w-0 font-heading text-2xl font-semibold text-slate-900">{selectedProgressItem.item.title || 'Progress Item'}</h3>
+                    <span className={`inline-flex flex-none rounded-full px-2.5 py-1 text-xs font-semibold ${getCampaignProgressStatusClassName(selectedProgressItem.item.status, selectedProgressItem.item.isActive)}`}>
+                      {getCampaignProgressStatusLabel(selectedProgressItem.item.status, selectedProgressItem.item.isActive)}
+                    </span>
+                  </div>
+                  <div className="mt-4 h-px bg-slate-200" />
+                  <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-slate-700">{selectedProgressItem.item.description || 'No description has been added.'}</p>
+                </section>
 
-              {Array.isArray(selectedProgressItem.item.photos) && selectedProgressItem.item.photos.length > 0 ? (
-                <div className="mt-4">
-                  <div className="mt-2 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                {Array.isArray(selectedProgressItem.item.photos) && selectedProgressItem.item.photos.length > 0 ? (
+                  <section className="rounded-xl border border-slate-200 bg-white p-3">
+                    <div className="grid grid-cols-2 gap-3">
                       {selectedProgressItem.item.photos.slice(0, 25).map((photoUrl, index) => (
                         <button
                           key={`${photoUrl}-${index}`}
                           type="button"
                           onClick={() => setEnlargedProgressPhoto(photoUrl)}
-                          className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-1 text-left shadow-[0_8px_18px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-brand-blue/30"
+                          className="group relative aspect-[4/3] overflow-hidden rounded-lg border border-slate-200 bg-slate-50 text-left transition hover:border-brand-blue/40"
                         >
-                          <img src={photoUrl} alt="Progress" className="h-24 w-full rounded-lg object-cover transition group-hover:scale-[1.03]" loading="lazy" />
+                          <img src={photoUrl} alt={`Campaign progress ${index + 1}`} className="h-full w-full object-cover transition group-hover:scale-[1.03]" loading="lazy" />
                         </button>
                       ))}
                     </div>
                     {selectedProgressItem.item.photos.length > 25 ? <p className="mt-2 text-xs font-medium text-slate-500">Showing first 25 photos in the grid.</p> : null}
-                  </div>
-                </div>
-              ) : null}
+                  </section>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>

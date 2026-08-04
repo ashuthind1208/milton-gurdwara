@@ -19,6 +19,8 @@ import advertisementService from '../../services/advertisementService';
 import { useAuth } from '../../context/AuthContext';
 import contentApiService from '../../services/contentApiService';
 import PhoneNumberRequiredNotice from '../../components/common/PhoneNumberRequiredNotice';
+import PhoneInput from '../../components/forms/PhoneInput';
+import { formatTenDigitPhone, isTenDigitPhone, TEN_DIGIT_PHONE_ERROR } from '../../utils/phone';
 
 const locales = { 'en-US': enUS };
 const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales });
@@ -71,7 +73,7 @@ const EventsPage = () => {
   const registrationDefaults = useMemo(() => ({
     name: String(user?.name || ''),
     email: String(user?.email || ''),
-    contact: String(user?.phone || '')
+    contact: formatTenDigitPhone(user?.phone)
   }), [user?.email, user?.name, user?.phone]);
   const registrationForm = useForm({ defaultValues: { name: '', email: '', contact: '' } });
 
@@ -489,7 +491,7 @@ const EventsPage = () => {
           </div>
         </div>
         <div className="space-y-6">
-          <div className="events-calendar-shell h-[700px] overflow-y-auto overflow-x-hidden rounded-2xl border border-slate-200 bg-gradient-to-b from-white to-blue-50/35 p-3 shadow-[0_18px_46px_-28px_rgba(30,64,175,0.38)] md:h-[740px] md:overflow-hidden">
+          <div className="events-calendar-shell hidden h-[740px] overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-b from-white to-blue-50/35 p-3 shadow-[0_18px_46px_-28px_rgba(30,64,175,0.38)] md:block">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Calendar View</p>
               <span className="rounded-full bg-brand-blue/10 px-2.5 py-1 text-[11px] font-bold text-brand-blue">{calendarEvents.length} events in view</span>
@@ -564,12 +566,12 @@ const EventsPage = () => {
       ) : null}
 
       {selectedEvent ? (
-        <div className="fixed inset-0 z-[90] overflow-y-auto bg-slate-900/45 px-4 py-4">
-          <div className="mx-auto flex min-h-full items-center justify-center">
-          <div className="w-full max-w-4xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl bg-white p-4 shadow-xl sm:p-5">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="font-heading text-2xl font-semibold text-slate-900">Event Details and Registration</h3>
-              <button type="button" onClick={() => setSelectedEvent(null)} className="rounded-md border border-slate-300 px-3 py-1 text-sm">Close</button>
+        <div className="fixed inset-0 z-[90] overflow-x-hidden overflow-y-auto bg-slate-900/45 px-4 py-4">
+          <div className="mx-auto flex min-h-full min-w-0 items-center justify-center">
+          <div className="box-border max-h-[calc(100vh-2rem)] w-full min-w-0 max-w-4xl overflow-x-hidden overflow-y-auto rounded-2xl bg-white p-4 shadow-xl sm:p-5">
+            <div className="flex min-w-0 items-start justify-between gap-3">
+              <h3 className="min-w-0 break-words font-heading text-xl font-semibold text-slate-900 sm:text-2xl">Event Details and Registration</h3>
+              <button type="button" onClick={() => setSelectedEvent(null)} className="shrink-0 rounded-md border border-slate-300 px-3 py-1 text-sm">Close</button>
             </div>
 
             <div className="mt-3 border-b border-slate-200" />
@@ -590,18 +592,18 @@ const EventsPage = () => {
               </button>
             </div>
 
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <h4 className="mt-1 truncate font-heading text-2xl font-extrabold text-slate-900" title={selectedEvent.title}>{selectedEvent.title}</h4>
-                <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{selectedEventDateLabel} • {selectedEventTimeLabel}</p>
+            <div className="mt-4 grid min-w-0 gap-4 md:grid-cols-2">
+              <section className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <h4 className="mt-1 break-words font-heading text-2xl font-extrabold text-slate-900" title={selectedEvent.title}>{selectedEvent.title}</h4>
+                <p className="mt-1 break-words text-xs font-semibold uppercase tracking-wide text-slate-500">{selectedEventDateLabel} • {selectedEventTimeLabel}</p>
                 <div className="mt-3 border-t border-slate-200" />
-                <p className="mt-2 text-sm leading-relaxed text-slate-700">
+                <p className="mt-2 break-words text-sm leading-relaxed text-slate-700">
                   {selectedEventDescription || 'No description provided for this event yet.'}
                 </p>
                 {selectedEvent.mediaUrl ? <img src={selectedEvent.mediaUrl} alt={selectedEvent.title || 'Event media'} className="mt-3 h-44 w-full rounded-lg object-cover" loading="lazy" /> : null}
               </section>
 
-              <section className="rounded-xl border border-slate-200 p-4">
+              <section className="min-w-0 rounded-xl border border-slate-200 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <h4 className="font-heading text-lg font-semibold text-slate-900">Register for This Event</h4>
                   <div className="text-right text-sm font-semibold text-brand-green">
@@ -634,6 +636,7 @@ const EventsPage = () => {
                           <input
                             type="text"
                             {...registrationForm.register('name', { required: true })}
+                            required
                             className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
                             placeholder="Enter your name"
                           />
@@ -643,17 +646,16 @@ const EventsPage = () => {
                           <input
                             type="email"
                             {...registrationForm.register('email', { required: true })}
+                            required
                             className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
                             placeholder="name@example.com"
                           />
                         </label>
                         <label className="text-sm font-medium text-slate-700">
                           Phone (optional)
-                          <input
-                            type="tel"
-                            {...registrationForm.register('contact')}
+                          <PhoneInput
+                            {...registrationForm.register('contact', { validate: (value) => !value || isTenDigitPhone(value) || TEN_DIGIT_PHONE_ERROR })}
                             className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
-                            placeholder="Phone number"
                           />
                         </label>
                       </div>

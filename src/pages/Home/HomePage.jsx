@@ -142,7 +142,6 @@ const HomePage = () => {
     // Force layout so browsers re-apply animation timeline reliably.
     void node.offsetHeight;
     node.style.animation = '';
-    node.style.animationPlayState = 'running';
   };
 
   useEffect(() => {
@@ -390,8 +389,7 @@ const HomePage = () => {
               animationName: 'ticker-scroll-left',
               animationDuration: '160s',
               animationTimingFunction: 'linear',
-              animationIterationCount: 'infinite',
-              animationPlayState: 'running'
+              animationIterationCount: 'infinite'
             }}
           >
             {[0, 1, 2].map((groupIndex) => (
