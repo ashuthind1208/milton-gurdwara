@@ -3012,64 +3012,76 @@ const removeEventRegistrant = async ({ eventId, registrantId }) => {
   }
 
   const numericRegistrantId = Number(String(registrantId).replace('evt-reg-', ''));
+  const client = await pool.connect();
   let promotedRegistration = null;
 
-  const deleteResult = await pool.query(
-    `
-    DELETE FROM event_registrants
-    WHERE id = $1 AND event_id = $2
-    RETURNING id, status;
-    `,
-    [numericRegistrantId, eventId]
-  );
-
-  if (deleteResult.rowCount > 0 && deleteResult.rows[0]?.status === 'confirmed') {
-    await pool.query(
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT id FROM events WHERE id = $1 FOR UPDATE;', [eventId]);
+    const deleteResult = await client.query(
       `
-      UPDATE events
-      SET registrations = GREATEST(0, registrations - 1),
-          updated_at = NOW()
-      WHERE id = $1;
+      DELETE FROM event_registrants
+      WHERE id = $1 AND event_id = $2
+      RETURNING id, status;
       `,
-      [eventId]
+      [numericRegistrantId, eventId]
     );
 
-    const promoteResult = await pool.query(
-      `
-      UPDATE event_registrants
-      SET status = 'confirmed'
-      WHERE id = (
-        SELECT id
-        FROM event_registrants
-        WHERE event_id = $1 AND status = 'waitlisted'
-        ORDER BY created_at ASC
-        LIMIT 1
-      )
-      RETURNING id, event_id, name, email, contact, status, created_at;
-      `,
-      [eventId]
-    );
-
-    if (promoteResult.rowCount > 0) {
-      await pool.query(
+    if (deleteResult.rowCount > 0 && String(deleteResult.rows[0]?.status || '').toLowerCase() === 'confirmed') {
+      await client.query(
         `
         UPDATE events
-        SET registrations = registrations + 1,
+        SET registrations = GREATEST(0, registrations - 1),
             updated_at = NOW()
         WHERE id = $1;
         `,
         [eventId]
       );
-      const promoted = promoteResult.rows[0];
-      promotedRegistration = {
-        id: `evt-reg-${promoted.id}`,
-        name: promoted.name || '',
-        email: promoted.email || '',
-        contact: promoted.contact || '',
-        status: String(promoted.status || 'confirmed').toLowerCase(),
-        createdAt: promoted.created_at || ''
-      };
+
+      const promoteResult = await client.query(
+        `
+        SELECT id, event_id, name, email, contact, status, created_at
+        FROM event_registrants
+        WHERE event_id = $1 AND status = 'waitlisted'
+        ORDER BY created_at ASC, id ASC
+        FOR UPDATE SKIP LOCKED
+        LIMIT 1
+        `,
+        [eventId]
+      );
+
+      if (promoteResult.rowCount > 0) {
+        const promoted = promoteResult.rows[0];
+        await client.query(
+          `UPDATE event_registrants SET status = 'confirmed' WHERE id = $1;`,
+          [promoted.id]
+        );
+        await client.query(
+          `
+          UPDATE events
+          SET registrations = registrations + 1,
+              updated_at = NOW()
+          WHERE id = $1;
+          `,
+          [eventId]
+        );
+        promotedRegistration = {
+          id: `evt-reg-${promoted.id}`,
+          name: promoted.name || '',
+          email: promoted.email || '',
+          contact: promoted.contact || '',
+          status: 'confirmed',
+          createdAt: promoted.created_at || ''
+        };
+      }
     }
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
 
   const rows = await getEvents({ includeInactive: true });
@@ -3080,102 +3092,112 @@ const removeEventRegistrant = async ({ eventId, registrantId }) => {
   } : null;
 };
 
-const updateEventRegistrantStatus = async ({ eventId, registrantId, status }) => {
+const removeVolunteerRegistration = async (registrationId) => {
   if (!pool) {
     throw new Error('Database is not configured.');
   }
 
-  const normalizedStatus = String(status || '').trim().toLowerCase();
-  if (!['confirmed', 'waitlisted'].includes(normalizedStatus)) {
-    const error = new Error('Registration status must be confirmed or waitlisted.');
-    error.status = 400;
-    throw error;
-  }
+  const normalizedId = String(registrationId || '').trim();
+  const client = await pool.connect();
+  let removedRegistration = null;
+  let promotedRegistration = null;
 
-  const numericRegistrantId = Number(String(registrantId).replace('evt-reg-', ''));
-  const existingResult = await pool.query(
-    `
-    SELECT id, event_id, name, email, contact, status, created_at
-    FROM event_registrants
-    WHERE id = $1 AND event_id = $2
-    LIMIT 1;
-    `,
-    [numericRegistrantId, eventId]
-  );
-  const existing = existingResult.rows?.[0];
-  if (!existing) {
-    const error = new Error('Event registration not found.');
-    error.status = 404;
-    throw error;
-  }
-
-  const previousStatus = String(existing.status || 'confirmed').toLowerCase();
-  if (previousStatus === 'waitlisted' && normalizedStatus === 'confirmed') {
-    const capacityResult = await pool.query(
+  try {
+    await client.query('BEGIN');
+    const existingResult = await client.query(
       `
       SELECT
-        e.capacity,
-        COUNT(r.id) FILTER (WHERE r.status = 'confirmed')::int AS confirmed_count
-      FROM events e
-      LEFT JOIN event_registrants r ON r.event_id = e.id
-      WHERE e.id = $1
-      GROUP BY e.id;
+        id, opportunity_id, name, email, phone, whatsapp, area, seva_type,
+        seva_date, seva_time, contact_preference, wants_event_emails, notes,
+        status, created_at
+      FROM volunteer_registrations
+      WHERE id = $1
+      FOR UPDATE;
       `,
-      [eventId]
+      [normalizedId]
     );
-    const eventCapacity = capacityResult.rows?.[0];
-    if (!eventCapacity) {
-      const error = new Error('Event not found.');
+    const existing = existingResult.rows?.[0];
+    if (!existing) {
+      const error = new Error('Seva registration not found.');
       error.status = 404;
       throw error;
     }
-    const capacity = Math.max(0, Number(eventCapacity.capacity || 0));
-    const confirmedCount = Number(eventCapacity.confirmed_count || 0);
-    if (capacity > 0 && confirmedCount >= capacity) {
-      const error = new Error('Event capacity is full. Remove a confirmed registration before promoting someone from the waitlist.');
-      error.status = 409;
-      throw error;
-    }
-  }
 
-  const updateResult = await pool.query(
-    `
-    UPDATE event_registrants
-    SET status = $3
-    WHERE id = $1 AND event_id = $2
-    RETURNING id, event_id, name, email, contact, status, created_at;
-    `,
-    [numericRegistrantId, eventId, normalizedStatus]
-  );
+    removedRegistration = {
+      id: String(existing.id || ''),
+      opportunityId: String(existing.opportunity_id || ''),
+      status: String(existing.status || 'confirmed').toLowerCase()
+    };
 
-  if (previousStatus !== normalizedStatus) {
-    const registrationDelta = normalizedStatus === 'confirmed' ? 1 : -1;
-    await pool.query(
-      `
-      UPDATE events
-      SET registrations = GREATEST(0, registrations + $2),
-          updated_at = NOW()
-      WHERE id = $1;
-      `,
-      [eventId, registrationDelta]
+    await client.query('DELETE FROM volunteer_registrations WHERE id = $1;', [normalizedId]);
+    await client.query(
+      `DELETE FROM app_items WHERE resource = 'volunteer_registrations' AND id = $1;`,
+      [normalizedId]
     );
+
+    if (removedRegistration.status !== 'waitlisted' && removedRegistration.opportunityId) {
+      const promoteResult = await client.query(
+        `
+        SELECT
+          id, opportunity_id, name, email, phone, whatsapp, area, seva_type,
+          seva_date, seva_time, contact_preference, wants_event_emails, notes,
+          status, created_at
+        FROM volunteer_registrations
+        WHERE opportunity_id = $1 AND LOWER(status) = 'waitlisted'
+        ORDER BY created_at ASC, id ASC
+        FOR UPDATE SKIP LOCKED
+        LIMIT 1;
+        `,
+        [removedRegistration.opportunityId]
+      );
+      const promoted = promoteResult.rows?.[0];
+      if (promoted) {
+        await client.query(
+          `UPDATE volunteer_registrations SET status = 'confirmed' WHERE id = $1;`,
+          [promoted.id]
+        );
+        await client.query(
+          `
+          UPDATE app_items
+          SET payload = jsonb_set(payload, '{status}', '"confirmed"'::jsonb),
+              updated_at = NOW()
+          WHERE resource = 'volunteer_registrations' AND id = $1;
+          `,
+          [promoted.id]
+        );
+        promotedRegistration = {
+          id: String(promoted.id || ''),
+          opportunityId: String(promoted.opportunity_id || ''),
+          name: promoted.name || '',
+          email: promoted.email || '',
+          phone: promoted.phone || '',
+          whatsapp: promoted.whatsapp || '',
+          area: promoted.area || '',
+          sevaType: promoted.seva_type || promoted.area || '',
+          sevaDate: promoted.seva_date || '',
+          sevaTime: promoted.seva_time || '',
+          contactPreference: promoted.contact_preference || 'Email',
+          wantsEventEmails: promoted.wants_event_emails === true,
+          notes: promoted.notes || '',
+          status: 'confirmed',
+          createdAt: promoted.created_at || ''
+        };
+      }
+    }
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
 
-  const rows = await getEvents({ includeInactive: true });
-  const updatedEvent = rows.find((entry) => entry.id === Number(eventId)) || null;
-  const registration = updateResult.rows?.[0];
-  return updatedEvent ? {
-    ...updatedEvent,
-    previousRegistrationStatus: previousStatus,
-    registration: registration ? {
-      id: `evt-reg-${registration.id}`,
-      name: registration.name || '',
-      email: registration.email || '',
-      contact: registration.contact || '',
-      status: String(registration.status || 'confirmed').toLowerCase(),
-      createdAt: registration.created_at || ''
-    } : null
-  } : null;
+  return {
+    success: true,
+    removedRegistration,
+    promotedRegistration
+  };
 };
 
 const normalizeComparableContact = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -3456,8 +3478,8 @@ module.exports = {
   updateEvent,
   removeEvent,
   registerForEvent,
-  updateEventRegistrantStatus,
   removeEventRegistrant,
+  removeVolunteerRegistration,
   getUserRegistrationDependencies,
   markUserRegistrationsDormant,
   purgeUserRegistrations

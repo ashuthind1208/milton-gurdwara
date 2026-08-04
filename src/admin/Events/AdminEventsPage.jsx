@@ -306,18 +306,6 @@ const AdminEventsPage = () => {
     }
   });
 
-  const confirmRegistrantMutation = useMutation({
-    mutationFn: ({ eventId, registrantId }) => eventService.updateRegistrantStatus({ eventId, registrantId, status: 'confirmed' }),
-    onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['admin-events'] });
-      queryClient.invalidateQueries({ queryKey: ['events'] });
-      if (result?.data?.id) {
-        setViewEvent(result.data);
-      }
-    },
-    onError: (error) => window.alert(error?.response?.data?.message || error?.message || 'Unable to confirm this registration.')
-  });
-
   const openEdit = (event) => {
     setEditingEvent(event);
     const startValue = toInputDateTime(event.date);
@@ -1141,25 +1129,13 @@ const AdminEventsPage = () => {
                               <td className="px-3 py-2 text-slate-700">{entry.contact || 'No contact provided'}</td>
                               <td className="px-3 py-2 text-slate-700">{entry.status || 'confirmed'}</td>
                               <td className="px-3 py-2 text-right">
-                                <div className="inline-flex items-center gap-2">
-                                  {String(entry.status || '').toLowerCase() === 'waitlisted' ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => confirmRegistrantMutation.mutate({ eventId: viewEvent.id, registrantId: entry.id })}
-                                      disabled={confirmRegistrantMutation.isPending}
-                                      className="rounded-md border border-emerald-200 px-2 py-1 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40"
-                                    >
-                                      Confirm
-                                    </button>
-                                  ) : null}
-                                  <button
-                                    type="button"
-                                    onClick={() => removeRegistrantMutation.mutate({ eventId: viewEvent.id, registrantId: entry.id })}
-                                    className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-50"
-                                  >
-                                    Remove
-                                  </button>
-                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => removeRegistrantMutation.mutate({ eventId: viewEvent.id, registrantId: entry.id })}
+                                  className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-50"
+                                >
+                                  Remove
+                                </button>
                               </td>
                             </tr>
                           ))}

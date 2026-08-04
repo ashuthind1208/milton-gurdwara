@@ -258,18 +258,13 @@ const volunteerService = {
     return serviceResponse(updated);
   },
 
-  updateApplicationStatus: async (id, status) => {
-    const response = await fetchJson(`/api/volunteer-registrations/${encodeURIComponent(id)}/status`, {
+  removeApplication: async (id) => {
+    const response = await fetchJson(`/api/volunteer-registrations/${encodeURIComponent(id)}/remove`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status })
+      body: JSON.stringify({})
     });
-    return serviceResponse(response.data || {});
-  },
-
-  removeApplication: async (id) => {
-    await contentApiService.remove(APPLICATIONS_RESOURCE, id);
-    return serviceResponse({ success: true });
+    return serviceResponse(response.data || { success: true });
   },
 
   sendOpportunityReminderEmails: async (opportunityId) => {

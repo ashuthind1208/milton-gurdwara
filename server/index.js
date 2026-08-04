@@ -4732,62 +4732,34 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  const volunteerStatusMatch = requestUrl.pathname.match(/^\/api\/volunteer-registrations\/([^/]+)\/status$/i);
-  if (volunteerStatusMatch && request.method === 'POST') {
+  const volunteerRemovalMatch = requestUrl.pathname.match(/^\/api\/volunteer-registrations\/([^/]+)\/remove$/i);
+  if (volunteerRemovalMatch && request.method === 'POST') {
     try {
-      const registrationId = parseStringPathId(decodeURIComponent(volunteerStatusMatch[1]), 'registration id');
-      const body = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
-      ensureNoUnknownKeys(body, ['status']);
-      const status = readStringField(body, 'status', { required: true, max: 20 }).toLowerCase();
-      assertInput(['confirmed', 'waitlisted'].includes(status), 'status must be confirmed or waitlisted.');
-
-      const registrations = await eventsDb.listItems('volunteer_registrations');
-      const existing = registrations.find((entry) => String(entry?.id || '') === registrationId);
-      if (!existing) {
-        const error = new Error('Seva registration not found.');
-        error.status = 404;
-        throw error;
-      }
-
-      const previousStatus = String(existing.status || 'confirmed').toLowerCase();
-      const opportunityId = String(existing.opportunityId || '').trim();
-      if (previousStatus === 'waitlisted' && status === 'confirmed') {
-        const opportunities = await eventsDb.listItems('seva_opportunities');
-        const opportunity = opportunities.find((entry) => String(entry?.id || '') === opportunityId);
-        if (!opportunity) {
-          const error = new Error('Seva opportunity not found.');
-          error.status = 404;
-          throw error;
-        }
-        const confirmedCount = registrations.filter((entry) => (
-          String(entry?.opportunityId || '') === opportunityId
-          && String(entry?.status || 'confirmed').toLowerCase() !== 'waitlisted'
-        )).length;
-        const totalRequired = Math.max(1, Number(opportunity.totalVolunteersRequired) || 1);
-        if (confirmedCount >= totalRequired) {
-          const error = new Error('Seva capacity is full. Remove a confirmed volunteer before promoting someone from the waitlist.');
-          error.status = 409;
-          throw error;
-        }
-      }
-
-      const updated = await eventsDb.updateItem('volunteer_registrations', registrationId, { ...existing, status });
-      const promoted = previousStatus === 'waitlisted' && status === 'confirmed';
-      const emailResult = promoted
-        ? await sendRegistrationStatusEmail({ registration: updated, kind: 'seva', promoted: true })
-        : { sent: false, reason: 'not_promoted' };
+      const registrationId = parseStringPathId(decodeURIComponent(volunteerRemovalMatch[1]), 'registration id');
+      const data = await eventsDb.removeVolunteerRegistration(registrationId);
+      const promotedRegistration = data?.promotedRegistration || null;
+      const promotionEmailResult = promotedRegistration
+        ? await sendRegistrationStatusEmail({ registration: promotedRegistration, kind: 'seva', promoted: true })
+        : { sent: false, reason: 'no_promotion' };
       await appendAuditLog(request, {
-        action: 'volunteer.registration.status',
+        action: 'volunteer.registration.remove',
         targetType: 'seva_opportunity',
-        targetId: opportunityId,
-        description: `Updated seva registration ${registrationId} to ${status}`,
-        payload: { registrationId, opportunityId, status }
+        targetId: String(data?.removedRegistration?.opportunityId || ''),
+        description: `Removed seva registration ${registrationId}`,
+        payload: {
+          registrationId,
+          opportunityId: data?.removedRegistration?.opportunityId || '',
+          promotedRegistrationId: promotedRegistration?.id || ''
+        }
       });
-      sendJson(response, 200, { ok: true, data: { ...updated, previousStatus, emailSent: emailResult.sent === true } });
+      sendJson(response, 200, {
+        ok: true,
+        data: { ...data, promotionEmailSent: promotionEmailResult.sent === true }
+      });
     } catch (error) {
       sendJson(response, error.status || 500, {
         ok: false,
-        message: error.message || 'Unable to update seva registration status.'
+        message: error.message || 'Unable to remove seva registration.'
       });
     }
     return;
@@ -4910,13 +4882,26 @@ const server = http.createServer(async (request, response) => {
         }
       }
 
-      const data = await eventsDb.removeItem(resource, id);
+      let data;
+      if (resource === 'volunteer_registrations') {
+        data = await eventsDb.removeVolunteerRegistration(id);
+        const promotedRegistration = data?.promotedRegistration || null;
+        const promotionEmailResult = promotedRegistration
+          ? await sendRegistrationStatusEmail({ registration: promotedRegistration, kind: 'seva', promoted: true })
+          : { sent: false, reason: 'no_promotion' };
+        data = { ...data, promotionEmailSent: promotionEmailResult.sent === true };
+      } else {
+        data = await eventsDb.removeItem(resource, id);
+      }
       if (resource !== 'audit_logs') {
         await appendAuditLog(request, {
           action: 'content.delete',
           targetType: resource,
           targetId: String(id || ''),
-          description: `Deleted ${resource} item`
+          description: `Deleted ${resource} item`,
+          payload: resource === 'volunteer_registrations'
+            ? { promotedRegistrationId: data?.promotedRegistration?.id || '' }
+            : undefined
         });
       }
       sendJson(response, 200, { ok: true, data });
@@ -5253,37 +5238,6 @@ const server = http.createServer(async (request, response) => {
       sendJson(response, error.status || 500, {
         ok: false,
         message: error.message || 'Unable to register for event.'
-      });
-    }
-    return;
-  }
-
-  if (requestUrl.pathname === '/api/events/registrant/status' && request.method === 'POST') {
-    try {
-      const body = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
-      ensureNoUnknownKeys(body, ['eventId', 'registrantId', 'status']);
-      const eventId = readStringField(body, 'eventId', { required: true, max: 12, pattern: /^\d{1,12}$/ });
-      const registrantId = readStringField(body, 'registrantId', { required: true, max: 128, pattern: simpleIdPattern });
-      const status = readStringField(body, 'status', { required: true, max: 20 }).toLowerCase();
-      assertInput(['confirmed', 'waitlisted'].includes(status), 'status must be confirmed or waitlisted.');
-      const data = await eventsDb.updateEventRegistrantStatus({ eventId, registrantId, status });
-      const registration = data?.registration ? normalizeEventRegistrantForReminder(data.registration, data) : null;
-      const wasPromoted = data?.previousRegistrationStatus === 'waitlisted' && status === 'confirmed';
-      const emailResult = wasPromoted && registration
-        ? await sendRegistrationStatusEmail({ registration, kind: 'event', promoted: true })
-        : { sent: false, reason: 'not_promoted' };
-      await appendAuditLog(request, {
-        action: 'event.registrant.status',
-        targetType: 'event',
-        targetId: String(eventId),
-        description: `Updated event registrant ${registrantId} to ${status}`,
-        payload: { eventId, registrantId, status }
-      });
-      sendJson(response, 200, { ok: true, data: { ...data, emailSent: emailResult.sent === true } });
-    } catch (error) {
-      sendJson(response, error.status || 500, {
-        ok: false,
-        message: error.message || 'Unable to update event registration status.'
       });
     }
     return;
