@@ -22,6 +22,7 @@ import newsService from '../../services/newsService';
 import useSeoMeta from '../../hooks/useSeoMeta';
 import Seo from '../../components/common/Seo';
 import gurdwaraLogo from '../../assets/gurdwara-logo.webp';
+import { isEventCurrent } from '../../utils/eventAvailability';
 
 const toDateKey = (value = new Date()) => {
   const date = value instanceof Date ? value : new Date(value);
@@ -133,7 +134,10 @@ const HomePage = () => {
   const homeTickerTrackRef = useRef(null);
   const specialTickerTrackRef = useRef(null);
 
-  const tickerItems = useMemo(() => (events.length > 0 ? events : []), [events]);
+  const tickerItems = useMemo(
+    () => (events.length > 0 ? events.filter((event) => isEventCurrent(event)) : []),
+    [events]
+  );
   const tickerLoopItems = useMemo(() => {
     if (tickerItems.length === 0) {
       return [];
@@ -363,7 +367,7 @@ const HomePage = () => {
         path: '/events',
         type: 'events',
         description: 'View the latest samagams, workshops, and seva gatherings.',
-        items: events.slice(0, 4).map((event) => ({
+        items: tickerItems.slice(0, 4).map((event) => ({
           primary: event.title,
           secondary: new Date(event.date).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })
         }))

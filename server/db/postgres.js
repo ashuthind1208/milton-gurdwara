@@ -1666,6 +1666,7 @@ const searchPublicContent = async (queryText, options = {}) => {
         e.updated_at AS updated_at
       FROM events e
       WHERE e.active = TRUE
+        AND COALESCE(e.end_date, e.date) >= NOW()
 
       UNION ALL
 
@@ -2968,10 +2969,11 @@ const registerForEvent = async ({ eventId, name, contact, email }) => {
     throw error;
   }
 
-  await pool.query(
+  const registrationResult = await pool.query(
     `
     INSERT INTO event_registrants (event_id, name, email, contact, status)
-    VALUES ($1, $2, $3, $4, $5);
+    VALUES ($1, $2, $3, $4, $5)
+    RETURNING id, event_id, name, email, contact, status, created_at;
     `,
     [eventId, name || 'Anonymous', normalizedEmail, String(contact || '').trim(), status]
   );
@@ -2989,7 +2991,19 @@ const registerForEvent = async ({ eventId, name, contact, email }) => {
   }
 
   const rows = await getEvents();
-  return rows.find((entry) => entry.id === Number(eventId)) || null;
+  const updatedEvent = rows.find((entry) => entry.id === Number(eventId)) || null;
+  const registration = registrationResult.rows?.[0];
+  return updatedEvent ? {
+    ...updatedEvent,
+    registration: registration ? {
+      id: `evt-reg-${registration.id}`,
+      name: registration.name || '',
+      email: registration.email || '',
+      contact: registration.contact || '',
+      status: String(registration.status || 'confirmed').toLowerCase(),
+      createdAt: registration.created_at || ''
+    } : null
+  } : null;
 };
 
 const removeEventRegistrant = async ({ eventId, registrantId }) => {
@@ -2998,6 +3012,7 @@ const removeEventRegistrant = async ({ eventId, registrantId }) => {
   }
 
   const numericRegistrantId = Number(String(registrantId).replace('evt-reg-', ''));
+  let promotedRegistration = null;
 
   const deleteResult = await pool.query(
     `
@@ -3030,7 +3045,7 @@ const removeEventRegistrant = async ({ eventId, registrantId }) => {
         ORDER BY created_at ASC
         LIMIT 1
       )
-      RETURNING id;
+      RETURNING id, event_id, name, email, contact, status, created_at;
       `,
       [eventId]
     );
@@ -3045,11 +3060,122 @@ const removeEventRegistrant = async ({ eventId, registrantId }) => {
         `,
         [eventId]
       );
+      const promoted = promoteResult.rows[0];
+      promotedRegistration = {
+        id: `evt-reg-${promoted.id}`,
+        name: promoted.name || '',
+        email: promoted.email || '',
+        contact: promoted.contact || '',
+        status: String(promoted.status || 'confirmed').toLowerCase(),
+        createdAt: promoted.created_at || ''
+      };
     }
   }
 
-  const rows = await getEvents();
-  return rows.find((entry) => entry.id === Number(eventId)) || null;
+  const rows = await getEvents({ includeInactive: true });
+  const updatedEvent = rows.find((entry) => entry.id === Number(eventId)) || null;
+  return updatedEvent ? {
+    ...updatedEvent,
+    promotedRegistration
+  } : null;
+};
+
+const updateEventRegistrantStatus = async ({ eventId, registrantId, status }) => {
+  if (!pool) {
+    throw new Error('Database is not configured.');
+  }
+
+  const normalizedStatus = String(status || '').trim().toLowerCase();
+  if (!['confirmed', 'waitlisted'].includes(normalizedStatus)) {
+    const error = new Error('Registration status must be confirmed or waitlisted.');
+    error.status = 400;
+    throw error;
+  }
+
+  const numericRegistrantId = Number(String(registrantId).replace('evt-reg-', ''));
+  const existingResult = await pool.query(
+    `
+    SELECT id, event_id, name, email, contact, status, created_at
+    FROM event_registrants
+    WHERE id = $1 AND event_id = $2
+    LIMIT 1;
+    `,
+    [numericRegistrantId, eventId]
+  );
+  const existing = existingResult.rows?.[0];
+  if (!existing) {
+    const error = new Error('Event registration not found.');
+    error.status = 404;
+    throw error;
+  }
+
+  const previousStatus = String(existing.status || 'confirmed').toLowerCase();
+  if (previousStatus === 'waitlisted' && normalizedStatus === 'confirmed') {
+    const capacityResult = await pool.query(
+      `
+      SELECT
+        e.capacity,
+        COUNT(r.id) FILTER (WHERE r.status = 'confirmed')::int AS confirmed_count
+      FROM events e
+      LEFT JOIN event_registrants r ON r.event_id = e.id
+      WHERE e.id = $1
+      GROUP BY e.id;
+      `,
+      [eventId]
+    );
+    const eventCapacity = capacityResult.rows?.[0];
+    if (!eventCapacity) {
+      const error = new Error('Event not found.');
+      error.status = 404;
+      throw error;
+    }
+    const capacity = Math.max(0, Number(eventCapacity.capacity || 0));
+    const confirmedCount = Number(eventCapacity.confirmed_count || 0);
+    if (capacity > 0 && confirmedCount >= capacity) {
+      const error = new Error('Event capacity is full. Remove a confirmed registration before promoting someone from the waitlist.');
+      error.status = 409;
+      throw error;
+    }
+  }
+
+  const updateResult = await pool.query(
+    `
+    UPDATE event_registrants
+    SET status = $3
+    WHERE id = $1 AND event_id = $2
+    RETURNING id, event_id, name, email, contact, status, created_at;
+    `,
+    [numericRegistrantId, eventId, normalizedStatus]
+  );
+
+  if (previousStatus !== normalizedStatus) {
+    const registrationDelta = normalizedStatus === 'confirmed' ? 1 : -1;
+    await pool.query(
+      `
+      UPDATE events
+      SET registrations = GREATEST(0, registrations + $2),
+          updated_at = NOW()
+      WHERE id = $1;
+      `,
+      [eventId, registrationDelta]
+    );
+  }
+
+  const rows = await getEvents({ includeInactive: true });
+  const updatedEvent = rows.find((entry) => entry.id === Number(eventId)) || null;
+  const registration = updateResult.rows?.[0];
+  return updatedEvent ? {
+    ...updatedEvent,
+    previousRegistrationStatus: previousStatus,
+    registration: registration ? {
+      id: `evt-reg-${registration.id}`,
+      name: registration.name || '',
+      email: registration.email || '',
+      contact: registration.contact || '',
+      status: String(registration.status || 'confirmed').toLowerCase(),
+      createdAt: registration.created_at || ''
+    } : null
+  } : null;
 };
 
 const normalizeComparableContact = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -3330,6 +3456,7 @@ module.exports = {
   updateEvent,
   removeEvent,
   registerForEvent,
+  updateEventRegistrantStatus,
   removeEventRegistrant,
   getUserRegistrationDependencies,
   markUserRegistrationsDormant,

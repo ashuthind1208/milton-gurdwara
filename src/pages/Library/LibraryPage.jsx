@@ -27,6 +27,7 @@ import Seo from '../../components/common/Seo';
 import Card from '../../components/ui/Card';
 import libraryService from '../../services/libraryService';
 import eventService from '../../services/eventService';
+import { isLibraryProgramCurrent } from '../../utils/eventAvailability';
 import advertisementService from '../../services/advertisementService';
 import kidsLearningService from '../../services/kidsLearningService';
 import kidsQuizBankService from '../../services/kidsQuizBankService';
@@ -241,6 +242,10 @@ const LibraryPage = () => {
   const physicalBooks = useMemo(() => libraryData?.physicalBooks || [], [libraryData]);
   const digitalResources = useMemo(() => libraryData?.digitalResources || [], [libraryData]);
   const programUpdates = useMemo(() => libraryData?.programUpdates || [], [libraryData]);
+  const currentProgramUpdates = useMemo(
+    () => programUpdates.filter((entry) => isLibraryProgramCurrent(entry)),
+    [programUpdates]
+  );
   const mediaResources = useMemo(() => libraryData?.mediaResources || [], [libraryData]);
   const libraryTopAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Library Top Banner').slice(0, 2), [ads]);
   const libraryFooterAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Library Footer Banner').slice(0, 2), [ads]);
@@ -276,8 +281,8 @@ const LibraryPage = () => {
   );
 
   const sessionModalEntry = useMemo(
-    () => programUpdates.find((entry) => entry.id === sessionModalId) || null,
-    [programUpdates, sessionModalId]
+    () => currentProgramUpdates.find((entry) => entry.id === sessionModalId) || null,
+    [currentProgramUpdates, sessionModalId]
   );
 
   const mediaModalEntry = useMemo(
@@ -307,7 +312,7 @@ const LibraryPage = () => {
 
   const libraryTickerItems = useMemo(() => {
     const items = [
-      ...programUpdates.slice(0, 4).map((entry) => ({
+      ...currentProgramUpdates.slice(0, 4).map((entry) => ({
         id: `event-${entry.id}`,
         icon: CalendarDaysIcon,
         primary: `New library event: ${entry.title || 'Library Session'}`,
@@ -328,15 +333,15 @@ const LibraryPage = () => {
     ];
 
     return items.slice(0, 12);
-  }, [programUpdates, physicalBooks, mediaResources]);
+  }, [currentProgramUpdates, physicalBooks, mediaResources]);
 
   const sortedProgramUpdates = useMemo(() => {
-    return [...programUpdates].sort((left, right) => {
+    return [...currentProgramUpdates].sort((left, right) => {
       const leftStamp = `${left.scheduleDate || '1970-01-01'}T${left.scheduleTime || '00:00'}`;
       const rightStamp = `${right.scheduleDate || '1970-01-01'}T${right.scheduleTime || '00:00'}`;
       return new Date(leftStamp).getTime() - new Date(rightStamp).getTime();
     });
-  }, [programUpdates]);
+  }, [currentProgramUpdates]);
 
   const programEventsTotalPages = Math.max(1, Math.ceil(sortedProgramUpdates.length / PAGE_SIZE));
   const visibleProgramEvents = useMemo(() => {

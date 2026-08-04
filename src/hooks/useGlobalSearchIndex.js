@@ -5,6 +5,7 @@ import newsService from '../services/newsService';
 import libraryService from '../services/libraryService';
 import volunteerService from '../services/volunteerService';
 import cmsService from '../services/cmsService';
+import { isEventCurrent, isLibraryProgramCurrent } from '../utils/eventAvailability';
 
 const CMS_PAGE_ROUTE_MAP = {
   about: '/about',
@@ -27,16 +28,18 @@ const toDateLabel = (value = '') => {
   });
 };
 
-const normalizeEvents = (events = []) => (Array.isArray(events) ? events : []).map((event) => ({
-  id: `event-${event.id}`,
-  type: 'event',
-  title: String(event.title || 'Event').trim(),
-  subtitle: `${toDateLabel(event.date)}${event.location ? ` - ${event.location}` : ''}`.trim(),
-  body: String(event.description || '').trim(),
-  keywords: [event.category, event.location].filter(Boolean),
-  route: '/events',
-  updatedAt: event.updatedAt || event.date || ''
-}));
+const normalizeEvents = (events = []) => (Array.isArray(events) ? events : [])
+  .filter((event) => isEventCurrent(event))
+  .map((event) => ({
+    id: `event-${event.id}`,
+    type: 'event',
+    title: String(event.title || 'Event').trim(),
+    subtitle: `${toDateLabel(event.date)}${event.location ? ` - ${event.location}` : ''}`.trim(),
+    body: String(event.description || '').trim(),
+    keywords: [event.category, event.location].filter(Boolean),
+    route: '/events',
+    updatedAt: event.updatedAt || event.date || ''
+  }));
 
 const normalizeNews = (articles = []) => (Array.isArray(articles) ? articles : [])
   .filter((article) => newsService.isLiveArticle(article))
@@ -79,16 +82,18 @@ const normalizeLibrary = (payload = {}) => {
     updatedAt: entry.updatedAt || ''
   }));
 
-  const programRows = programUpdates.map((entry) => ({
-    id: `library-program-${entry.id}`,
-    type: 'library',
-    title: String(entry.title || 'Library Program').trim(),
-    subtitle: `${entry.scheduleDate || ''}${entry.scheduleTime ? ` - ${entry.scheduleTime}` : ''}`.trim(),
-    body: String(entry.summary || '').trim(),
-    keywords: [entry.speaker, entry.audience, entry.location].filter(Boolean),
-    route: '/library',
-    updatedAt: entry.updatedAt || entry.scheduleDate || ''
-  }));
+  const programRows = programUpdates
+    .filter((entry) => isLibraryProgramCurrent(entry))
+    .map((entry) => ({
+      id: `library-program-${entry.id}`,
+      type: 'library',
+      title: String(entry.title || 'Library Program').trim(),
+      subtitle: `${entry.scheduleDate || ''}${entry.scheduleTime ? ` - ${entry.scheduleTime}` : ''}`.trim(),
+      body: String(entry.summary || '').trim(),
+      keywords: [entry.speaker, entry.audience, entry.location].filter(Boolean),
+      route: '/library',
+      updatedAt: entry.updatedAt || entry.scheduleDate || ''
+    }));
 
   return [...bookRows, ...digitalRows, ...programRows];
 };

@@ -35,6 +35,16 @@ const eventService = {
     return { data: response.data?.data };
   },
 
+  updateRegistrantStatus: async ({ eventId, registrantId, status }) => {
+    const normalizedEventId = String(eventId || '').trim();
+    const response = await apiClient.post('/events/registrant/status', {
+      eventId: normalizedEventId,
+      registrantId,
+      status
+    });
+    return { data: response.data?.data };
+  },
+
   runEventReminders: async (force = false) => {
     const response = await apiClient.post('/events/reminders/run', { force: Boolean(force) });
     return { data: response.data?.data };

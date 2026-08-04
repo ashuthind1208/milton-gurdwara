@@ -2396,6 +2396,138 @@ const sendEventReminderEmail = async (registration, options = {}) => {
   }
 };
 
+const buildRegistrationStatusEmail = ({ registration = {}, kind = 'event', promoted = false }) => {
+  const isSeva = kind === 'seva';
+  const status = String(registration.status || 'confirmed').trim().toLowerCase();
+  const isWaitlisted = status === 'waitlisted';
+  const itemLabel = isSeva
+    ? String(registration.sevaType || registration.area || 'Seva Opportunity').trim()
+    : String(registration.eventTitle || registration.title || 'Event').trim();
+  const dateValue = isSeva ? registration.sevaDate : registration.eventDate;
+  const dateLabel = isSeva
+    ? formatSevaDateLabel(dateValue)
+    : formatDateTimeLabel(dateValue, 'Date TBD');
+  const timeLabel = isSeva
+    ? String(registration.sevaTime || 'Time TBD').trim()
+    : dateLabel;
+  const locationLabel = isSeva
+    ? volunteerReminderSiteName
+    : String(registration.eventLocation || volunteerReminderSiteName).trim();
+  const recipientName = String(registration.name || 'Sangat Member').trim();
+  const logoSrc = volunteerReminderLogoUrl || `${volunteerReminderBaseUrl}/gurdwara-logo.webp` || embeddedVolunteerReminderLogo;
+  const baseUrl = String(volunteerReminderBaseUrl || 'https://singhsabhamilton.com').trim().replace(/\/+$/, '');
+  const detailsUrl = `${baseUrl}/${isSeva ? 'seva' : 'events'}`;
+  const contactUrl = `${baseUrl}/contact`;
+  const typeLabel = isSeva ? 'Seva' : 'Event';
+  const statusLabel = isWaitlisted ? 'Waitlisted' : 'Confirmed';
+  const heading = promoted ? `${typeLabel} Registration Confirmed` : `${typeLabel} Registration ${statusLabel}`;
+  const subject = promoted
+    ? `Your spot is confirmed: ${itemLabel}`
+    : `${typeLabel} registration ${statusLabel.toLowerCase()}: ${itemLabel}`;
+  const explanation = promoted
+    ? 'A spot has opened and your registration has been moved from the waitlist to confirmed.'
+    : isWaitlisted
+      ? 'We received your registration. The confirmed spaces are currently full, so you have been added to the waitlist. We will email you if a spot opens.'
+      : 'We received your registration and your spot is confirmed.';
+  const preparationNote = isWaitlisted
+    ? 'No action is needed while you are on the waitlist.'
+    : isSeva
+      ? 'Please arrive a little early and check in with the seva coordinator.'
+      : 'Please arrive a few minutes early so the program can begin on time.';
+  const detailRows = [
+    [typeLabel, itemLabel],
+    ['Date', dateLabel],
+    ...(isSeva ? [['Time', timeLabel]] : []),
+    ['Location', locationLabel],
+    ['Status', statusLabel]
+  ];
+  const greetingLine = 'ਵਾਹਿਗੁਰੂ ਜੀ ਕਾ ਖਾਲਸਾ, ਵਾਹਿਗੁਰੂ ਜੀ ਕੀ ਫਤਿਹ';
+  const text = [
+    greetingLine,
+    '',
+    `${recipientName},`,
+    '',
+    explanation,
+    '',
+    ...detailRows.map(([label, value]) => `${label}: ${value}`),
+    '',
+    preparationNote,
+    `Details: ${detailsUrl}`,
+    `Contact: ${contactUrl}`,
+    '',
+    volunteerReminderSiteName,
+    '7035 Sixth Line, Milton ON | +1 (905) 546-7035 | singhsabhamilton@gmail.com'
+  ].join('\n');
+  const rowsHtml = detailRows.map(([label, value], index) => `
+            <tr>
+              <td style="width:34%;padding:12px 14px;background:#eef5ff;${index < detailRows.length - 1 ? 'border-bottom:1px solid #d7e3f3;' : ''}font-size:14px;font-weight:700;color:#0a4d9f;">${escapeHtml(label)}</td>
+              <td style="padding:12px 14px;${index < detailRows.length - 1 ? 'border-bottom:1px solid #d7e3f3;' : ''}font-size:16px;font-weight:800;color:#0f172a;">${escapeHtml(value)}</td>
+            </tr>`).join('');
+  const html = `
+  <div style="background:#f5f8fc;padding:28px 14px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:760px;margin:0 auto;background:#ffffff;border:1px solid #dbe7f6;border-radius:14px;overflow:hidden;">
+      <tr><td style="padding:16px 22px;background:linear-gradient(90deg,#0a4d9f,#0b67c2,#e58b16);color:#ffffff;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
+          ${logoSrc ? `<td style="width:44px;padding-right:12px;"><img src="${escapeHtml(logoSrc)}" alt="${escapeHtml(volunteerReminderSiteName)} logo" width="44" height="44" style="display:block;border-radius:9999px;background:#ffffff;object-fit:cover;"/></td>` : ''}
+          <td><div style="font-size:13px;font-weight:700;text-transform:uppercase;">${escapeHtml(volunteerReminderSiteName)}</div><div style="font-size:18px;font-weight:800;margin-top:2px;">${escapeHtml(heading)}</div></td>
+        </tr></table>
+      </td></tr>
+      <tr><td style="padding:22px 28px 28px;">
+        <div style="font-size:19px;line-height:1.45;font-weight:800;">${escapeHtml(greetingLine)}</div>
+        <div style="margin-top:8px;font-size:16px;font-weight:600;color:#334155;">${escapeHtml(recipientName)},</div>
+        <div style="margin-top:14px;font-size:15px;line-height:1.8;color:#334155;">${escapeHtml(explanation)}</div>
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top:16px;border:1px solid #d7e3f3;border-radius:12px;overflow:hidden;background:#fbfdff;">${rowsHtml}</table>
+        <div style="margin-top:16px;font-size:15px;line-height:1.8;color:#334155;">${escapeHtml(preparationNote)}</div>
+        <div style="margin-top:16px;"><a href="${escapeHtml(detailsUrl)}" style="display:inline-block;border-radius:8px;background:#0b67c2;padding:11px 16px;color:#ffffff;text-decoration:none;font-size:13px;font-weight:700;">View ${escapeHtml(typeLabel)} Details</a></div>
+        <div style="margin-top:18px;border-top:1px solid #e2e8f0;padding-top:12px;font-size:12px;line-height:1.8;color:#64748b;">
+          <div style="font-weight:700;color:#334155;">${escapeHtml(volunteerReminderSiteName)}</div>
+          <div>7035 Sixth Line, Milton ON | +1 (905) 546-7035</div>
+          <div><a href="mailto:singhsabhamilton@gmail.com" style="color:#0b67c2;text-decoration:none;">singhsabhamilton@gmail.com</a> | <a href="${escapeHtml(contactUrl)}" style="color:#0b67c2;text-decoration:none;">Contact us</a></div>
+        </div>
+      </td></tr>
+    </table>
+  </div>`;
+
+  return { subject, text, html };
+};
+
+const sendRegistrationStatusEmail = async ({ registration, kind, promoted = false }) => {
+  const email = String(registration?.email || '').trim().toLowerCase();
+  if (!isValidEmailAddress(email)) {
+    return { sent: false, reason: 'invalid_email' };
+  }
+
+  const template = buildRegistrationStatusEmail({ registration, kind, promoted });
+  try {
+    const response = await fetch(kind === 'seva' ? volunteerReminderWebhookUrl : eventReminderWebhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: `${kind}-registration-${promoted ? 'promoted' : 'acknowledgement'}`,
+        to: email,
+        email,
+        name: registration.name,
+        subject: template.subject,
+        message: template.text,
+        text: template.text,
+        html: template.html,
+        bodyHtml: template.html,
+        bodyText: template.text,
+        templateType: 'html',
+        metadata: {
+          registrationId: registration.id,
+          registrationStatus: registration.status,
+          promoted
+        },
+        sentAt: new Date().toISOString()
+      })
+    });
+    return response.ok ? { sent: true } : { sent: false, reason: 'webhook_error' };
+  } catch {
+    return { sent: false, reason: 'network_error' };
+  }
+};
+
 const buildDonationInvoiceEmail = ({ donation = {}, organizationName = '', campaignDescription = '', address = '', phone = '' }) => {
   const donorName = String(donation.donorName || 'Sangat Member').trim();
   const donorEmail = String(donation.donorEmail || '').trim().toLowerCase();
@@ -4489,6 +4621,178 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (requestUrl.pathname === '/api/volunteer-registrations' && request.method === 'POST') {
+    try {
+      const body = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
+      ensureNoUnknownKeys(body, [
+        'opportunityId', 'name', 'email', 'phone', 'whatsapp', 'contactPreference',
+        'wantsEventEmails', 'notes', 'isAuthenticated'
+      ]);
+      const opportunityId = readStringField(body, 'opportunityId', { required: true, max: 128, pattern: simpleIdPattern });
+      const name = readStringField(body, 'name', { required: true, min: 2, max: 120 });
+      const email = readEmailField(body, 'email', { required: false });
+      const phone = readPhoneField(body, 'phone');
+      const whatsapp = readPhoneField(body, 'whatsapp');
+      const contactPreference = readStringField(body, 'contactPreference', { max: 20 }) || 'Email';
+      const wantsEventEmails = readBooleanField(body, 'wantsEventEmails');
+      const notes = readStringField(body, 'notes', { max: 1000 });
+      readBooleanField(body, 'isAuthenticated');
+      assertInput(Boolean(email || phone || whatsapp), 'Either email or phone is required.');
+
+      const opportunities = await eventsDb.listItems('seva_opportunities');
+      const opportunity = opportunities.find((entry) => String(entry?.id || '') === opportunityId);
+      if (!opportunity) {
+        const error = new Error('Please select a valid seva opportunity.');
+        error.status = 404;
+        throw error;
+      }
+
+      const todayDateKey = toDateKeyFromParts(getDatePartsInTimeZone(new Date(), volunteerReminderTimeZone));
+      const opportunityDate = String(opportunity.date || '').slice(0, 10);
+      const expiryDate = String(opportunity.expiryDate || opportunity.date || '').slice(0, 10);
+      if (opportunity.active === false || (opportunityDate && opportunityDate < todayDateKey) || (expiryDate && expiryDate < todayDateKey)) {
+        const error = new Error('Registration is closed for this seva opportunity.');
+        error.status = 409;
+        throw error;
+      }
+
+      const registrations = await eventsDb.listItems('volunteer_registrations');
+      const matching = registrations.filter((entry) => String(entry?.opportunityId || '') === opportunityId);
+      const normalizedEmail = String(email || '').trim().toLowerCase();
+      const normalizedPhone = String(phone || whatsapp || '').replace(/\D/g, '');
+      const duplicate = matching.some((entry) => {
+        const entryEmail = String(entry?.email || '').trim().toLowerCase();
+        const entryPhone = String(entry?.phone || entry?.whatsapp || '').replace(/\D/g, '');
+        return normalizedEmail
+          ? Boolean(entryEmail && entryEmail === normalizedEmail)
+          : Boolean(normalizedPhone && entryPhone && entryPhone === normalizedPhone);
+      });
+      if (duplicate) {
+        const error = new Error('You have already registered for this seva opportunity.');
+        error.status = 409;
+        throw error;
+      }
+
+      const confirmedCount = matching.filter((entry) => String(entry?.status || 'confirmed').toLowerCase() !== 'waitlisted').length;
+      const totalRequired = Math.max(1, Number(opportunity.totalVolunteersRequired) || 1);
+      const isAtCapacity = confirmedCount >= totalRequired;
+      if (isAtCapacity && opportunity.waitlistEnabled === false) {
+        const error = new Error('Volunteer limit reached for this seva opportunity.');
+        error.status = 409;
+        throw error;
+      }
+
+      const status = isAtCapacity ? 'waitlisted' : 'confirmed';
+      const record = {
+        id: `vol-${Date.now()}`,
+        name,
+        email: normalizedEmail,
+        phone: phone || '',
+        whatsapp: whatsapp || '',
+        opportunityId,
+        area: opportunity.sevaType || '',
+        sevaType: opportunity.sevaType || '',
+        sevaDate: opportunity.date || '',
+        sevaTime: opportunity.time || '',
+        contactPreference,
+        wantsEventEmails: wantsEventEmails !== false,
+        notes: notes || '',
+        status,
+        date: todayDateKey,
+        createdAt: new Date().toISOString()
+      };
+      const created = await eventsDb.createItem('volunteer_registrations', record);
+      const emailResult = await sendRegistrationStatusEmail({ registration: created, kind: 'seva' });
+      const waitlistCount = matching.filter((entry) => String(entry?.status || '').toLowerCase() === 'waitlisted').length
+        + (status === 'waitlisted' ? 1 : 0);
+      await appendAuditLog(request, {
+        action: 'volunteer.registration.create',
+        targetType: 'seva_opportunity',
+        targetId: opportunityId,
+        description: `Registered ${email || phone || name} for seva`,
+        payload: { opportunityId, registrationId: created?.id, status }
+      });
+      sendJson(response, 200, {
+        ok: true,
+        data: {
+          success: true,
+          payload: created,
+          waitlisted: status === 'waitlisted',
+          status,
+          waitlistCount,
+          emailSent: emailResult.sent === true
+        }
+      });
+    } catch (error) {
+      sendJson(response, error.status || 500, {
+        ok: false,
+        message: error.message || 'Unable to register for seva.'
+      });
+    }
+    return;
+  }
+
+  const volunteerStatusMatch = requestUrl.pathname.match(/^\/api\/volunteer-registrations\/([^/]+)\/status$/i);
+  if (volunteerStatusMatch && request.method === 'POST') {
+    try {
+      const registrationId = parseStringPathId(decodeURIComponent(volunteerStatusMatch[1]), 'registration id');
+      const body = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
+      ensureNoUnknownKeys(body, ['status']);
+      const status = readStringField(body, 'status', { required: true, max: 20 }).toLowerCase();
+      assertInput(['confirmed', 'waitlisted'].includes(status), 'status must be confirmed or waitlisted.');
+
+      const registrations = await eventsDb.listItems('volunteer_registrations');
+      const existing = registrations.find((entry) => String(entry?.id || '') === registrationId);
+      if (!existing) {
+        const error = new Error('Seva registration not found.');
+        error.status = 404;
+        throw error;
+      }
+
+      const previousStatus = String(existing.status || 'confirmed').toLowerCase();
+      const opportunityId = String(existing.opportunityId || '').trim();
+      if (previousStatus === 'waitlisted' && status === 'confirmed') {
+        const opportunities = await eventsDb.listItems('seva_opportunities');
+        const opportunity = opportunities.find((entry) => String(entry?.id || '') === opportunityId);
+        if (!opportunity) {
+          const error = new Error('Seva opportunity not found.');
+          error.status = 404;
+          throw error;
+        }
+        const confirmedCount = registrations.filter((entry) => (
+          String(entry?.opportunityId || '') === opportunityId
+          && String(entry?.status || 'confirmed').toLowerCase() !== 'waitlisted'
+        )).length;
+        const totalRequired = Math.max(1, Number(opportunity.totalVolunteersRequired) || 1);
+        if (confirmedCount >= totalRequired) {
+          const error = new Error('Seva capacity is full. Remove a confirmed volunteer before promoting someone from the waitlist.');
+          error.status = 409;
+          throw error;
+        }
+      }
+
+      const updated = await eventsDb.updateItem('volunteer_registrations', registrationId, { ...existing, status });
+      const promoted = previousStatus === 'waitlisted' && status === 'confirmed';
+      const emailResult = promoted
+        ? await sendRegistrationStatusEmail({ registration: updated, kind: 'seva', promoted: true })
+        : { sent: false, reason: 'not_promoted' };
+      await appendAuditLog(request, {
+        action: 'volunteer.registration.status',
+        targetType: 'seva_opportunity',
+        targetId: opportunityId,
+        description: `Updated seva registration ${registrationId} to ${status}`,
+        payload: { registrationId, opportunityId, status }
+      });
+      sendJson(response, 200, { ok: true, data: { ...updated, previousStatus, emailSent: emailResult.sent === true } });
+    } catch (error) {
+      sendJson(response, error.status || 500, {
+        ok: false,
+        message: error.message || 'Unable to update seva registration status.'
+      });
+    }
+    return;
+  }
+
   const contentResourceMatch = requestUrl.pathname.match(/^\/api\/content\/([a-z0-9_-]+)$/i);
   if (contentResourceMatch && request.method === 'GET') {
     try {
@@ -4928,6 +5232,10 @@ const server = http.createServer(async (request, response) => {
         body.wantsEventEmails = wantsEventEmails;
       }
       const data = await eventsDb.registerForEvent(body);
+      const registration = data?.registration ? normalizeEventRegistrantForReminder(data.registration, data) : null;
+      const emailResult = registration
+        ? await sendRegistrationStatusEmail({ registration, kind: 'event' })
+        : { sent: false, reason: 'missing_registration' };
       await appendAuditLog(request, {
         action: 'event.register',
         targetType: 'event',
@@ -4940,11 +5248,42 @@ const server = http.createServer(async (request, response) => {
           contact: body?.contact
         }
       });
-      sendJson(response, 200, { ok: true, data });
+      sendJson(response, 200, { ok: true, data: { ...data, emailSent: emailResult.sent === true } });
     } catch (error) {
       sendJson(response, error.status || 500, {
         ok: false,
         message: error.message || 'Unable to register for event.'
+      });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/events/registrant/status' && request.method === 'POST') {
+    try {
+      const body = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
+      ensureNoUnknownKeys(body, ['eventId', 'registrantId', 'status']);
+      const eventId = readStringField(body, 'eventId', { required: true, max: 12, pattern: /^\d{1,12}$/ });
+      const registrantId = readStringField(body, 'registrantId', { required: true, max: 128, pattern: simpleIdPattern });
+      const status = readStringField(body, 'status', { required: true, max: 20 }).toLowerCase();
+      assertInput(['confirmed', 'waitlisted'].includes(status), 'status must be confirmed or waitlisted.');
+      const data = await eventsDb.updateEventRegistrantStatus({ eventId, registrantId, status });
+      const registration = data?.registration ? normalizeEventRegistrantForReminder(data.registration, data) : null;
+      const wasPromoted = data?.previousRegistrationStatus === 'waitlisted' && status === 'confirmed';
+      const emailResult = wasPromoted && registration
+        ? await sendRegistrationStatusEmail({ registration, kind: 'event', promoted: true })
+        : { sent: false, reason: 'not_promoted' };
+      await appendAuditLog(request, {
+        action: 'event.registrant.status',
+        targetType: 'event',
+        targetId: String(eventId),
+        description: `Updated event registrant ${registrantId} to ${status}`,
+        payload: { eventId, registrantId, status }
+      });
+      sendJson(response, 200, { ok: true, data: { ...data, emailSent: emailResult.sent === true } });
+    } catch (error) {
+      sendJson(response, error.status || 500, {
+        ok: false,
+        message: error.message || 'Unable to update event registration status.'
       });
     }
     return;
@@ -4959,6 +5298,12 @@ const server = http.createServer(async (request, response) => {
       body.eventId = eventId;
       body.registrantId = registrantId;
       const data = await eventsDb.removeEventRegistrant(body);
+      const promotedRegistration = data?.promotedRegistration
+        ? normalizeEventRegistrantForReminder(data.promotedRegistration, data)
+        : null;
+      const promotionEmailResult = promotedRegistration
+        ? await sendRegistrationStatusEmail({ registration: promotedRegistration, kind: 'event', promoted: true })
+        : { sent: false, reason: 'no_promotion' };
       await appendAuditLog(request, {
         action: 'event.registrant.remove',
         targetType: 'event',
@@ -4969,7 +5314,7 @@ const server = http.createServer(async (request, response) => {
           registrantId: body?.registrantId
         }
       });
-      sendJson(response, 200, { ok: true, data });
+      sendJson(response, 200, { ok: true, data: { ...data, promotionEmailSent: promotionEmailResult.sent === true } });
     } catch (error) {
       sendJson(response, error.status || 500, {
         ok: false,

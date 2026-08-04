@@ -12,6 +12,7 @@ import donationService from '../../services/donationService';
 import volunteerService from '../../services/volunteerService';
 import { downloadCsv, downloadDonationInvoicePdf } from '../../utils/csvExport';
 import { siteConfig } from '../../constants/siteConfig';
+import { isEventCurrent } from '../../utils/eventAvailability';
 
 const toDateKey = (value) => {
   const parsed = new Date(value);
@@ -131,7 +132,7 @@ const FamilyDashboardPage = () => {
     }
 
     const rows = [];
-    events.forEach((event) => {
+    events.filter((event) => isEventCurrent(event)).forEach((event) => {
       const registrants = Array.isArray(event.registrants) ? event.registrants : [];
       registrants.forEach((entry) => {
         const entryName = String(entry.name || '').trim().toLowerCase();

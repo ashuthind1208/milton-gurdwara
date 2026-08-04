@@ -21,6 +21,7 @@ import contentApiService from '../../services/contentApiService';
 import PhoneNumberRequiredNotice from '../../components/common/PhoneNumberRequiredNotice';
 import PhoneInput from '../../components/forms/PhoneInput';
 import { formatTenDigitPhone, isTenDigitPhone, TEN_DIGIT_PHONE_ERROR } from '../../utils/phone';
+import { isEventCurrent } from '../../utils/eventAvailability';
 
 const locales = { 'en-US': enUS };
 const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales });
@@ -40,24 +41,6 @@ const categoryDotClass = {
 const normalizeTextToken = (value) => String(value || '').trim().toLowerCase();
 const normalizePhoneToken = (value) => String(value || '').replace(/\D/g, '');
 const EVENTS_IDENTITY_SETTING_KEY = 'settings-events-allow-custom-name-email';
-
-const toEventTimestamp = (value) => {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-  return parsed.getTime();
-};
-
-const isEventAvailable = (event, now = Date.now()) => {
-  const endStamp = toEventTimestamp(event?.endDate || event?.end);
-  const startStamp = toEventTimestamp(event?.date);
-  const referenceStamp = Number.isFinite(endStamp) ? endStamp : startStamp;
-  if (!Number.isFinite(referenceStamp)) {
-    return true;
-  }
-  return referenceStamp >= now;
-};
 
 const EventsPage = () => {
   const meta = useSeoMeta('Events', 'Event calendar, list view, filters, and RSVP registration for all programs.');
@@ -139,7 +122,7 @@ const EventsPage = () => {
         throw new Error('You have already registered for this event.');
       }
 
-      if (!isEventAvailable(selectedEvent)) {
+      if (!isEventCurrent(selectedEvent)) {
         throw new Error('This event is no longer available for registration.');
       }
 
@@ -212,12 +195,12 @@ const EventsPage = () => {
   const selectedEventConfirmedRegistrations = Number(selectedEvent?.registrations || 0);
   const selectedEventIsFull = selectedEventCapacity > 0 && selectedEventConfirmedRegistrations >= selectedEventCapacity;
   const selectedEventWaitlistEnabled = selectedEvent?.waitlistEnabled !== false;
-  const isSelectedEventAvailable = Boolean(selectedEvent) && isEventAvailable(selectedEvent);
+  const isSelectedEventAvailable = Boolean(selectedEvent) && isEventCurrent(selectedEvent);
   const canRegisterForSelectedEvent = isSelectedEventAvailable && (!selectedEventIsFull || selectedEventWaitlistEnabled);
 
   const activeEvents = useMemo(() => {
     const now = Date.now();
-    return events.filter((event) => event.active !== false && isEventAvailable(event, now));
+    return events.filter((event) => event.active !== false && isEventCurrent(event, now));
   }, [events]);
 
   const filtered = useMemo(

@@ -44,6 +44,7 @@ import userService from '../../services/userService';
 import addressLookupService from '../../services/addressLookupService';
 import { useAuth } from '../../context/AuthContext';
 import { formatTenDigitPhone, isTenDigitPhone, TEN_DIGIT_PHONE_ERROR } from '../../utils/phone';
+import { isEventCurrent } from '../../utils/eventAvailability';
 import PhoneInput from '../forms/PhoneInput';
 import StreamingModal from '../common/StreamingModal';
 import AudioPillPlayer from '../common/AudioPillPlayer';
@@ -206,20 +207,6 @@ const extractRangeEndMinutes = (value) => {
 const nowLocalMinutes = () => {
   const now = new Date();
   return (now.getHours() * 60) + now.getMinutes();
-};
-
-const isEventAvailable = (event, now = Date.now()) => {
-  const endStamp = Number.isNaN(new Date(event?.endDate || event?.end).getTime())
-    ? null
-    : new Date(event?.endDate || event?.end).getTime();
-  const startStamp = Number.isNaN(new Date(event?.date).getTime()) ? null : new Date(event?.date).getTime();
-  const referenceStamp = Number.isFinite(endStamp) ? endStamp : startStamp;
-
-  if (!Number.isFinite(referenceStamp)) {
-    return true;
-  }
-
-  return referenceStamp >= now;
 };
 
 const toBase64FromArrayBuffer = (buffer) => {
@@ -880,7 +867,7 @@ const Navbar = () => {
     }
 
     const now = Date.now();
-    return familyEvents.filter((event) => event?.active !== false && isEventAvailable(event, now));
+    return familyEvents.filter((event) => event?.active !== false && isEventCurrent(event, now));
   }, [familyEvents, isAuthenticated]);
   const visibleFamilySeva = useMemo(() => {
     if (!isAuthenticated) {

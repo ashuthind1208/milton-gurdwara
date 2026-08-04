@@ -166,25 +166,6 @@ const readRegistrations = async () => {
   return rows;
 };
 
-const countRegisteredForOpportunity = (opportunity, registrations) => registrations.filter((entry) => (
-  entry.opportunityId === opportunity.id ||
-  (!entry.opportunityId && (entry.sevaType || entry.area) === opportunity.sevaType && entry.sevaDate === opportunity.date)
-)).length;
-
-const countConfirmedForOpportunity = (opportunity, registrations) => registrations.filter((entry) => {
-  const sameOpportunity = entry.opportunityId === opportunity.id
-    || (!entry.opportunityId && (entry.sevaType || entry.area) === opportunity.sevaType && entry.sevaDate === opportunity.date);
-
-  if (!sameOpportunity) {
-    return false;
-  }
-
-  return normalizeComparableValue(entry.status) !== 'waitlisted';
-}).length;
-
-const normalizeComparableValue = (value) => String(value || '').trim().toLowerCase();
-const normalizeDigits = (value) => String(value || '').replace(/\D/g, '');
-
 const fetchJson = async (url, options = {}) => {
   const response = await fetch(url, options);
   const data = await response.json().catch(() => ({}));
@@ -242,100 +223,11 @@ const volunteerService = {
   },
 
   apply: async (payload) => {
-    const allRecords = await readRegistrations();
-    const allOpportunities = await ensureDefaultOpportunities();
-    const selectedOpportunity = allOpportunities.find((item) => item.id === payload.opportunityId);
-
-    if (!selectedOpportunity) {
-      throw new Error('Please select a valid seva opportunity.');
-    }
-
-    const today = toIsoDate(Date.now());
-    if (isOpportunityClosedByDate(selectedOpportunity, today)) {
-      throw new Error('Registration is closed for this seva opportunity.');
-    }
-
-    const confirmedCount = countConfirmedForOpportunity(selectedOpportunity, allRecords);
-    const isAtCapacity = confirmedCount >= selectedOpportunity.totalVolunteersRequired;
-
-    if (isAtCapacity && selectedOpportunity.waitlistEnabled === false) {
-      throw new Error('Volunteer limit reached for this seva opportunity.');
-    }
-
-    const payloadEmail = normalizeComparableValue(payload.email);
-    const payloadPhone = normalizeComparableValue(payload.phone);
-    const payloadPhoneDigits = normalizeDigits(payload.phone);
-    const canCheckByEmail = Boolean(payloadEmail);
-    const canCheckByPhone = !canCheckByEmail && Boolean(payloadPhoneDigits || payloadPhone);
-
-    if (!payloadEmail && !payloadPhoneDigits && !payloadPhone) {
-      throw new Error('Please provide at least an email or phone number.');
-    }
-
-    const alreadyRegistered = allRecords.some((entry) => {
-      const selectedDateKey = normalizeDateKey(selectedOpportunity.date);
-      const selectedTimeKey = normalizeComparableValue(selectedOpportunity.time);
-      const entryDateKey = normalizeDateKey(entry.sevaDate || entry.date);
-      const entryTimeKey = normalizeComparableValue(entry.sevaTime || entry.time);
-
-      const sameOpportunity =
-        String(entry.opportunityId || '').trim() === String(selectedOpportunity.id || '').trim()
-        || (
-          !entry.opportunityId
-          && normalizeComparableValue(entry.sevaType || entry.area) === normalizeComparableValue(selectedOpportunity.sevaType)
-          && entryDateKey === selectedDateKey
-          && entryTimeKey === selectedTimeKey
-        );
-
-      if (!sameOpportunity) {
-        return false;
-      }
-
-      const entryEmail = normalizeComparableValue(entry.email);
-      const entryPhone = normalizeComparableValue(entry.phone || entry.whatsapp);
-      const entryPhoneDigits = normalizeDigits(entry.phone || entry.whatsapp);
-
-      if (canCheckByEmail) {
-        return Boolean(payloadEmail && entryEmail && entryEmail === payloadEmail);
-      }
-
-      if (canCheckByPhone && payloadPhoneDigits && entryPhoneDigits && entryPhoneDigits === payloadPhoneDigits) {
-        return true;
-      }
-
-      if (canCheckByPhone && payloadPhone && entryPhone && entryPhone === payloadPhone) {
-        return true;
-      }
-
-      return false;
+    const response = await fetchJson('/api/volunteer-registrations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     });
-
-    if (alreadyRegistered) {
-      throw new Error('You have already registered for this seva opportunity.');
-    }
-
-    const registrationStatus = isAtCapacity ? 'waitlisted' : 'confirmed';
-
-    const record = {
-      id: `vol-${Date.now()}`,
-      name: payload.name,
-      email: payload.email,
-      phone: payload.phone,
-      whatsapp: payload.whatsapp,
-      opportunityId: selectedOpportunity.id,
-      area: selectedOpportunity.sevaType,
-      sevaType: selectedOpportunity.sevaType,
-      sevaDate: selectedOpportunity.date,
-      sevaTime: selectedOpportunity.time,
-      contactPreference: payload.contactPreference || 'Email',
-      wantsEventEmails: Boolean(payload.wantsEventEmails),
-      notes: payload.notes || '',
-      status: registrationStatus,
-      date: toIsoDate(Date.now()),
-      createdAt: new Date().toISOString()
-    };
-
-    await contentApiService.create(APPLICATIONS_RESOURCE, record);
 
     if (payload.isAuthenticated) {
       try {
@@ -350,15 +242,7 @@ const volunteerService = {
       }
     }
 
-    const waitlistCount = Math.max(0, countRegisteredForOpportunity(selectedOpportunity, allRecords) - confirmedCount);
-
-    return serviceResponse({
-      success: true,
-      payload: record,
-      waitlisted: registrationStatus === 'waitlisted',
-      status: registrationStatus,
-      waitlistCount: registrationStatus === 'waitlisted' ? waitlistCount + 1 : waitlistCount
-    });
+    return serviceResponse(response.data || {});
   },
 
   getApplications: async () => {
@@ -372,6 +256,15 @@ const volunteerService = {
     const updated = { ...existing, ...payload, id };
     await contentApiService.update(APPLICATIONS_RESOURCE, id, updated);
     return serviceResponse(updated);
+  },
+
+  updateApplicationStatus: async (id, status) => {
+    const response = await fetchJson(`/api/volunteer-registrations/${encodeURIComponent(id)}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    });
+    return serviceResponse(response.data || {});
   },
 
   removeApplication: async (id) => {
