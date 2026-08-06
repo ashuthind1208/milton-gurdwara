@@ -385,7 +385,7 @@ const EventsPage = () => {
           </div>
         </section>
       ) : null}
-      {content?.intro ? <p className="rounded-xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-700">{content.intro}</p> : null}
+      {content?.intro ? <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-700" dangerouslySetInnerHTML={{ __html: content.intro }} /> : null}
       <div className="grid gap-6 lg:grid-cols-[320px_1fr] xl:grid-cols-[340px_1fr]">
         <div className="space-y-4 rounded-2xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 p-4 lg:sticky lg:top-24 lg:self-start">
           <label className="block text-sm font-medium">

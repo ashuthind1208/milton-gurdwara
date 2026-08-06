@@ -249,9 +249,7 @@ const ContactPage = () => {
       ) : null}
 
       {content?.intro ? (
-        <p className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-relaxed text-slate-700">
-          {content.intro}
-        </p>
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-relaxed text-slate-700" dangerouslySetInnerHTML={{ __html: content.intro }} />
       ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
@@ -340,7 +338,7 @@ const ContactPage = () => {
           {(content.sections || []).map((section) => (
             <article key={section.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_35px_-38px_rgba(15,23,42,0.8)]">
               <h3 className="font-heading text-lg font-semibold text-brand-blue">{section.title}</h3>
-              <p className="mt-1 text-sm leading-relaxed text-slate-700">{section.body}</p>
+              <div className="mt-1 text-sm leading-relaxed text-slate-700" dangerouslySetInnerHTML={{ __html: section.body }} />
               {section.mediaUrl ? <img src={section.mediaUrl} alt={section.title} className="mt-3 h-48 w-full rounded-lg object-contain bg-slate-50" loading="lazy" /> : null}
             </article>
           ))}

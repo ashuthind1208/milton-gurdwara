@@ -8,6 +8,7 @@ import cmsService from '../../services/cmsService';
 import uploadService from '../../services/uploadService';
 import StatusAlert from '../../components/common/StatusAlert';
 import PhoneInput from '../../components/forms/PhoneInput';
+import RichTextEditor from '../../components/forms/RichTextEditor';
 import { isTenDigitPhone, TEN_DIGIT_PHONE_ERROR } from '../../utils/phone';
 
 const emptySlide = {
@@ -54,6 +55,8 @@ const AdminCmsPage = () => {
   const [slideUploadProgress, setSlideUploadProgress] = useState(0);
   const [sectionUploadProgress, setSectionUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState({ type: 'success', message: '' });
+  const [introHtml, setIntroHtml] = useState('');
+  const [sectionBodyHtml, setSectionBodyHtml] = useState('');
 
   const slideForm = useForm({ defaultValues: emptySlide });
   const pageForm = useForm({
@@ -95,6 +98,7 @@ const AdminCmsPage = () => {
       address: pageData.address || '',
       mapEmbedUrl: pageData.mapEmbedUrl || ''
     });
+    setIntroHtml(pageData.intro || '');
   }, [pageData, pageForm]);
 
   const selectedSlide = useMemo(() => slides.find((slide) => slide.id === slideModal.slideId), [slides, slideModal.slideId]);
@@ -127,6 +131,7 @@ const AdminCmsPage = () => {
 
     if (sectionModal.mode === 'add') {
       sectionForm.reset(emptySection);
+      setSectionBodyHtml('');
       return;
     }
 
@@ -136,6 +141,7 @@ const AdminCmsPage = () => {
         body: selectedSection.body || '',
         mediaUrl: selectedSection.mediaUrl || ''
       });
+      setSectionBodyHtml(selectedSection.body || '');
     }
   }, [sectionForm, sectionModal, selectedSection]);
 
@@ -166,7 +172,7 @@ const AdminCmsPage = () => {
   });
 
   const savePageBasicsMutation = useMutation({
-    mutationFn: (values) => cmsService.updatePageContent(selectedPage, { ...pageData, ...values, sections }),
+    mutationFn: (values) => cmsService.updatePageContent(selectedPage, { ...pageData, ...values, intro: introHtml, sections }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['page-content-admin', selectedPage] });
       queryClient.invalidateQueries({ queryKey: ['page-content', selectedPage] });
@@ -200,15 +206,15 @@ const AdminCmsPage = () => {
   const onSectionSubmit = (values) => {
     if (sectionModal.mode === 'add') {
       saveSectionsMutation.mutate([
-        { id: `section-${Date.now()}`, ...values },
-        ...sections
+        ...sections,
+        { id: `section-${Date.now()}`, ...values, body: sectionBodyHtml }
       ]);
       return;
     }
 
     if (selectedSection) {
       saveSectionsMutation.mutate(
-        sections.map((section) => (section.id === selectedSection.id ? { ...section, ...values } : section))
+        sections.map((section) => (section.id === selectedSection.id ? { ...section, ...values, body: sectionBodyHtml } : section))
       );
     }
   };
@@ -375,7 +381,9 @@ const AdminCmsPage = () => {
               <textarea {...pageForm.register('heroDescription')} rows={2} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
             </label>
             <label className="text-sm md:col-span-2">Intro Text
-              <textarea {...pageForm.register('intro')} rows={3} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              <div className="mt-1">
+                <RichTextEditor value={introHtml} onChange={setIntroHtml} minHeight={120} />
+              </div>
             </label>
             {selectedPage === 'contact' ? (
               <>
@@ -417,7 +425,7 @@ const AdminCmsPage = () => {
                 {sections.map((section) => (
                   <tr key={section.id}>
                     <td className="px-3 py-2">{section.title || 'Untitled section'}</td>
-                    <td className="px-3 py-2">{(section.body || '').slice(0, 90)}{(section.body || '').length > 90 ? '...' : ''}</td>
+                    <td className="max-w-[200px] truncate px-3 py-2 text-slate-500 text-xs">{(section.body || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 90)}{(section.body || '').replace(/<[^>]+>/g, '').trim().length > 90 ? '...' : ''}</td>
                     <td className="px-3 py-2">
                       {section.mediaUrl ? (
                         isImageUrl(section.mediaUrl) ? (
@@ -568,9 +576,14 @@ const AdminCmsPage = () => {
                   </div>
                 ) : null}
               </label>
-              <label className="text-sm">Section Body
-                <textarea rows={5} disabled={sectionModal.mode === 'view'} {...sectionForm.register('body')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-50" />
-              </label>
+              <div className="text-sm">
+                <p className="mb-1 font-medium">Section Body</p>
+                {sectionModal.mode === 'view' ? (
+                  <div className="min-h-[120px] rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-sm" dangerouslySetInnerHTML={{ __html: sectionBodyHtml || '<em class="text-slate-400">No content</em>' }} />
+                ) : (
+                  <RichTextEditor value={sectionBodyHtml} onChange={setSectionBodyHtml} minHeight={180} />
+                )}
+              </div>
 
               {sectionModal.mode !== 'view' ? (
                 <div className="flex gap-2">

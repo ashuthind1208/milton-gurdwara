@@ -20,12 +20,12 @@ const SikhismPage = () => {
       <Seo {...meta} />
       <PageHero title={content?.heroTitle ?? 'Learn Sikhism'} description={content?.heroDescription ?? 'Structured learning resources prepared for community education.'} />
       {content?.mediaUrl ? <img src={content.mediaUrl} alt="Sikh education" className="h-56 w-full object-cover" loading="lazy" /> : null}
-      {content?.intro ? <p className="text-sm leading-relaxed text-slate-700">{content.intro}</p> : null}
+      {content?.intro ? <div className="text-sm leading-relaxed text-slate-700" dangerouslySetInnerHTML={{ __html: content.intro }} /> : null}
       <div className="grid gap-4 md:grid-cols-3">
         {sections.map((section) => (
           <div key={section.id} className="rounded-xl border border-slate-200 bg-white p-4">
             <h3 className="font-heading text-lg font-semibold text-brand-blue">{section.title}</h3>
-            <p className="mt-1 text-sm text-slate-700">{section.body}</p>
+            <div className="mt-1 text-sm text-slate-700" dangerouslySetInnerHTML={{ __html: section.body }} />
             {section.mediaUrl ? (
               isImageUrl(section.mediaUrl) ? (
                 <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-slate-50">

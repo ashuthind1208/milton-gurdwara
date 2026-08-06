@@ -122,7 +122,11 @@ const userFormDefaults = {
   email: '',
   phone: '',
   address: '',
-  role: 'Member'
+  role: 'Member',
+  dateOfBirth: '',
+  canadianStatus: '',
+  donationMethod: '',
+  donationSchedule: 'monthly'
 };
 
 const membershipFeeFormDefaults = {
@@ -246,9 +250,11 @@ const AdminUsersPage = () => {
   const editForm = useForm({ defaultValues: userFormDefaults });
   const membershipFeeForm = useForm({ defaultValues: membershipFeeFormDefaults });
 
-  const { data: users = [] } = useQuery({
+  const { data: users = [], refetch: refetchUsers } = useQuery({
     queryKey: ['admin-users'],
-    queryFn: () => userService.getUsers().then((res) => res.data)
+    queryFn: () => userService.getUsers().then((res) => res.data),
+    staleTime: 0,
+    refetchOnWindowFocus: true
   });
   const { data: customRoleDefinitions = [] } = useQuery({
     queryKey: ['admin-role-definitions'],
@@ -294,12 +300,20 @@ const AdminUsersPage = () => {
       const resolvedRole = String(values.role || '').trim() || 'Member';
       const customRoleAccess = getCustomRoleAccessByName(resolvedRole);
       const isCustomRole = !isStandardRole(resolvedRole);
+      const existingUser = users.find((u) => u.id === id);
 
       return userService.updateUser(id, {
         ...values,
         role: resolvedRole,
         adminPageAccess: isCustomRole ? customRoleAccess : undefined,
-        avatarUrl: String(editAvatarUrl || '').trim()
+        avatarUrl: String(editAvatarUrl || '').trim(),
+        membershipProfile: {
+          ...(existingUser?.membershipProfile || {}),
+          dateOfBirth: String(values.dateOfBirth || '').trim(),
+          canadianStatus: String(values.canadianStatus || '').trim(),
+          donationMethod: String(values.donationMethod || '').trim(),
+          donationSchedule: String(values.donationSchedule || 'monthly').trim().toLowerCase() || 'monthly'
+        }
       });
     },
     onSuccess: (response, variables) => {
@@ -409,7 +423,11 @@ const AdminUsersPage = () => {
       email: user.email || '',
       phone: user.phone || '',
       address: user.address || '',
-      role: user.role || 'Member'
+      role: user.role || 'Member',
+      dateOfBirth: user.membershipProfile?.dateOfBirth || '',
+      canadianStatus: user.membershipProfile?.canadianStatus || '',
+      donationMethod: user.membershipProfile?.donationMethod || '',
+      donationSchedule: user.membershipProfile?.donationSchedule || 'monthly'
     });
   };
 
@@ -422,6 +440,7 @@ const AdminUsersPage = () => {
     setViewUser(null);
     setEditUserId('');
     setMembershipSearchTerm('');
+    refetchUsers();
     setMembershipUserId(user.id);
     membershipFeeForm.reset({
       ...membershipFeeFormDefaults,
@@ -1211,6 +1230,36 @@ const AdminUsersPage = () => {
                           {roleOptions.map((role) => (
                             <option key={role} value={role}>{role}</option>
                           ))}
+                        </select>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-slate-200 pt-5">
+                    <p className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Membership Profile</p>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label className="text-sm font-semibold text-slate-700">Date of Birth
+                        <input type="date" {...editForm.register('dateOfBirth')} className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 shadow-sm outline-none transition focus:border-brand-blue" />
+                      </label>
+                      <label className="text-sm font-semibold text-slate-700">Canadian Status
+                        <select {...editForm.register('canadianStatus')} className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 shadow-sm outline-none transition focus:border-brand-blue">
+                          <option value="">— Select —</option>
+                          <option value="Citizen">Citizen</option>
+                          <option value="Permanent Resident">Permanent Resident</option>
+                          <option value="Immigrant">Immigrant</option>
+                        </select>
+                      </label>
+                      <label className="text-sm font-semibold text-slate-700">Donation Method
+                        <select {...editForm.register('donationMethod')} className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 shadow-sm outline-none transition focus:border-brand-blue">
+                          <option value="">— Select —</option>
+                          <option value="Interac E-Transfer">Interac E-Transfer</option>
+                          <option value="Cash at Gurdwara">Cash at Gurdwara</option>
+                        </select>
+                      </label>
+                      <label className="text-sm font-semibold text-slate-700">Donation Schedule
+                        <select {...editForm.register('donationSchedule')} className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 shadow-sm outline-none transition focus:border-brand-blue">
+                          <option value="monthly">Monthly</option>
+                          <option value="yearly">Yearly</option>
                         </select>
                       </label>
                     </div>

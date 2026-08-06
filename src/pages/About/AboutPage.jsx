@@ -23,7 +23,7 @@ const AboutPage = () => {
 
       {content?.mediaUrl ? <img src={content.mediaUrl} alt="About section" className="h-56 w-full object-cover" loading="lazy" /> : null}
 
-      {content?.intro ? <p className="text-sm leading-relaxed text-slate-700">{content.intro}</p> : null}
+      {content?.intro ? <div className="text-sm leading-relaxed text-slate-700" dangerouslySetInnerHTML={{ __html: content.intro }} /> : null}
 
       <section>
         <SectionTitle title="History, Vision, and Mission" />
@@ -31,7 +31,7 @@ const AboutPage = () => {
           {sections.map((section) => (
             <article key={section.id} className="rounded-xl border border-slate-200 bg-white p-4">
               <h3 className="font-heading text-xl font-semibold text-brand-blue">{section.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-700">{section.body}</p>
+              <div className="mt-2 text-sm leading-relaxed text-slate-700" dangerouslySetInnerHTML={{ __html: section.body }} />
               {section.mediaUrl ? (
                 isImageUrl(section.mediaUrl) ? (
                   <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-slate-50">

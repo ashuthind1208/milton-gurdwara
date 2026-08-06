@@ -874,8 +874,10 @@ const readPhoneField = (payload, key, options = {}) => {
     return '';
   }
 
-  assertInput(/^[0-9()\-\s]+$/.test(value), `${key} may contain numbers only.`);
-  const digits = value.replace(/\D/g, '');
+  // Strip optional +1 country code prefix before validating
+  const stripped = value.replace(/^\+?1[\s-]?/, '');
+  assertInput(/^[0-9()\-\s]+$/.test(stripped), `${key} may contain numbers only.`);
+  const digits = stripped.replace(/\D/g, '');
   assertInput(digits.length === 10, `${key} must contain exactly 10 numbers in the format (905)-123-4567.`);
   const normalized = `(${digits.slice(0, 3)})-${digits.slice(3, 6)}-${digits.slice(6)}`;
   payload[key] = normalized;

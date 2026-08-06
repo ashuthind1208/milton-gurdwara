@@ -94,7 +94,7 @@ const getOpportunityStatusMeta = (item) => {
   }
 
   if (registered >= totalRequired && item?.waitlistEnabled) {
-    return { label: 'Waitlist Open', className: 'bg-amber-100 text-amber-800' };
+    return { label: 'Waitlist', className: 'bg-amber-100 text-amber-800' };
   }
 
   if (fillRatio >= 0.9) {
