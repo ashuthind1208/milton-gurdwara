@@ -237,6 +237,112 @@ export const createDonationInvoicePdfBlob = async ({
   return doc.output('blob');
 };
 
+const toDisplayLabel = (value, fallback = '-') => {
+  const normalized = String(value || '').trim();
+  if (!normalized) {
+    return fallback;
+  }
+  return normalized
+    .toLowerCase()
+    .replace(/[-_]+/g, ' ')
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+};
+
+export const createBookingReceiptPdfBlob = async ({
+  organizationName,
+  address,
+  phone,
+  email,
+  booking = {}
+}) => {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const logoDataUrl = await loadLogoDataUrl();
+  const receiptNumber = booking.receiptNumber || booking.id || 'Pending';
+  const generatedOn = new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  doc.setFillColor(...LOGO_BLUE_RGB);
+  doc.rect(0, 0, pageWidth, 112, 'F');
+  if (logoDataUrl) {
+    doc.addImage(logoDataUrl, 'WEBP', 34, 24, 62, 62);
+  }
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(15);
+  doc.text(organizationName || 'Singh Sabha Milton Gurdwara', 112, 42);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.text(address || '', 112, 60);
+  doc.text([phone, email].filter(Boolean).join('  |  '), 112, 77);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.text('Booking Receipt', pageWidth - 34, 42, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.text(`Receipt: ${receiptNumber}`, pageWidth - 34, 61, { align: 'right' });
+  doc.text(`Prepared: ${generatedOn}`, pageWidth - 34, 77, { align: 'right' });
+
+  autoTable(doc, {
+    startY: 140,
+    head: [['Booking Information', 'Details']],
+    body: [
+      ['Booking Type', booking.categoryName || booking.title || '-'],
+      ['Date', booking.date || '-'],
+      ['Time', `${booking.startTime || '-'} - ${booking.endTime || '-'}`],
+      ['Location', booking.bookingLocation || '-'],
+      ['Booking Status', toDisplayLabel(booking.status)],
+      ['Booking ID', booking.id || '-']
+    ],
+    styles: { fontSize: 10, cellPadding: 8, valign: 'top' },
+    headStyles: { fillColor: LOGO_BLUE_RGB, textColor: 255, fontStyle: 'bold' },
+    columnStyles: {
+      0: { cellWidth: 140, fontStyle: 'bold', fillColor: [238, 245, 255], textColor: [0, 64, 129] },
+      1: { cellWidth: 'auto' }
+    },
+    theme: 'grid',
+    margin: { left: 40, right: 40 }
+  });
+
+  autoTable(doc, {
+    startY: (doc.lastAutoTable?.finalY || 330) + 24,
+    head: [['Payment Information', 'Details']],
+    body: [
+      ['Payment Status', toDisplayLabel(booking.paymentStatus)],
+      ['Payment Method', toDisplayLabel(booking.paymentMethod || booking.paymentProvider)],
+      ['Amount', `CAD ${Number(booking.amount || 0).toFixed(2)}`],
+      ['Receipt Number', booking.receiptNumber || 'Not assigned'],
+      ['Payment Reference', booking.paymentReference || '-'],
+      ...(booking.status === 'cancelled' ? [
+        ['Refund Status', toDisplayLabel(booking.refundStatus, 'Not required')],
+        ['Refund Amount', `CAD ${Number(booking.refundAmount || 0).toFixed(2)}`],
+        ['Refund Method', toDisplayLabel(booking.refundMethod)],
+        ['Refund Reference', booking.refundReference || '-'],
+        ['Refund Date', booking.refundDate || '-']
+      ] : [])
+    ],
+    styles: { fontSize: 10, cellPadding: 8, valign: 'top' },
+    headStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold' },
+    columnStyles: {
+      0: { cellWidth: 140, fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [30, 41, 59] },
+      1: { cellWidth: 'auto' }
+    },
+    theme: 'grid',
+    margin: { left: 40, right: 40 }
+  });
+
+  const contactY = Math.min((doc.lastAutoTable?.finalY || 540) + 36, pageHeight - 70);
+  doc.setDrawColor(203, 213, 225);
+  doc.line(40, contactY - 16, pageWidth - 40, contactY - 16);
+  doc.setTextColor(71, 85, 105);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text('Please retain this receipt for your records. Contact the Gurdwara office if any details need correction.', 40, contactY, { maxWidth: pageWidth - 80 });
+
+  return doc.output('blob');
+};
+
 export const createMembershipFeeInformationPdfBlob = async ({ user = {}, organizationName, address, phone, email }) => {
   const records = Array.isArray(user?.membershipFeeRecords) ? user.membershipFeeRecords : [];
   const latestPaidRecord = records
@@ -377,6 +483,12 @@ export const downloadDonationInvoicePdf = async (payload) => {
   const blob = await createDonationInvoicePdfBlob(payload);
   const fileName = payload?.fileName || `invoice-${payload?.donation?.receiptId || payload?.donation?.id || 'donation'}.pdf`;
   triggerFileDownload(blob, fileName);
+};
+
+export const downloadBookingReceiptPdf = async (payload) => {
+  const blob = await createBookingReceiptPdfBlob(payload);
+  const reference = payload?.booking?.receiptNumber || payload?.booking?.id || 'booking';
+  triggerFileDownload(blob, payload?.fileName || `booking-receipt-${reference}.pdf`);
 };
 
 export const downloadCampaignDonationsCsv = ({

@@ -61,3 +61,346 @@
   flex-shrink: 0;
 }
 
+.booking-availability-calendar.react-calendar {
+  width: 100%;
+  border: 0;
+  background: #ffffff;
+  font-family: inherit;
+}
+
+.booking-calendar-toolbar {
+  display: flex;
+  min-height: 3.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 0.65rem 0.85rem;
+}
+
+.booking-calendar-arrow-button,
+.booking-calendar-today-button {
+  display: inline-flex;
+  height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  color: #334155;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.booking-calendar-arrow-button {
+  width: 2.25rem;
+}
+
+.booking-calendar-today-button {
+  padding: 0 0.8rem;
+}
+
+.booking-calendar-arrow-button:hover,
+.booking-calendar-today-button:hover {
+  border-color: #0a4d9f;
+  color: #0a4d9f;
+}
+
+.booking-availability-calendar .react-calendar__navigation {
+  height: 3.5rem;
+  margin: 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.booking-availability-calendar .react-calendar__navigation button {
+  color: #0f172a;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.booking-availability-calendar .react-calendar__navigation button:enabled:hover,
+.booking-availability-calendar .react-calendar__navigation button:enabled:focus {
+  background: #eff6ff;
+}
+
+.booking-availability-calendar .react-calendar__month-view__weekdays {
+  display: grid !important;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.35rem;
+  color: #64748b;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.booking-availability-calendar .react-calendar__month-view__weekdays__weekday {
+  max-width: none !important;
+  padding: 0.65rem 0.25rem;
+}
+
+.booking-availability-calendar .react-calendar__month-view__weekdays abbr {
+  text-decoration: none;
+}
+
+.booking-availability-calendar .react-calendar__month-view__days {
+  display: grid !important;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.625rem;
+  padding: 0.625rem;
+}
+
+.booking-availability-calendar .react-calendar__tile {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  box-sizing: border-box;
+  flex: none !important;
+  margin-left: 0 !important;
+  width: auto !important;
+  height: 5.75rem;
+  min-height: 5.75rem;
+  max-width: none !important;
+  border: 2px solid #cbd5e1;
+  border-radius: 0.625rem;
+  padding: 0.625rem;
+  color: #0f172a;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: left;
+  vertical-align: top;
+}
+
+.booking-availability-calendar .booking-calendar-month-start-1 { grid-column-start: 1; }
+.booking-availability-calendar .booking-calendar-month-start-2 { grid-column-start: 2; }
+.booking-availability-calendar .booking-calendar-month-start-3 { grid-column-start: 3; }
+.booking-availability-calendar .booking-calendar-month-start-4 { grid-column-start: 4; }
+.booking-availability-calendar .booking-calendar-month-start-5 { grid-column-start: 5; }
+.booking-availability-calendar .booking-calendar-month-start-6 { grid-column-start: 6; }
+.booking-availability-calendar .booking-calendar-month-start-7 { grid-column-start: 7; }
+
+.booking-availability-calendar .react-calendar__month-view__days__day--weekend {
+  color: #0f172a;
+}
+
+.booking-availability-calendar .booking-calendar-day-has-items {
+  border-color: #94a3b8;
+}
+
+.booking-availability-calendar .booking-calendar-day-has-event {
+  border-color: #64748b;
+}
+
+.booking-availability-calendar .react-calendar__tile > abbr {
+  position: relative;
+  z-index: 2;
+}
+
+.booking-calendar-cell-background {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  pointer-events: none;
+}
+
+.booking-availability-calendar .react-calendar__tile:enabled:hover,
+.booking-availability-calendar .react-calendar__tile:enabled:focus {
+  background: #f8fafc;
+}
+
+.booking-availability-calendar .react-calendar__tile--now {
+  background: #fff7ed;
+  box-shadow: inset 0 0 0 2px #f5a623;
+}
+
+.booking-availability-calendar .react-calendar__tile--active {
+  background: #eff6ff;
+  color: #0a4d9f;
+  box-shadow: inset 0 0 0 2px #0a4d9f;
+}
+
+.booking-availability-calendar .react-calendar__month-view__days__day--neighboringMonth {
+  color: #94a3b8;
+  background: #f8fafc;
+}
+
+.booking-calendar-pills {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  max-height: 4.1rem;
+  margin-top: 0.35rem;
+  flex-direction: column;
+  gap: 0.25rem;
+  overflow-y: auto;
+}
+
+.booking-calendar-pill {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+  border: 1px solid;
+  border-radius: 999px;
+  padding: 0.18rem 0.35rem;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1.15;
+  cursor: pointer;
+}
+
+.booking-calendar-pill-event {
+  border-color: #94a3b8;
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.booking-calendar-pill-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.booking-calendar-pill-time {
+  flex-shrink: 0;
+  opacity: 0.78;
+}
+
+.booking-mobile-calendar.react-calendar {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  font-family: inherit;
+}
+
+.booking-mobile-calendar,
+.booking-mobile-calendar * {
+  box-sizing: border-box;
+}
+
+.booking-mobile-calendar .react-calendar__navigation {
+  height: 2.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.booking-mobile-calendar .react-calendar__navigation button {
+  min-width: 2.25rem;
+  padding: 0.25rem;
+  color: #0f172a;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.booking-mobile-calendar .react-calendar__month-view__weekdays {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.booking-mobile-calendar .react-calendar__month-view__weekdays abbr {
+  text-decoration: none;
+}
+
+.booking-mobile-calendar .react-calendar__tile {
+  position: relative;
+  height: 3.2rem;
+  max-width: 100%;
+  padding: 0.4rem 0.15rem 0.85rem;
+  color: #1e293b;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.booking-mobile-calendar .react-calendar__tile--active {
+  border-radius: 0.4rem;
+  background: #0a4d9f;
+  color: #ffffff;
+}
+
+.booking-mobile-calendar .react-calendar__tile--now:not(.react-calendar__tile--active) {
+  border-radius: 0.4rem;
+  background: #fff7ed;
+  box-shadow: inset 0 0 0 1px #f5a623;
+}
+
+.booking-mobile-calendar-dots {
+  position: absolute;
+  right: 0;
+  bottom: 0.35rem;
+  left: 0;
+  display: flex;
+  justify-content: center;
+  gap: 0.16rem;
+}
+
+.booking-mobile-calendar-dot {
+  width: 0.34rem;
+  height: 0.34rem;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 999px;
+}
+
+.bookings-page,
+.bookings-page > *,
+.booking-request-dialog,
+.booking-request-form,
+.booking-request-form section,
+.booking-request-form label {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.booking-request-dialog {
+  width: min(48rem, calc(100vw - 1.5rem));
+}
+
+.booking-request-form > label,
+.booking-request-form input:not([type='checkbox']),
+.booking-request-form select,
+.booking-request-form textarea {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.booking-request-form input[type='checkbox'] {
+  display: inline-block;
+  width: auto;
+  min-width: auto;
+  flex: none;
+}
+
+.booking-request-form .booking-mobile-date-select,
+.booking-request-form .booking-date-input {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  inline-size: 100%;
+  overflow: hidden;
+}
+
+.booking-request-form .booking-date-input {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+@media (max-width: 639px) {
+  .bookings-page {
+    width: 100%;
+    overflow-x: clip;
+  }
+
+  .booking-request-form input[type='date'],
+  .booking-request-form input[type='time'] {
+    min-inline-size: 0;
+    inline-size: 100%;
+  }
+}
+

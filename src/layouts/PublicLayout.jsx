@@ -8,6 +8,7 @@ import phase2Service from '../services/phase2Service';
 const PublicLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const isHomeRoute = location.pathname === '/';
   const kioskTimerRef = useRef(null);
   const { data: phase2ChannelsConfig } = useQuery({
     queryKey: ['phase2-channels-config-public'],
@@ -61,10 +62,17 @@ const PublicLayout = () => {
     };
   }, [kioskHomeRoute, kioskModeEnabled, kioskTimeoutMs, location.pathname, navigate]);
 
+  useEffect(() => {
+    if (location.hash) {
+      return;
+    }
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [location.pathname, location.search, location.hash]);
+
   return (
     <div className="min-h-screen overflow-x-clip bg-white text-slate-900 transition-colors">
       <Navbar />
-      <main className="mx-auto w-full max-w-7xl overflow-x-hidden px-4 py-5 md:px-6 md:py-6">
+      <main className={`mx-auto w-full max-w-7xl px-4 ${isHomeRoute ? 'pt-0 pb-5 md:pt-0 md:pb-6' : 'py-5 md:py-6'} md:px-6`}>
         <Suspense fallback={<div className="py-20 text-center text-slate-600">Loading page...</div>}>
           <Outlet />
         </Suspense>

@@ -356,7 +356,8 @@ const HomePage = () => {
   }, [selectedContentLink]);
 
   const featuredAlbum = albums[0];
-  const globalBannerAds = ads.filter((ad) => ad.active && ad.placement === 'Global Banner').slice(0, 2);
+  const globalBannerAds = ads.filter((ad) => ad.active && ad.placement === 'Global Banner');
+  const globalBannerImageHeightClass = globalBannerAds.length > 2 ? 'h-16 md:h-20' : 'h-24 md:h-28';
   const homeSidebarAds = ads.filter((ad) => ad.active && ad.placement === 'Homepage Sidebar').slice(0, 2);
   const homeFooterAds = ads.filter((ad) => ad.active && ad.placement === 'Homepage Footer').slice(0, 2);
 
@@ -432,7 +433,7 @@ const HomePage = () => {
   };
 
   return (
-    <div className="min-w-0 space-y-3">
+    <div className="min-w-0 space-y-0">
       <Seo {...meta} />
 
       <HomeHeroBanner
@@ -443,7 +444,7 @@ const HomePage = () => {
       />
 
       {tickerItems.length > 0 ? (
-        <section className="ticker-shell ticker-shell-home overflow-hidden py-1">
+        <section className="ticker-shell ticker-shell-home relative left-1/2 w-screen -translate-x-1/2 overflow-hidden py-0.5 -mt-1 mb-5 md:mb-6">
           <div
             ref={homeTickerTrackRef}
             key={`${tickerRenderKey}-${tickerMotionSeed}`}
@@ -461,7 +462,7 @@ const HomePage = () => {
                   <button
                     key={`${groupIndex}-${event._tickerLoopKey}`}
                     type="button"
-                    className="ticker-item ticker-item-home mx-1 inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white/95 px-3 py-1 text-xs font-black uppercase tracking-wide text-slate-900 transition hover:-translate-y-0.5 hover:bg-slate-200 hover:text-slate-900"
+                    className="ticker-item ticker-item-home mx-1 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-black uppercase tracking-wide transition hover:-translate-y-0.5"
                     onClick={() => setSelectedTickerEvent(event)}
                   >
                     <span className="h-1.5 w-1.5 rounded-full bg-brand-saffron" />
@@ -477,9 +478,11 @@ const HomePage = () => {
         </section>
       ) : null}
 
+      <div className="h-4 md:h-6 lg:h-8" aria-hidden="true" />
+
       {globalBannerAds.length > 0 ? (
-        <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-          <div className="grid gap-2 md:grid-cols-2">
+        <section className="mb-4 rounded-xl py-2 md:mb-5 lg:mb-6">
+          <div className="flex flex-nowrap items-stretch gap-2 overflow-hidden">
             {globalBannerAds.map((ad) => (
               <a
                 key={ad.id}
@@ -491,16 +494,16 @@ const HomePage = () => {
                     void advertisementService.recordAdClick(ad.id);
                   }
                 }}
-                className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30"
+                className="block min-w-0 flex-1 overflow-hidden rounded-lg transition hover:opacity-95"
               >
-                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full bg-slate-50 p-1 object-contain md:h-28" loading="lazy" /> : null}
+                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className={`${globalBannerImageHeightClass} w-full p-1 object-contain`} loading="lazy" /> : null}
               </a>
             ))}
           </div>
         </section>
       ) : null}
 
-      <section className="pb-8">
+      <section className="mt-6 pb-8 md:mt-8 lg:mt-10">
         <div className="min-w-0 grid gap-3 lg:grid-cols-[1.5fr_0.85fr]">
           <div className="min-w-0 space-y-3">
             <div className="rounded-xl border border-brand-blue/20 bg-white px-5 py-4">
@@ -804,9 +807,9 @@ const HomePage = () => {
                     void advertisementService.recordAdClick(ad.id);
                   }
                 }}
-                className="block overflow-hidden rounded-xl border border-slate-200 bg-white hover:border-brand-blue/30"
+                className="block overflow-hidden rounded-xl border border-slate-200 hover:border-brand-blue/30"
               >
-                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-28 w-full bg-slate-50 p-2 object-contain md:h-32" loading="lazy" /> : null}
+                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-28 w-full p-2 object-contain md:h-32" loading="lazy" /> : null}
               </a>
             ))}
           </div>
@@ -814,7 +817,7 @@ const HomePage = () => {
       </section>
 
       {homeFooterAds.length > 0 ? (
-        <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+        <section className="rounded-xl border border-slate-200 px-3 py-2">
           <div className="grid gap-2 md:grid-cols-2">
             {homeFooterAds.map((ad) => (
               <a
@@ -829,7 +832,7 @@ const HomePage = () => {
                 }}
                 className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30"
               >
-                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full bg-slate-50 p-1 object-contain md:h-28" loading="lazy" /> : null}
+                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full p-1 object-contain md:h-28" loading="lazy" /> : null}
               </a>
             ))}
           </div>

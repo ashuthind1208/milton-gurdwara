@@ -148,8 +148,12 @@ const SevaPage = () => {
   });
   const allowIdentityOverride = Boolean(sevaIdentitySettings?.enabled);
 
-  const sevaTopAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Seva Top Banner').slice(0, 2), [ads]);
-  const sevaFooterAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Seva Footer Banner').slice(0, 2), [ads]);
+  const sevaTopAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Seva Top Banner'), [ads]);
+  const sevaFooterAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Seva Footer Banner'), [ads]);
+  const sevaTopAdImageHeightClass = sevaTopAds.length > 2 ? 'h-16 md:h-20' : 'h-24 md:h-28';
+  const sevaFooterAdImageHeightClass = sevaFooterAds.length > 2 ? 'h-16 md:h-20' : 'h-24 md:h-28';
+  const sevaTopAdsGridStyle = useMemo(() => ({ gridTemplateColumns: `repeat(${Math.max(1, sevaTopAds.length)}, minmax(0, 1fr))` }), [sevaTopAds.length]);
+  const sevaFooterAdsGridStyle = useMemo(() => ({ gridTemplateColumns: `repeat(${Math.max(1, sevaFooterAds.length)}, minmax(0, 1fr))` }), [sevaFooterAds.length]);
 
   const onSubmit = async (payload) => {
     if (isSubmittingRegistration) {
@@ -442,6 +446,29 @@ const SevaPage = () => {
         <p className="mt-2 max-w-3xl text-slate-700">Join hands in langar, cleaning, parking, teaching, and event support.</p>
       </section>
 
+      {sevaTopAds.length > 0 ? (
+        <section className="rounded-xl py-2">
+          <div className="grid w-full gap-2" style={sevaTopAdsGridStyle}>
+            {sevaTopAds.map((ad) => (
+              <a
+                key={ad.id}
+                href={ad.website || '#'}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => {
+                  if (ad.website) {
+                    void advertisementService.recordAdClick(ad.id);
+                  }
+                }}
+                className="block min-w-0 overflow-hidden rounded-lg transition hover:opacity-95"
+              >
+                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className={`${sevaTopAdImageHeightClass} w-full p-1 object-contain`} loading="lazy" /> : null}
+              </a>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_180px]">
         <div className="space-y-3">
           {!isAuthenticated && !allowIdentityOverride ? (
@@ -597,33 +624,9 @@ const SevaPage = () => {
         </aside>
       </section>
 
-      {sevaTopAds.length > 0 ? (
-        <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-          <div className="grid gap-2 md:grid-cols-2">
-            {sevaTopAds.map((ad) => (
-              <a
-                key={ad.id}
-                href={ad.website || '#'}
-                target="_blank"
-                rel="noreferrer"
-                onClick={() => {
-                  if (ad.website) {
-                    void advertisementService.recordAdClick(ad.id);
-                  }
-                }}
-                className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30"
-              >
-                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
-              </a>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-
       {sevaFooterAds.length > 0 ? (
-        <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-          <div className="grid gap-2 md:grid-cols-2">
+        <section className="rounded-xl py-2">
+          <div className="grid w-full gap-2" style={sevaFooterAdsGridStyle}>
             {sevaFooterAds.map((ad) => (
               <a
                 key={ad.id}
@@ -635,9 +638,9 @@ const SevaPage = () => {
                     void advertisementService.recordAdClick(ad.id);
                   }
                 }}
-                className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30"
+                className="block min-w-0 overflow-hidden rounded-lg transition hover:opacity-95"
               >
-                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
+                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className={`${sevaFooterAdImageHeightClass} w-full p-1 object-contain`} loading="lazy" /> : null}
               </a>
             ))}
           </div>

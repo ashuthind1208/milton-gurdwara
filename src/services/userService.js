@@ -305,6 +305,7 @@ const userService = {
     const hasApprovalStatusInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'approvalStatus');
     const hasRegistrationCompleteInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'registrationComplete');
     const hasMembershipFeeRecordsInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'membershipFeeRecords');
+    const hasMembershipProfileInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'membershipProfile');
     const nextRole = hasRoleInPayload ? normalizeRole(payload.role) : normalizeRole(existing?.role || normalized.role);
     const roleChanged = hasRoleInPayload && nextRole !== normalizeRole(existing?.role);
     const nextAdminPageAccess = hasAdminPageAccessInPayload
@@ -332,6 +333,7 @@ const userService = {
       approvalStatus: hasApprovalStatusInPayload ? normalized.approvalStatus : existing.approvalStatus,
       registrationComplete: hasRegistrationCompleteInPayload ? normalized.registrationComplete : existing.registrationComplete,
       adminPageAccess: resolveRoleAdminPageAccess(nextRole, nextAdminPageAccess, roleDefinitions),
+      membershipProfile: hasMembershipProfileInPayload ? normalized.membershipProfile : existing.membershipProfile,
       membershipFeeRecords: roleChanged && nextRole === 'Member'
         ? []
         : (hasMembershipFeeRecordsInPayload ? normalized.membershipFeeRecords : existing.membershipFeeRecords),

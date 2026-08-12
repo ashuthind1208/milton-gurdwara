@@ -11,6 +11,7 @@ const SikhismPage = lazy(() => import('../pages/Sikhism/SikhismPage'));
 const GurbaniLibraryPage = lazy(() => import('../pages/GurbaniLibrary/GurbaniLibraryPage'));
 const HukamnamaPage = lazy(() => import('../pages/Hukamnama/HukamnamaPage'));
 const EventsPage = lazy(() => import('../pages/Events/EventsPage'));
+const BookingsPage = lazy(() => import('../pages/Bookings/BookingsPage'));
 const SevaPage = lazy(() => import('../pages/Seva/SevaPage'));
 const FamilyDashboardPage = lazy(() => import('../pages/Family/FamilyDashboardPage'));
 const DonationPage = lazy(() => import('../pages/Donation/DonationPage'));
@@ -18,6 +19,7 @@ const KidsLearningPage = lazy(() => import('../pages/KidsLearning/KidsLearningPa
 const DonationDisplayBoardPage = lazy(() => import('../pages/Donation/DonationDisplayBoardPage'));
 const DonationSuccessPage = lazy(() => import('../pages/Donation/DonationSuccessPage'));
 const GalleryPage = lazy(() => import('../pages/Gallery/GalleryPage'));
+const MediaPage = lazy(() => import('../pages/Media/MediaPage'));
 const NewsPage = lazy(() => import('../pages/News/NewsPage'));
 const LibraryPage = lazy(() => import('../pages/Library/LibraryPage'));
 const VideosPage = lazy(() => import('../pages/Videos/VideosPage'));
@@ -39,6 +41,7 @@ const AdminStreamingPage = lazy(() => import('../admin/Streaming/AdminStreamingP
 const AdminAdvertisementsPage = lazy(() => import('../admin/Advertisements/AdminAdvertisementsPage'));
 const AdminSponsorsPage = lazy(() => import('../admin/Sponsors/AdminSponsorsPage'));
 const AdminEventsPage = lazy(() => import('../admin/Events/AdminEventsPage'));
+const AdminBookingsPage = lazy(() => import('../admin/Bookings/AdminBookingsPage'));
 const AdminDonationsPage = lazy(() => import('../admin/Donations/AdminDonationsPage'));
 const AdminUsersPage = lazy(() => import('../admin/Users/AdminUsersPage'));
 const AdminRolesAccessPage = lazy(() => import('../admin/RolesAccess/AdminRolesAccessPage'));
@@ -62,12 +65,13 @@ const AppRoutes = () => {
           <Route path="/gurbani-library" element={<GurbaniLibraryPage />} />
           <Route path="/hukamnama" element={<HukamnamaPage />} />
           <Route path="/events" element={<EventsPage />} />
+          <Route path="/bookings" element={<BookingsPage />} />
           <Route path="/join" element={<Navigate to="/login?mode=join" replace />} />
           <Route path="/seva" element={<SevaPage />} />
           <Route path="/family-dashboard" element={<FamilyDashboardPage />} />
           <Route path="/donation" element={<DonationPage />} />
           <Route path="/kids-learning" element={<KidsLearningPage />} />
-          <Route path="/donationsuccess" element={<DonationSuccessPage />} />
+          <Route path="/media" element={<MediaPage />} />
           <Route path="/gallery" element={<GalleryPage />} />
           <Route path="/news" element={<NewsPage />} />
           <Route path="/library" element={<LibraryPage />} />
@@ -76,6 +80,8 @@ const AppRoutes = () => {
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/login" element={<LoginPage />} />
         </Route>
+
+        <Route path="/donationsuccess" element={<DonationSuccessPage />} />
 
         <Route path="/donation-board" element={<DonationDisplayBoardPage />} />
 
@@ -95,6 +101,7 @@ const AppRoutes = () => {
             <Route path="/admin/sponsors" element={<AdminSponsorsPage />} />
             <Route path="/admin/seva-opportunities" element={<AdminSevaOpportunitiesPage />} />
             <Route path="/admin/events" element={<AdminEventsPage />} />
+            <Route path="/admin/bookings" element={<AdminBookingsPage />} />
             <Route path="/admin/donations" element={<AdminDonationsPage />} />
             <Route path="/admin/users" element={<AdminUsersPage />} />
             <Route path="/admin/newsletter" element={<AdminNewsletterPage />} />

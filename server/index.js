@@ -7,6 +7,8 @@ const { URL } = require('url');
 const Stripe = require('stripe');
 const crypto = require('crypto');
 const ffmpegPath = require('ffmpeg-static');
+const { jsPDF } = require('jspdf');
+const autoTable = require('jspdf-autotable').default;
 const {
   extractZeffyPaymentId,
   mapZeffyApiPayment,
@@ -49,7 +51,7 @@ const workspaceRoot = path.resolve(__dirname, '..');
 loadEnvFile(path.join(workspaceRoot, '.env'));
 loadEnvFile(path.join(workspaceRoot, '.env.local'));
 
-const eventsDb = require('./db/postgres');
+const eventsDb = require('./db/adapter');
 
 const API_VERSION = '2026-07-27.phase2';
 const API_STARTUP_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -111,6 +113,7 @@ const dataDir = path.resolve(__dirname, 'data');
 const usersPath = path.join(dataDir, 'users.json');
 const volunteerReminderLogPath = path.join(dataDir, 'volunteer-reminder-log.json');
 const eventReminderLogPath = path.join(dataDir, 'event-reminder-log.json');
+const bookingReminderLogPath = path.join(dataDir, 'booking-reminder-log.json');
 const uploadsDir = path.resolve(__dirname, 'uploads');
 const quizBankDir = path.resolve(workspaceRoot, 'public', 'quiz');
 const maxUploadBytes = 15 * 1024 * 1024;
@@ -169,6 +172,16 @@ const eventReminderDays = String(process.env.EVENT_REMINDER_DAYS || '7,3,1')
   .split(',')
   .map((value) => Number(String(value || '').trim()))
   .filter((value) => Number.isFinite(value) && value >= 0);
+const bookingReminderWebhookUrl = resolveLocalWebhookUrl(
+  process.env.BOOKING_REMINDER_WEBHOOK_URL || process.env.WEBHOOK_URL || eventReminderWebhookUrl || internalMailRelayUrl,
+  '/api/internal/mail-relay'
+);
+const bookingReminderSendTimeRaw = String(process.env.BOOKING_REMINDER_SEND_TIME || eventReminderSendTimeRaw || '09:00').trim();
+const bookingReminderTimeZone = String(process.env.BOOKING_REMINDER_TIME_ZONE || eventReminderTimeZone || 'America/Toronto').trim() || 'America/Toronto';
+const bookingReminderDays = String(process.env.BOOKING_REMINDER_DAYS || '7,4,2,1')
+  .split(',')
+  .map((value) => Number(String(value || '').trim()))
+  .filter((value) => Number.isFinite(value) && value >= 0);
 const localMailFromAddress = String(process.env.LOCAL_MAIL_FROM || 'no-reply@singhsabhamilton.local').trim() || 'no-reply@singhsabhamilton.local';
 const localMailTransport = String(process.env.LOCAL_MAIL_TRANSPORT || 'sendmail').trim().toLowerCase();
 const smtpHost = String(process.env.SMTP_HOST || '').trim();
@@ -177,11 +190,17 @@ const smtpSecure = String(process.env.SMTP_SECURE || 'false').trim().toLowerCase
 const smtpUser = String(process.env.SMTP_USER || '').trim();
 const smtpPass = String(process.env.SMTP_PASS || '').trim();
 const smtpFromAddress = String(process.env.SMTP_FROM || localMailFromAddress).trim() || localMailFromAddress;
+const newsletterPublicBaseUrl = String(process.env.PUBLIC_SITE_URL || process.env.NEWSLETTER_PUBLIC_BASE_URL || volunteerReminderBaseUrl).trim().replace(/\/$/, '');
+const newsletterUnsubscribeSecret = String(process.env.NEWSLETTER_UNSUBSCRIBE_SECRET || smtpPass || stripeWebhookSecret || '').trim();
+const newsletterSendConcurrency = Math.max(1, Math.min(10, Number(process.env.NEWSLETTER_SEND_CONCURRENCY || 3)));
 const contactUsInboxAddress = String(process.env.CONTACT_US_EMAIL || smtpFromAddress || smtpUser || localMailFromAddress).trim();
+let smtpTransport = null;
 let volunteerReminderSweepRunning = false;
 let volunteerReminderLastRunDateKey = '';
 let eventReminderSweepRunning = false;
 let eventReminderLastRunDateKey = '';
+let bookingReminderSweepRunning = false;
+let bookingReminderLastRunDateKey = '';
 const darbarSahibStreamSource = String(process.env.DARBAR_SAHIB_STREAM_PROXY_TARGET || 'http://live.sgpc.net:4835/;').trim();
 const darbarSahibHlsDir = path.join(process.env.TMPDIR || dataDir, 'singhsabha-darbar-hls');
 const darbarSahibHlsPlaylistPath = path.join(darbarSahibHlsDir, 'stream.m3u8');
@@ -226,6 +245,7 @@ const parseReminderSendTime = (value) => {
 
 const volunteerReminderSendTime = parseReminderSendTime(volunteerReminderSendTimeRaw);
 const eventReminderSendTime = parseReminderSendTime(eventReminderSendTimeRaw);
+const bookingReminderSendTime = parseReminderSendTime(bookingReminderSendTimeRaw);
 
 const getDatePartsInTimeZone = (date = new Date(), timeZone = 'UTC') => {
   try {
@@ -772,12 +792,17 @@ const sendViaSmtp = async ({ from, toList, bccList, subject, textBody, htmlBody,
     throw new Error('nodemailer is not installed. Run: npm install nodemailer');
   }
 
-  const transport = nodemailer.createTransport({
-    host: smtpHost,
-    port: smtpPort,
-    secure: smtpSecure,
-    ...(authEnabled ? { auth: { user: smtpUser, pass: smtpPass } } : {})
-  });
+  if (!smtpTransport) {
+    smtpTransport = nodemailer.createTransport({
+      pool: true,
+      maxConnections: newsletterSendConcurrency,
+      maxMessages: 100,
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpSecure,
+      ...(authEnabled ? { auth: { user: smtpUser, pass: smtpPass } } : {})
+    });
+  }
 
   const normalizedAttachments = Array.isArray(attachments)
     ? attachments.map((entry) => ({
@@ -793,7 +818,7 @@ const sendViaSmtp = async ({ from, toList, bccList, subject, textBody, htmlBody,
   const fromHeader = smtpFromAddress;
   const replyToCandidate = extractEmailAddress(from);
   const replyToHeader = isValidEmailAddress(replyToCandidate) ? replyToCandidate : undefined;
-  const smtpInfo = await transport.sendMail({
+  const smtpInfo = await smtpTransport.sendMail({
     from: fromHeader,
     replyTo: replyToHeader,
     to: Array.isArray(toList) && toList.length > 0 ? toList : undefined,
@@ -832,6 +857,93 @@ const sendViaConfiguredMailTransport = async ({ from, toList, bccList = [], subj
   }
 
   return sendViaLocalSendmail({ from, toList, bccList, subject, textBody, htmlBody, attachments });
+};
+
+const createNewsletterUnsubscribeToken = (subscriber = {}) => {
+  if (!newsletterUnsubscribeSecret) {
+    throw new Error('NEWSLETTER_UNSUBSCRIBE_SECRET is required for newsletter delivery.');
+  }
+  const payload = Buffer.from(JSON.stringify({
+    id: String(subscriber.id || '').trim(),
+    email: String(subscriber.email || '').trim().toLowerCase()
+  }), 'utf8').toString('base64url');
+  const signature = crypto.createHmac('sha256', newsletterUnsubscribeSecret).update(payload).digest('base64url');
+  return `${payload}.${signature}`;
+};
+
+const parseNewsletterUnsubscribeToken = (token = '') => {
+  if (!newsletterUnsubscribeSecret) {
+    throw new Error('Newsletter unsubscribe is not configured.');
+  }
+  const [payload, signature] = String(token || '').trim().split('.');
+  if (!payload || !signature) {
+    throw new Error('Invalid unsubscribe link.');
+  }
+  const expected = crypto.createHmac('sha256', newsletterUnsubscribeSecret).update(payload).digest();
+  const received = Buffer.from(signature, 'base64url');
+  if (received.length !== expected.length || !crypto.timingSafeEqual(received, expected)) {
+    throw new Error('Invalid unsubscribe link.');
+  }
+  const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+  const id = String(decoded?.id || '').trim();
+  const email = String(decoded?.email || '').trim().toLowerCase();
+  if (!id || !isValidEmailAddress(email)) {
+    throw new Error('Invalid unsubscribe link.');
+  }
+  return { id, email };
+};
+
+const appendNewsletterUnsubscribe = ({ htmlBody = '', textBody = '', unsubscribeUrl = '' }) => ({
+  htmlBody: `${String(htmlBody || '')}<div style="max-width:760px;margin:0 auto;padding:16px 24px 28px;text-align:center;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;color:#64748b;">You are receiving this email because you subscribed to Singh Sabha Milton updates.<br/><a href="${escapeHtml(unsubscribeUrl)}" style="color:#0b67c2;text-decoration:underline;">Unsubscribe from this newsletter</a></div>`,
+  textBody: `${String(textBody || '').trim()}\n\nYou are receiving this email because you subscribed to Singh Sabha Milton updates.\nUnsubscribe: ${unsubscribeUrl}`.trim()
+});
+
+const sendNewsletterPrivately = async ({ relayPayload, recipients, subject, htmlBody, textBody, attachments }) => {
+  const subscribers = await eventsDb.listItems('subscribers');
+  const byEmail = new Map((Array.isArray(subscribers) ? subscribers : [])
+    .filter((entry) => entry?.active !== false && isValidEmailAddress(entry?.email))
+    .map((entry) => [String(entry.email).trim().toLowerCase(), entry]));
+  const deliveries = recipients.map((email) => ({ email, subscriber: byEmail.get(email) })).filter((entry) => entry.subscriber);
+  if (deliveries.length === 0) {
+    throw new Error('No active newsletter subscribers matched the recipient list.');
+  }
+
+  let nextIndex = 0;
+  const results = [];
+  const worker = async () => {
+    while (nextIndex < deliveries.length) {
+      const current = deliveries[nextIndex];
+      nextIndex += 1;
+      const token = createNewsletterUnsubscribeToken(current.subscriber);
+      const unsubscribeUrl = `${newsletterPublicBaseUrl}/api/newsletter/unsubscribe?token=${encodeURIComponent(token)}`;
+      const personalized = appendNewsletterUnsubscribe({ htmlBody, textBody, unsubscribeUrl });
+      try {
+        const delivery = await sendViaConfiguredMailTransport({
+          from: localMailFromAddress,
+          toList: [],
+          bccList: [current.email],
+          subject,
+          textBody: personalized.textBody,
+          htmlBody: personalized.htmlBody,
+          attachments
+        });
+        results.push({ email: current.email, sent: true, provider: delivery?.provider || localMailTransport });
+      } catch (error) {
+        results.push({ email: current.email, sent: false, error: error?.message || 'Delivery failed.' });
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(newsletterSendConcurrency, deliveries.length) }, () => worker()));
+  const failed = results.filter((entry) => !entry.sent);
+  if (failed.length > 0) {
+    throw new Error(`Newsletter delivery failed for ${failed.length} of ${results.length} recipients.`);
+  }
+  return {
+    provider: results[0]?.provider || localMailTransport,
+    accepted: results.map((entry) => entry.email),
+    newsletterRecipients: results.length,
+    campaignId: relayPayload.campaignId
+  };
 };
 
 const ensureNoUnknownKeys = (payload, allowedKeys, label = 'body') => {
@@ -1451,6 +1563,9 @@ const ensureStorage = () => {
   if (!fs.existsSync(eventReminderLogPath)) {
     fs.writeFileSync(eventReminderLogPath, JSON.stringify({ sent: {} }, null, 2), 'utf8');
   }
+  if (!fs.existsSync(bookingReminderLogPath)) {
+    fs.writeFileSync(bookingReminderLogPath, JSON.stringify({ sent: {} }, null, 2), 'utf8');
+  }
 };
 
 const readVolunteerReminderLog = () => {
@@ -1491,6 +1606,26 @@ const writeEventReminderLog = (payload) => {
     sent: payload && typeof payload.sent === 'object' && payload.sent ? payload.sent : {}
   };
   fs.writeFileSync(eventReminderLogPath, JSON.stringify(next, null, 2), 'utf8');
+};
+
+const readBookingReminderLog = () => {
+  ensureStorage();
+  try {
+    const raw = fs.readFileSync(bookingReminderLogPath, 'utf8');
+    const parsed = JSON.parse(raw);
+    const sent = parsed && typeof parsed.sent === 'object' && parsed.sent ? parsed.sent : {};
+    return { sent };
+  } catch {
+    return { sent: {} };
+  }
+};
+
+const writeBookingReminderLog = (payload) => {
+  ensureStorage();
+  const next = {
+    sent: payload && typeof payload.sent === 'object' && payload.sent ? payload.sent : {}
+  };
+  fs.writeFileSync(bookingReminderLogPath, JSON.stringify(next, null, 2), 'utf8');
 };
 
 const getUtcStartOfDay = (value) => {
@@ -2872,6 +3007,374 @@ const runScheduledEventReminderSweep = async () => {
   return result;
 };
 
+const normalizeBookingForNotification = (entry = {}) => ({
+  ...entry,
+  id: String(entry.id || '').trim(),
+  requesterName: String(entry.requesterName || 'Sangat Member').trim(),
+  requesterEmail: String(entry.requesterEmail || '').trim().toLowerCase(),
+  categoryName: String(entry.categoryName || entry.title || 'Booking').trim(),
+  date: String(entry.date || '').trim(),
+  startTime: String(entry.startTime || '').trim(),
+  endTime: String(entry.endTime || '').trim(),
+  bookingLocation: String(entry.bookingLocation || entry.location || 'Gurdwara Singh Sabha Milton, 7035 Sixth Line, Milton, ON').trim(),
+  status: String(entry.status || '').trim().toLowerCase() === 'completed'
+    ? 'confirmed'
+    : String(entry.status || 'pending').trim().toLowerCase(),
+  paymentStatus: String(entry.paymentStatus || 'pending').trim().toLowerCase(),
+  paymentMethod: String(entry.paymentMethod || entry.paymentProvider || 'Not selected').trim(),
+  amount: Number(entry.amount || 0),
+  receiptNumber: String(entry.receiptNumber || '').trim(),
+  paymentReference: String(entry.paymentReference || '').trim(),
+  refundStatus: String(entry.refundStatus || '').trim().toLowerCase(),
+  refundAmount: Math.max(0, Number(entry.refundAmount || 0)),
+  refundMethod: String(entry.refundMethod || '').trim(),
+  refundReference: String(entry.refundReference || '').trim(),
+  refundDate: String(entry.refundDate || '').trim(),
+  refundNotes: String(entry.refundNotes || '').trim()
+});
+
+const enforceBookingPaymentStatus = (entry = {}) => {
+  const paymentStatus = String(entry.paymentStatus || 'pending').trim().toLowerCase();
+  const rawStatus = String(entry.status || 'pending').trim().toLowerCase();
+  const allowedStatus = ['pending', 'confirmed', 'cancelled'].includes(rawStatus) ? rawStatus : 'pending';
+  const paymentProvider = String(entry.paymentProvider || entry.paymentMethod || '').trim().toUpperCase();
+  const isOnlineBooking = String(entry.source || '').trim().toLowerCase() === 'public'
+    && (['STRIPE', 'ZEFFY'].includes(paymentProvider) || Boolean(String(entry.donationPendingId || '').trim()));
+  return {
+    ...entry,
+    paymentStatus,
+    status: rawStatus === 'cancelled'
+      ? 'cancelled'
+      : paymentStatus === 'paid' && !isOnlineBooking
+        ? 'confirmed'
+        : rawStatus === 'completed'
+          ? 'confirmed'
+          : allowedStatus
+  };
+};
+
+const shouldDelayBookingEmailUntilPayment = (booking = {}) => {
+  const provider = String(booking.paymentProvider || booking.paymentMethod || '').trim().toUpperCase();
+  return String(booking.source || '').trim().toLowerCase() === 'public'
+    && ['STRIPE', 'ZEFFY'].includes(provider)
+    && String(booking.paymentStatus || 'pending').trim().toLowerCase() !== 'paid'
+    && Number(booking.amount || 0) > 0;
+};
+
+const toBookingDisplayLabel = (value, fallback = '-') => {
+  const normalized = String(value || '').trim();
+  return normalized
+    ? normalized.toLowerCase().replace(/[-_]+/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase())
+    : fallback;
+};
+
+const buildBookingReceiptPdfAttachment = (booking = {}) => {
+  const normalized = normalizeBookingForNotification(booking);
+  const isRefundReleased = normalized.status === 'cancelled' && normalized.refundStatus === 'processed';
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const receiptNumber = normalized.receiptNumber || normalized.id || 'Pending';
+  const logoPath = path.join(workspaceRoot, 'public', 'gurdwara-logo.webp');
+
+  doc.setFillColor(0, 64, 129);
+  doc.rect(0, 0, pageWidth, 112, 'F');
+  if (fs.existsSync(logoPath)) {
+    try {
+      doc.addImage(fs.readFileSync(logoPath).toString('base64'), 'WEBP', 34, 24, 62, 62);
+    } catch {
+      // Keep the branded header when the optional logo cannot be decoded.
+    }
+  }
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(15);
+  doc.text(volunteerReminderSiteName, 112, 42);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.text('7035 Sixth Line, Milton ON', 112, 60);
+  doc.text('+1 (905) 546-7035  |  singhsabhamilton@gmail.com', 112, 77);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(isRefundReleased ? 15 : 18);
+  doc.text(isRefundReleased ? 'Refund Release Confirmation' : 'Booking Receipt', pageWidth - 34, 42, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.text(`Receipt: ${receiptNumber}`, pageWidth - 34, 61, { align: 'right' });
+  doc.text(`Prepared: ${new Date().toLocaleDateString('en-CA')}`, pageWidth - 34, 77, { align: 'right' });
+
+  autoTable(doc, {
+    startY: 140,
+    head: [['Booking Information', 'Details']],
+    body: [
+      ['Booking Type', normalized.categoryName],
+      ['Date', normalized.date || '-'],
+      ['Time', `${normalized.startTime || '-'} - ${normalized.endTime || '-'}`],
+      ['Location', normalized.bookingLocation],
+      ['Booking Status', toBookingDisplayLabel(normalized.status)],
+      ['Booking ID', normalized.id || '-']
+    ],
+    styles: { fontSize: 10, cellPadding: 8, valign: 'top' },
+    headStyles: { fillColor: [0, 64, 129], textColor: 255, fontStyle: 'bold' },
+    columnStyles: {
+      0: { cellWidth: 140, fontStyle: 'bold', fillColor: [238, 245, 255], textColor: [0, 64, 129] },
+      1: { cellWidth: 'auto' }
+    },
+    theme: 'grid',
+    margin: { left: 40, right: 40 }
+  });
+
+  autoTable(doc, {
+    startY: (doc.lastAutoTable?.finalY || 330) + 24,
+    head: [['Payment Information', 'Details']],
+    body: [
+      ['Payment Status', toBookingDisplayLabel(normalized.paymentStatus)],
+      ['Payment Method', toBookingDisplayLabel(normalized.paymentMethod)],
+      ['Amount', `CAD ${normalized.amount.toFixed(2)}`],
+      ['Receipt Number', normalized.receiptNumber || 'Not assigned'],
+      ['Payment Reference', normalized.paymentReference || '-'],
+      ...(normalized.status === 'cancelled' ? [
+        ['Refund Status', isRefundReleased ? 'Released' : toBookingDisplayLabel(normalized.refundStatus, 'Not required')],
+        ['Refund Amount', `CAD ${normalized.refundAmount.toFixed(2)}`],
+        ['Refund Method', toBookingDisplayLabel(normalized.refundMethod)],
+        ['Refund Reference', normalized.refundReference || '-'],
+        ['Refund Date', normalized.refundDate || '-']
+      ] : [])
+    ],
+    styles: { fontSize: 10, cellPadding: 8, valign: 'top' },
+    headStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold' },
+    columnStyles: {
+      0: { cellWidth: 140, fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [30, 41, 59] },
+      1: { cellWidth: 'auto' }
+    },
+    theme: 'grid',
+    margin: { left: 40, right: 40 }
+  });
+
+  const footerY = Math.min((doc.lastAutoTable?.finalY || 540) + 36, pageHeight - 70);
+  doc.setDrawColor(203, 213, 225);
+  doc.line(40, footerY - 16, pageWidth - 40, footerY - 16);
+  doc.setTextColor(71, 85, 105);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text(isRefundReleased
+    ? 'This confirms that the refund listed above was released. Please retain this confirmation for your records.'
+    : 'Please retain this receipt for your records. Contact the Gurdwara office if any details need correction.', 40, footerY, { maxWidth: pageWidth - 80 });
+
+  const reference = String(receiptNumber).replace(/[^A-Za-z0-9_-]+/g, '-');
+  return {
+    filename: `${isRefundReleased ? 'refund-release' : 'booking-receipt'}-${reference}.pdf`,
+    contentType: 'application/pdf',
+    content: Buffer.from(doc.output('arraybuffer')).toString('base64'),
+    disposition: 'attachment'
+  };
+};
+
+const buildBookingNotificationEmail = ({ booking, daysRemaining = null, changeType = 'updated' }) => {
+  const normalized = normalizeBookingForNotification(booking);
+  const isReminder = Number.isFinite(daysRemaining);
+  const isPaid = normalized.paymentStatus === 'paid';
+  const isCancelled = normalized.status === 'cancelled';
+  const refundProcessed = normalized.refundStatus === 'processed';
+  const refundPending = normalized.refundStatus === 'pending';
+  const isRefundReleased = isCancelled && refundProcessed && changeType === 'refund-released';
+  const refundStatusLabel = refundProcessed ? 'Released' : toBookingDisplayLabel(normalized.refundStatus, 'Not required');
+  const logoSrc = volunteerReminderLogoUrl || `${volunteerReminderBaseUrl}/gurdwara-logo.webp`;
+  const contactUrl = `${volunteerReminderBaseUrl}/contact`;
+  const dateTimeLabel = `${normalized.date || 'Date TBD'}${normalized.startTime ? `, ${normalized.startTime}` : ''}${normalized.endTime ? ` - ${normalized.endTime}` : ''}`;
+  const subject = isReminder
+    ? `Booking Reminder (${daysRemaining} day${daysRemaining === 1 ? '' : 's'}): ${normalized.categoryName}`
+    : isRefundReleased
+      ? `Refund Released: ${normalized.categoryName}`
+    : isCancelled
+      ? `Booking Cancelled: ${normalized.categoryName}`
+    : `${isPaid ? 'Payment Receipt' : `Booking ${changeType === 'created' ? 'Received' : 'Updated'}`}: ${normalized.categoryName}`;
+  const intro = isReminder
+    ? `Your booking is coming up in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'}.`
+    : isRefundReleased
+      ? `Your refund of CAD ${normalized.refundAmount.toFixed(2)} has been released${normalized.refundDate ? ` on ${normalized.refundDate}` : ''}. Please allow your payment provider's standard processing time for the funds to appear in your account.`
+    : isCancelled
+      ? refundProcessed
+        ? `Your booking has been cancelled. A refund of CAD ${normalized.refundAmount.toFixed(2)} was processed${normalized.refundDate ? ` on ${normalized.refundDate}` : ''}. Please allow your payment provider's standard processing time for the funds to appear.`
+        : refundPending
+          ? `Your booking has been cancelled. A refund of CAD ${normalized.refundAmount.toFixed(2)} is pending and the Gurdwara office will notify you after it has been processed.`
+          : 'Your booking has been cancelled. No refund is required for this booking.'
+    : isPaid
+      ? 'Your payment was received successfully. Your updated booking receipt is attached.'
+      : `Your booking record has been ${changeType === 'created' ? 'received' : 'updated'}.`;
+  const text = [
+    `Dear ${normalized.requesterName},`,
+    '',
+    intro,
+    `Booking: ${normalized.categoryName}`,
+    `Date and Time: ${dateTimeLabel}`,
+    `Location: ${normalized.bookingLocation}`,
+    `Booking Status: ${normalized.status}`,
+    `Payment Status: ${normalized.paymentStatus}`,
+    `Payment Method: ${normalized.paymentMethod}`,
+    `Amount: CAD ${normalized.amount.toFixed(2)}`,
+    normalized.receiptNumber ? `Receipt Number: ${normalized.receiptNumber}` : '',
+    isCancelled ? `Refund Status: ${refundStatusLabel}` : '',
+    isCancelled && normalized.refundAmount > 0 ? `Refund Amount: CAD ${normalized.refundAmount.toFixed(2)}` : '',
+    isCancelled && normalized.refundMethod ? `Refund Method: ${normalized.refundMethod}` : '',
+    isCancelled && normalized.refundReference ? `Refund Reference: ${normalized.refundReference}` : '',
+    isCancelled && normalized.refundDate ? `Refund Date: ${normalized.refundDate}` : '',
+    isCancelled && normalized.refundNotes ? `Refund Notes: ${normalized.refundNotes}` : '',
+    '',
+    'Please contact the Gurdwara office if any details need to be changed.',
+    '',
+    volunteerReminderSiteName
+  ].filter(Boolean).join('\n');
+  const rows = [
+    ['Booking', normalized.categoryName],
+    ['Date and Time', dateTimeLabel],
+    ['Location', normalized.bookingLocation],
+    ['Booking Status', toBookingDisplayLabel(normalized.status)],
+    ['Payment Status', toBookingDisplayLabel(normalized.paymentStatus)],
+    ['Payment Method', toBookingDisplayLabel(normalized.paymentMethod)],
+    ['Amount', `CAD ${normalized.amount.toFixed(2)}`],
+    ...(normalized.receiptNumber ? [['Receipt Number', normalized.receiptNumber]] : []),
+    ...(isCancelled ? [
+      ['Refund Status', refundStatusLabel],
+      ...(normalized.refundAmount > 0 ? [['Refund Amount', `CAD ${normalized.refundAmount.toFixed(2)}`]] : []),
+      ...(normalized.refundMethod ? [['Refund Method', toBookingDisplayLabel(normalized.refundMethod)]] : []),
+      ...(normalized.refundReference ? [['Refund Reference', normalized.refundReference]] : []),
+      ...(normalized.refundDate ? [['Refund Date', normalized.refundDate]] : [])
+    ] : [])
+  ];
+  const html = `
+    <div style="background:#f5f8fc;padding:28px 14px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
+      <table role="presentation" cellspacing="0" cellpadding="0" width="100%" style="max-width:720px;margin:0 auto;background:#ffffff;border:1px solid #dbe7f6;border-radius:14px;overflow:hidden;">
+        <tr><td style="padding:18px 24px;background:linear-gradient(90deg,#004081,#0b67c2,#e58b16);color:#ffffff;"><table role="presentation" cellspacing="0" cellpadding="0"><tr>${logoSrc ? `<td style="padding-right:12px;"><img src="${escapeHtml(logoSrc)}" alt="${escapeHtml(volunteerReminderSiteName)} logo" width="46" height="46" style="display:block;border-radius:9999px;background:#ffffff;object-fit:cover;"/></td>` : ''}<td><div style="font-size:13px;font-weight:700;text-transform:uppercase;">${escapeHtml(volunteerReminderSiteName)}</div><div style="margin-top:3px;font-size:21px;font-weight:800;">${isReminder ? 'Booking Reminder' : isRefundReleased ? 'Refund Released' : isCancelled ? 'Booking Cancelled' : isPaid ? 'Payment Receipt' : 'Booking Status Update'}</div></td></tr></table></td></tr>
+        <tr><td style="padding:24px;"><p style="font-size:17px;font-weight:700;">Dear ${escapeHtml(normalized.requesterName)},</p><p style="color:#334155;line-height:1.7;">${escapeHtml(intro)}</p>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #d7e3f3;border-radius:10px;overflow:hidden;">${rows.map(([label, value]) => `<tr><td style="width:34%;padding:11px 12px;background:#eef5ff;border-bottom:1px solid #d7e3f3;font-weight:700;color:#0a4d9f;">${escapeHtml(label)}</td><td style="padding:11px 12px;border-bottom:1px solid #d7e3f3;font-weight:700;">${escapeHtml(value)}</td></tr>`).join('')}</table>
+          <p style="margin-top:18px;color:#475569;line-height:1.7;">A PDF copy of these booking and payment details is attached for your records.</p>
+          <div style="border-top:1px solid #e2e8f0;padding-top:14px;font-size:12px;line-height:1.8;color:#64748b;"><strong>Need help?</strong><br/><a href="${escapeHtml(contactUrl)}" style="color:#0b67c2;">Contact the Gurdwara office</a><br/>${escapeHtml(volunteerReminderSiteName)}</div>
+        </td></tr>
+      </table>
+    </div>`;
+  return { subject, text, html, booking: normalized };
+};
+
+const sendBookingNotificationEmail = async (booking, options = {}) => {
+  const normalized = normalizeBookingForNotification(booking);
+  if (!isValidEmailAddress(normalized.requesterEmail)) {
+    return { sent: false, reason: 'missing_email' };
+  }
+  const daysRemaining = Number.isFinite(Number(options.daysRemaining)) ? Number(options.daysRemaining) : null;
+  const template = buildBookingNotificationEmail({ booking: normalized, daysRemaining, changeType: options.changeType || 'updated' });
+  let attachments = [];
+  try {
+    attachments = [buildBookingReceiptPdfAttachment(normalized)];
+  } catch (error) {
+    console.error('[booking-email] Unable to generate PDF attachment:', error?.message || error);
+  }
+  const payload = {
+    type: daysRemaining == null
+      ? options.changeType === 'refund-released' ? 'booking-refund-released' : 'booking-status-update'
+      : 'booking-reminder',
+    to: normalized.requesterEmail,
+    email: normalized.requesterEmail,
+    name: normalized.requesterName,
+    subject: template.subject,
+    message: template.text,
+    text: template.text,
+    html: template.html,
+    bodyHtml: template.html,
+    bodyText: template.text,
+    attachments,
+    metadata: {
+      bookingId: normalized.id,
+      bookingType: normalized.categoryName,
+      bookingDate: normalized.date,
+      bookingStatus: normalized.status,
+      paymentStatus: normalized.paymentStatus,
+      refundStatus: normalized.refundStatus,
+      refundAmount: normalized.refundAmount,
+      refundDate: normalized.refundDate,
+      reminderDays: daysRemaining
+    },
+    sentAt: new Date().toISOString()
+  };
+  try {
+    const response = await fetch(bookingReminderWebhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return response.ok ? { sent: true } : { sent: false, reason: 'webhook_error' };
+  } catch {
+    return { sent: false, reason: 'network_error' };
+  }
+};
+
+const bookingNotificationFields = ['status', 'paymentStatus', 'date', 'startTime', 'endTime', 'bookingLocation', 'categoryName', 'receiptNumber', 'refundStatus', 'refundAmount', 'refundMethod', 'refundReference', 'refundDate', 'refundNotes'];
+const hasBookingNotificationChange = (existing = {}, updated = {}) => bookingNotificationFields.some(
+  (field) => String(existing?.[field] ?? '') !== String(updated?.[field] ?? '')
+);
+
+const shouldRunBookingReminderSweep = (date = new Date()) => {
+  const nowParts = getDatePartsInTimeZone(date, bookingReminderTimeZone);
+  const todayDateKey = toDateKeyFromParts(nowParts);
+  const nowMinutes = (nowParts.hour * 60) + nowParts.minute;
+  const scheduledMinutes = (bookingReminderSendTime.hour * 60) + bookingReminderSendTime.minute;
+  return bookingReminderLastRunDateKey !== todayDateKey && nowMinutes >= scheduledMinutes;
+};
+
+const runBookingReminderSweep = async (options = {}) => {
+  if (bookingReminderSweepRunning) {
+    return { processed: 0, sent: 0, skipped: 0, reason: 'already_running' };
+  }
+  bookingReminderSweepRunning = true;
+  const force = options.force === true;
+  try {
+    const bookings = await eventsDb.listItems('bookings');
+    const logStore = readBookingReminderLog();
+    let processed = 0;
+    let sent = 0;
+    let skipped = 0;
+    for (const entry of Array.isArray(bookings) ? bookings : []) {
+      const booking = normalizeBookingForNotification(entry);
+      processed += 1;
+      if (!booking.id || !booking.date || !isValidEmailAddress(booking.requesterEmail) || booking.status === 'cancelled') {
+        skipped += 1;
+        continue;
+      }
+      const daysRemaining = getDaysUntilDate(booking.date);
+      if (daysRemaining == null || !bookingReminderDays.includes(daysRemaining)) {
+        skipped += 1;
+        continue;
+      }
+      const reminderKey = `${booking.id}:${booking.date}:${daysRemaining}`;
+      if (!force && logStore.sent[reminderKey]) {
+        skipped += 1;
+        continue;
+      }
+      const result = await sendBookingNotificationEmail(booking, { daysRemaining });
+      if (!result.sent) {
+        skipped += 1;
+        continue;
+      }
+      sent += 1;
+      logStore.sent[reminderKey] = new Date().toISOString();
+    }
+    writeBookingReminderLog(logStore);
+    return { processed, sent, skipped, force, reminderDays: bookingReminderDays, webhookConfigured: Boolean(bookingReminderWebhookUrl) };
+  } finally {
+    bookingReminderSweepRunning = false;
+  }
+};
+
+const runScheduledBookingReminderSweep = async () => {
+  if (!shouldRunBookingReminderSweep()) {
+    return null;
+  }
+  const result = await runBookingReminderSweep();
+  const nowParts = getDatePartsInTimeZone(new Date(), bookingReminderTimeZone);
+  bookingReminderLastRunDateKey = toDateKeyFromParts(nowParts);
+  return result;
+};
+
 const getVolunteerRecognitionData = async () => {
   const rows = await eventsDb.listItems('volunteer_registrations');
 
@@ -3532,14 +4035,76 @@ const zeffyPaymentMatchesConfiguration = (payment, configuration, configurationC
   return Boolean(localCampaignName && paymentCampaignName === localCampaignName) || configurationCount === 1;
 };
 
+const resolvePendingDonationForReceipt = async (donationRecord = {}) => {
+  const pendingRows = await eventsDb.getPendingDonations();
+  const directPendingId = String(donationRecord.sourcePendingId || '').trim();
+  if (directPendingId) {
+    return pendingRows.find((entry) => String(entry.id || '').trim() === directPendingId) || { id: directPendingId };
+  }
+
+  const provider = String(donationRecord.paymentProvider || '').trim().toUpperCase();
+  const donorEmail = String(donationRecord.donorEmail || '').trim().toLowerCase();
+  const campaignId = Number(donationRecord.campaignId);
+  const amount = Number(donationRecord.amount || 0);
+  const paymentTime = new Date(donationRecord.createdAt || Date.now()).getTime();
+
+  return pendingRows
+    .filter((entry) => {
+      const pendingTime = new Date(entry.createdAt || 0).getTime();
+      return String(entry.paymentProvider || '').trim().toUpperCase() === provider
+        && String(entry.donorEmail || '').trim().toLowerCase() === donorEmail
+        && Number(entry.campaignId) === campaignId
+        && Math.abs(Number(entry.amount || 0) - amount) < 0.01
+        && Number.isFinite(pendingTime)
+        && pendingTime <= paymentTime
+        && paymentTime - pendingTime <= 72 * 60 * 60 * 1000;
+    })
+    .sort((left, right) => new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime())[0] || null;
+};
+
+const attachDonationReceiptToBooking = async (donationRecord = {}) => {
+  const pending = await resolvePendingDonationForReceipt(donationRecord);
+  if (!pending?.id) {
+    return null;
+  }
+
+  const bookings = await eventsDb.listItems('bookings');
+  const booking = bookings.find((entry) => String(entry.donationPendingId || '').trim() === String(pending.id));
+  if (!booking?.id) {
+    return null;
+  }
+
+  const updated = await eventsDb.updateItem('bookings', booking.id, {
+    receiptNumber: String(donationRecord.receiptId || booking.receiptNumber || '').trim(),
+    paymentReference: String(donationRecord.gatewayTransactionId || pending.id).trim(),
+    paymentMethod: String(donationRecord.paymentProvider || booking.paymentMethod || '').trim().toUpperCase(),
+    paymentProvider: String(donationRecord.paymentProvider || booking.paymentProvider || '').trim().toUpperCase(),
+    paymentStatus: 'paid',
+    status: String(booking.status || 'pending').trim().toLowerCase() === 'confirmed' ? 'confirmed' : 'pending',
+    amount: Number(donationRecord.amount || booking.amount || 0),
+    updatedAt: new Date().toISOString()
+  });
+  await sendBookingNotificationEmail(updated, { changeType: 'updated' });
+  await eventsDb.removePendingDonation(pending.id).catch(() => null);
+  return updated;
+};
+
 const persistVerifiedZeffyPayment = async (payment, campaigns = [], campaignOverride = null) => {
   const donationRecord = mapZeffyApiPayment(payment);
   const matchedCampaign = campaignOverride || resolveZeffyCampaign(donationRecord, campaigns);
-  return upsertDonation({
+  const correlatedPending = await resolvePendingDonationForReceipt({
     ...donationRecord,
     campaignId: matchedCampaign ? Number(matchedCampaign.id) : null,
     campaignName: matchedCampaign?.name || donationRecord.campaignName || zeffyCampaignName
   });
+  const persistedDonation = await upsertDonation({
+    ...donationRecord,
+    sourcePendingId: correlatedPending?.id || donationRecord.sourcePendingId,
+    campaignId: matchedCampaign ? Number(matchedCampaign.id) : null,
+    campaignName: matchedCampaign?.name || donationRecord.campaignName || zeffyCampaignName
+  });
+  await attachDonationReceiptToBooking(persistedDonation);
+  return persistedDonation;
 };
 
 let zeffyReconciliationPromise = null;
@@ -4183,6 +4748,7 @@ const server = http.createServer(async (request, response) => {
       stripeConfigured: Boolean(stripeSecretKey),
       webhookConfigured: Boolean(stripeWebhookSecret),
       eventsDatabaseConfigured: eventsDb.hasDatabaseConnection,
+      databaseEngine: eventsDb.engine,
       apiVersion: API_VERSION,
       startupId: API_STARTUP_ID,
       serverPort: port
@@ -4270,16 +4836,19 @@ const server = http.createServer(async (request, response) => {
       const htmlBody = String(relayPayload.html || relayPayload.bodyHtml || relayPayload.content || relayPayload.message || '').trim();
       const textBody = String(relayPayload.text || relayPayload.bodyText || relayPayload.message || '').trim();
       const attachments = normalizeAttachmentList(relayPayload);
-
-      const deliveryResult = await sendViaConfiguredMailTransport({
-        from: localMailFromAddress,
-        toList: recipients,
-        bccList: bccRecipients,
-        subject,
-        textBody,
-        htmlBody,
-        attachments
-      });
+      const isNewsletter = String(relayPayload.type || '').trim().toLowerCase() === 'newsletter';
+      const newsletterRecipients = [...new Set([...bccRecipients, ...recipients])];
+      const deliveryResult = isNewsletter
+        ? await sendNewsletterPrivately({ relayPayload, recipients: newsletterRecipients, subject, htmlBody, textBody, attachments })
+        : await sendViaConfiguredMailTransport({
+          from: localMailFromAddress,
+          toList: recipients,
+          bccList: bccRecipients,
+          subject,
+          textBody,
+          htmlBody,
+          attachments
+        });
 
       sendJson(response, 200, {
         ok: true,
@@ -4289,8 +4858,8 @@ const server = http.createServer(async (request, response) => {
         messageId: String(deliveryResult?.messageId || '').trim() || undefined,
         acceptedRecipients: Array.isArray(deliveryResult?.accepted) ? deliveryResult.accepted : undefined,
         rejectedRecipients: Array.isArray(deliveryResult?.rejected) ? deliveryResult.rejected : undefined,
-        recipients: recipients.length,
-        bccRecipients: bccRecipients.length,
+        recipients: isNewsletter ? 0 : recipients.length,
+        bccRecipients: isNewsletter ? Number(deliveryResult?.newsletterRecipients || 0) : bccRecipients.length,
         hasAttachments: attachments.length > 0,
         type: String(relayPayload.type || '').trim() || 'generic'
       });
@@ -4301,6 +4870,31 @@ const server = http.createServer(async (request, response) => {
         sent: false,
         message: error?.message || 'Unable to send relay email.'
       });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/newsletter/unsubscribe' && request.method === 'GET') {
+    try {
+      const identity = parseNewsletterUnsubscribeToken(requestUrl.searchParams.get('token') || '');
+      const subscribers = await eventsDb.listItems('subscribers');
+      const subscriber = (Array.isArray(subscribers) ? subscribers : []).find((entry) => (
+        String(entry?.id || '').trim() === identity.id
+        && String(entry?.email || '').trim().toLowerCase() === identity.email
+      ));
+      if (subscriber?.active !== false) {
+        await eventsDb.updateItem('subscribers', identity.id, {
+          ...subscriber,
+          active: false,
+          unsubscribedAt: new Date().toISOString(),
+          unsubscribeSource: 'newsletter-link'
+        });
+      }
+      response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      response.end('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Newsletter Unsubscribed</title></head><body style="margin:0;background:#f1f5f9;font-family:Arial,sans-serif;color:#0f172a"><main style="max-width:560px;margin:10vh auto;padding:32px;border-top:6px solid #f4a300;background:#fff;box-shadow:0 20px 50px rgba(15,23,42,.12)"><h1 style="margin:0;color:#052f63">You have been unsubscribed</h1><p style="line-height:1.7;color:#475569">This email address has been removed from the active Singh Sabha Milton newsletter list. You will no longer receive newsletter campaigns.</p><a href="/" style="color:#0b4ea2;font-weight:700">Return to Singh Sabha Milton</a></main></body></html>');
+    } catch (error) {
+      response.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      response.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Invalid Unsubscribe Link</title></head><body style="font-family:Arial,sans-serif;padding:40px;color:#0f172a"><h1>Unable to unsubscribe</h1><p>${escapeHtml(error?.message || 'This unsubscribe link is invalid.')}</p></body></html>`);
     }
     return;
   }
@@ -4772,6 +5366,15 @@ const server = http.createServer(async (request, response) => {
     try {
       const resource = String(contentResourceMatch[1]).toLowerCase();
       let data = await eventsDb.listItems(resource);
+      if (resource === 'bookings') {
+        data = await Promise.all(data.map(async (booking) => {
+          const normalized = enforceBookingPaymentStatus(booking);
+          if (normalized.status === booking.status && normalized.paymentStatus === booking.paymentStatus) {
+            return booking;
+          }
+          return eventsDb.updateItem('bookings', booking.id, normalized);
+        }));
+      }
       if (resource === 'users') {
         data = await Promise.all(data.map(async (user) => {
           const reconciled = enforceUserMembershipActivity(user, {});
@@ -4794,7 +5397,11 @@ const server = http.createServer(async (request, response) => {
     try {
       const resource = String(contentResourceMatch[1]).toLowerCase();
       const body = await parseAndValidateGenericObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
-      const validatedBody = resource === 'users' ? enforceUserMembershipActivity(body, body) : body;
+      const validatedBody = resource === 'users'
+        ? enforceUserMembershipActivity(body, body)
+        : resource === 'bookings'
+          ? enforceBookingPaymentStatus(body)
+          : body;
       const data = await eventsDb.createItem(resource, validatedBody);
       if (resource !== 'audit_logs') {
         await appendAuditLog(request, {
@@ -4804,6 +5411,11 @@ const server = http.createServer(async (request, response) => {
           description: `Created ${resource} item`,
           payload: validatedBody
         });
+      }
+      if (resource === 'bookings') {
+        if (!shouldDelayBookingEmailUntilPayment(data)) {
+          await sendBookingNotificationEmail(data, { changeType: 'created' });
+        }
       }
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
@@ -4820,6 +5432,8 @@ const server = http.createServer(async (request, response) => {
       const body = await parseAndValidateGenericObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
       const existingUsers = resource === 'users' ? await eventsDb.listItems('users') : null;
       const existingUser = Array.isArray(existingUsers) ? existingUsers.find((entry) => String(entry?.id || '') === String(id)) : null;
+      const existingBookings = resource === 'bookings' ? await eventsDb.listItems('bookings') : null;
+      const existingBooking = Array.isArray(existingBookings) ? existingBookings.find((entry) => String(entry?.id || '') === String(id)) : null;
       const changedRoleToMember = resource === 'users'
         && String(existingUser?.role || '').trim().toLowerCase() !== 'member'
         && String(body?.role || '').trim().toLowerCase() === 'member';
@@ -4830,7 +5444,9 @@ const server = http.createServer(async (request, response) => {
           ...(changedRoleToMember ? { membershipFeeRecords: [] } : {}),
           id
         }, body)
-        : body;
+        : resource === 'bookings'
+          ? enforceBookingPaymentStatus({ ...(existingBooking || {}), ...body, id })
+          : body;
       const data = await eventsDb.updateItem(resource, id, validatedBody);
 
       if (resource === 'users' && eventsDb.hasDatabaseConnection) {
@@ -4858,6 +5474,14 @@ const server = http.createServer(async (request, response) => {
           description: `Updated ${resource} item`,
           payload: validatedBody
         });
+      }
+      if (resource === 'bookings') {
+        const mergedBooking = { ...(existingBooking || {}), ...(data || {}), ...(validatedBody || {}), id: String(id) };
+        if (hasBookingNotificationChange(existingBooking || {}, mergedBooking)) {
+          const refundReleased = String(existingBooking?.refundStatus || '').trim().toLowerCase() !== 'processed'
+            && String(mergedBooking.refundStatus || '').trim().toLowerCase() === 'processed';
+          await sendBookingNotificationEmail(mergedBooking, { changeType: refundReleased ? 'refund-released' : 'updated' });
+        }
       }
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
@@ -5534,6 +6158,26 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (requestUrl.pathname === '/api/bookings/reminders/run' && request.method === 'POST') {
+    try {
+      const body = await parseJsonObjectBody(request, { maxBytes: 64 * 1024, allowEmpty: true });
+      ensureNoUnknownKeys(body, ['force']);
+      const force = readBooleanField(body, 'force');
+      const data = await runBookingReminderSweep({ force: force === true });
+      await appendAuditLog(request, {
+        action: 'booking.reminders.run',
+        targetType: 'booking-reminders',
+        targetId: 'scheduled',
+        description: 'Executed booking reminder sweep',
+        payload: { force: force === true, result: data }
+      });
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to run booking reminders.' });
+    }
+    return;
+  }
+
   if (requestUrl.pathname === '/api/volunteer-recognition' && request.method === 'GET') {
     try {
       const data = await getVolunteerRecognitionData();
@@ -5625,6 +6269,7 @@ const server = http.createServer(async (request, response) => {
         const session = event.data.object;
         const donationRecord = mapWebhookDonation(session, event.id);
         const persistedDonation = await upsertDonation(donationRecord);
+        await attachDonationReceiptToBooking(persistedDonation);
         await syncCampaignRaisedTotal({
           campaignId: persistedDonation?.campaignId,
           campaignName: persistedDonation?.campaignName
@@ -6394,7 +7039,7 @@ const bootstrap = async () => {
       logServerError(error, 'Failed to initialize events database');
     }
   } else {
-    console.warn('Events database is not configured. Set DATABASE_URL to enable PostgreSQL events storage.');
+    console.warn('Runtime database is not configured. Set PostgreSQL or MySQL connection variables for the selected DB_ENGINE.');
   }
 
   server.listen(port, () => {
@@ -6405,6 +7050,8 @@ const bootstrap = async () => {
   console.log(`Volunteer reminder scheduler set for ${configuredTime} (${volunteerReminderTimeZone}) daily.`);
   const eventConfiguredTime = `${String(eventReminderSendTime.hour).padStart(2, '0')}:${String(eventReminderSendTime.minute).padStart(2, '0')}`;
   console.log(`Event reminder scheduler set for ${eventConfiguredTime} (${eventReminderTimeZone}) daily.`);
+  const bookingConfiguredTime = `${String(bookingReminderSendTime.hour).padStart(2, '0')}:${String(bookingReminderSendTime.minute).padStart(2, '0')}`;
+  console.log(`Booking reminder scheduler set for ${bookingConfiguredTime} (${bookingReminderTimeZone}) daily at ${bookingReminderDays.join(', ')} day intervals.`);
 
   // Check every minute, but only send once per day after the configured local send time.
   setInterval(() => {
@@ -6427,6 +7074,16 @@ const bootstrap = async () => {
 
   runScheduledEventReminderSweep().catch((error) => {
     logServerError(error, 'Initial event reminder scheduler check failed');
+  });
+
+  setInterval(() => {
+    runScheduledBookingReminderSweep().catch((error) => {
+      logServerError(error, 'Booking reminder sweep failed');
+    });
+  }, 60 * 1000);
+
+  runScheduledBookingReminderSweep().catch((error) => {
+    logServerError(error, 'Initial booking reminder scheduler check failed');
   });
 
   const zeffyReconciliationTimer = setInterval(() => {

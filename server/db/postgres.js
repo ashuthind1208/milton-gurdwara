@@ -3445,7 +3445,72 @@ const purgeUserRegistrations = async ({ userId, email, contact, name }) => {
     touchedEvents: touchedEventIds.length
   };
 };
+
+const exportSnapshot = async () => {
+  if (!pool) {
+    throw new Error('PostgreSQL is not configured.');
+  }
+
+  const [singletonsResult, itemsResult, quizResult, zeffyCampaigns] = await Promise.all([
+    pool.query('SELECT resource, payload, updated_at FROM app_singletons ORDER BY resource;'),
+    pool.query('SELECT resource, id, payload, created_at, updated_at FROM app_items ORDER BY resource, id;'),
+    pool.query('SELECT file_name, questions, updated_at FROM quiz_bank_files ORDER BY file_name;'),
+    getZeffyDonationCampaigns()
+  ]);
+  const zeffyKeys = new Map(zeffyCampaigns.map((campaign) => [Number(campaign.id), campaign.zeffyApiKey]));
+  const campaigns = (await getDonationCampaigns()).map((campaign) => ({
+    ...campaign,
+    zeffyApiKey: zeffyKeys.get(Number(campaign.id)) || ''
+  }));
+
+  return {
+    singletons: singletonsResult.rows.map((row) => ({
+      resource: row.resource,
+      payload: row.payload,
+      updatedAt: row.updated_at
+    })),
+    items: itemsResult.rows.map((row) => ({
+      resource: row.resource,
+      id: row.id,
+      payload: row.payload,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    })),
+    quizFiles: quizResult.rows.map((row) => ({
+      fileName: row.file_name,
+      questions: row.questions,
+      updatedAt: row.updated_at
+    })),
+    events: await getEvents(),
+    campaigns,
+    donations: await getDonations(),
+    pendingDonations: await getPendingDonations()
+  };
+};
+
+const getDataCounts = async () => {
+  if (!pool) {
+    throw new Error('PostgreSQL is not configured.');
+  }
+
+  const countQueries = {
+    app_singletons: 'SELECT COUNT(*)::int AS count FROM app_singletons;',
+    app_items: 'SELECT COUNT(*)::int AS count FROM app_items;',
+    quiz_bank_files: 'SELECT COUNT(*)::int AS count FROM quiz_bank_files;',
+    events: 'SELECT COUNT(*)::int AS count FROM events;',
+    event_registrants: 'SELECT COUNT(*)::int AS count FROM event_registrants;',
+    donation_campaigns: 'SELECT COUNT(*)::int AS count FROM donation_campaigns;',
+    donations: 'SELECT COUNT(*)::int AS count FROM donations WHERE deleted_at IS NULL;',
+    donation_pending: 'SELECT COUNT(*)::int AS count FROM donation_pending;'
+  };
+  const entries = await Promise.all(Object.entries(countQueries).map(async ([table, query]) => {
+    const result = await pool.query(query);
+    return [table, Number(result.rows[0]?.count || 0)];
+  }));
+  return Object.fromEntries(entries);
+};
 module.exports = {
+  pool,
   syncRelationalMirrorsFromContentStore,
   hasDatabaseConnection: Boolean(pool),
   ensureEventsSchema,
@@ -3482,5 +3547,7 @@ module.exports = {
   removeVolunteerRegistration,
   getUserRegistrationDependencies,
   markUserRegistrationsDormant,
-  purgeUserRegistrations
+  purgeUserRegistrations,
+  exportSnapshot,
+  getDataCounts
 };

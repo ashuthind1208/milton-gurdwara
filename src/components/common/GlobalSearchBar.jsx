@@ -10,6 +10,7 @@ import GlobalSearchResultsPanel from './GlobalSearchResultsPanel';
 const GlobalSearchBar = ({
   className = '',
   inputClassName = '',
+  iconClassName = '',
   panelClassName = '',
   placeholder = 'Search events, news, library, and seva...',
   minChars = 2,
@@ -19,6 +20,7 @@ const GlobalSearchBar = ({
   items = null,
   disableRemoteSearch = false,
   remoteSearchFn = null,
+  clearOnClickOutside = false,
   scope = 'all'
 }) => {
   const navigate = useNavigate();
@@ -126,12 +128,16 @@ const GlobalSearchBar = ({
       if (!rootRef.current.contains(event.target)) {
         setOpen(false);
         setActiveIndex(-1);
+        if (clearOnClickOutside) {
+          setQuery('');
+          setDebouncedQuery('');
+        }
       }
     };
 
     document.addEventListener('mousedown', onMouseDown);
     return () => document.removeEventListener('mousedown', onMouseDown);
-  }, []);
+  }, [clearOnClickOutside]);
 
   useEffect(() => {
     setActiveIndex(-1);
@@ -199,7 +205,7 @@ const GlobalSearchBar = ({
     <div ref={rootRef} className={`relative ${className}`}>
       <label className="sr-only" htmlFor={inputId}>Global search</label>
       <div className="relative">
-        <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <MagnifyingGlassIcon className={`pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 ${iconClassName}`} />
         <input
           id={inputId}
           ref={inputRef}

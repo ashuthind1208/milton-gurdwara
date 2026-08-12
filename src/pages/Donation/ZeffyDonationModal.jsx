@@ -1,8 +1,16 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 
 const ZeffyDonationModal = ({ isOpen, formUrl, onClose }) => {
+  const [isFrameLoading, setIsFrameLoading] = useState(true);
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsFrameLoading(true);
+    }
+  }, [formUrl, isOpen]);
+
   useEffect(() => {
     if (!isOpen) {
       return undefined;
@@ -14,8 +22,18 @@ const ZeffyDonationModal = ({ isOpen, formUrl, onClose }) => {
       }
     };
 
+    const handlePaymentCompleted = (event) => {
+      if (event.origin === window.location.origin && event.data?.type === 'ssm:payment-completed') {
+        onClose();
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('message', handlePaymentCompleted);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('message', handlePaymentCompleted);
+    };
   }, [isOpen, onClose]);
 
   if (!isOpen) {
@@ -32,10 +50,12 @@ const ZeffyDonationModal = ({ isOpen, formUrl, onClose }) => {
             <XMarkIcon className="h-6 w-6" aria-hidden="true" />
           </button>
         </header>
+        {isFrameLoading ? <div className="absolute inset-0 top-14 z-20 flex flex-col items-center justify-center gap-3 bg-white"><span className="block h-12 w-12 animate-spin rounded-full border-4 border-blue-100 border-t-brand-blue" /><p className="text-sm font-semibold text-slate-700">Loading secure checkout...</p></div> : null}
         <iframe
           title="Zeffy secure donation form"
           src={formUrl}
           allow="payment"
+          onLoad={() => setIsFrameLoading(false)}
           className="min-h-0 flex-1 border-0 bg-white"
         />
       </section>

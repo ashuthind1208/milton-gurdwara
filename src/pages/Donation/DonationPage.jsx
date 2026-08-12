@@ -54,8 +54,12 @@ const DonationPage = () => {
     queryFn: () => advertisementService.getAds().then((res) => res.data)
   });
 
-  const donationTopAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Donation Top Banner').slice(0, 2), [ads]);
-  const donationFooterAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Donation Footer Banner').slice(0, 2), [ads]);
+  const donationTopAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Donation Top Banner'), [ads]);
+  const donationFooterAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Donation Footer Banner'), [ads]);
+  const donationTopAdImageHeightClass = donationTopAds.length > 2 ? 'h-16 md:h-20' : 'h-24 md:h-28';
+  const donationFooterAdImageHeightClass = donationFooterAds.length > 2 ? 'h-16 md:h-20' : 'h-24 md:h-28';
+  const donationTopAdsGridStyle = useMemo(() => ({ gridTemplateColumns: `repeat(${Math.max(1, donationTopAds.length)}, minmax(0, 1fr))` }), [donationTopAds.length]);
+  const donationFooterAdsGridStyle = useMemo(() => ({ gridTemplateColumns: `repeat(${Math.max(1, donationFooterAds.length)}, minmax(0, 1fr))` }), [donationFooterAds.length]);
 
   const openCampaigns = useMemo(() => campaigns.filter((campaign) => !campaign.isClosed), [campaigns]);
   const preferredCampaignId = useMemo(() => {
@@ -238,8 +242,8 @@ const DonationPage = () => {
       {isAuthenticated && profilePhoneMissing ? <PhoneNumberRequiredNotice activityLabel="donations" /> : null}
 
       {donationTopAds.length > 0 ? (
-        <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-          <div className="grid gap-2 md:grid-cols-2">
+        <section className="rounded-xl py-2">
+          <div className="grid w-full gap-2" style={donationTopAdsGridStyle}>
             {donationTopAds.map((ad) => (
               <a
                 key={ad.id}
@@ -251,9 +255,9 @@ const DonationPage = () => {
                     void advertisementService.recordAdClick(ad.id);
                   }
                 }}
-                className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30"
+                className="block min-w-0 overflow-hidden rounded-lg transition hover:opacity-95"
               >
-                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
+                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className={`${donationTopAdImageHeightClass} w-full p-1 object-contain`} loading="lazy" /> : null}
               </a>
             ))}
           </div>
@@ -395,8 +399,8 @@ const DonationPage = () => {
       </div>
 
       {donationFooterAds.length > 0 ? (
-        <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-          <div className="grid gap-2 md:grid-cols-2">
+        <section className="rounded-xl py-2">
+          <div className="grid w-full gap-2" style={donationFooterAdsGridStyle}>
             {donationFooterAds.map((ad) => (
               <a
                 key={ad.id}
@@ -408,9 +412,9 @@ const DonationPage = () => {
                     void advertisementService.recordAdClick(ad.id);
                   }
                 }}
-                className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30"
+                className="block min-w-0 overflow-hidden rounded-lg transition hover:opacity-95"
               >
-                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
+                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className={`${donationFooterAdImageHeightClass} w-full p-1 object-contain`} loading="lazy" /> : null}
               </a>
             ))}
           </div>

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { ArrowDownTrayIcon, CalendarDaysIcon, HandRaisedIcon, BanknotesIcon, DocumentArrowDownIcon, XCircleIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, CalendarDaysIcon, HandRaisedIcon, BanknotesIcon, DocumentArrowDownIcon, EnvelopeIcon, EyeIcon, XCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import Seo from '../../components/common/Seo';
 import PageHero from '../../components/common/PageHero';
 import useSeoMeta from '../../hooks/useSeoMeta';
@@ -10,9 +10,11 @@ import { useAuth } from '../../context/AuthContext';
 import eventService from '../../services/eventService';
 import donationService from '../../services/donationService';
 import volunteerService from '../../services/volunteerService';
+import bookingService from '../../services/bookingService';
 import { downloadCsv, downloadDonationInvoicePdf } from '../../utils/csvExport';
 import { siteConfig } from '../../constants/siteConfig';
 import { isEventCurrent } from '../../utils/eventAvailability';
+import { bookingBelongsToProfile, isBookingPaymentDonation, sortBookingsBySchedule } from '../../utils/profileBookings';
 
 const toDateKey = (value) => {
   const parsed = new Date(value);
@@ -23,6 +25,31 @@ const toDateKey = (value) => {
   const month = String(parsed.getMonth() + 1).padStart(2, '0');
   const day = String(parsed.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+};
+
+const bookingStatusPillClass = (status) => {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'confirmed') {
+    return 'border-emerald-300 bg-emerald-500 text-white';
+  }
+  if (normalized === 'cancelled') {
+    return 'border-rose-300 bg-rose-500 text-white';
+  }
+  return 'border-amber-300 bg-amber-400 text-slate-950';
+};
+
+const paymentStatusPillClass = (status) => {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'paid') {
+    return 'border-emerald-300 bg-emerald-500 text-white';
+  }
+  if (normalized === 'refunded') {
+    return 'border-cyan-300 bg-cyan-500 text-slate-950';
+  }
+  if (normalized === 'partial') {
+    return 'border-orange-300 bg-orange-400 text-slate-950';
+  }
+  return 'border-slate-300 bg-slate-200 text-slate-800';
 };
 
 const parseTimeTokenToMinutes = (token) => {
@@ -93,6 +120,7 @@ const FamilyDashboardPage = () => {
   const queryClient = useQueryClient();
   const [donationPage, setDonationPage] = useState(1);
   const [calendarNotice, setCalendarNotice] = useState({ type: '', message: '' });
+  const [selectedBooking, setSelectedBooking] = useState(null);
   const donationsPerPage = 6;
   const userDisplayName = String(user?.name || 'Member').trim() || 'Member';
   const userAvatarUrl = String(user?.avatarUrl || user?.picture || user?.photoURL || user?.imageUrl || user?.profileImageUrl || '').trim();
@@ -123,6 +151,11 @@ const FamilyDashboardPage = () => {
   const { data: donations = [] } = useQuery({
     queryKey: ['family-dashboard-donations'],
     queryFn: () => donationService.getDonations().then((res) => res.data),
+    enabled: isAuthenticated
+  });
+  const { data: bookings = [] } = useQuery({
+    queryKey: ['bookings', 'family-dashboard'],
+    queryFn: () => bookingService.getBookings().then((res) => res.data),
     enabled: isAuthenticated
   });
 
@@ -239,20 +272,48 @@ const FamilyDashboardPage = () => {
     });
   }, [sevaApplications, isAuthenticated, email, userName, userPhone, userPhoneDigits, allSevaOpportunities]);
 
+  const familyBookings = useMemo(() => {
+    if (!isAuthenticated) {
+      return [];
+    }
+    return sortBookingsBySchedule(
+      bookings.filter((booking) => bookingBelongsToProfile(booking, user || {})),
+      'desc'
+    );
+  }, [bookings, isAuthenticated, user]);
+
   const familyDonations = useMemo(() => {
     if (!isAuthenticated) {
       return [];
     }
 
     return donations
-      .filter((entry) => String(entry.donorEmail || '').trim().toLowerCase() === email)
+      .filter((entry) => String(entry.donorEmail || '').trim().toLowerCase() === email && !isBookingPaymentDonation(entry, familyBookings))
       .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-  }, [donations, isAuthenticated, email]);
+  }, [donations, email, familyBookings, isAuthenticated]);
 
   const donationTotal = useMemo(
     () => familyDonations.reduce((sum, item) => sum + Number(item.amount || 0), 0),
     [familyDonations]
   );
+
+  useEffect(() => {
+    if (!selectedBooking) {
+      return undefined;
+    }
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') {
+        setSelectedBooking(null);
+      }
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [selectedBooking]);
 
   const exportFamilyEventsCsv = () => {
     downloadCsv({
@@ -487,26 +548,26 @@ const FamilyDashboardPage = () => {
             <p className="text-sm font-bold uppercase tracking-widest text-brand-blue/80">Sat Sri Akal,</p>
             <h2 className="text-2xl font-black text-slate-900 md:text-3xl">{userDisplayName}</h2>
             <p className="mt-1 text-sm text-slate-700">
-              You currently have {familyEventRegistrations.length} event RSVP{familyEventRegistrations.length === 1 ? '' : 's'}, {familySevaApplications.length} seva application{familySevaApplications.length === 1 ? '' : 's'}, and {familyDonations.length} donation record{familyDonations.length === 1 ? '' : 's'}.
+              You currently have {familyEventRegistrations.length} event RSVP{familyEventRegistrations.length === 1 ? '' : 's'}, {familySevaApplications.length} seva application{familySevaApplications.length === 1 ? '' : 's'}, {familyBookings.length} booking{familyBookings.length === 1 ? '' : 's'}, and {familyDonations.length} donation record{familyDonations.length === 1 ? '' : 's'}.
             </p>
             <div className="mt-3">
               <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Quick Links</p>
-              <div className="mt-2 grid auto-rows-fr gap-2 sm:grid-cols-2">
-                <Link to="/events" className="flex h-full min-h-[88px] flex-col justify-between rounded-lg border border-slate-200 bg-white/90 px-3 py-2 transition hover:border-brand-blue/40 hover:bg-blue-50">
-                  <p className="text-sm font-bold text-brand-blue">View Events</p>
-                  <p className="text-xs text-slate-600">Check upcoming programs and register your family.</p>
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <Link to="/events" className="group inline-flex min-h-[58px] items-center gap-2 rounded-xl border-2 border-blue-700 bg-gradient-to-r from-blue-700 to-blue-600 px-2.5 py-2 text-xs font-extrabold text-white shadow-md shadow-blue-900/15 transition hover:-translate-y-0.5 hover:shadow-lg">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/15"><CalendarDaysIcon className="h-5 w-5" /></span>
+                  <span className="leading-tight">View Events</span>
                 </Link>
-                <Link to="/seva" className="flex h-full min-h-[88px] flex-col justify-between rounded-lg border border-slate-200 bg-white/90 px-3 py-2 transition hover:border-brand-blue/40 hover:bg-blue-50">
-                  <p className="text-sm font-bold text-brand-blue">Explore Seva</p>
-                  <p className="text-xs text-slate-600">Find seva opportunities and apply in a few steps.</p>
+                <Link to="/seva" className="group inline-flex min-h-[58px] items-center gap-2 rounded-xl border-2 border-emerald-500 bg-gradient-to-r from-emerald-500 to-green-600 px-2.5 py-2 text-xs font-extrabold text-white shadow-md shadow-emerald-900/15 transition hover:-translate-y-0.5 hover:shadow-lg">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/15"><HandRaisedIcon className="h-5 w-5" /></span>
+                  <span className="leading-tight">Explore Seva</span>
                 </Link>
-                <Link to="/donation" className="flex h-full min-h-[88px] flex-col justify-between rounded-lg border border-slate-200 bg-white/90 px-3 py-2 transition hover:border-brand-blue/40 hover:bg-blue-50">
-                  <p className="text-sm font-bold text-brand-blue">Give Donation</p>
-                  <p className="text-xs text-slate-600">Support active campaigns and continue your contribution.</p>
+                <Link to="/donation" className="group inline-flex min-h-[58px] items-center gap-2 rounded-xl border-2 border-amber-500 bg-gradient-to-r from-amber-400 to-yellow-400 px-2.5 py-2 text-xs font-extrabold text-slate-950 shadow-md shadow-amber-900/15 transition hover:-translate-y-0.5 hover:shadow-lg">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-950/10"><BanknotesIcon className="h-5 w-5" /></span>
+                  <span className="leading-tight">Give Donation</span>
                 </Link>
-                <Link to="/contact" className="flex h-full min-h-[88px] flex-col justify-between rounded-lg border border-slate-200 bg-white/90 px-3 py-2 transition hover:border-brand-blue/40 hover:bg-blue-50">
-                  <p className="text-sm font-bold text-brand-blue">Contact Committee</p>
-                  <p className="text-xs text-slate-600">Reach out for membership, seva, or donation help.</p>
+                <Link to="/contact" className="group inline-flex min-h-[58px] items-center gap-2 rounded-xl border-2 border-rose-600 bg-gradient-to-r from-rose-600 to-pink-600 px-2.5 py-2 text-xs font-extrabold text-white shadow-md shadow-rose-900/15 transition hover:-translate-y-0.5 hover:shadow-lg">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/15"><EnvelopeIcon className="h-5 w-5" /></span>
+                  <span className="leading-tight">Contact Committee</span>
                 </Link>
               </div>
             </div>
@@ -597,6 +658,26 @@ const FamilyDashboardPage = () => {
             </div>
           </article>
 
+          <article className="rounded-2xl border border-cyan-200/80 bg-gradient-to-br from-cyan-50 via-white to-blue-100 p-5">
+            <h2 className="text-2xl font-black text-brand-blue">Booking History</h2>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Total bookings: {familyBookings.length}</p>
+            <div className="mt-3 space-y-2">
+              {familyBookings.map((booking) => (
+                <div key={booking.id} className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-slate-800">{booking.title || booking.categoryName || 'Booking'}</p>
+                      <p className="mt-0.5 text-xs text-slate-600">{booking.date || 'Date not set'}</p>
+                      <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-brand-blue">Type: {booking.categoryName || 'Other'}</p>
+                    </div>
+                    <button type="button" onClick={() => setSelectedBooking(booking)} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-brand-blue/25 bg-blue-50 text-brand-blue transition hover:border-brand-blue hover:bg-brand-blue hover:text-white" aria-label={`View booking details for ${booking.title || booking.categoryName || 'booking'}`} title="View booking details"><EyeIcon className="h-4 w-4" /></button>
+                  </div>
+                </div>
+              ))}
+              {familyBookings.length === 0 ? <p className="text-sm text-slate-500">No bookings found for your profile yet.</p> : null}
+            </div>
+          </article>
+
           <article className="rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-emerald-50 via-white to-emerald-100 p-5">
             <h2 className="text-2xl font-black text-brand-blue">Donations</h2>
             <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Records: {familyDonations.length}</p>
@@ -662,6 +743,30 @@ const FamilyDashboardPage = () => {
           ) : null}
         </article>
       </section>
+
+      {selectedBooking ? (
+        <div className="fixed inset-0 z-[280] overflow-y-auto bg-slate-950/70 p-4 backdrop-blur-sm" onClick={() => setSelectedBooking(null)}>
+          <div className="flex min-h-full items-center justify-center py-4">
+            <div role="dialog" aria-modal="true" aria-labelledby="booking-detail-title" className="w-full max-w-3xl overflow-hidden rounded-2xl border border-white/20 bg-white shadow-[0_28px_80px_rgba(2,6,23,0.42)]" onClick={(event) => event.stopPropagation()}>
+              <div className="relative overflow-hidden bg-[#052f63] px-5 py-5 text-white sm:px-7">
+                <div className="absolute inset-y-0 right-0 w-40 bg-brand-saffron/25 [clip-path:polygon(45%_0,100%_0,100%_100%,0_100%)]" />
+                <div className="relative flex items-start justify-between gap-4">
+                  <div className="min-w-0"><p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-100">Booking Details</p><h2 id="booking-detail-title" className="mt-1 truncate font-heading text-2xl font-bold">{selectedBooking.title || selectedBooking.categoryName || 'Booking'}</h2><p className="mt-1 text-sm text-blue-100">{selectedBooking.date || 'Date not set'} · {selectedBooking.startTime || '-'} - {selectedBooking.endTime || '-'}</p></div>
+                  <button type="button" onClick={() => setSelectedBooking(null)} className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/40 bg-white/10 text-white transition hover:bg-white hover:text-brand-blue" aria-label="Close booking details"><XMarkIcon className="h-5 w-5" /></button>
+                </div>
+                <div className="relative mt-4 flex flex-wrap gap-2"><span className={`rounded-full border px-3 py-1 text-xs font-extrabold uppercase shadow-sm ${bookingStatusPillClass(selectedBooking.status)}`}>{selectedBooking.status || 'pending'}</span><span className={`rounded-full border px-3 py-1 text-xs font-extrabold uppercase shadow-sm ${paymentStatusPillClass(selectedBooking.paymentStatus)}`}>Payment: {selectedBooking.paymentStatus || 'pending'}</span><span className="rounded-full border border-amber-300 bg-brand-saffron px-3 py-1 text-xs font-extrabold uppercase text-brand-navy shadow-sm">{selectedBooking.categoryName || 'Other'}</span></div>
+              </div>
+              <div className="grid gap-4 bg-slate-100/80 p-5 sm:p-7 md:grid-cols-2">
+                <section className="rounded-xl border border-blue-200 bg-white p-4 shadow-sm"><h3 className="border-b-2 border-blue-200 pb-2 font-heading text-base font-bold text-brand-blue">Programme</h3><dl className="mt-3 grid grid-cols-[110px_1fr] gap-x-3 gap-y-2 text-sm"><dt className="font-semibold text-slate-500">Type</dt><dd className="font-semibold text-slate-900">{selectedBooking.categoryName || '-'}</dd><dt className="font-semibold text-slate-500">Date</dt><dd>{selectedBooking.date || '-'}</dd><dt className="font-semibold text-slate-500">Time</dt><dd>{selectedBooking.startTime || '-'} - {selectedBooking.endTime || '-'}</dd><dt className="font-semibold text-slate-500">Location</dt><dd>{selectedBooking.bookingLocation || '-'}</dd><dt className="font-semibold text-slate-500">Booking ID</dt><dd className="break-all font-mono text-xs">{selectedBooking.id || '-'}</dd></dl></section>
+                <section className="rounded-xl border border-amber-200 bg-white p-4 shadow-sm"><h3 className="border-b-2 border-amber-200 pb-2 font-heading text-base font-bold text-brand-blue">Contact</h3><dl className="mt-3 grid grid-cols-[90px_1fr] gap-x-3 gap-y-2 text-sm"><dt className="font-semibold text-slate-500">Name</dt><dd>{selectedBooking.requesterName || '-'}</dd><dt className="font-semibold text-slate-500">Email</dt><dd className="break-all">{selectedBooking.requesterEmail || '-'}</dd><dt className="font-semibold text-slate-500">Phone</dt><dd>{selectedBooking.requesterPhone || '-'}</dd><dt className="font-semibold text-slate-500">Address</dt><dd>{selectedBooking.requesterAddress || '-'}</dd><dt className="font-semibold text-slate-500">Requested for</dt><dd>{selectedBooking.bookingForDifferentPerson ? 'Another person' : 'Profile holder'}</dd></dl></section>
+                <section className="rounded-xl border border-emerald-200 bg-white p-4 shadow-sm"><h3 className="border-b-2 border-emerald-200 pb-2 font-heading text-base font-bold text-brand-blue">Payment</h3><dl className="mt-3 grid grid-cols-[110px_1fr] gap-x-3 gap-y-2 text-sm"><dt className="font-semibold text-slate-500">Amount</dt><dd className="font-bold text-emerald-700">CAD ${Number(selectedBooking.amount || 0).toFixed(2)}</dd><dt className="font-semibold text-slate-500">Method</dt><dd>{selectedBooking.paymentMethod || selectedBooking.paymentProvider || '-'}</dd><dt className="font-semibold text-slate-500">Receipt</dt><dd>{selectedBooking.receiptNumber || '-'}</dd><dt className="font-semibold text-slate-500">Reference</dt><dd className="break-all">{selectedBooking.paymentReference || '-'}</dd>{selectedBooking.refundStatus ? <><dt className="font-semibold text-slate-500">Refund</dt><dd>{selectedBooking.refundStatus === 'processed' ? 'released' : selectedBooking.refundStatus} · CAD ${Number(selectedBooking.refundAmount || 0).toFixed(2)}</dd><dt className="font-semibold text-slate-500">Refund date</dt><dd>{selectedBooking.refundDate || '-'}</dd><dt className="font-semibold text-slate-500">Refund ref.</dt><dd className="break-all">{selectedBooking.refundReference || '-'}</dd><dt className="font-semibold text-slate-500">Refund notes</dt><dd className="whitespace-pre-wrap">{selectedBooking.refundNotes || '-'}</dd></> : null}</dl></section>
+                <section className="rounded-xl border border-cyan-200 bg-white p-4 shadow-sm"><h3 className="border-b-2 border-cyan-200 pb-2 font-heading text-base font-bold text-brand-blue">Record</h3><dl className="mt-3 grid grid-cols-[90px_1fr] gap-x-3 gap-y-2 text-sm"><dt className="font-semibold text-slate-500">Source</dt><dd>{selectedBooking.source || '-'}</dd><dt className="font-semibold text-slate-500">Created</dt><dd>{selectedBooking.createdAt ? format(new Date(selectedBooking.createdAt), 'MMM d, yyyy, h:mm a') : '-'}</dd><dt className="font-semibold text-slate-500">Updated</dt><dd>{selectedBooking.updatedAt ? format(new Date(selectedBooking.updatedAt), 'MMM d, yyyy, h:mm a') : '-'}</dd><dt className="font-semibold text-slate-500">Notes</dt><dd className="whitespace-pre-wrap">{selectedBooking.notes || 'No additional notes.'}</dd></dl></section>
+              </div>
+              <div className="flex justify-end border-t border-slate-200 bg-slate-50 px-5 py-3 sm:px-7"><button type="button" onClick={() => setSelectedBooking(null)} className="rounded-lg bg-brand-blue px-5 py-2 text-sm font-bold text-white transition hover:bg-blue-700">Close</button></div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

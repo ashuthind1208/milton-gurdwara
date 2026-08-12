@@ -17,6 +17,7 @@
     "hls.js": "^1.6.16",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
+    "mysql2": "^3.23.3",
     "nodemailer": "^7.0.13",
     "pg": "^8.22.0",
     "react": "^19.2.7",
@@ -38,6 +39,10 @@
     "start": "node scripts/start.js",
     "build": "react-scripts build",
     "test": "react-scripts test",
+    "db:migrate:mysql": "node scripts/migrate-postgres-to-mysql.js",
+    "db:verify:mysql": "node scripts/migrate-postgres-to-mysql.js --verify-only",
+    "db:smoke:mysql": "node scripts/smoke-test-mysql.js",
+    "newsletter:smoke": "node scripts/smoke-test-newsletter.js",
     "eject": "react-scripts eject"
   },
   "proxy": "http://127.0.0.1:4242",

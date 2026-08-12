@@ -18,7 +18,6 @@ import {
   CalendarDaysIcon,
   HandRaisedIcon,
   GiftIcon,
-  PhotoIcon,
   PhoneIcon,
   FilmIcon,
   UserCircleIcon,
@@ -39,12 +38,14 @@ import advertisementService from '../../services/advertisementService';
 import eventService from '../../services/eventService';
 import volunteerService from '../../services/volunteerService';
 import donationService from '../../services/donationService';
+import bookingService from '../../services/bookingService';
 import uploadService from '../../services/uploadService';
 import userService from '../../services/userService';
 import addressLookupService from '../../services/addressLookupService';
 import { useAuth } from '../../context/AuthContext';
 import { formatTenDigitPhone, isTenDigitPhone, TEN_DIGIT_PHONE_ERROR } from '../../utils/phone';
 import { isEventCurrent } from '../../utils/eventAvailability';
+import { bookingBelongsToProfile, isBookingPaymentDonation, sortBookingsBySchedule } from '../../utils/profileBookings';
 import PhoneInput from '../forms/PhoneInput';
 import StreamingModal from '../common/StreamingModal';
 import AudioPillPlayer from '../common/AudioPillPlayer';
@@ -377,10 +378,10 @@ const leftMenu = [
 
 const rightMenu = [
   { label: 'Library', path: '/library', icon: BookOpenIcon },
-  { label: 'Videos', path: '/videos', icon: FilmIcon },
+  { label: 'Media', path: '/media', icon: FilmIcon },
+  { label: 'Bookings', path: '/bookings', icon: CalendarDaysIcon },
   { label: 'Seva', path: '/seva', icon: HandRaisedIcon },
   { label: 'Donation', path: '/donation', icon: GiftIcon },
-  { label: 'Gallery', path: '/gallery', icon: PhotoIcon },
   { label: 'Contact', path: '/contact', icon: PhoneIcon }
 ];
 
@@ -415,6 +416,7 @@ const Navbar = () => {
   const { user, isAuthenticated, logout, updateProfile, persistUser } = useAuth();
   const [open, setOpen] = useState(false);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+  const [isInlineSearchExpanded, setIsInlineSearchExpanded] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
   const [compactStreamsOpen, setCompactStreamsOpen] = useState(false);
   const [isCompactProfileLanyardOpen, setIsCompactProfileLanyardOpen] = useState(false);
@@ -464,6 +466,8 @@ const Navbar = () => {
   const kirtanReconnectInFlightRef = useRef(false);
   const datePopoverCloseTimeoutRef = useRef(null);
   const profilePopoverCloseTimeoutRef = useRef(null);
+  const inlineSearchWrapperRef = useRef(null);
+  const inlineSearchCloseTimeoutRef = useRef(null);
   const viewportResetTimeoutRef = useRef(null);
   const compactStreamsBackdropGuardRef = useRef(false);
   const compactLanyardBackdropGuardRef = useRef(false);
@@ -498,6 +502,7 @@ const Navbar = () => {
     [calendarViewDate, nanakshahiObservances]
   );
   const location = useLocation();
+  const isHomePage = location.pathname === '/';
   const userEmail = String(user?.email || '').trim().toLowerCase();
   const userName = String(user?.name || '').trim().toLowerCase();
   const userPhone = String(user?.phone || '').trim().toLowerCase();
@@ -540,6 +545,11 @@ const Navbar = () => {
   const { data: familyDonations = [] } = useQuery({
     queryKey: ['navbar-family-donations'],
     queryFn: () => donationService.getDonations().then((res) => res.data),
+    enabled: isAuthenticated
+  });
+  const { data: familyBookings = [] } = useQuery({
+    queryKey: ['bookings', 'navbar'],
+    queryFn: () => bookingService.getBookings().then((res) => res.data),
     enabled: isAuthenticated
   });
   const { data: streamingItems = [] } = useQuery({
@@ -608,6 +618,10 @@ const Navbar = () => {
   const compactMenuItems = useMemo(
     () => [...leftMenuBalanced, ...rightMenuBalanced].filter((item) => item.path !== '/'),
     [leftMenuBalanced, rightMenuBalanced]
+  );
+  const compactDesktopMenuItems = useMemo(
+    () => compactMenuItems.filter((item) => item.path !== '/donation'),
+    [compactMenuItems]
   );
   const mobileMenuItems = useMemo(
     () => publicNav.filter((item) => item.path !== '/gurbani-library' && item.path !== '/faq' && item.path !== '/family-dashboard'),
@@ -929,6 +943,15 @@ const Navbar = () => {
       return sevaDateKey >= todayDateKey;
     });
   }, [familySeva, familySevaOpportunities, isAuthenticated, userEmail, userName, userPhone, userPhoneDigits]);
+  const profileBookings = useMemo(() => {
+    if (!isAuthenticated) {
+      return [];
+    }
+    return familyBookings.filter((booking) => bookingBelongsToProfile(booking, user || {}));
+  }, [familyBookings, isAuthenticated, user]);
+  const upcomingBooking = useMemo(() => sortBookingsBySchedule(
+    profileBookings.filter((booking) => booking.status !== 'cancelled' && String(booking.date || '') >= todayIso)
+  )[0] || null, [profileBookings, todayIso]);
   const familySummary = useMemo(() => {
     if (!isAuthenticated) {
       return {
@@ -961,7 +984,7 @@ const Navbar = () => {
     const sevaCount = visibleFamilySeva.length;
 
     const donationTotal = familyDonations
-      .filter((entry) => String(entry.donorEmail || '').trim().toLowerCase() === userEmail)
+      .filter((entry) => String(entry.donorEmail || '').trim().toLowerCase() === userEmail && !isBookingPaymentDonation(entry, profileBookings))
       .reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
     return {
@@ -970,7 +993,7 @@ const Navbar = () => {
       sevaCount,
       donationTotal
     };
-  }, [familyDonations, isAuthenticated, userEmail, userName, visibleFamilyEvents, visibleFamilySeva]);
+  }, [familyDonations, isAuthenticated, profileBookings, userEmail, userName, visibleFamilyEvents, visibleFamilySeva]);
 
   const handleLogout = async () => {
     setIsProfilePopoverOpen(false);
@@ -1586,6 +1609,7 @@ const Navbar = () => {
 
   const statusDotClass = isKirtanPlaying ? 'bg-emerald-400' : (isKirtanLoading ? 'bg-amber-300' : 'bg-red-400');
   const featuredStream = miltonPrimaryStream || liveStreams[0] || null;
+  const isHomeOverlayMode = isHomePage && !isCompact;
 
   const openStreamModal = (id) => {
     setStreamModalState({ open: true, id });
@@ -1633,8 +1657,8 @@ const Navbar = () => {
   };
 
   const handleCompactNavClick = () => {
-    compactScrollRestoreRef.current = window.scrollY;
-    preserveCompactUntilRef.current = Date.now() + 800;
+    compactScrollRestoreRef.current = null;
+    preserveCompactUntilRef.current = 0;
   };
 
   const armBackdropGuard = (guardRef, timeoutRef) => {
@@ -1693,6 +1717,33 @@ const Navbar = () => {
 
     window.scrollTo({ top: window.scrollY, left: 0, behavior: 'auto' });
     window.dispatchEvent(new Event('resize'));
+  };
+
+  const openInlineSearch = () => {
+    if (inlineSearchCloseTimeoutRef.current) {
+      window.clearTimeout(inlineSearchCloseTimeoutRef.current);
+      inlineSearchCloseTimeoutRef.current = null;
+    }
+    setIsInlineSearchExpanded(true);
+  };
+
+  const closeInlineSearch = () => {
+    if (inlineSearchCloseTimeoutRef.current) {
+      window.clearTimeout(inlineSearchCloseTimeoutRef.current);
+      inlineSearchCloseTimeoutRef.current = null;
+    }
+    setIsInlineSearchExpanded(false);
+  };
+
+  const closeInlineSearchWithDelay = () => {
+    if (inlineSearchCloseTimeoutRef.current) {
+      window.clearTimeout(inlineSearchCloseTimeoutRef.current);
+    }
+
+    inlineSearchCloseTimeoutRef.current = window.setTimeout(() => {
+      setIsInlineSearchExpanded(false);
+      inlineSearchCloseTimeoutRef.current = null;
+    }, 220);
   };
 
   const getImageDataUrl = async (source) => new Promise((resolve) => {
@@ -2145,11 +2196,29 @@ const Navbar = () => {
     if (searchBackdropGuardTimeoutRef.current) {
       window.clearTimeout(searchBackdropGuardTimeoutRef.current);
     }
+    if (inlineSearchCloseTimeoutRef.current) {
+      window.clearTimeout(inlineSearchCloseTimeoutRef.current);
+    }
   }, []);
 
+  useEffect(() => {
+    if (!isInlineSearchExpanded) {
+      return undefined;
+    }
+
+    const handlePointerDown = (event) => {
+      if (inlineSearchWrapperRef.current && !inlineSearchWrapperRef.current.contains(event.target)) {
+        closeInlineSearch();
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [isInlineSearchExpanded]);
+
   return (
-    <header className={`sticky top-0 z-50 bg-slate-950/95 shadow-[0_10px_26px_-10px_rgba(2,6,23,0.65)] ring-1 ring-slate-700/80 backdrop-blur-md transition-all duration-300 ${isCompact ? 'pb-1' : ''}`}>
-      <div className="hidden border-b border-white/20 bg-[#0a1a33] px-4 py-1 text-xs text-blue-50 xl:block">
+    <header className={`${isHomeOverlayMode ? 'fixed inset-x-0 top-0 z-50 bg-transparent shadow-none ring-0 backdrop-blur-0' : 'sticky top-0 z-50 bg-slate-950/95 shadow-[0_10px_26px_-10px_rgba(2,6,23,0.65)] ring-1 ring-slate-700/80 backdrop-blur-md'} transition-all duration-300 ${isCompact ? 'pb-1' : ''}`}>
+      <div className="hidden border-b border-white/20 bg-[#0a1a33] px-4 py-0.5 text-xs text-blue-50 xl:block">
         <div className="mx-auto flex max-w-7xl items-center justify-between md:px-2">
           <div className="flex items-center gap-2">
             <p>{siteConfig.contact.address}</p>
@@ -2263,135 +2332,176 @@ const Navbar = () => {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setIsSearchModalOpen(true)}
-              className="hidden items-center gap-1.5 rounded-full border border-brand-blue/70 bg-brand-blue/20 px-2.5 py-0.5 text-[11px] font-bold text-blue-50 shadow-[0_6px_12px_rgba(10,77,159,0.28)] transition hover:bg-brand-blue/35 xl:inline-flex"
-            >
-              <MagnifyingGlassIcon className="h-3.5 w-3.5" />
-              Search
-            </button>
-            {!isAuthenticated ? (
-              <Link to="/login?mode=join&next=/family-dashboard" onClick={handleBecomeMemberClick} className="rounded-full border border-brand-saffron bg-brand-saffron px-3 py-1 text-[11px] font-extrabold text-brand-navy shadow-[0_8px_18px_rgba(245,166,35,0.4)] transition hover:-translate-y-0.5 hover:bg-amber-300">Become Member</Link>
-            ) : null}
-            {isAuthenticated ? (
-              <div className="relative flex items-center gap-2">
-                <img
-                  src={userAvatarUrl}
-                  alt={userDisplayName}
-                  className="h-7 w-7 rounded-full border border-brand-saffron/80 object-cover shadow-[0_4px_10px_rgba(15,23,42,0.24)]"
-                  onError={(event) => {
-                    const fallback = getAvatarFallbackUrl(userDisplayName);
-                    if (event.currentTarget.src !== fallback) {
-                      event.currentTarget.src = fallback;
-                    }
-                  }}
-                />
-                <span className="text-[11px] font-bold text-blue-50">Welcome, {userDisplayName}</span>
-                <button
-                  type="button"
-                  onClick={() => setIsProfilePopoverOpen((previous) => !previous)}
-                  onMouseEnter={openProfilePopover}
-                  onMouseLeave={closeProfilePopoverWithDelay}
-                  onFocus={openProfilePopover}
-                  onBlur={closeProfilePopoverWithDelay}
-                  aria-expanded={isProfilePopoverOpen}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-brand-saffron bg-brand-saffron px-2.5 py-0.5 text-[11px] font-bold text-brand-navy shadow-[0_6px_12px_rgba(245,166,35,0.3)] transition hover:bg-amber-300"
-                >
-                  <span>Details</span>
-                </button>
-                <div className="pointer-events-auto absolute right-0 top-full z-[275] h-4 w-full min-w-[360px]" />
-                <div onMouseEnter={openProfilePopover} onMouseLeave={closeProfilePopoverWithDelay} className={`absolute right-0 top-[calc(100%+8px)] z-[276] w-[360px] rounded-3xl border border-brand-blue/35 bg-gradient-to-br from-blue-50/95 via-white to-amber-50/95 p-4 shadow-[0_24px_60px_rgba(15,23,42,0.24)] transition duration-200 ${isProfilePopoverOpen ? 'pointer-events-auto translate-y-0 opacity-100' : 'pointer-events-none translate-y-1 opacity-0'}`}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={userAvatarUrl}
-                        alt={userDisplayName}
-                        className="h-12 w-12 rounded-full border-2 border-brand-saffron object-cover"
-                        onError={(event) => {
-                          const fallback = getAvatarFallbackUrl(userDisplayName);
-                          if (event.currentTarget.src !== fallback) {
-                            event.currentTarget.src = fallback;
-                          }
-                        }}
-                      />
-                      <div>
-                        <p className="text-sm font-extrabold text-brand-blue">{userDisplayName}</p>
-                        <p className="text-xs font-semibold text-slate-600">{userDisplayEmail}</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-bold text-rose-700 transition hover:bg-rose-100"
-                    >
-                      <ArrowRightOnRectangleIcon className="h-3.5 w-3.5" />
-                      Logout
-                    </button>
+          <div className="flex flex-1 items-center gap-3">
+            <div className="flex min-w-0 items-center gap-2 xl:hidden" />
+            <div className="hidden items-center gap-2 xl:flex">
+              <div
+                ref={inlineSearchWrapperRef}
+                onMouseEnter={openInlineSearch}
+                onMouseLeave={closeInlineSearchWithDelay}
+                onFocusCapture={openInlineSearch}
+                onBlurCapture={(event) => {
+                  if (!inlineSearchWrapperRef.current?.contains(event.relatedTarget)) {
+                    closeInlineSearchWithDelay();
+                  }
+                }}
+                className="relative z-[320] flex h-6 items-center overflow-visible"
+              >
+                <span aria-hidden="true" className="ml-2 mr-2 text-white/70">|</span>
+                <div className={`relative h-6 overflow-visible transition-[width] duration-300 ease-out ${isInlineSearchExpanded ? 'w-[min(24rem,calc(100vw-38rem))]' : 'w-[7.25rem]'}`}>
+                  <button
+                    type="button"
+                    onClick={openInlineSearch}
+                    className={`absolute inset-0 inline-flex h-6 items-center gap-1.5 rounded-full border border-blue-200/30 bg-transparent px-2.5 text-white transition-opacity duration-200 ${isInlineSearchExpanded ? 'pointer-events-none opacity-0' : 'opacity-100 hover:bg-blue-800/40'}`}
+                    aria-label="Open search"
+                    title="Search"
+                  >
+                    <MagnifyingGlassIcon className="!h-2.5 !w-2.5" />
+                    <span className="text-[11px] font-semibold leading-none text-white">Search</span>
+                  </button>
+                  <div className={`absolute inset-0 transition-[opacity,transform] duration-300 ease-out ${isInlineSearchExpanded ? 'opacity-100 translate-x-0' : 'pointer-events-none opacity-0 translate-x-2'}`}>
+                    <GlobalSearchBar
+                      className="w-full min-w-0"
+                      panelClassName="z-[999] max-w-full overflow-x-hidden !top-[calc(100%+2px)]"
+                      iconClassName="!h-2.5 !w-2.5 text-white/85"
+                      inputClassName="!h-6 w-full !rounded-xl !border !border-white/35 !bg-transparent !py-0 pl-8 pr-2.5 !text-[11px] !leading-none font-semibold text-white placeholder:text-white/70 shadow-none outline-none transition focus:!border-white/60 focus:!bg-transparent focus:ring-0 focus:shadow-none"
+                      placeholder="Search"
+                      inputId="global-search-navbar-input"
+                      scope="public"
+                      clearOnClickOutside
+                      autoFocus={isInlineSearchExpanded}
+                      onResultSelect={closeInlineSearch}
+                    />
                   </div>
-
-                  <div className="mt-2.5 grid grid-cols-2 grid-rows-2 gap-2">
-                    <div className="flex h-[62px] flex-col justify-center rounded-xl border border-brand-blue/20 bg-white px-2 py-1.5">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Event RSVPs</p>
-                      <p className="mt-0.5 text-base font-black leading-none text-brand-blue">{familySummary.eventCount}</p>
-                      <p className="mt-0.5 text-[10px] text-amber-700">Waitlist: {familySummary.waitlistCount}</p>
-                    </div>
-                    <div className="row-span-2 flex min-h-[126px] flex-col items-start justify-start rounded-xl border border-emerald-200 bg-white px-2.5 py-1.5">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Donations</p>
-                      <p className="mt-1 text-[1.85rem] font-black leading-none text-emerald-700">{formatCompactDonationTotal(familySummary.donationTotal)}</p>
-                    </div>
-                    <div className="flex h-[62px] flex-col justify-center rounded-xl border border-brand-blue/20 bg-white px-2 py-1.5">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Seva Applications</p>
-                      <p className="mt-0.5 text-base font-black leading-none text-brand-blue">{familySummary.sevaCount}</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-4 gap-2">
-                    <button type="button" onClick={openProfileModal} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-2 py-1.5 text-[10px] font-bold text-brand-blue hover:bg-blue-50">
-                      <UserCircleIcon className="h-4.5 w-4.5" />
-                      Profile
-                    </button>
-                    <Link to="/events" onClick={handleProfileQuickLink('/events')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-2 py-1.5 text-[10px] font-bold text-brand-blue hover:bg-blue-50">
-                      <CalendarDaysIcon className="h-4.5 w-4.5" />
-                      Events
-                    </Link>
-                    <Link to="/seva" onClick={handleProfileQuickLink('/seva')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-2 py-1.5 text-[10px] font-bold text-brand-blue hover:bg-blue-50">
-                      <HandRaisedIcon className="h-4.5 w-4.5" />
-                      Seva
-                    </Link>
-                    <Link to="/donation" onClick={handleProfileQuickLink('/donation')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-2 py-1.5 text-[10px] font-bold text-brand-blue hover:bg-blue-50">
-                      <HeartIcon className="h-4.5 w-4.5" />
-                      Donation
-                    </Link>
-                  </div>
-
-                  <Link to="/family-dashboard" onClick={handleProfileQuickLink('/family-dashboard')} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-brand-saffron bg-brand-saffron px-3 py-1.5 text-xs font-extrabold uppercase tracking-wide text-brand-navy transition hover:bg-amber-300">
-                    <SparklesIcon className="h-4 w-4" />
-                    Open Family Dashboard
-                  </Link>
-                  {canSeeAdminPortalButton ? (
-                    <Link to="/admin" onClick={handleProfileQuickLink('/admin')} className="mt-2 inline-flex w-full items-center justify-center rounded-full border border-brand-blue/30 bg-gradient-to-r from-brand-blue via-blue-600 to-brand-saffron px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white shadow-[0_8px_20px_rgba(10,77,159,0.28)] transition hover:from-blue-700 hover:via-brand-blue hover:to-amber-500">
-                      Go to Admin Portal
-                    </Link>
-                  ) : null}
                 </div>
               </div>
-            ) : (
-              <Link to="/login" onClick={handleSignInClick} className="rounded-full border border-brand-blue bg-brand-blue px-3 py-1 text-[11px] font-extrabold text-white shadow-[0_8px_18px_rgba(10,77,159,0.42)] transition hover:-translate-y-0.5 hover:bg-blue-700">Sign In</Link>
-            )}
+            </div>
+            <div className="ml-auto flex items-center gap-3">
+              {!isAuthenticated ? (
+                <Link to="/login?mode=join&next=/family-dashboard" onClick={handleBecomeMemberClick} className="my-1 rounded-full border border-brand-saffron bg-brand-saffron px-3 py-1 text-[11px] font-extrabold text-brand-navy shadow-[0_8px_18px_rgba(245,166,35,0.4)] transition hover:bg-amber-300 hover:shadow-[0_0_18px_rgba(245,166,35,0.55)]">Become Member</Link>
+              ) : null}
+              {isAuthenticated ? (
+                <div className="relative flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsProfilePopoverOpen((previous) => !previous)}
+                    onMouseEnter={openProfilePopover}
+                    onMouseLeave={closeProfilePopoverWithDelay}
+                    onFocus={openProfilePopover}
+                    onBlur={closeProfilePopoverWithDelay}
+                    aria-expanded={isProfilePopoverOpen}
+                    className="inline-flex items-center gap-2 rounded-full border border-transparent px-0.5 py-0.5 text-left"
+                  >
+                    <img
+                      src={userAvatarUrl}
+                      alt={userDisplayName}
+                      className="h-7 w-7 rounded-full border border-brand-saffron/80 object-cover shadow-[0_4px_10px_rgba(15,23,42,0.24)]"
+                      onError={(event) => {
+                        const fallback = getAvatarFallbackUrl(userDisplayName);
+                        if (event.currentTarget.src !== fallback) {
+                          event.currentTarget.src = fallback;
+                        }
+                      }}
+                    />
+                    <span className="text-[11px] font-bold text-blue-50">Welcome, {userDisplayName}</span>
+                  </button>
+                  <div className="pointer-events-auto absolute right-0 top-full z-[275] h-4 w-full min-w-[360px]" />
+                  <div onMouseEnter={openProfilePopover} onMouseLeave={closeProfilePopoverWithDelay} className={`absolute right-0 top-[calc(100%+8px)] z-[276] w-[360px] rounded-3xl border border-brand-blue/35 bg-gradient-to-br from-blue-50/95 via-white to-amber-50/95 p-4 shadow-[0_24px_60px_rgba(15,23,42,0.24)] transition duration-200 ${isProfilePopoverOpen ? 'pointer-events-auto translate-y-0 opacity-100' : 'pointer-events-none translate-y-1 opacity-0'}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={userAvatarUrl}
+                          alt={userDisplayName}
+                          className="h-12 w-12 rounded-full border-2 border-brand-saffron object-cover"
+                          onError={(event) => {
+                            const fallback = getAvatarFallbackUrl(userDisplayName);
+                            if (event.currentTarget.src !== fallback) {
+                              event.currentTarget.src = fallback;
+                            }
+                          }}
+                        />
+                        <div>
+                          <p className="text-sm font-extrabold text-brand-blue">{userDisplayName}</p>
+                          <p className="text-xs font-semibold text-slate-600">{userDisplayEmail}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleLogout}
+                        className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-bold text-rose-700 transition hover:bg-rose-100"
+                      >
+                        <ArrowRightOnRectangleIcon className="h-3.5 w-3.5" />
+                        Logout
+                      </button>
+                    </div>
+
+                    <div className="mt-2.5 grid grid-cols-2 gap-2">
+                      <div className="flex h-[62px] flex-col justify-center rounded-xl border border-brand-blue/20 bg-white px-2 py-1.5">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Event RSVPs</p>
+                        <p className="mt-0.5 text-base font-black leading-none text-brand-blue">{familySummary.eventCount}</p>
+                        <p className="mt-0.5 text-[10px] text-amber-700">Waitlist: {familySummary.waitlistCount}</p>
+                      </div>
+                      <div className="flex h-[62px] flex-col justify-center rounded-xl border border-emerald-200 bg-white px-2 py-1.5">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Donations</p>
+                        <p className="mt-0.5 text-base font-black leading-none text-emerald-700">{formatCompactDonationTotal(familySummary.donationTotal)}</p>
+                      </div>
+                      <div className="flex h-[62px] flex-col justify-center rounded-xl border border-brand-blue/20 bg-white px-2 py-1.5">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Seva Applications</p>
+                        <p className="mt-0.5 text-base font-black leading-none text-brand-blue">{familySummary.sevaCount}</p>
+                      </div>
+                      <div className="flex h-[62px] min-w-0 flex-col justify-center rounded-xl border border-amber-200 bg-white px-2 py-1.5">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Upcoming Booking</p>
+                        <p className="mt-0.5 truncate text-xs font-black leading-tight text-brand-blue">{upcomingBooking?.title || upcomingBooking?.categoryName || 'None scheduled'}</p>
+                        <p className="mt-0.5 text-[10px] font-semibold text-amber-700">{upcomingBooking?.date || 'No upcoming date'}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-4 gap-2">
+                      <button type="button" onClick={openProfileModal} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-2 py-1.5 text-[10px] font-bold text-brand-blue hover:bg-blue-50">
+                        <UserCircleIcon className="h-4.5 w-4.5" />
+                        Profile
+                      </button>
+                      <Link to="/events" onClick={handleProfileQuickLink('/events')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-2 py-1.5 text-[10px] font-bold text-brand-blue hover:bg-blue-50">
+                        <CalendarDaysIcon className="h-4.5 w-4.5" />
+                        Events
+                      </Link>
+                      <Link to="/seva" onClick={handleProfileQuickLink('/seva')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-2 py-1.5 text-[10px] font-bold text-brand-blue hover:bg-blue-50">
+                        <HandRaisedIcon className="h-4.5 w-4.5" />
+                        Seva
+                      </Link>
+                      <Link to="/donation" onClick={handleProfileQuickLink('/donation')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-2 py-1.5 text-[10px] font-bold text-brand-blue hover:bg-blue-50">
+                        <HeartIcon className="h-4.5 w-4.5" />
+                        Donation
+                      </Link>
+                    </div>
+
+                    <Link to="/family-dashboard" onClick={handleProfileQuickLink('/family-dashboard')} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-brand-saffron bg-brand-saffron px-3 py-1.5 text-xs font-extrabold uppercase tracking-wide text-brand-navy transition hover:bg-amber-300">
+                      <SparklesIcon className="h-4 w-4" />
+                      Open Family Dashboard
+                    </Link>
+                    {canSeeAdminPortalButton ? (
+                      <Link to="/admin" onClick={handleProfileQuickLink('/admin')} className="mt-2 inline-flex w-full items-center justify-center rounded-full border border-brand-blue/30 bg-gradient-to-r from-brand-blue via-blue-600 to-brand-saffron px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white shadow-[0_8px_20px_rgba(10,77,159,0.28)] transition hover:from-blue-700 hover:via-brand-blue hover:to-amber-500">
+                        Go to Admin Portal
+                      </Link>
+                    ) : null}
+                  </div>
+                </div>
+              ) : (
+                <Link to="/login" onClick={handleSignInClick} className="my-1 rounded-full border border-brand-blue bg-brand-blue px-3 py-1 text-[11px] font-extrabold text-white shadow-[0_8px_18px_rgba(10,77,159,0.42)] transition hover:bg-blue-700 hover:shadow-[0_0_18px_rgba(10,77,159,0.52)]">Sign In</Link>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="w-full bg-slate-900/92 xl:mt-2">
+      <div className={`w-full ${isHomeOverlayMode ? 'bg-transparent' : 'bg-slate-900/92'}`}>
         <div className="mx-auto max-w-7xl px-4 md:px-6">
-          <div className={`relative hidden items-center transition-[min-height,padding] duration-300 ease-in-out xl:flex ${isCompact ? 'min-h-[86px] py-2' : 'min-h-[146px] py-2'}`}>
+          <div className={`relative hidden items-center transition-[min-height,padding,height] duration-300 ease-in-out xl:flex ${(isCompact || !isHomePage) ? 'h-[88px] py-0' : 'min-h-[146px] py-2'}`}>
           <Link
             to="/"
-            className={`absolute left-1/2 top-1/2 z-20 flex -translate-y-1/2 -translate-x-1/2 items-center justify-center text-brand-blue transition-all duration-300 ease-in-out ${isCompact ? 'pointer-events-none opacity-0 scale-[0.94]' : 'pointer-events-auto opacity-100 scale-100'}`}
-            aria-hidden={isCompact}
-            tabIndex={isCompact ? -1 : 0}
+            className={`absolute left-1/2 top-1/2 z-20 flex -translate-y-1/2 -translate-x-1/2 items-center justify-center text-brand-blue transition-all duration-300 ease-in-out ${(isCompact || !isHomePage) ? 'pointer-events-none opacity-0 scale-[0.94]' : 'pointer-events-auto opacity-100 scale-100'}`}
+            aria-hidden={isCompact || !isHomePage}
+            tabIndex={(isCompact || !isHomePage) ? -1 : 0}
           >
             <img
               src={gurdwaraLogo}
@@ -2402,11 +2512,11 @@ const Navbar = () => {
 
           <Link
             to="/"
-            preventScrollReset={isCompact}
-            onClick={isCompact ? handleCompactNavClick : undefined}
-            className={`absolute left-0 top-1/2 z-20 flex -translate-y-1/2 items-center justify-center text-brand-blue transition-all duration-300 ease-in-out ${isCompact ? 'pointer-events-auto opacity-100 translate-x-0 scale-100' : 'pointer-events-none opacity-0 -translate-x-2 scale-[0.92]'}`}
-            aria-hidden={!isCompact}
-            tabIndex={isCompact ? 0 : -1}
+            preventScrollReset={isCompact || !isHomePage}
+            onClick={(isCompact || !isHomePage) ? handleCompactNavClick : undefined}
+            className={`absolute left-0 top-1/2 z-20 flex -translate-y-1/2 items-center justify-center text-brand-blue transition-all duration-300 ease-in-out ${(isCompact || !isHomePage) ? 'pointer-events-auto opacity-100 translate-x-0 scale-100' : 'pointer-events-none opacity-0 -translate-x-2 scale-[0.92]'}`}
+            aria-hidden={!(isCompact || !isHomePage)}
+            tabIndex={(isCompact || !isHomePage) ? 0 : -1}
           >
             <img
               src={gurdwaraLogo}
@@ -2415,7 +2525,7 @@ const Navbar = () => {
             />
           </Link>
 
-          {!isCompact ? (
+          {(!isCompact && isHomePage) ? (
             <>
               <nav className="flex w-full items-center justify-start gap-2 pr-10" aria-label="Left navigation">
                 {leftMenuBalanced.map((item) => {
@@ -2446,8 +2556,8 @@ const Navbar = () => {
           ) : (
             <div className="grid w-full grid-cols-[minmax(0,1fr)_minmax(210px,36%)] items-center gap-2 pl-[5.4rem]">
               <nav className="flex min-w-0 items-center overflow-x-auto pr-2" aria-label="Compact navigation">
-                {compactMenuItems.map((item) => {
-                  const isLastItem = item.path === compactMenuItems[compactMenuItems.length - 1]?.path;
+                {compactDesktopMenuItems.map((item) => {
+                  const isLastItem = item.path === compactDesktopMenuItems[compactDesktopMenuItems.length - 1]?.path;
 
                   return (
                     <span key={item.path} className="inline-flex items-center whitespace-nowrap">
@@ -2462,29 +2572,39 @@ const Navbar = () => {
                 })}
               </nav>
 
-              <div className="flex min-w-0 items-center justify-end pr-2">
-                {liveStreams.length > 0 ? (
-                  <button
-                    type="button"
-                    onPointerDown={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      openCompactStreams();
-                    }}
-                    onTouchStart={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      openCompactStreams();
-                    }}
-                    onClick={openCompactStreams}
-                    className="inline-flex shrink-0 items-center gap-1 rounded-full border border-blue-100/35 bg-white/95 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-brand-blue shadow-[0_4px_14px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-blue-100/70"
-                  >
-                    <span className="inline-flex h-4.5 w-4.5 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-amber-100 text-brand-blue shadow-inner">
-                      <LiveStreamGlyph />
-                    </span>
-                    <span>View all live channels</span>
-                  </button>
-                ) : null}
+              <div className="flex min-w-0 items-center justify-end gap-2 pr-2">
+                <button
+                  type="button"
+                  onPointerDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    openCompactStreams();
+                  }}
+                  onTouchStart={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    openCompactStreams();
+                  }}
+                  onClick={openCompactStreams}
+                  disabled={liveStreams.length === 0}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-full border border-blue-100/35 bg-white/95 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-brand-blue shadow-[0_4px_14px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-blue-100/70 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <span className="inline-flex h-4.5 w-4.5 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-amber-100 text-brand-blue shadow-inner">
+                    <LiveStreamGlyph />
+                  </span>
+                  <span>LIVE Channel</span>
+                </button>
+                <Link
+                  to="/donation"
+                  preventScrollReset
+                  onClick={handleCompactNavClick}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-300 bg-amber-400 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-brand-navy shadow-[0_8px_18px_rgba(245,166,35,0.4)] transition hover:-translate-y-0.5 hover:bg-amber-300 [animation:pulse_2.1s_ease-in-out_infinite]"
+                >
+                  <span className="inline-flex h-4.5 w-4.5 items-center justify-center rounded-full bg-amber-100 text-amber-700 shadow-inner">
+                    <GiftIcon className="h-3.5 w-3.5" />
+                  </span>
+                  <span className="py-1.5">Donation</span>
+                </Link>
               </div>
             </div>
           )}
@@ -2493,14 +2613,14 @@ const Navbar = () => {
       </div>
       </div>
 
-      <div className="bg-slate-900/92 px-4 py-2 xl:hidden">
+      <div className={`${isHomeOverlayMode ? 'bg-transparent' : 'bg-slate-900/92'} px-4 py-2 xl:hidden`}>
         <div className="relative flex min-h-[3.7rem] items-center justify-between py-1">
           <div className="flex items-center justify-start">
             <Link to="/" className="inline-flex items-center" aria-label="Go to homepage">
               <img
                 src={gurdwaraLogo}
                 alt="Gurdwara Singh Sabha Milton logo"
-                className="h-[3.55rem] w-[3.55rem] rounded-full border border-brand-saffron object-cover"
+                className="mt-1.5 h-[3.55rem] w-[3.55rem] rounded-full border border-brand-saffron object-cover"
               />
             </Link>
           </div>
@@ -2637,12 +2757,12 @@ const Navbar = () => {
       </div>
 
       <div
-        className={`hidden transition-[grid-template-rows,opacity] duration-300 ease-in-out xl:grid ${isCompact ? 'pointer-events-none grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'}`}
-        aria-hidden={isCompact}
-        inert={isCompact}
+        className={`hidden transition-[grid-template-rows,opacity] duration-300 ease-in-out xl:grid ${(isCompact || !isHomePage) ? 'pointer-events-none grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'}`}
+        aria-hidden={isCompact || !isHomePage}
+        inert={isCompact || !isHomePage}
       >
         <div className="min-h-0 overflow-hidden">
-          <div className="border-b-2 border-brand-blue/45 bg-slate-900/92 pb-5 pt-1">
+          <div className={`border-b-2 ${isHomeOverlayMode ? 'border-transparent bg-transparent' : 'border-brand-blue/45 bg-slate-900/92'} pb-5 pt-1`}>
             <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 md:px-6">
               {miltonPrimaryStream ? (
                 <div className="flex justify-center pt-0.5 pb-3">
@@ -2826,9 +2946,14 @@ const Navbar = () => {
                   <p className="mt-1 text-lg font-black leading-none text-brand-blue">{familySummary.eventCount}</p>
                   <p className="mt-0.5 text-[10px] text-amber-700">Waitlist: {familySummary.waitlistCount}</p>
                 </div>
-                <div className="col-span-2 rounded-xl border border-brand-blue/20 bg-white px-2.5 py-2">
+                <div className="rounded-xl border border-brand-blue/20 bg-white px-2.5 py-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Seva Applications</p>
                   <p className="mt-1 text-lg font-black leading-none text-brand-blue">{familySummary.sevaCount}</p>
+                </div>
+                <div className="min-w-0 rounded-xl border border-amber-200 bg-white px-2.5 py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Upcoming Booking</p>
+                  <p className="mt-1 truncate text-xs font-black leading-tight text-brand-blue">{upcomingBooking?.title || upcomingBooking?.categoryName || 'None scheduled'}</p>
+                  <p className="mt-0.5 text-[10px] font-semibold text-amber-700">{upcomingBooking?.date || 'No upcoming date'}</p>
                 </div>
               </div>
 

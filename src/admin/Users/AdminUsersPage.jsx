@@ -1337,9 +1337,9 @@ const AdminUsersPage = () => {
 
                   {membershipReviewMeta.showReviewCard ? (
                     <div className={`rounded-2xl border p-4 shadow-sm ${membershipReviewMeta.isActive ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-600">{membershipReviewMeta.schedule === 'yearly' ? 'Yearly' : 'Monthly'} Membership Review</p>
-                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${membershipReviewMeta.isActive ? 'border border-emerald-300 bg-emerald-100 text-emerald-700' : 'border border-amber-300 bg-amber-100 text-amber-700'}`}>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="whitespace-nowrap text-xs font-bold uppercase tracking-[0.16em] text-slate-600">{membershipReviewMeta.schedule === 'yearly' ? 'Yearly' : 'Monthly'} Membership Review</p>
+                        <span className={`inline-flex w-fit whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${membershipReviewMeta.isActive ? 'border border-emerald-300 bg-emerald-100 text-emerald-700' : 'border border-amber-300 bg-amber-100 text-amber-700'}`}>
                           {membershipReviewMeta.isActive ? 'Active' : 'Review Required'}
                         </span>
                       </div>

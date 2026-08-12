@@ -247,8 +247,12 @@ const LibraryPage = () => {
     [programUpdates]
   );
   const mediaResources = useMemo(() => libraryData?.mediaResources || [], [libraryData]);
-  const libraryTopAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Library Top Banner').slice(0, 2), [ads]);
-  const libraryFooterAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Library Footer Banner').slice(0, 2), [ads]);
+  const libraryTopAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Library Top Banner'), [ads]);
+  const libraryFooterAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Library Footer Banner'), [ads]);
+  const libraryTopAdImageHeightClass = libraryTopAds.length > 2 ? 'h-16 md:h-20' : 'h-24 md:h-28';
+  const libraryFooterAdImageHeightClass = libraryFooterAds.length > 2 ? 'h-16 md:h-20' : 'h-24 md:h-28';
+  const libraryTopAdsGridStyle = useMemo(() => ({ gridTemplateColumns: `repeat(${Math.max(1, libraryTopAds.length)}, minmax(0, 1fr))` }), [libraryTopAds.length]);
+  const libraryFooterAdsGridStyle = useMemo(() => ({ gridTemplateColumns: `repeat(${Math.max(1, libraryFooterAds.length)}, minmax(0, 1fr))` }), [libraryFooterAds.length]);
   const filteredFlashCardQuestions = useMemo(() => (Array.isArray(quizBankQuestions) ? quizBankQuestions : []), [quizBankQuestions]);
   const flashCardQuestion = useMemo(() => {
     if (!Array.isArray(filteredFlashCardQuestions) || filteredFlashCardQuestions.length === 0) {
@@ -530,8 +534,8 @@ const LibraryPage = () => {
       <BreadcrumbTrail items={breadcrumbItems} className="-mt-4 px-1" />
 
       {libraryTopAds.length > 0 ? (
-        <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-          <div className="grid gap-2 md:grid-cols-2">
+        <section className="rounded-xl py-2">
+          <div className="grid w-full gap-2" style={libraryTopAdsGridStyle}>
             {libraryTopAds.map((ad) => (
               <a
                 key={ad.id}
@@ -543,9 +547,9 @@ const LibraryPage = () => {
                     void advertisementService.recordAdClick(ad.id);
                   }
                 }}
-                className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30"
+                className="block min-w-0 overflow-hidden rounded-lg transition hover:opacity-95"
               >
-                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
+                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className={`${libraryTopAdImageHeightClass} w-full p-1 object-contain`} loading="lazy" /> : null}
               </a>
             ))}
           </div>
@@ -1191,8 +1195,8 @@ const LibraryPage = () => {
       ) : null}
 
       {libraryFooterAds.length > 0 ? (
-        <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-          <div className="grid gap-2 md:grid-cols-2">
+        <section className="rounded-xl py-2">
+          <div className="grid w-full gap-2" style={libraryFooterAdsGridStyle}>
             {libraryFooterAds.map((ad) => (
               <a
                 key={ad.id}
@@ -1204,9 +1208,9 @@ const LibraryPage = () => {
                     void advertisementService.recordAdClick(ad.id);
                   }
                 }}
-                className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30"
+                className="block min-w-0 overflow-hidden rounded-lg transition hover:opacity-95"
               >
-                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
+                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className={`${libraryFooterAdImageHeightClass} w-full p-1 object-contain`} loading="lazy" /> : null}
               </a>
             ))}
           </div>

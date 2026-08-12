@@ -5,13 +5,13 @@ export const publicNav = [
   { label: 'Gurbani Library', path: '/gurbani-library' },
   { label: 'Daily Hukamnama', path: '/hukamnama' },
   { label: 'Events', path: '/events' },
+  { label: 'Bookings', path: '/bookings' },
   { label: 'Family Dashboard', path: '/family-dashboard' },
   { label: 'Seva', path: '/seva' },
   { label: 'Donation', path: '/donation' },
-  { label: 'Gallery', path: '/gallery' },
+  { label: 'Media', path: '/media' },
   { label: 'Library', path: '/library' },
   { label: 'News', path: '/news' },
-  { label: 'Videos', path: '/videos' },
   { label: 'FAQ', path: '/faq' },
   { label: 'Contact', path: '/contact' }
 ];
@@ -31,6 +31,7 @@ export const adminNav = [
   { label: 'Advertisements', path: '/admin/advertisements' },
   { label: 'Sponsors', path: '/admin/sponsors' },
   { label: 'Events', path: '/admin/events' },
+  { label: 'Bookings', path: '/admin/bookings' },
   { label: 'Kids Learning', path: '/admin/kids-learning' },
   { label: 'Donations', path: '/admin/donations' },
   { label: 'Newsletter', path: '/admin/newsletter' },

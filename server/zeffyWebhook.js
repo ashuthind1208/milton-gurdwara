@@ -101,7 +101,13 @@ const mapZeffyApiPayment = (payment = {}) => {
   return {
     id: `zeffy-${transactionId}`,
     receiptId: `ZEF-${receiptSuffix}`,
-    sourcePendingId: '',
+    sourcePendingId: String(firstValue(
+      payment.client_reference_id,
+      payment.clientReferenceId,
+      payment.metadata?.client_reference_id,
+      payment.metadata?.clientReferenceId,
+      payment.custom_fields?.client_reference_id
+    ) || '').trim(),
     campaignId: null,
     campaignName: String(payment.description || 'Help Us Build Our Gurdwara').trim(),
     donorName,

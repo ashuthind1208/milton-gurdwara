@@ -1,22 +1,37 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import Card from '../../components/ui/Card';
-import Button from '../../components/ui/Button';
+import { CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/react/24/solid';
 import donationService from '../../services/donationService';
+import bookingService from '../../services/bookingService';
 
 const DonationSuccessPage = () => {
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const confirmationKeyRef = useRef('');
+  const [confirmationState, setConfirmationState] = useState('confirming');
 
   const confirmMutation = useMutation({
-    mutationFn: ({ pendingId, gatewayTransactionId, amount }) => donationService.confirmDonationPayment({ pendingId, gatewayTransactionId, amount }),
+    mutationFn: async ({ pendingId, gatewayTransactionId, amount }) => {
+      const confirmation = await donationService.confirmDonationPayment({ pendingId, gatewayTransactionId, amount });
+      const result = confirmation?.data || {};
+      await bookingService.attachPaymentReceipt({
+        pendingId,
+        receiptNumber: result.receiptId,
+        gatewayTransactionId: result.donation?.gatewayTransactionId || gatewayTransactionId,
+        paymentProvider: result.donation?.paymentProvider,
+        amount: result.donation?.amount || amount
+      }).catch(() => null);
+      return confirmation;
+    },
     onSuccess: () => {
+      setConfirmationState('completed');
       queryClient.invalidateQueries({ queryKey: ['campaigns'] });
       queryClient.invalidateQueries({ queryKey: ['admin-campaigns'] });
       queryClient.invalidateQueries({ queryKey: ['admin-donations'] });
-    }
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+    },
+    onError: () => setConfirmationState('error')
   });
 
   useEffect(() => {
@@ -30,6 +45,7 @@ const DonationSuccessPage = () => {
     const fallbackPendingId = donationService.getLastPendingDonationId() || donationService.getLatestPendingDonation()?.id || '';
     const pendingId = pendingIdFromQuery || fallbackPendingId;
     if (!pendingId) {
+      setConfirmationState('error');
       return;
     }
 
@@ -68,30 +84,56 @@ const DonationSuccessPage = () => {
     });
   }, [confirmMutation, queryClient, searchParams]);
 
-  const closePopupAndNavigate = (path) => {
-    if (window.opener && !window.opener.closed) {
-      window.opener.location.assign(path);
-      window.close();
-      return;
+  useEffect(() => {
+    if (confirmationState !== 'completed') {
+      return undefined;
     }
-    window.location.assign(path);
-  };
+
+    const closeTimer = window.setTimeout(() => {
+      if (window.parent !== window) {
+        window.parent.postMessage({ type: 'ssm:payment-completed' }, window.location.origin);
+        return;
+      }
+      if (window.opener && !window.opener.closed) {
+        try {
+          window.opener.location.reload();
+        } catch {
+          // The opener refreshes independently when cross-origin restrictions apply.
+        }
+        window.close();
+        return;
+      }
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        window.location.assign('/');
+      }
+    }, 5000);
+
+    return () => window.clearTimeout(closeTimer);
+  }, [confirmationState]);
 
   return (
-    <div className="mx-auto grid max-w-3xl gap-4 md:grid-cols-2">
-      <Card className="border border-emerald-200 bg-emerald-50/70 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Donation complete</p>
-        <p className="mt-3 text-2xl font-semibold text-emerald-950">Payment successful</p>
-        <p className="mt-2 text-sm text-emerald-900/80">Thank you for your daswand. Your payment has been completed successfully.</p>
-      </Card>
-
-      <Card className="border border-slate-200 bg-white shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Next step</p>
-        <div className="mt-4 space-y-3">
-          <Button type="button" onClick={() => closePopupAndNavigate('/donation?reset=1')} className="w-full">Go to Donation</Button>
-          <Button type="button" variant="ghost" onClick={() => closePopupAndNavigate('/')} className="w-full">Go Home</Button>
-        </div>
-      </Card>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/55 p-4">
+      <section className="w-full max-w-sm rounded-lg bg-white px-6 py-9 text-center shadow-2xl" role="dialog" aria-live="polite" aria-label="Payment status">
+        {confirmationState === 'error' ? (
+          <>
+            <ExclamationCircleIcon className="mx-auto h-16 w-16 text-rose-500" />
+            <h1 className="mt-4 font-heading text-2xl font-semibold text-slate-900">Payment could not be confirmed</h1>
+          </>
+        ) : confirmationState === 'confirming' ? (
+          <>
+            <span className="mx-auto block h-14 w-14 animate-spin rounded-full border-4 border-emerald-100 border-t-emerald-600" />
+            <h1 className="mt-4 font-heading text-2xl font-semibold text-slate-900">Confirming payment</h1>
+          </>
+        ) : (
+          <>
+            <CheckCircleIcon className="mx-auto h-20 w-20 text-emerald-500" />
+            <h1 className="mt-4 font-heading text-3xl font-semibold text-slate-900">Payment completed</h1>
+            <p className="mt-2 text-sm text-slate-500">This window will close in 5 seconds.</p>
+          </>
+        )}
+      </section>
     </div>
   );
 };

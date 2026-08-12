@@ -51,18 +51,24 @@ const HomeHeroBanner = ({ content, actions, topRightSlot, onSlideAction }) => {
   const activeEyebrow = activeSlide.eyebrow || resolvedContent.eyebrow;
   const activeTitle = activeSlide.title || activeSlide.heading || resolvedContent.title;
   const activeDescription = activeSlide.description || activeSlide.caption || resolvedContent.description;
+  const heroSlides = slides.length > 0 ? slides : [fallbackContent.slides[0]];
 
   return (
-    <section className="relative overflow-hidden rounded-3xl border border-brand-blue/20 shadow-soft">
-      <img
-        src={activeSlide.image}
-        alt={activeSlide.heading || 'Hero slide'}
-        className="h-[360px] w-full object-cover opacity-35 md:h-[440px]"
-        loading="eager"
-        decoding="async"
-      />
+    <section className="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden">
+      <div className="relative h-[500px] w-full md:h-[600px] lg:h-[680px]">
+        {heroSlides.map((slide, slideIndex) => (
+          <img
+            key={`${slide.title || slide.heading || 'hero'}-${slideIndex}`}
+            src={slide.image}
+            alt={slide.heading || slide.title || 'Hero slide'}
+            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ease-in-out ${slideIndex === index ? 'opacity-80' : 'opacity-0'}`}
+            loading={slideIndex === 0 ? 'eager' : 'lazy'}
+            decoding="async"
+          />
+        ))}
 
-      <div className="absolute inset-0 bg-gradient-to-r from-brand-navy via-brand-blue/78 to-brand-blue/62" />
+        <div className="pointer-events-none absolute inset-0 bg-black/70" />
+      </div>
 
       {topRightSlot ? (
         <div className="absolute right-4 top-4 z-10 w-[220px] max-w-[calc(100%-2rem)] md:right-6 md:top-6 md:w-[260px]">
@@ -70,10 +76,10 @@ const HomeHeroBanner = ({ content, actions, topRightSlot, onSlideAction }) => {
         </div>
       ) : null}
 
-      <div className="absolute inset-0 flex flex-col justify-center p-6 pt-24 text-white md:p-10 md:pt-10">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-saffron">{activeEyebrow}</p>
-        <h1 className="mt-3 max-w-3xl font-heading text-3xl font-bold leading-tight md:text-5xl">{activeTitle}</h1>
-        <p className="mt-3 max-w-3xl text-sm text-blue-50 md:text-base">{activeDescription}</p>
+      <div className="absolute inset-0 flex flex-col items-start justify-end p-6 pb-8 text-white md:p-10 md:pb-12">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-saffron drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)]">{activeEyebrow}</p>
+        <h1 className="mt-3 max-w-3xl font-heading text-3xl font-bold leading-tight text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.85)] md:text-5xl">{activeTitle}</h1>
+        <p className="mt-3 max-w-3xl text-sm text-blue-50 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] md:text-base">{activeDescription}</p>
         <div className="mt-5 flex flex-wrap gap-3">
           {activeSlide.primaryCtaLabel && activeSlide.primaryCtaPath ? (
             <button

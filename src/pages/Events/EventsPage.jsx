@@ -96,8 +96,12 @@ const EventsPage = () => {
     return map;
   }, [libraryContent]);
 
-  const eventsTopAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Events Top Banner').slice(0, 2), [ads]);
-  const eventsFooterAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Events Footer Banner').slice(0, 2), [ads]);
+  const eventsTopAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Events Top Banner'), [ads]);
+  const eventsFooterAds = useMemo(() => ads.filter((ad) => ad.active && ad.placement === 'Events Footer Banner'), [ads]);
+  const eventsTopAdImageHeightClass = eventsTopAds.length > 2 ? 'h-16 md:h-20' : 'h-24 md:h-28';
+  const eventsFooterAdImageHeightClass = eventsFooterAds.length > 2 ? 'h-16 md:h-20' : 'h-24 md:h-28';
+  const eventsTopAdsGridStyle = useMemo(() => ({ gridTemplateColumns: `repeat(${Math.max(1, eventsTopAds.length)}, minmax(0, 1fr))` }), [eventsTopAds.length]);
+  const eventsFooterAdsGridStyle = useMemo(() => ({ gridTemplateColumns: `repeat(${Math.max(1, eventsFooterAds.length)}, minmax(0, 1fr))` }), [eventsFooterAds.length]);
 
   const registrationMutation = useMutation({
     mutationFn: (values) => {
@@ -364,8 +368,8 @@ const EventsPage = () => {
       {isAuthenticated && profilePhoneMissing ? <PhoneNumberRequiredNotice activityLabel="event registrations" /> : null}
       {content?.mediaUrl ? <img src={content.mediaUrl} alt="Events banner" className="h-56 w-full rounded-xl object-cover" loading="lazy" /> : null}
       {eventsTopAds.length > 0 ? (
-        <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-          <div className="grid gap-2 md:grid-cols-2">
+        <section className="rounded-xl py-2">
+          <div className="grid w-full gap-2" style={eventsTopAdsGridStyle}>
             {eventsTopAds.map((ad) => (
               <a
                 key={ad.id}
@@ -377,9 +381,9 @@ const EventsPage = () => {
                     void advertisementService.recordAdClick(ad.id);
                   }
                 }}
-                className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30"
+                className="block min-w-0 overflow-hidden rounded-lg transition hover:opacity-95"
               >
-                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
+                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className={`${eventsTopAdImageHeightClass} w-full p-1 object-contain`} loading="lazy" /> : null}
               </a>
             ))}
           </div>
@@ -695,8 +699,8 @@ const EventsPage = () => {
       ) : null}
 
       {eventsFooterAds.length > 0 ? (
-        <section className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-          <div className="grid gap-2 md:grid-cols-2">
+        <section className="rounded-xl py-2">
+          <div className="grid w-full gap-2" style={eventsFooterAdsGridStyle}>
             {eventsFooterAds.map((ad) => (
               <a
                 key={ad.id}
@@ -708,9 +712,9 @@ const EventsPage = () => {
                     void advertisementService.recordAdClick(ad.id);
                   }
                 }}
-                className="block overflow-hidden rounded-lg border border-slate-200 hover:border-brand-blue/30"
+                className="block min-w-0 overflow-hidden rounded-lg transition hover:opacity-95"
               >
-                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className="h-24 w-full object-cover" loading="lazy" /> : null}
+                {ad.bannerUrl ? <img src={ad.bannerUrl} alt={ad.title || 'Advertisement'} className={`${eventsFooterAdImageHeightClass} w-full p-1 object-contain`} loading="lazy" /> : null}
               </a>
             ))}
           </div>

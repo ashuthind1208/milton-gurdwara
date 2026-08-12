@@ -70,9 +70,9 @@ Add these to `.env.local`:
 	- Local Stripe helper API (`server/index.js`)
 2. `npm run build` builds the React app.
 
-## Events Database (PostgreSQL)
+## Runtime Database (PostgreSQL or MySQL 8)
 
-Events are now persisted via PostgreSQL using backend API routes. This replaces local-only event storage and allows cross-device verification when deployed.
+Runtime data can use PostgreSQL or MySQL 8 through the same backend API. PostgreSQL remains the default and rollback option. See [docs/MYSQL_MIGRATION_RUNBOOK.md](docs/MYSQL_MIGRATION_RUNBOOK.md) for guarded migration, verification, cutover, and rollback commands.
 
 ### 1. Create a PostgreSQL instance
 
@@ -86,6 +86,7 @@ Use any managed Postgres provider (Neon, Supabase, Railway, Render, RDS, etc.) a
 
 Set this in `.env.local` and in your deployment environment variables:
 
+1. `DB_ENGINE=postgresql`
 1. `DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DBNAME?sslmode=require`
 
 Optional (if you do not use `DATABASE_URL`):

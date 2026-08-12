@@ -396,6 +396,7 @@ const notificationToneByPath = {
   '/admin/sponsors': 'border-rose-300 bg-gradient-to-r from-rose-100 to-white',
   '/admin/advertisements': 'border-yellow-300 bg-gradient-to-r from-yellow-100 to-white',
   '/admin/roles-access': 'border-purple-300 bg-gradient-to-r from-purple-100 to-white',
+  '/admin/bookings': 'border-cyan-300 bg-gradient-to-r from-cyan-100 to-white',
   '/admin/analytics': 'border-blue-300 bg-gradient-to-r from-blue-100 to-white',
   '/admin/audit-trail': 'border-slate-300 bg-gradient-to-r from-slate-100 to-white'
 };
@@ -427,6 +428,7 @@ const iconByPath = {
   '/admin/advertisements': MegaphoneIcon,
   '/admin/sponsors': CameraIcon,
   '/admin/events': QueueListIcon,
+  '/admin/bookings': CalendarDaysIcon,
   '/admin/kids-learning': BookOpenIcon,
   '/admin/phase2-config': SparklesIcon,
   '/admin/donations': CurrencyDollarIcon,

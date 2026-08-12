@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import './App.css';
 import AppRoutes from './routes/AppRoutes';
 import DeleteConfirmationGuard from './components/common/DeleteConfirmationGuard';
 import FormValidationGuard from './components/common/FormValidationGuard';
