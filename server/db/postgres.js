@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const { allTableNames } = require('./mysql-relational-schema');
 
 const toBoolean = (value) => {
   const normalized = String(value || '').trim().toLowerCase();
@@ -3493,17 +3494,9 @@ const getDataCounts = async () => {
     throw new Error('PostgreSQL is not configured.');
   }
 
-  const countQueries = {
-    app_singletons: 'SELECT COUNT(*)::int AS count FROM app_singletons;',
-    app_items: 'SELECT COUNT(*)::int AS count FROM app_items;',
-    quiz_bank_files: 'SELECT COUNT(*)::int AS count FROM quiz_bank_files;',
-    events: 'SELECT COUNT(*)::int AS count FROM events;',
-    event_registrants: 'SELECT COUNT(*)::int AS count FROM event_registrants;',
-    donation_campaigns: 'SELECT COUNT(*)::int AS count FROM donation_campaigns;',
-    donations: 'SELECT COUNT(*)::int AS count FROM donations WHERE deleted_at IS NULL;',
-    donation_pending: 'SELECT COUNT(*)::int AS count FROM donation_pending;'
-  };
-  const entries = await Promise.all(Object.entries(countQueries).map(async ([table, query]) => {
+  const entries = await Promise.all(allTableNames.map(async (table) => {
+    const whereClause = table === 'donations' ? ' WHERE deleted_at IS NULL' : '';
+    const query = `SELECT COUNT(*)::int AS count FROM ${table}${whereClause};`;
     const result = await pool.query(query);
     return [table, Number(result.rows[0]?.count || 0)];
   }));

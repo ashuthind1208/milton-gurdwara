@@ -37,12 +37,14 @@
   },
   "scripts": {
     "start": "node scripts/start.js",
-    "build": "react-scripts build",
+    "build": "node scripts/build-production.js",
     "test": "react-scripts test",
     "db:migrate:mysql": "node scripts/migrate-postgres-to-mysql.js",
     "db:verify:mysql": "node scripts/migrate-postgres-to-mysql.js --verify-only",
+    "db:sync:mysql-relational": "node scripts/migrate-postgres-to-mysql.js --sync-relational-only",
     "db:smoke:mysql": "node scripts/smoke-test-mysql.js",
     "newsletter:smoke": "node scripts/smoke-test-newsletter.js",
+    "newsletter:smoke:smtp2go": "NEWSLETTER_SMOKE_SMTP_PROVIDER=smtp2go node scripts/smoke-test-newsletter.js",
     "eject": "react-scripts eject"
   },
   "proxy": "http://127.0.0.1:4242",

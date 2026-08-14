@@ -50,6 +50,21 @@ Set these in local development:
 
 Then restart frontend and backend processes.
 
+For SMTP delivery, keep Gmail selected until the SMTP2GO account and sender domain are ready:
+
+```dotenv
+LOCAL_MAIL_TRANSPORT=smtp
+SMTP_PROVIDER=gmail
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=<gmail-smtp-username>
+SMTP_PASS=<gmail-app-password>
+SMTP_FROM=<verified-sender-address>
+```
+
+Store future SMTP2GO credentials under `SMTP2GO_HOST`, `SMTP2GO_PORT`, `SMTP2GO_SECURE`, `SMTP2GO_USER`, `SMTP2GO_PASS`, and `SMTP2GO_FROM`. Switching `SMTP_PROVIDER` from `gmail` to `smtp2go` activates those values after a backend restart.
+
 ## 4) End-to-end verification checklist
 
 1. Newsletter send from admin:
@@ -74,4 +89,4 @@ Then restart frontend and backend processes.
 ## 5) Notes
 
 - The app sends compatibility fields (recipient aliases and html/body aliases) to reduce integration brittleness.
-- Relay normalizes payloads and sends via local sendmail, including attachment support for donation invoices.
+- Relay normalizes payloads and sends through the selected SMTP provider (or local sendmail when configured), including attachment support for donation invoices.

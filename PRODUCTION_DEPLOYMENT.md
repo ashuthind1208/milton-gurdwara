@@ -5,7 +5,7 @@ This guide is the current end-to-end checklist for deploying Singh Sabha Milton 
 ## 1) Prerequisites
 
 - Node.js 18+ and npm
-- A PostgreSQL database (managed service recommended)
+- A MySQL 8 database (managed service recommended)
 - Public domain(s) for frontend and backend
 - TLS/HTTPS enabled on both frontend and backend endpoints
 - Persistent storage for uploaded files (do not rely on ephemeral disk)
@@ -14,7 +14,7 @@ This guide is the current end-to-end checklist for deploying Singh Sabha Milton 
 
 - Frontend is a CRA app (`react-scripts`) that builds to static files.
 - Backend serves APIs under `/api/*` and content/upload endpoints.
-- The app uses PostgreSQL for persistent data.
+- The production runtime uses MySQL 8 for persistent data.
 - Uploaded sponsor/advertisement banners must persist across restarts/deploys.
 
 ## 3) Environment Variables
@@ -22,6 +22,10 @@ This guide is the current end-to-end checklist for deploying Singh Sabha Milton 
 Set these in production (frontend and backend as applicable).
 
 ### Frontend (`REACT_APP_*`)
+
+The committed `.env.production` contains public build-time values only. `npm run build` gives this file precedence over `.env.local`, then embeds the values into the static JavaScript bundle. Do not copy `.env.production` into `build/`; it is not read after compilation.
+
+Never place database credentials, SMTP credentials, Stripe secrets, Zeffy API keys, or `YOUTUBE_API_KEY` in `.env.production`. Configure those as backend runtime secrets in the hosting platform.
 
 - `REACT_APP_GOOGLE_OAUTH_URL`
   - Must use production `redirect_uri`.
@@ -41,11 +45,10 @@ Set these in production (frontend and backend as applicable).
 
 ### Backend / Server
 
-- `DATABASE_URL`
-  - Production PostgreSQL connection string.
-  - Prefer SSL-enabled URL (`sslmode=require` or equivalent).
-- `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SSL`
-  - Optional discrete fields if `DATABASE_URL` is not used.
+- Follow the detailed beginner runbook: [Backend Production Environment Runbook](docs/BACKEND_PRODUCTION_ENV_RUNBOOK.md).
+- Set `DB_ENGINE=mysql`.
+- Configure `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE`, `MYSQL_SSL`, and `MYSQL_SSL_REJECT_UNAUTHORIZED`.
+- Store all backend values in the hosting platform's secret store or a protected server file outside the repository.
 - `STRIPE_SECRET_KEY`
   - Live key in production.
 - `STRIPE_WEBHOOK_SECRET`
@@ -189,7 +192,9 @@ If storage is ephemeral, sponsor/advertisement banners may disappear after deplo
    - `npm ci`
 2. Build frontend:
    - `npm run build`
-3. Run backend in production mode with production env vars.
+3. Run the backend with production runtime variables:
+  - `node server/index.js`
+  - Do not use `npm start`; it also starts the frontend development server.
 
 ### Deploy
 
@@ -208,7 +213,7 @@ If using Nginx/Cloudflare/ingress:
 
 ## 10) Database and Backups
 
-1. Ensure PostgreSQL credentials are correct and SSL is enabled.
+1. Ensure MySQL credentials are correct, `DB_ENGINE=mysql`, and production TLS is enabled.
 2. Confirm app boot initializes required tables.
 3. Enable automated DB backups and point-in-time recovery if available.
 

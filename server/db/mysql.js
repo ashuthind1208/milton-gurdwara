@@ -1,4 +1,6 @@
 const mysql = require('mysql2/promise');
+const { allTableNames, relationalSchemaStatements } = require('./mysql-relational-schema');
+const { deleteItemMirror, mirrorItemResource, mirrorSingletonResource } = require('./mysql-relational-mirrors');
 
 const toBoolean = (value) => ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
 const mysqlUrl = String(process.env.MYSQL_URL || '').trim();
@@ -106,7 +108,8 @@ const ensureEventsSchema = async () => {
       payload JSON NOT NULL,
       created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
       INDEX idx_donation_pending_created (created_at)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    ...relationalSchemaStatements
   ];
   for (const statement of statements) {
     await db.query(statement);
@@ -127,6 +130,11 @@ const setSingleton = async (resource, payload) => {
      ON DUPLICATE KEY UPDATE payload = VALUES(payload), updated_at = CURRENT_TIMESTAMP(3)`,
     [normalized, JSON.stringify(payload ?? {})]
   );
+  try {
+    await mirrorSingletonResource(requirePool(), normalized, payload ?? {});
+  } catch (error) {
+    console.error('MySQL singleton mirror sync failed:', error.message || error);
+  }
   return payload;
 };
 
@@ -147,6 +155,11 @@ const createItem = async (resource, payload = {}) => {
     'INSERT INTO app_items(resource, id, payload) VALUES (?, ?, ?)',
     [normalized, id, JSON.stringify(record)]
   );
+  try {
+    await mirrorItemResource(requirePool(), normalized, record);
+  } catch (error) {
+    console.error('MySQL item mirror sync failed:', error.message || error);
+  }
   return record;
 };
 
@@ -167,6 +180,11 @@ const updateItem = async (resource, id, payload = {}) => {
      ON DUPLICATE KEY UPDATE payload = VALUES(payload), updated_at = CURRENT_TIMESTAMP(3)`,
     [normalized, normalizedItemId, JSON.stringify(record)]
   );
+  try {
+    await mirrorItemResource(requirePool(), normalized, record);
+  } catch (error) {
+    console.error('MySQL item mirror sync failed:', error.message || error);
+  }
   return record;
 };
 
@@ -174,6 +192,11 @@ const removeItem = async (resource, id) => {
   const normalized = normalizeResource(resource);
   const normalizedItemId = normalizeId(id);
   await requirePool().execute('DELETE FROM app_items WHERE resource = ? AND id = ?', [normalized, normalizedItemId]);
+  try {
+    await deleteItemMirror(requirePool(), normalized, normalizedItemId);
+  } catch (error) {
+    console.error('MySQL delete mirror sync failed:', error.message || error);
+  }
   return { success: true };
 };
 
@@ -590,7 +613,23 @@ const purgeUserRegistrations = async (identity = {}) => {
   return { removedEventRegistrations: dependencies.eventRegistrations.length, removedSevaRegistrations: dependencies.sevaRegistrations.length, touchedEvents: touched.size };
 };
 
-const syncRelationalMirrorsFromContentStore = async () => true;
+const syncRelationalMirrorsFromContentStore = async () => {
+  const db = requirePool();
+  const itemResourceOrder = [
+    'users', 'advertisements', 'news_articles', 'gallery_albums', 'videos', 'streaming_configs',
+    'subscribers', 'seva_opportunities', 'volunteer_registrations', 'donation_records', 'donations',
+    'analytics_daily_metrics', 'analytics'
+  ];
+  for (const resource of itemResourceOrder) {
+    const [rows] = await db.execute('SELECT payload FROM app_items WHERE resource = ? ORDER BY created_at, id', [resource]);
+    for (const row of rows) await mirrorItemResource(db, resource, parsePayload(row.payload));
+  }
+  for (const resource of ['cms_home_content', 'cms_page_content', 'library_content', 'hukamnama_ssm_hukamnama_entries']) {
+    const [rows] = await db.execute('SELECT payload FROM app_singletons WHERE resource = ? LIMIT 1', [resource]);
+    if (rows[0]) await mirrorSingletonResource(db, resource, parsePayload(rows[0].payload));
+  }
+  return true;
+};
 
 const importSnapshot = async (snapshot = {}) => {
   const connection = await requirePool().getConnection();
@@ -657,9 +696,8 @@ const exportSnapshot = async () => {
 
 const getDataCounts = async () => {
   const db = requirePool();
-  const tableNames = ['app_singletons', 'app_items', 'quiz_bank_files', 'events', 'event_registrants', 'donation_campaigns', 'donations', 'donation_pending'];
   const counts = {};
-  for (const table of tableNames) {
+  for (const table of allTableNames) {
     const [rows] = await db.query(`SELECT COUNT(*) AS count FROM ${table}`);
     counts[table] = Number(rows[0]?.count || 0);
   }

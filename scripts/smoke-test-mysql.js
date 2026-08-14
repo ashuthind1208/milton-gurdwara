@@ -53,6 +53,11 @@ const run = async () => {
   assert.equal(updatedItem.heading, marker, 'partial item updates must preserve existing fields');
   assert.equal(updatedItem.content, 'updated');
   assert.ok((await db.searchPublicContent(marker)).some((entry) => entry.id === `news-${itemId}`));
+  const [mirroredNewsRows] = await db.pool.execute('SELECT heading, content FROM news_articles WHERE id = ?', [itemId]);
+  assert.deepEqual(mirroredNewsRows[0], { heading: marker, content: 'updated' });
+  await db.removeItem('news_articles', itemId);
+  const [removedNewsRows] = await db.pool.execute('SELECT id FROM news_articles WHERE id = ?', [itemId]);
+  assert.equal(removedNewsRows.length, 0, 'removing a canonical item must remove its relational mirror');
 
   const event = await db.createEvent({
     title: marker,

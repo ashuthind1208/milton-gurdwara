@@ -85,6 +85,14 @@ npm run db:smoke:mysql
 npm run newsletter:smoke
 ```
 
+If MySQL has already received post-cutover writes, do not use `--replace`. Create and populate the full relational mirror schema without changing the canonical MySQL runtime tables:
+
+```bash
+npm run db:sync:mysql-relational
+```
+
+This command creates all 33 PostgreSQL-equivalent table names, copies the 25 relational mirror tables in foreign-key order, then overlays newer records from MySQL's canonical `app_items` and `app_singletons` stores. Count differences are reported because post-cutover MySQL data can legitimately be newer than PostgreSQL.
+
 After verification succeeds, set:
 
 ```dotenv
@@ -107,5 +115,6 @@ The migration copies:
 - Donation campaigns
 - Active donations
 - Pending donations
+- All 25 typed relational mirror tables, including CMS, users, schedule, seva, library, hukamnama, media, subscribers, and analytics
 
 Soft-deleted donation rows are intentionally excluded because they are not part of the runtime donation feed. JSON data is stored in native MySQL `JSON` columns and timestamps use UTC connections.

@@ -91,13 +91,11 @@ const buildPhase2SearchVariants = (query) => {
 };
 
 const resolveServerPort = () => {
-  const preferred = Number(process.env.STRIPE_API_PORT || process.env.SERVER_PORT || 4242);
+  const preferred = Number(process.env.SERVER_PORT || process.env.STRIPE_API_PORT || process.env.PORT || 4242);
   if (Number.isFinite(preferred) && preferred > 0) {
     return preferred;
   }
-
-  const fallback = Number(process.env.PORT || 4242);
-  return Number.isFinite(fallback) && fallback > 0 ? fallback : 4242;
+  return 4242;
 };
 
 const port = resolveServerPort();
@@ -184,12 +182,34 @@ const bookingReminderDays = String(process.env.BOOKING_REMINDER_DAYS || '7,4,2,1
   .filter((value) => Number.isFinite(value) && value >= 0);
 const localMailFromAddress = String(process.env.LOCAL_MAIL_FROM || 'no-reply@singhsabhamilton.local').trim() || 'no-reply@singhsabhamilton.local';
 const localMailTransport = String(process.env.LOCAL_MAIL_TRANSPORT || 'sendmail').trim().toLowerCase();
-const smtpHost = String(process.env.SMTP_HOST || '').trim();
-const smtpPortRaw = Number(process.env.SMTP_PORT || 587);
-const smtpSecure = String(process.env.SMTP_SECURE || 'false').trim().toLowerCase() === 'true';
-const smtpUser = String(process.env.SMTP_USER || '').trim();
-const smtpPass = String(process.env.SMTP_PASS || '').trim();
-const smtpFromAddress = String(process.env.SMTP_FROM || localMailFromAddress).trim() || localMailFromAddress;
+const smtpProvider = String(process.env.SMTP_PROVIDER || 'gmail').trim().toLowerCase();
+const supportedSmtpProviders = new Set(['gmail', 'smtp2go', 'custom']);
+if (!supportedSmtpProviders.has(smtpProvider)) {
+  throw new Error(`Unsupported SMTP_PROVIDER "${smtpProvider}". Use "gmail", "smtp2go", or "custom".`);
+}
+const smtpProviderConfig = smtpProvider === 'smtp2go'
+  ? {
+    host: String(process.env.SMTP2GO_HOST || 'mail.smtp2go.com').trim(),
+    port: Number(process.env.SMTP2GO_PORT || 587),
+    secure: String(process.env.SMTP2GO_SECURE || 'false').trim().toLowerCase() === 'true',
+    user: String(process.env.SMTP2GO_USER || '').trim(),
+    pass: String(process.env.SMTP2GO_PASS || '').trim(),
+    from: String(process.env.SMTP2GO_FROM || localMailFromAddress).trim() || localMailFromAddress
+  }
+  : {
+    host: String(process.env.SMTP_HOST || (smtpProvider === 'gmail' ? 'smtp.gmail.com' : '')).trim(),
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: String(process.env.SMTP_SECURE || 'false').trim().toLowerCase() === 'true',
+    user: String(process.env.SMTP_USER || '').trim(),
+    pass: String(process.env.SMTP_PASS || '').trim(),
+    from: String(process.env.SMTP_FROM || localMailFromAddress).trim() || localMailFromAddress
+  };
+const smtpHost = smtpProviderConfig.host;
+const smtpPortRaw = smtpProviderConfig.port;
+const smtpSecure = smtpProviderConfig.secure;
+const smtpUser = smtpProviderConfig.user;
+const smtpPass = smtpProviderConfig.pass;
+const smtpFromAddress = smtpProviderConfig.from;
 const newsletterPublicBaseUrl = String(process.env.PUBLIC_SITE_URL || process.env.NEWSLETTER_PUBLIC_BASE_URL || volunteerReminderBaseUrl).trim().replace(/\/$/, '');
 const newsletterUnsubscribeSecret = String(process.env.NEWSLETTER_UNSUBSCRIBE_SECRET || smtpPass || stripeWebhookSecret || '').trim();
 const newsletterSendConcurrency = Math.max(1, Math.min(10, Number(process.env.NEWSLETTER_SEND_CONCURRENCY || 3)));
@@ -778,11 +798,18 @@ const sendViaLocalSendmail = async ({ from, toList, bccList, subject, textBody, 
 
 const sendViaSmtp = async ({ from, toList, bccList, subject, textBody, htmlBody, attachments }) => {
   if (!smtpHost) {
-    throw new Error('SMTP_HOST is required when LOCAL_MAIL_TRANSPORT=smtp.');
+    throw new Error(`SMTP host is required for SMTP_PROVIDER=${smtpProvider}.`);
+  }
+  if (smtpProvider !== 'custom' && (!smtpUser || !smtpPass)) {
+    const credentialPrefix = smtpProvider === 'smtp2go' ? 'SMTP2GO' : 'SMTP';
+    throw new Error(`${credentialPrefix}_USER and ${credentialPrefix}_PASS are required for SMTP delivery.`);
+  }
+  if (smtpProvider === 'custom' && Boolean(smtpUser) !== Boolean(smtpPass)) {
+    throw new Error('SMTP_USER and SMTP_PASS must both be set when custom SMTP authentication is enabled.');
   }
 
   const smtpPort = Number.isFinite(smtpPortRaw) && smtpPortRaw > 0 ? smtpPortRaw : 587;
-  const authEnabled = Boolean(smtpUser || smtpPass);
+  const authEnabled = Boolean(smtpUser && smtpPass);
 
   let nodemailer = null;
   try {
@@ -840,7 +867,7 @@ const sendViaSmtp = async ({ from, toList, bccList, subject, textBody, htmlBody,
   }
 
   return {
-    provider: 'smtp',
+    provider: `smtp-${smtpProvider}`,
     envelopeFrom: smtpFromAddress,
     fromHeader,
     messageId: String(smtpInfo?.messageId || '').trim(),
@@ -4749,6 +4776,8 @@ const server = http.createServer(async (request, response) => {
       webhookConfigured: Boolean(stripeWebhookSecret),
       eventsDatabaseConfigured: eventsDb.hasDatabaseConnection,
       databaseEngine: eventsDb.engine,
+      mailTransport: localMailTransport,
+      smtpProvider: localMailTransport === 'smtp' ? smtpProvider : null,
       apiVersion: API_VERSION,
       startupId: API_STARTUP_ID,
       serverPort: port

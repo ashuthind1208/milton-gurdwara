@@ -26,6 +26,7 @@ loadEnvFile(path.join(workspaceRoot, '.env.local'));
 const db = require('../server/db/mysql');
 const apiPort = 4243;
 const smtpPort = 2526;
+const smtpProvider = String(process.env.NEWSLETTER_SMOKE_SMTP_PROVIDER || 'gmail').trim().toLowerCase();
 const marker = `newsletter-smoke-${Date.now()}`;
 const subscribers = [
   { id: `${marker}-one`, email: `${marker}-one@example.com`, active: true, interests: ['Test'] },
@@ -57,7 +58,8 @@ const createSmtpCapture = () => net.createServer((socket) => {
       if (lineEnd < 0) return;
       const line = buffer.slice(0, lineEnd);
       buffer = buffer.slice(lineEnd + 2);
-      if (/^(EHLO|HELO)\b/i.test(line)) socket.write('250-localhost\r\n250 PIPELINING\r\n');
+      if (/^(EHLO|HELO)\b/i.test(line)) socket.write('250-localhost\r\n250-AUTH PLAIN LOGIN\r\n250 PIPELINING\r\n');
+      else if (/^AUTH PLAIN\b/i.test(line)) socket.write('235 2.7.0 authentication successful\r\n');
       else if (/^MAIL FROM:/i.test(line)) socket.write('250 2.1.0 sender ok\r\n');
       else if (/^RCPT TO:/i.test(line)) {
         const match = line.match(/<([^>]+)>/);
@@ -131,12 +133,24 @@ const run = async () => {
         SERVER_PORT: String(apiPort),
         STRIPE_API_PORT: String(apiPort),
         LOCAL_MAIL_TRANSPORT: 'smtp',
-        SMTP_HOST: '127.0.0.1',
-        SMTP_PORT: String(smtpPort),
-        SMTP_SECURE: 'false',
-        SMTP_USER: '',
-        SMTP_PASS: '',
-        SMTP_FROM: 'newsletter-smoke@example.com',
+        SMTP_PROVIDER: smtpProvider,
+        ...(smtpProvider === 'smtp2go'
+          ? {
+            SMTP2GO_HOST: '127.0.0.1',
+            SMTP2GO_PORT: String(smtpPort),
+            SMTP2GO_SECURE: 'false',
+            SMTP2GO_USER: 'newsletter-smoke-smtp2go-user',
+            SMTP2GO_PASS: 'newsletter-smoke-smtp2go-password',
+            SMTP2GO_FROM: 'newsletter-smoke@example.com'
+          }
+          : {
+            SMTP_HOST: '127.0.0.1',
+            SMTP_PORT: String(smtpPort),
+            SMTP_SECURE: 'false',
+            SMTP_USER: 'newsletter-smoke-gmail-user',
+            SMTP_PASS: 'newsletter-smoke-gmail-password',
+            SMTP_FROM: 'newsletter-smoke@example.com'
+          }),
         NEWSLETTER_UNSUBSCRIBE_SECRET: `${marker}-secret`,
         PUBLIC_SITE_URL: `http://127.0.0.1:${apiPort}`
       },
@@ -158,6 +172,7 @@ const run = async () => {
     });
     const relayBody = await relayResponse.json();
     assert.equal(relayResponse.status, 200, JSON.stringify(relayBody));
+    assert.equal(relayBody.provider, `smtp-${smtpProvider}`);
     assert.equal(relayBody.recipients, 0);
     assert.equal(relayBody.bccRecipients, 2);
     assert.equal(capturedMessages.length, 2);
@@ -181,6 +196,7 @@ const run = async () => {
 
     console.log(JSON.stringify({
       ok: true,
+      smtpProvider,
       messages: capturedMessages.length,
       recipientsPerMessage: capturedMessages.map((message) => message.recipients.length),
       distinctUnsubscribeLinks: new Set(unsubscribeUrls).size,
