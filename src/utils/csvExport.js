@@ -237,6 +237,108 @@ export const createDonationInvoicePdfBlob = async ({
   return doc.output('blob');
 };
 
+export const createBulkDonationStatementPdfBlob = async ({
+  organizationName,
+  address,
+  phone,
+  donor = {},
+  donations = [],
+  dateFrom = '',
+  dateTo = ''
+}) => {
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const logoDataUrl = await loadLogoDataUrl();
+  const formatStatementDate = (value) => {
+    const date = value ? new Date(value) : null;
+    return date && !Number.isNaN(date.getTime())
+      ? date.toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' })
+      : '-';
+  };
+  const totalAmount = donations.reduce((sum, donation) => sum + Number(donation?.amount || 0), 0);
+  const periodLabel = dateFrom || dateTo
+    ? `${dateFrom ? formatStatementDate(`${dateFrom}T00:00:00`) : 'Beginning'} to ${dateTo ? formatStatementDate(`${dateTo}T00:00:00`) : 'Present'}`
+    : 'All dates';
+
+  doc.setFillColor(...LOGO_BLUE_RGB);
+  doc.rect(0, 0, pageWidth, 112, 'F');
+  if (logoDataUrl) {
+    doc.addImage(logoDataUrl, 'WEBP', 34, 24, 62, 62);
+  }
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(15);
+  doc.text(organizationName || 'Singh Sabha Milton Gurdwara', 112, 40);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.text(address || '', 112, 59, { maxWidth: 330 });
+  doc.text(phone || '', 112, 84);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.text('Donation Statement', pageWidth - 34, 36, { align: 'right' });
+  doc.setFontSize(11);
+  doc.text(donor.name || 'Donor', pageWidth - 34, 56, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.text(donor.email || '-', pageWidth - 34, 72, { align: 'right' });
+  if (donor.phone) {
+    doc.text(donor.phone, pageWidth - 34, 88, { align: 'right' });
+  }
+
+  doc.setTextColor(15, 23, 42);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text(`Statement period: ${periodLabel}`, 40, 136);
+  doc.text(`Donations: ${donations.length}`, pageWidth / 2 - 40, 136);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Total: CAD $${totalAmount.toFixed(2)}`, pageWidth - 40, 136, { align: 'right' });
+
+  autoTable(doc, {
+    startY: 150,
+    head: [['Date', 'Receipt', 'Donor Name', 'Campaign', 'Amount', 'Provider', 'Status']],
+    body: donations.map((donation) => ([
+      formatStatementDate(donation?.createdAt),
+      donation?.receiptId || donation?.id || '-',
+      donation?.donorName || donor.name || '-',
+      donation?.campaignName || '-',
+      donation?.amount != null ? `CAD $${Number(donation.amount).toFixed(2)}` : '-',
+      donation?.paymentProvider || '-',
+      donation?.paymentStatus || '-'
+    ])),
+    styles: { fontSize: 9, cellPadding: 6, valign: 'top' },
+    headStyles: { fillColor: LOGO_BLUE_RGB, textColor: 255, fontStyle: 'bold' },
+    columnStyles: {
+      0: { cellWidth: 78 },
+      1: { cellWidth: 105 },
+      4: { cellWidth: 82, halign: 'right' }
+    },
+    theme: 'grid',
+    margin: { left: 40, right: 40 },
+    didDrawPage: (data) => {
+      doc.setTextColor(100, 116, 139);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.text(`Page ${data.pageNumber}`, pageWidth - 40, pageHeight - 22, { align: 'right' });
+    }
+  });
+
+  const finalY = doc.lastAutoTable?.finalY || 300;
+  doc.setTextColor(71, 85, 105);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text(
+    'This statement confirms the donation records received for the selected period. Please contact the Gurdwara office if any details need correction.',
+    40,
+    Math.min(finalY + 24, pageHeight - 34),
+    { maxWidth: pageWidth - 80 }
+  );
+
+  return doc.output('blob');
+};
+
 const toDisplayLabel = (value, fallback = '-') => {
   const normalized = String(value || '').trim();
   if (!normalized) {
@@ -483,6 +585,12 @@ export const downloadDonationInvoicePdf = async (payload) => {
   const blob = await createDonationInvoicePdfBlob(payload);
   const fileName = payload?.fileName || `invoice-${payload?.donation?.receiptId || payload?.donation?.id || 'donation'}.pdf`;
   triggerFileDownload(blob, fileName);
+};
+
+export const downloadBulkDonationStatementPdf = async (payload) => {
+  const blob = await createBulkDonationStatementPdfBlob(payload);
+  const donorName = String(payload?.donor?.name || 'donor').trim().replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase();
+  triggerFileDownload(blob, payload?.fileName || `donation-statement-${donorName || 'donor'}.pdf`);
 };
 
 export const downloadBookingReceiptPdf = async (payload) => {

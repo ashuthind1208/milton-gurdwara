@@ -30,7 +30,9 @@ import Button from '../../components/ui/Button';
 import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton';
 import StatusAlert from '../../components/common/StatusAlert';
 import {
+  createBulkDonationStatementPdfBlob,
   createDonationInvoicePdfBlob,
+  downloadBulkDonationStatementPdf,
   downloadCampaignDonationsCsv,
   downloadCampaignDonationsPdf,
   downloadDonationInvoicePdf
@@ -50,6 +52,7 @@ import { isTenDigitPhone, TEN_DIGIT_PHONE_ERROR } from '../../utils/phone';
 const DONATIONS_PAGE_SIZE = 6;
 const PROGRESS_ITEMS_PAGE_SIZE = 10;
 const CAMPAIGN_DONORS_PAGE_SIZE = 8;
+const STATEMENT_PREVIEW_PAGE_SIZE = 8;
 const DONATION_IDENTITY_SETTING_KEY = 'settings-donation-allow-custom-name-email';
 const campaignDefaults = {
   name: '',
@@ -85,6 +88,14 @@ const createCashDonationDefaults = () => ({
   receiptId: createCashReceiptId(),
   paidAt: new Date().toISOString().slice(0, 10)
 });
+
+const createDonorKey = (donation = {}) => {
+  const email = String(donation.donorEmail || '').trim().toLowerCase();
+  if (email) {
+    return `email:${email}`;
+  }
+  return `name:${String(donation.donorName || 'Unknown donor').trim().toLowerCase()}`;
+};
 
 const sortOptions = [
   { value: 'newest', label: 'Newest first' },
@@ -261,6 +272,13 @@ const AdminDonationsPage = () => {
   const [cashDonationSuccess, setCashDonationSuccess] = useState('');
   const [invoiceEmailStatus, setInvoiceEmailStatus] = useState({ type: 'success', message: '' });
   const [invoiceEmailSendingId, setInvoiceEmailSendingId] = useState('');
+  const [emailSuccessModal, setEmailSuccessModal] = useState(null);
+  const [bulkStatementOpen, setBulkStatementOpen] = useState(false);
+  const [bulkStatementDonorKey, setBulkStatementDonorKey] = useState('');
+  const [bulkStatementCampaign, setBulkStatementCampaign] = useState('all');
+  const [bulkStatementDateFrom, setBulkStatementDateFrom] = useState('');
+  const [bulkStatementDateTo, setBulkStatementDateTo] = useState('');
+  const [bulkStatementPage, setBulkStatementPage] = useState(1);
   const [openCampaignActionMenuId, setOpenCampaignActionMenuId] = useState('');
   const [openDonorActionMenuId, setOpenDonorActionMenuId] = useState('');
   const [donationPendingDelete, setDonationPendingDelete] = useState(null);
@@ -373,6 +391,55 @@ const AdminDonationsPage = () => {
     const start = (safePage - 1) * DONATIONS_PAGE_SIZE;
     return visibleDonations.slice(start, start + DONATIONS_PAGE_SIZE);
   }, [page, totalPages, visibleDonations]);
+  const statementDonors = useMemo(() => {
+    const donorMap = new Map();
+    donations.forEach((donation) => {
+      const key = createDonorKey(donation);
+      const existing = donorMap.get(key);
+      donorMap.set(key, {
+        key,
+        name: String(donation.donorName || existing?.name || 'Unknown donor').trim(),
+        email: String(donation.donorEmail || existing?.email || '').trim(),
+        phone: String(donation.phone || donation.donorPhone || existing?.phone || '').trim()
+      });
+    });
+    return Array.from(donorMap.values()).sort((left, right) => left.name.localeCompare(right.name));
+  }, [donations]);
+  const selectedStatementDonor = useMemo(
+    () => statementDonors.find((donor) => donor.key === bulkStatementDonorKey) || null,
+    [bulkStatementDonorKey, statementDonors]
+  );
+  const statementDonations = useMemo(() => donations
+    .filter((donation) => createDonorKey(donation) === bulkStatementDonorKey)
+    .filter((donation) => (
+      bulkStatementCampaign === 'all'
+      || String(donation.campaignId) === bulkStatementCampaign
+      || String(donation.campaignName) === bulkStatementCampaign
+    ))
+    .filter((donation) => {
+      const createdAt = new Date(donation.createdAt || 0).getTime();
+      if (!Number.isFinite(createdAt)) return false;
+      const fromTime = bulkStatementDateFrom ? new Date(`${bulkStatementDateFrom}T00:00:00`).getTime() : null;
+      const toTime = bulkStatementDateTo ? new Date(`${bulkStatementDateTo}T23:59:59.999`).getTime() : null;
+      return (!fromTime || createdAt >= fromTime) && (!toTime || createdAt <= toTime);
+    })
+    .sort((left, right) => new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime()), [
+      bulkStatementCampaign,
+      bulkStatementDateFrom,
+      bulkStatementDateTo,
+      bulkStatementDonorKey,
+      donations
+    ]);
+  const statementTotalPages = Math.max(1, Math.ceil(statementDonations.length / STATEMENT_PREVIEW_PAGE_SIZE));
+  const pagedStatementDonations = useMemo(() => {
+    const safePage = Math.min(bulkStatementPage, statementTotalPages);
+    const start = (safePage - 1) * STATEMENT_PREVIEW_PAGE_SIZE;
+    return statementDonations.slice(start, start + STATEMENT_PREVIEW_PAGE_SIZE);
+  }, [bulkStatementPage, statementDonations, statementTotalPages]);
+  const statementTotalAmount = useMemo(
+    () => statementDonations.reduce((sum, donation) => sum + Number(donation.amount || 0), 0),
+    [statementDonations]
+  );
   const progressManagerTotalPages = Math.max(1, Math.ceil(progressItemsDraft.length / PROGRESS_ITEMS_PAGE_SIZE));
   const pagedProgressItems = useMemo(() => {
     const safePage = Math.min(progressManagerPage, progressManagerTotalPages);
@@ -414,6 +481,16 @@ const AdminDonationsPage = () => {
       setCampaignDonorPage(campaignDonorTotalPages);
     }
   }, [campaignDonorPage, campaignDonorTotalPages]);
+
+  useEffect(() => {
+    setBulkStatementPage(1);
+  }, [bulkStatementCampaign, bulkStatementDateFrom, bulkStatementDateTo, bulkStatementDonorKey]);
+
+  useEffect(() => {
+    if (bulkStatementPage > statementTotalPages) {
+      setBulkStatementPage(statementTotalPages);
+    }
+  }, [bulkStatementPage, statementTotalPages]);
 
   const createMutation = useMutation({
     mutationFn: (values) => donationService.createCampaign(toCampaignPayload(values)),
@@ -787,12 +864,95 @@ const AdminDonationsPage = () => {
         type: 'success',
         message: `Invoice emailed to ${donorEmail}.`
       });
-      window.alert(`Invoice emailed successfully to ${donorEmail}.`);
+      setEmailSuccessModal({
+        title: 'Invoice sent',
+        message: `The donation invoice was emailed to ${donorEmail}.`
+      });
     } catch (error) {
       setInvoiceEmailStatus({
         type: 'error',
         message: error?.message || 'Unable to email invoice right now.'
       });
+    } finally {
+      setInvoiceEmailSendingId('');
+    }
+  };
+
+  const openBulkStatement = () => {
+    setBulkStatementDonorKey(statementDonors[0]?.key || '');
+    setBulkStatementCampaign('all');
+    setBulkStatementDateFrom('');
+    setBulkStatementDateTo('');
+    setBulkStatementPage(1);
+    setInvoiceEmailStatus({ type: 'success', message: '' });
+    setBulkStatementOpen(true);
+  };
+
+  const getBulkStatementPayload = () => {
+    const donorName = String(selectedStatementDonor?.name || 'donor');
+    const safeDonorName = donorName.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase();
+    return {
+      fileName: `donation-statement-${safeDonorName || 'donor'}.pdf`,
+      organizationName: siteConfig.name,
+      address: siteConfig.contact.address,
+      phone: siteConfig.contact.phone,
+      donor: selectedStatementDonor || {},
+      donations: statementDonations,
+      dateFrom: bulkStatementDateFrom,
+      dateTo: bulkStatementDateTo
+    };
+  };
+
+  const handleDownloadBulkStatement = async () => {
+    if (!selectedStatementDonor || statementDonations.length === 0) {
+      return;
+    }
+    await downloadBulkDonationStatementPdf(getBulkStatementPayload());
+  };
+
+  const handleEmailBulkStatement = async () => {
+    if (!selectedStatementDonor?.email || statementDonations.length === 0) {
+      return;
+    }
+
+    try {
+      setInvoiceEmailSendingId('bulk-statement');
+      setInvoiceEmailStatus({ type: 'success', message: '' });
+      const payload = getBulkStatementPayload();
+      const blob = await createBulkDonationStatementPdfBlob(payload);
+      const attachmentBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const content = String(reader.result || '').split(',')[1] || '';
+          content ? resolve(content) : reject(new Error('Unable to encode donation statement.'));
+        };
+        reader.onerror = () => reject(new Error('Unable to read donation statement.'));
+        reader.readAsDataURL(blob);
+      });
+
+      await donationService.emailBulkDonationStatement({
+        donor: selectedStatementDonor,
+        donationIds: statementDonations.map((donation) => String(donation.id || '')),
+        campaignName: bulkStatementCampaign === 'all'
+          ? 'All campaigns'
+          : (campaignMap[bulkStatementCampaign]?.name || statementDonations[0]?.campaignName || 'Selected campaign'),
+        dateFrom: bulkStatementDateFrom,
+        dateTo: bulkStatementDateTo,
+        organizationName: siteConfig.name,
+        address: siteConfig.contact.address,
+        phone: siteConfig.contact.phone,
+        fileName: payload.fileName,
+        attachmentBase64
+      });
+
+      setInvoiceEmailStatus({ type: 'success', message: `Donation statement emailed to ${selectedStatementDonor.email}.` });
+      setBulkStatementOpen(false);
+      setEmailSuccessModal({
+        title: 'Statement sent',
+        message: `The donation statement was emailed to ${selectedStatementDonor.email}.`
+      });
+    } catch (error) {
+      setInvoiceEmailStatus({ type: 'error', message: error?.message || 'Unable to email the donation statement.' });
     } finally {
       setInvoiceEmailSendingId('');
     }
@@ -865,7 +1025,26 @@ const AdminDonationsPage = () => {
               </div>
             </div>
             <p className="mt-3 text-sm font-bold text-slate-900">Please wait, sending email...</p>
-            <p className="mt-1 text-xs text-slate-600">Generating invoice and delivering it to the donor inbox.</p>
+            <p className="mt-1 text-xs text-slate-600">
+              {invoiceEmailSendingId === 'bulk-statement'
+                ? 'Generating the donation statement and delivering it to the donor inbox.'
+                : 'Generating invoice and delivering it to the donor inbox.'}
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {emailSuccessModal ? (
+        <div className="fixed inset-0 z-[125] flex items-center justify-center bg-slate-950/35 px-4" onClick={() => setEmailSuccessModal(null)}>
+          <div className="w-full max-w-sm rounded-lg border border-emerald-200 bg-white p-5 text-center shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="email-success-title" onClick={(event) => event.stopPropagation()}>
+            <span className="mx-auto inline-flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
+              <CheckCircleIcon className="h-7 w-7" />
+            </span>
+            <h2 id="email-success-title" className="mt-3 font-heading text-lg font-semibold text-slate-900">{emailSuccessModal.title}</h2>
+            <p className="mt-1 text-sm leading-6 text-slate-600">{emailSuccessModal.message}</p>
+            <button type="button" onClick={() => setEmailSuccessModal(null)} className="mt-4 w-full rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800">
+              Done
+            </button>
           </div>
         </div>
       ) : null}
@@ -1314,6 +1493,14 @@ const AdminDonationsPage = () => {
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-heading text-xl font-semibold">Donor List</h2>
+          <button
+            type="button"
+            onClick={openBulkStatement}
+            disabled={statementDonors.length === 0}
+            className="inline-flex items-center gap-2 rounded-lg border border-brand-blue/25 bg-blue-50 px-3 py-2 text-sm font-semibold text-brand-blue transition hover:border-brand-blue/40 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <DocumentArrowDownIcon className="h-4 w-4" /> Bulk Donation Record
+          </button>
         </div>
         <div className="mt-4 grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 lg:grid-cols-[1.4fr_1fr_1fr]">
           <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
@@ -1492,6 +1679,98 @@ const AdminDonationsPage = () => {
           </div>
         </div>
       </Card>
+
+      {bulkStatementOpen ? (
+        <div className="fixed inset-0 z-[105] overflow-y-auto bg-slate-900/60 px-4 py-6" onClick={() => setBulkStatementOpen(false)}>
+          <div className="mx-auto w-full max-w-6xl rounded-xl bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="bulk-statement-title" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+              <div>
+                <h3 id="bulk-statement-title" className="font-heading text-xl font-semibold text-slate-900">Bulk Donation Record</h3>
+                <p className="mt-1 text-sm text-slate-600">Select a donor and narrow the donations included in the statement.</p>
+              </div>
+              <button type="button" onClick={() => setBulkStatementOpen(false)} className="rounded-md border border-slate-300 p-1.5 text-slate-600 hover:bg-slate-100" aria-label="Close bulk donation record">
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="grid gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 md:grid-cols-2 xl:grid-cols-4">
+              <label className="text-sm font-semibold text-slate-700">Donor
+                <select value={bulkStatementDonorKey} onChange={(event) => setBulkStatementDonorKey(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 font-normal">
+                  {statementDonors.map((donor) => (
+                    <option key={donor.key} value={donor.key}>{donor.name}{donor.email ? ` (${donor.email})` : ''}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm font-semibold text-slate-700">Campaign
+                <select value={bulkStatementCampaign} onChange={(event) => setBulkStatementCampaign(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 font-normal">
+                  <option value="all">All campaigns</option>
+                  {campaigns.map((campaign) => <option key={campaign.id} value={String(campaign.id)}>{campaign.name}</option>)}
+                </select>
+              </label>
+              <label className="text-sm font-semibold text-slate-700">From date
+                <input type="date" value={bulkStatementDateFrom} onChange={(event) => setBulkStatementDateFrom(event.target.value)} max={bulkStatementDateTo || undefined} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 font-normal" />
+              </label>
+              <label className="text-sm font-semibold text-slate-700">To date
+                <input type="date" value={bulkStatementDateTo} onChange={(event) => setBulkStatementDateTo(event.target.value)} min={bulkStatementDateFrom || undefined} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 font-normal" />
+              </label>
+            </div>
+
+            <div className="px-5 py-4">
+              <StatusAlert type={invoiceEmailStatus.type} message={invoiceEmailStatus.message} />
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm">
+                <p className="font-semibold text-slate-800">{selectedStatementDonor?.name || 'No donor selected'} <span className="font-normal text-slate-500">{selectedStatementDonor?.email || 'No email available'}</span></p>
+                <p className="font-semibold text-slate-800">{statementDonations.length} donation{statementDonations.length === 1 ? '' : 's'} · {formatCurrency(statementTotalAmount)}</p>
+              </div>
+              <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="bg-slate-100 text-xs font-semibold uppercase text-slate-600">
+                    <tr>
+                      <th className="px-3 py-2">Date</th>
+                      <th className="px-3 py-2">Receipt</th>
+                      <th className="px-3 py-2">Name</th>
+                      <th className="px-3 py-2">Campaign</th>
+                      <th className="px-3 py-2 text-right">Amount</th>
+                      <th className="px-3 py-2">Provider</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pagedStatementDonations.map((donation) => (
+                      <tr key={donation.id} className="border-t border-slate-100">
+                        <td className="whitespace-nowrap px-3 py-2">{new Date(donation.createdAt).toLocaleDateString()}</td>
+                        <td className="px-3 py-2">{donation.receiptId || donation.id || '-'}</td>
+                        <td className="px-3 py-2 font-semibold text-slate-800">{donation.donorName || '-'}</td>
+                        <td className="px-3 py-2">{donation.campaignName || '-'}</td>
+                        <td className="whitespace-nowrap px-3 py-2 text-right font-semibold">{formatCurrency(donation.amount)}</td>
+                        <td className="px-3 py-2">{donation.paymentProvider || '-'}</td>
+                      </tr>
+                    ))}
+                    {pagedStatementDonations.length === 0 ? (
+                      <tr><td colSpan={6} className="px-3 py-8 text-center text-slate-500">No donations match the selected filters.</td></tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-3 text-sm text-slate-600">
+                <span>Page {Math.min(bulkStatementPage, statementTotalPages)} of {statementTotalPages}</span>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setBulkStatementPage((current) => Math.max(1, current - 1))} disabled={bulkStatementPage <= 1} className="rounded-lg border border-slate-300 px-3 py-1.5 font-semibold disabled:opacity-40">Prev</button>
+                  <button type="button" onClick={() => setBulkStatementPage((current) => Math.min(statementTotalPages, current + 1))} disabled={bulkStatementPage >= statementTotalPages} className="rounded-lg border border-slate-300 px-3 py-1.5 font-semibold disabled:opacity-40">Next</button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4">
+              <Button type="button" variant="ghost" onClick={() => setBulkStatementOpen(false)}>Close</Button>
+              <button type="button" onClick={() => void handleDownloadBulkStatement()} disabled={statementDonations.length === 0} className="inline-flex items-center gap-2 rounded-lg border border-brand-blue px-4 py-2 text-sm font-semibold text-brand-blue hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40">
+                <DocumentArrowDownIcon className="h-4 w-4" /> Download Invoice
+              </button>
+              <button type="button" onClick={() => void handleEmailBulkStatement()} disabled={!selectedStatementDonor?.email || statementDonations.length === 0} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-40" title={selectedStatementDonor?.email ? 'Email this donation statement' : 'The selected donor has no email address'}>
+                <EnvelopeIcon className="h-4 w-4" /> Send Email
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {donationPendingDelete && canDeleteDonations ? (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/60 px-4 py-6" onClick={() => {

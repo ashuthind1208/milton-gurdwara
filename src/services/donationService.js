@@ -668,6 +668,38 @@ const donationService = {
     return serviceResponse(response.data || { success: true });
   },
 
+  emailBulkDonationStatement: async ({
+    donor,
+    donationIds = [],
+    campaignName = '',
+    dateFrom = '',
+    dateTo = '',
+    organizationName = '',
+    address = '',
+    phone = '',
+    fileName = '',
+    attachmentBase64 = ''
+  }) => {
+    const response = await apiClient.post('/donations/email-statement', {
+      donor: {
+        name: String(donor?.name || '').trim(),
+        email: String(donor?.email || '').trim(),
+        phone: String(donor?.phone || '').trim()
+      },
+      donationIds: donationIds.map((id) => String(id || '').trim()).filter(Boolean),
+      campaignName: String(campaignName || ''),
+      dateFrom: String(dateFrom || ''),
+      dateTo: String(dateTo || ''),
+      organizationName: String(organizationName || ''),
+      address: String(address || ''),
+      phone: String(phone || ''),
+      fileName: String(fileName || ''),
+      attachmentBase64: String(attachmentBase64 || '')
+    });
+
+    return serviceResponse(response.data?.data || { success: true });
+  },
+
   resolveStripePaymentDetails,
 
   initiateDonation: async (payload) => {

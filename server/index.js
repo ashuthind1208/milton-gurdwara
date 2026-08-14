@@ -2953,6 +2953,171 @@ const sendDonationInvoiceEmail = async ({
   }
 };
 
+const buildBulkDonationStatementEmail = ({
+  donor = {},
+  donations = [],
+  campaignName = '',
+  dateFrom = '',
+  dateTo = '',
+  organizationName = '',
+  address = '',
+  phone = ''
+}) => {
+  const donorName = String(donor.name || 'Sangat Member').trim();
+  const donorEmail = String(donor.email || '').trim().toLowerCase();
+  const siteName = String(organizationName || volunteerReminderSiteName || 'Singh Sabha Milton Gurdwara').trim();
+  const totalAmount = donations.reduce((sum, donation) => sum + Number(donation?.amount || 0), 0);
+  const amountText = `$${totalAmount.toFixed(2)}`;
+  const periodText = dateFrom || dateTo
+    ? `${dateFrom || 'Beginning'} to ${dateTo || 'Present'}`
+    : 'All dates';
+  const normalizedCampaignName = String(campaignName || 'All campaigns').trim();
+  const subject = `Donation Statement - ${periodText}`;
+  const logoSrc = volunteerReminderLogoUrl || `${volunteerReminderBaseUrl}/gurdwara-logo.webp` || embeddedVolunteerReminderLogo;
+  const text = [
+    `Sat Sri Akal ${donorName},`,
+    '',
+    'Please find your consolidated donation statement attached.',
+    `Campaign: ${normalizedCampaignName}`,
+    `Statement period: ${periodText}`,
+    `Donations: ${donations.length}`,
+    `Total: ${amountText}`,
+    '',
+    'Thank you for your generous support and seva.',
+    String(address || '').trim() ? `Address: ${String(address).trim()}` : '',
+    String(phone || '').trim() ? `Phone: ${String(phone).trim()}` : '',
+    '',
+    siteName
+  ].filter(Boolean).join('\n');
+  const html = `
+  <div style="background:#f5f8fc;padding:28px 14px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:760px;margin:0 auto;background:#ffffff;border:1px solid #dbe7f6;border-radius:14px;overflow:hidden;">
+      <tr><td style="padding:16px 22px;background:#0a4d9f;color:#ffffff;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
+          ${logoSrc ? `<td style="padding-right:12px;"><img src="${escapeHtml(logoSrc)}" alt="${escapeHtml(siteName)} logo" width="44" height="44" style="display:block;border-radius:9999px;object-fit:cover;background:#ffffff;"/></td>` : ''}
+          <td><div style="font-size:13px;font-weight:700;">${escapeHtml(siteName)}</div><div style="font-size:20px;font-weight:800;margin-top:3px;">Donation Statement</div></td>
+        </tr></table>
+      </td></tr>
+      <tr><td style="padding:24px;">
+        <p style="margin:0;font-size:15px;line-height:1.7;color:#334155;">Sat Sri Akal ${escapeHtml(donorName)},</p>
+        <p style="font-size:15px;line-height:1.7;color:#334155;">Please find your consolidated donation statement attached. Thank you for your generous support and seva.</p>
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top:18px;border:1px solid #c7dcf7;border-radius:10px;overflow:hidden;">
+          <tr><td style="padding:10px 12px;background:#edf4ff;font-weight:700;color:#1e3a8a;">Campaign</td><td style="padding:10px 12px;">${escapeHtml(normalizedCampaignName)}</td></tr>
+          <tr><td style="padding:10px 12px;background:#edf4ff;font-weight:700;color:#1e3a8a;">Period</td><td style="padding:10px 12px;">${escapeHtml(periodText)}</td></tr>
+          <tr><td style="padding:10px 12px;background:#edf4ff;font-weight:700;color:#1e3a8a;">Donations</td><td style="padding:10px 12px;">${donations.length}</td></tr>
+          <tr><td style="padding:10px 12px;background:#edf4ff;font-weight:700;color:#1e3a8a;">Total</td><td style="padding:10px 12px;font-weight:700;">${escapeHtml(amountText)}</td></tr>
+        </table>
+        <p style="margin:20px 0 0;font-size:14px;color:#475569;">With gratitude,<br/><strong>${escapeHtml(siteName)}</strong></p>
+      </td></tr>
+    </table>
+  </div>`;
+
+  return { donorName, donorEmail, subject, text, html, amountText, periodText, campaignName: normalizedCampaignName };
+};
+
+const sendBulkDonationStatementEmail = async ({
+  donor = {},
+  donationIds = [],
+  campaignName = '',
+  dateFrom = '',
+  dateTo = '',
+  organizationName = '',
+  address = '',
+  phone = '',
+  fileName = '',
+  attachmentBase64 = ''
+} = {}) => {
+  if (!donationInvoiceWebhookUrl) {
+    const error = new Error('Donation email webhook is not configured.');
+    error.status = 503;
+    throw error;
+  }
+  if (!eventsDb.hasDatabaseConnection) {
+    const error = new Error('Database is not configured. Donation statement emails require database records.');
+    error.status = 503;
+    throw error;
+  }
+
+  const requestedIds = Array.from(new Set(donationIds.map((id) => String(id || '').trim()).filter(Boolean)));
+  const persistedDonations = await eventsDb.getDonations();
+  const donationMap = new Map((Array.isArray(persistedDonations) ? persistedDonations : []).map((entry) => [String(entry?.id || '').trim(), entry]));
+  const selectedDonations = requestedIds.map((id) => donationMap.get(id)).filter(Boolean);
+  if (selectedDonations.length !== requestedIds.length) {
+    const error = new Error('One or more donation records were not found in the database.');
+    error.status = 404;
+    throw error;
+  }
+
+  const donorEmail = String(donor.email || '').trim().toLowerCase();
+  if (!isValidEmailAddress(donorEmail)) {
+    const error = new Error('Valid donor email is required.');
+    error.status = 400;
+    throw error;
+  }
+  const containsAnotherDonor = selectedDonations.some((donation) => String(donation?.donorEmail || '').trim().toLowerCase() !== donorEmail);
+  if (containsAnotherDonor) {
+    const error = new Error('All selected donations must belong to the same donor email.');
+    error.status = 400;
+    throw error;
+  }
+
+  const normalizedAttachment = String(attachmentBase64 || '').trim();
+  const attachmentBuffer = Buffer.from(normalizedAttachment, 'base64');
+  if (!attachmentBuffer.length || String(attachmentBuffer.slice(0, 4)) !== '%PDF') {
+    const error = new Error('Invalid PDF attachment payload.');
+    error.status = 400;
+    throw error;
+  }
+
+  const template = buildBulkDonationStatementEmail({
+    donor,
+    donations: selectedDonations,
+    campaignName,
+    dateFrom,
+    dateTo,
+    organizationName,
+    address,
+    phone
+  });
+  const normalizedFileName = String(fileName || '').trim() || `donation-statement-${Date.now()}.pdf`;
+  const canonicalAttachmentBase64 = attachmentBuffer.toString('base64');
+  const response = await fetch(donationInvoiceWebhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      type: 'donation-statement',
+      to: template.donorEmail,
+      email: template.donorEmail,
+      name: template.donorName,
+      subject: template.subject,
+      message: template.text,
+      text: template.text,
+      html: template.html,
+      bodyHtml: template.html,
+      bodyText: template.text,
+      templateType: 'html',
+      attachments: [{ filename: normalizedFileName, contentType: 'application/pdf', content: canonicalAttachmentBase64, encoding: 'base64', disposition: 'attachment' }],
+      invoicePdfFileName: normalizedFileName,
+      invoicePdfDataUrl: `data:application/pdf;base64,${canonicalAttachmentBase64}`,
+      metadata: {
+        campaignName: template.campaignName,
+        donationCount: selectedDonations.length,
+        amount: template.amountText,
+        statementPeriod: template.periodText,
+        organizationName: String(organizationName || volunteerReminderSiteName || '').trim()
+      },
+      sentAt: new Date().toISOString()
+    })
+  });
+
+  if (!response.ok) {
+    const error = new Error(`Donation statement email service returned ${response.status}.`);
+    error.status = 502;
+    throw error;
+  }
+  return { sent: true, to: template.donorEmail, subject: template.subject, fileName: normalizedFileName };
+};
+
 const shouldRunEventReminderSweep = (date = new Date()) => {
   const nowParts = getDatePartsInTimeZone(date, eventReminderTimeZone);
   const todayDateKey = toDateKeyFromParts(nowParts);
@@ -6455,6 +6620,41 @@ const server = http.createServer(async (request, response) => {
           ? 'This receipt number already exists. Enter a unique Gurdwara receipt number.'
           : (error.message || 'Unable to upsert donation.')
       });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/donations/email-statement' && request.method === 'POST') {
+    if (!canManageDonations(request)) {
+      sendJson(response, 403, { ok: false, message: 'Only Admin and Super Admin can email donation statements.' });
+      return;
+    }
+    try {
+      const body = await parseJsonObjectBody(request, { maxBytes: maxUploadBytes * 2, allowEmpty: false });
+      ensureNoUnknownKeys(body, ['donor', 'donationIds', 'campaignName', 'dateFrom', 'dateTo', 'organizationName', 'address', 'phone', 'fileName', 'attachmentBase64']);
+      const donor = readObjectField(body, 'donor', { required: true });
+      ensureNoUnknownKeys(donor, ['name', 'email', 'phone']);
+      readStringField(donor, 'name', { required: true, max: 180 });
+      readEmailField(donor, 'email', { required: true });
+      readPhoneField(donor, 'phone');
+      const donationIds = readArrayField(body, 'donationIds', { required: true, max: 500 });
+      assertInput(donationIds.length > 0, 'donationIds must contain at least one donation.');
+      donationIds.forEach((id) => assertInput(typeof id === 'string' && simpleIdPattern.test(id), 'Each donation id must be valid.'));
+      readStringField(body, 'campaignName', { max: 180 });
+      const dateFrom = readStringField(body, 'dateFrom', { max: 10 });
+      const dateTo = readStringField(body, 'dateTo', { max: 10 });
+      if (dateFrom) assertInput(/^\d{4}-\d{2}-\d{2}$/.test(dateFrom), 'dateFrom must use YYYY-MM-DD format.');
+      if (dateTo) assertInput(/^\d{4}-\d{2}-\d{2}$/.test(dateTo), 'dateTo must use YYYY-MM-DD format.');
+      if (dateFrom && dateTo) assertInput(dateFrom <= dateTo, 'dateFrom must be on or before dateTo.');
+      readStringField(body, 'organizationName', { max: 180 });
+      readStringField(body, 'address', { max: 300 });
+      readPhoneField(body, 'phone');
+      readStringField(body, 'fileName', { max: 180, pattern: /^[A-Za-z0-9._-]+$/ });
+      readStringField(body, 'attachmentBase64', { required: true, max: maxUploadBytes * 3 });
+      const data = await sendBulkDonationStatementEmail(body);
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to send donation statement email.' });
     }
     return;
   }
