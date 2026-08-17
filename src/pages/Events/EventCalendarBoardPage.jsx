@@ -207,6 +207,11 @@ const EventCalendarBoardPage = () => {
     const itemDate = new Date(item.dateTime || item.date || 0);
     return !Number.isNaN(itemDate.getTime()) && isSameMonth(itemDate, monthStart);
   }), [monthStart, visibleCalendarItems]);
+  const scheduleCarouselItems = useMemo(() => {
+    if (!monthScheduleItems.length) return [];
+    const repeats = Math.max(1, Math.ceil(5 / monthScheduleItems.length));
+    return Array.from({ length: repeats }, () => monthScheduleItems).flat();
+  }, [monthScheduleItems]);
 
   useEffect(() => {
     if (previousRegistrationTotalRef.current === null) {
@@ -415,14 +420,14 @@ const EventCalendarBoardPage = () => {
                 </div>
                 <div className="min-h-0 flex-1 overflow-hidden">
                   {monthScheduleItems.length ? (
-                    <div className={monthScheduleItems.length > 4 ? 'event-board-schedule-track' : ''}>
-                      {(monthScheduleItems.length > 4 ? [0, 1] : [0]).map((groupIndex) => (
+                    <div className="event-board-schedule-track">
+                      {[0, 1].map((groupIndex) => (
                         <div key={`schedule-group-${groupIndex}`} className="space-y-3 pb-3" aria-hidden={groupIndex === 1}>
-                          {monthScheduleItems.map((item) => {
+                          {scheduleCarouselItems.map((item, itemIndex) => {
                             const itemDate = new Date(item.dateTime || item.date);
                             const hasPassed = itemDate.getTime() < now.getTime();
                             return (
-                              <div key={`${item.itemType}-${item.id}-${groupIndex}`} className={`min-h-[104px] overflow-hidden rounded-md border bg-slate-950/45 px-3 py-3 ${item.itemType === 'booking' ? 'border-rose-300/45' : 'border-cyan-300/35'} ${hasPassed ? 'opacity-65' : ''}`}>
+                              <div key={`${item.itemType}-${item.id}-${groupIndex}-${itemIndex}`} className={`min-h-[104px] overflow-hidden rounded-md border bg-slate-950/45 px-3 py-3 ${item.itemType === 'booking' ? 'border-rose-300/45' : 'border-cyan-300/35'} ${hasPassed ? 'opacity-65' : ''}`}>
                                 <div className="flex min-w-0 items-start justify-between gap-2">
                                   <p className="line-clamp-2 text-sm font-bold leading-snug text-white xl:text-base">{item.title}</p>
                                   <span className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${item.itemType === 'booking' ? 'bg-rose-300/20 text-rose-100' : 'bg-cyan-300/20 text-cyan-100'}`}>{item.itemType}</span>
