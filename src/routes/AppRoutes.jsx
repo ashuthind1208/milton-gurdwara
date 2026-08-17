@@ -17,6 +17,7 @@ const FamilyDashboardPage = lazy(() => import('../pages/Family/FamilyDashboardPa
 const DonationPage = lazy(() => import('../pages/Donation/DonationPage'));
 const KidsLearningPage = lazy(() => import('../pages/KidsLearning/KidsLearningPage'));
 const DonationDisplayBoardPage = lazy(() => import('../pages/Donation/DonationDisplayBoardPage'));
+const EventCalendarBoardPage = lazy(() => import('../pages/Events/EventCalendarBoardPage'));
 const DonationSuccessPage = lazy(() => import('../pages/Donation/DonationSuccessPage'));
 const GalleryPage = lazy(() => import('../pages/Gallery/GalleryPage'));
 const MediaPage = lazy(() => import('../pages/Media/MediaPage'));
@@ -84,6 +85,7 @@ const AppRoutes = () => {
         <Route path="/donationsuccess" element={<DonationSuccessPage />} />
 
         <Route path="/donation-board" element={<DonationDisplayBoardPage />} />
+        <Route path="/event-calendar-board" element={<EventCalendarBoardPage />} />
 
         <Route element={<ProtectedRoute allowedRoles={LIMITED_ADMIN_ROLES} />}>
           <Route element={<AdminLayout />}>

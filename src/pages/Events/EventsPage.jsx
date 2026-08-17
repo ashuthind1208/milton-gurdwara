@@ -362,7 +362,7 @@ const EventsPage = () => {
   }, [events, location.search]);
 
   return (
-    <div className="space-y-8">
+    <div className="min-w-0 max-w-full space-y-8 overflow-x-hidden">
       <Seo {...meta} />
       <PageHero title={content?.heroTitle ?? 'Events and Registrations'} description={content?.heroDescription ?? 'Switch between calendar and list views, filter by category, and RSVP online.'} />
       {isAuthenticated && profilePhoneMissing ? <PhoneNumberRequiredNotice activityLabel="event registrations" /> : null}
@@ -390,8 +390,8 @@ const EventsPage = () => {
         </section>
       ) : null}
       {content?.intro ? <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-700" dangerouslySetInnerHTML={{ __html: content.intro }} /> : null}
-      <div className="grid gap-6 lg:grid-cols-[320px_1fr] xl:grid-cols-[340px_1fr]">
-        <div className="space-y-4 rounded-2xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 p-4 lg:sticky lg:top-24 lg:self-start">
+      <div className="grid min-w-0 gap-6 lg:grid-cols-[320px_minmax(0,1fr)] xl:grid-cols-[340px_minmax(0,1fr)]">
+        <div className="min-w-0 space-y-4 rounded-2xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 p-3 sm:p-4 lg:sticky lg:top-24 lg:self-start">
           <label className="block text-sm font-medium">
             Filter by category
             <select className="mt-2 w-full rounded-lg border border-slate-300 p-2.5 dark:border-slate-700 dark:bg-slate-800" value={category} onChange={(e) => setCategory(e.target.value)}>
@@ -409,7 +409,7 @@ const EventsPage = () => {
           </div>
 
           <ReactCalendar
-            className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm"
+            className="events-mobile-calendar max-w-full rounded-xl border border-slate-200 bg-white p-2 shadow-sm"
             onChange={setSelectedDate}
             value={selectedDate}
             tileContent={({ date, view }) => {
@@ -477,7 +477,7 @@ const EventsPage = () => {
             )}
           </div>
         </div>
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <div className="events-calendar-shell hidden h-[740px] overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-b from-white to-blue-50/35 p-3 shadow-[0_18px_46px_-28px_rgba(30,64,175,0.38)] md:block">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Calendar View</p>
@@ -563,7 +563,7 @@ const EventsPage = () => {
 
             <div className="mt-3 border-b border-slate-200" />
 
-            <div className="mt-3 flex flex-wrap items-center gap-2 pt-2 text-sm text-slate-700">
+            <div className="mt-3 grid min-w-0 gap-2 pt-2 text-sm text-slate-700 sm:flex sm:flex-wrap sm:items-center">
               <span className="inline-flex items-center gap-1 rounded-full border border-brand-blue/25 bg-brand-blue px-3 py-1 text-xs font-extrabold tracking-wide text-white shadow-sm">
                 {selectedEvent.category || 'Event'}
               </span>
@@ -572,7 +572,7 @@ const EventsPage = () => {
                 onClick={() => {
                   void downloadEventCalendarFile(selectedEvent.id);
                 }}
-                className="ml-auto inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-extrabold tracking-wide text-emerald-900 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-100"
+                className="inline-flex w-full min-w-0 items-center justify-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-extrabold tracking-wide text-emerald-900 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-100 sm:ml-auto sm:w-auto sm:rounded-full sm:py-1"
               >
                 <CalendarDaysIcon className="h-3.5 w-3.5" />
                 <span className="uppercase">Add To Calendar</span>

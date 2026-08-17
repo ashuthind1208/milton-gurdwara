@@ -6,6 +6,7 @@ import {
   EllipsisVerticalIcon,
   EyeIcon,
   PencilSquareIcon,
+  PresentationChartBarIcon,
   TrashIcon
 } from '@heroicons/react/24/outline';
 import Card from '../../components/ui/Card';
@@ -561,16 +562,27 @@ const AdminEventsPage = () => {
             <p className="text-sm font-semibold text-slate-900">Website Identity Override</p>
             <p className="text-xs text-slate-600">Allow visitors to edit Name and Email on Events registration form.</p>
           </div>
-          <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
-            <span>{eventsIdentitySettings?.enabled ? 'Enabled' : 'Disabled'}</span>
-            <input
-              type="checkbox"
-              checked={Boolean(eventsIdentitySettings?.enabled)}
-              onChange={(event) => updateEventsIdentitySettingMutation.mutate(event.target.checked)}
-              disabled={updateEventsIdentitySettingMutation.isPending}
-              className="h-4 w-4"
-            />
-          </label>
+          <div className="flex flex-wrap items-center gap-3">
+            <a
+              href="/event-calendar-board"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg border border-brand-blue px-3 py-2 text-sm font-semibold text-brand-blue transition hover:bg-brand-blue hover:text-white"
+            >
+              <PresentationChartBarIcon className="h-4 w-4" />
+              Go To Event Calendar Board
+            </a>
+            <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
+              <span>{eventsIdentitySettings?.enabled ? 'Enabled' : 'Disabled'}</span>
+              <input
+                type="checkbox"
+                checked={Boolean(eventsIdentitySettings?.enabled)}
+                onChange={(event) => updateEventsIdentitySettingMutation.mutate(event.target.checked)}
+                disabled={updateEventsIdentitySettingMutation.isPending}
+                className="h-4 w-4"
+              />
+            </label>
+          </div>
         </div>
       </Card>
 
