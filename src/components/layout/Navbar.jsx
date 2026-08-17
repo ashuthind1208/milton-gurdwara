@@ -232,6 +232,8 @@ const toIsoDateKeyFromDate = (date) => {
 
 const resolveObservanceTypeKey = (type = '') => {
   const token = String(type || '').toLowerCase();
+  if (token.includes('community event')) return 'community-event';
+  if (token.includes('confirmed booking')) return 'confirmed-booking';
   if (token.includes('puranmashi') || token.includes('pooranmashi') || token.includes('pooranmasi')) return 'puranmashi';
   if (token.includes('masya') || token.includes('massia') || token.includes('maseya') || token.includes('masseya')) return 'massia';
   if (token.includes('gurpurab')) return 'gurpurab';
@@ -248,6 +250,20 @@ const resolveObservanceTypeKey = (type = '') => {
 const getObservanceTypeStyles = (type = '') => {
   const key = resolveObservanceTypeKey(type);
   const palette = {
+    'community-event': {
+      cell: 'ring-1 ring-cyan-300/70 bg-cyan-100 text-cyan-900',
+      badge: 'bg-cyan-100 text-cyan-900 ring-1 ring-cyan-300/70',
+      title: 'text-cyan-900',
+      dot: 'bg-cyan-500',
+      gradient: '#22d3ee'
+    },
+    'confirmed-booking': {
+      cell: 'ring-1 ring-pink-300/70 bg-pink-100 text-pink-900',
+      badge: 'bg-pink-100 text-pink-900 ring-1 ring-pink-300/70',
+      title: 'text-pink-900',
+      dot: 'bg-pink-500',
+      gradient: '#f472b6'
+    },
     puranmashi: {
       cell: 'ring-1 ring-yellow-300/70 bg-yellow-100 text-yellow-900',
       badge: 'bg-yellow-100 text-yellow-900 ring-1 ring-yellow-300/70',
@@ -497,9 +513,89 @@ const Navbar = () => {
     staleTime: 12 * 60 * 60 * 1000,
     placeholderData: (previousData) => previousData
   });
+  const { data: publicCalendarEvents = [] } = useQuery({
+    queryKey: ['navbar-public-calendar-events'],
+    queryFn: () => eventService.getEvents().then((res) => res.data),
+    staleTime: 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+    placeholderData: (previousData) => previousData
+  });
+  const { data: publicCalendarBookings = [] } = useQuery({
+    queryKey: ['navbar-public-calendar-bookings'],
+    queryFn: () => bookingService.getBookings().then((res) => res.data),
+    staleTime: 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+    placeholderData: (previousData) => previousData
+  });
+  const combinedNanakshahiObservances = useMemo(() => {
+    const todayKey = toDateKey(new Date());
+    const formatTime = (value) => {
+      const parsed = new Date(value || 0);
+      if (Number.isNaN(parsed.getTime())) return 'Time to be announced';
+      return parsed.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
+    };
+    const formatBookingTime = (value) => {
+      const token = String(value || '').trim();
+      if (!token) return 'Time to be announced';
+      const parsed = new Date(`2000-01-01T${token}`);
+      return Number.isNaN(parsed.getTime())
+        ? token
+        : parsed.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
+    };
+
+    const eventObservances = (Array.isArray(publicCalendarEvents) ? publicCalendarEvents : [])
+      .filter((event) => event?.active !== false && isEventCurrent(event) && toDateKey(event?.date) >= todayKey)
+      .map((event) => {
+        const date = toDateKey(event.date);
+        const time = formatTime(event.date);
+        const locationLabel = String(event.location || 'Gurdwara Singh Sabha Milton').trim();
+        return {
+          id: `community-event-${event.id}`,
+          date,
+          gregorianDate: date,
+          title: String(event.title || 'Community Event').trim(),
+          titlePa: String(event.titlePa || '').trim(),
+          type: 'Community Event',
+          eventType: 'Community Event',
+          occasion: 'Gurdwara Event',
+          eventEn: 'Gurdwara Event',
+          eventPa: 'ਗੁਰਦੁਆਰਾ ਸਮਾਗਮ',
+          blurb: `${time} · ${locationLabel}`,
+          blurbPa: `ਸਮਾਂ: ${time} · ਸਥਾਨ: ${locationLabel}`,
+          significanceEn: String(event.description || '').trim(),
+          significancePa: String(event.descriptionPa || '').trim()
+        };
+      });
+
+    const bookingObservances = (Array.isArray(publicCalendarBookings) ? publicCalendarBookings : [])
+      .filter((booking) => booking?.status === 'confirmed' && String(booking?.date || '') >= todayKey)
+      .map((booking) => {
+        const title = String(booking.title || booking.categoryName || 'Gurdwara Booking').trim();
+        const time = formatBookingTime(booking.startTime);
+        const locationLabel = String(booking.bookingLocation || 'Gurdwara Singh Sabha Milton').trim();
+        return {
+          id: `confirmed-booking-${booking.id}`,
+          date: String(booking.date),
+          gregorianDate: String(booking.date),
+          title,
+          titlePa: String(booking.titlePa || '').trim(),
+          type: 'Confirmed Booking',
+          eventType: 'Confirmed Booking',
+          occasion: 'Confirmed Booking',
+          eventEn: 'Confirmed Booking',
+          eventPa: 'ਪੱਕੀ ਬੁਕਿੰਗ',
+          blurb: `${time} · ${locationLabel}`,
+          blurbPa: `ਸਮਾਂ: ${time} · ਸਥਾਨ: ${locationLabel}`,
+          significanceEn: 'Confirmed Gurdwara booking.',
+          significancePa: 'ਗੁਰਦੁਆਰਾ ਸਾਹਿਬ ਦੀ ਪੱਕੀ ਬੁਕਿੰਗ।'
+        };
+      });
+
+    return [...nanakshahiObservances, ...eventObservances, ...bookingObservances];
+  }, [nanakshahiObservances, publicCalendarBookings, publicCalendarEvents]);
   const nanakshahiMonthCalendar = useMemo(
-    () => getNanakshahiMonthCalendar(calendarViewDate, nanakshahiObservances),
-    [calendarViewDate, nanakshahiObservances]
+    () => getNanakshahiMonthCalendar(calendarViewDate, combinedNanakshahiObservances),
+    [calendarViewDate, combinedNanakshahiObservances]
   );
   const location = useLocation();
   const isHomePage = location.pathname === '/';
@@ -575,8 +671,8 @@ const Navbar = () => {
   }, []);
   const todayGregorianKey = todayIso;
   const upcomingObservances = useMemo(
-    () => getUpcomingPunjabiObservances(20, new Date(), nanakshahiObservances),
-    [nanakshahiObservances]
+    () => getUpcomingPunjabiObservances(20, new Date(), combinedNanakshahiObservances),
+    [combinedNanakshahiObservances]
   );
   const pdfBannerImageUrls = useMemo(() => {
     const sponsorBanners = (Array.isArray(sponsors) ? sponsors : [])
@@ -721,26 +817,28 @@ const Navbar = () => {
                 </span>
               ) : null}
               {cell.hasObservance ? (
-                <span className={`pointer-events-none invisible absolute left-1/2 top-[calc(100%+8px)] z-[1200] hidden w-64 -translate-x-1/2 rounded-2xl border border-brand-blue/30 bg-gradient-to-br from-amber-50 via-white to-blue-50 p-3 text-left opacity-0 shadow-[0_16px_38px_rgba(15,23,42,0.2)] transition duration-150 group-hover/date:visible group-hover/date:opacity-100 xl:block ${hasScrollableObservances ? 'max-h-72 overflow-y-auto pr-2' : ''}`}>
-                  {cell.observances.map((event, eventIndex) => {
-                    const tone = getObservanceTypeStyles(event.type);
-                    return (
-                    <span
-                      key={`${event.type}-${event.titlePa}-${eventIndex}`}
-                      className={`block ${eventIndex > 0 ? 'mt-3 border-t border-brand-blue/15 pt-3' : ''}`}
-                    >
-                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${tone.badge}`}>
-                        <CalendarDaysIcon className="h-3 w-3 flex-shrink-0" />
-                        {event.occasion}
+                <span className="pointer-events-auto invisible absolute left-1/2 top-full z-[1200] hidden w-64 -translate-x-1/2 pt-2 text-left opacity-0 transition duration-150 group-hover/date:visible group-hover/date:opacity-100 xl:block">
+                  <span className={`block rounded-2xl border border-brand-blue/30 bg-gradient-to-br from-amber-50 via-white to-blue-50 p-3 shadow-[0_16px_38px_rgba(15,23,42,0.2)] ${hasScrollableObservances ? 'max-h-72 overflow-y-auto overscroll-contain pr-2' : ''}`}>
+                    {cell.observances.map((event, eventIndex) => {
+                      const tone = getObservanceTypeStyles(event.type);
+                      return (
+                      <span
+                        key={`${event.type}-${event.titlePa}-${eventIndex}`}
+                        className={`block ${eventIndex > 0 ? 'mt-3 border-t border-brand-blue/15 pt-3' : ''}`}
+                      >
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${tone.badge}`}>
+                          <CalendarDaysIcon className="h-3 w-3 flex-shrink-0" />
+                          {event.occasion}
+                        </span>
+                        <span className={`mt-1 block text-[11px] font-bold ${tone.title}`}>{event.titlePa}</span>
+                        <span className="block text-[10px] font-semibold text-slate-700">{event.title}</span>
+                        <span className="mt-0.5 block text-[10px] font-bold tracking-wide text-slate-700">{englishDateLabel}</span>
+                        <span className="mt-1 block text-[10px] leading-snug text-slate-600">{event.blurbPa}</span>
+                        <span className="mt-0.5 block text-[10px] leading-snug text-slate-600">{event.blurb}</span>
                       </span>
-                      <span className={`mt-1 block text-[11px] font-bold ${tone.title}`}>{event.titlePa}</span>
-                      <span className="block text-[10px] font-semibold text-slate-700">{event.title}</span>
-                      <span className="mt-0.5 block text-[10px] font-bold tracking-wide text-slate-700">{englishDateLabel}</span>
-                      <span className="mt-1 block text-[10px] leading-snug text-slate-600">{event.blurbPa}</span>
-                      <span className="mt-0.5 block text-[10px] leading-snug text-slate-600">{event.blurb}</span>
-                    </span>
-                    );
-                  })}
+                      );
+                    })}
+                  </span>
                 </span>
               ) : null}
             </button>
@@ -1843,11 +1941,11 @@ const Navbar = () => {
   };
 
   const getNanakshahiYearMonths = () => {
-    let firstMonth = getNanakshahiMonthCalendar(nanakshahiMonthCalendar.monthStartGregorian, nanakshahiObservances);
+    let firstMonth = getNanakshahiMonthCalendar(nanakshahiMonthCalendar.monthStartGregorian, combinedNanakshahiObservances);
     let rewindGuard = 0;
 
     while (firstMonth.month !== 'Chet' && rewindGuard < 14) {
-      firstMonth = getNanakshahiMonthCalendar(new Date(firstMonth.monthStartGregorian.getTime() - CALENDAR_NAV_DAY_MS), nanakshahiObservances);
+      firstMonth = getNanakshahiMonthCalendar(new Date(firstMonth.monthStartGregorian.getTime() - CALENDAR_NAV_DAY_MS), combinedNanakshahiObservances);
       rewindGuard += 1;
     }
 
@@ -1856,7 +1954,7 @@ const Navbar = () => {
 
     for (let index = 0; index < 12; index += 1) {
       yearMonths.push(cursor);
-      cursor = getNanakshahiMonthCalendar(new Date(cursor.nextMonthStartGregorian.getTime()), nanakshahiObservances);
+      cursor = getNanakshahiMonthCalendar(new Date(cursor.nextMonthStartGregorian.getTime()), combinedNanakshahiObservances);
     }
 
     return yearMonths;
