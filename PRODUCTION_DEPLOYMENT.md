@@ -192,16 +192,18 @@ If storage is ephemeral, sponsor/advertisement banners may disappear after deplo
    - `npm ci`
 2. Build frontend:
    - `npm run build`
-3. Run the backend with production runtime variables:
-  - `node server/index.js`
+3. Run the frontend and backend together on one port:
+  - `npm run start:production`
+  - Uses the host's `PORT` or `SERVER_PORT`; defaults to port `3000`.
   - Do not use `npm start`; it also starts the frontend development server.
+  - Do not use `serve -s build`; it serves static files only and cannot handle `/api/*` requests.
 
 ### Deploy
 
-1. Deploy backend API server with env vars.
-2. Deploy frontend static build.
-3. Ensure frontend can reach backend APIs (`/api/*` routing or reverse proxy).
-4. Configure SPA fallback to `index.html` for client-side routing.
+1. For a single Node host, deploy the repository with `build/`, install production dependencies, set runtime env vars, and use `npm run start:production` as the start command.
+2. The Node server serves both the built frontend and same-origin `/api/*` routes.
+3. For separate frontend/backend hosts, deploy `build/` statically and configure the frontend host's reverse proxy to forward `/api/*` to the backend.
+4. Never deploy only `build/` when using same-origin `/api/*`; static files cannot execute the backend.
 
 ## 9) Reverse Proxy / Routing
 

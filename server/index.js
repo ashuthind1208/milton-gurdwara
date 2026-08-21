@@ -108,6 +108,7 @@ const zeffyCampaignId = Number(process.env.ZEFFY_CAMPAIGN_ID || 0);
 const zeffyCampaignName = String(process.env.ZEFFY_CAMPAIGN_NAME || 'Help Us Build Our Gurdwara').trim();
 const youtubeApiKey = String(process.env.YOUTUBE_API_KEY || '').trim();
 const dataDir = path.resolve(__dirname, 'data');
+const buildDir = path.resolve(workspaceRoot, 'build');
 const usersPath = path.join(dataDir, 'users.json');
 const volunteerReminderLogPath = path.join(dataDir, 'volunteer-reminder-log.json');
 const eventReminderLogPath = path.join(dataDir, 'event-reminder-log.json');
@@ -3632,6 +3633,13 @@ const getVolunteerRecognitionData = async () => {
 };
 
 const mimeByExtension = {
+  '.html': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.xml': 'application/xml; charset=utf-8',
+  '.webmanifest': 'application/manifest+json',
+  '.ico': 'image/x-icon',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
@@ -3665,6 +3673,58 @@ const sanitizeFileName = (value) => {
 const getMimeTypeFromName = (fileName) => {
   const extension = path.extname(String(fileName || '')).toLowerCase();
   return mimeByExtension[extension] || 'application/octet-stream';
+};
+
+const serveProductionBuild = (request, response, pathname) => {
+  if (!['GET', 'HEAD'].includes(request.method) || !fs.existsSync(buildDir)) {
+    return false;
+  }
+
+  let decodedPath;
+  try {
+    decodedPath = decodeURIComponent(pathname);
+  } catch {
+    return false;
+  }
+
+  const requestedPath = decodedPath === '/' ? '/index.html' : decodedPath;
+  const relativePath = requestedPath.replace(/^\/+/, '');
+  const candidatePath = path.resolve(buildDir, relativePath);
+  const normalizedBuildRoot = `${buildDir}${path.sep}`;
+  const isInsideBuild = candidatePath === buildDir || candidatePath.startsWith(normalizedBuildRoot);
+  const candidateIsFile = isInsideBuild && fs.existsSync(candidatePath) && fs.statSync(candidatePath).isFile();
+  const hasFileExtension = Boolean(path.extname(relativePath));
+  const filePath = candidateIsFile
+    ? candidatePath
+    : (!hasFileExtension ? path.join(buildDir, 'index.html') : '');
+
+  if (!filePath || !fs.existsSync(filePath)) {
+    return false;
+  }
+
+  const stat = fs.statSync(filePath);
+  const isHashedAsset = /[.-][a-f0-9]{8,}\.(?:css|js|map)$/i.test(path.basename(filePath));
+  response.writeHead(200, {
+    'Content-Type': getMimeTypeFromName(filePath),
+    'Content-Length': stat.size,
+    'Cache-Control': isHashedAsset ? 'public, max-age=31536000, immutable' : 'no-cache'
+  });
+  if (request.method === 'HEAD') {
+    response.end();
+    return true;
+  }
+
+  const fileStream = fs.createReadStream(filePath);
+  fileStream.on('error', (error) => {
+    logServerError(error, 'production-static-file');
+    if (!response.headersSent) {
+      sendJson(response, 500, { ok: false, message: 'Unable to serve the requested file.' });
+    } else {
+      response.destroy(error);
+    }
+  });
+  fileStream.pipe(response);
+  return true;
 };
 
 const getExtensionFromMime = (mimeType) => {
@@ -7256,6 +7316,11 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  const isApiPath = requestUrl.pathname === '/api' || requestUrl.pathname.startsWith('/api/');
+  if (!isApiPath && serveProductionBuild(request, response, requestUrl.pathname)) {
+    return;
+  }
+
   sendJson(response, 404, { ok: false, message: 'Not found' });
 });
 
@@ -7272,7 +7337,10 @@ const bootstrap = async () => {
   }
 
   server.listen(port, () => {
-    console.log(`Stripe API helper listening on http://127.0.0.1:${port}`);
+    console.log(`Singh Sabha Milton server listening on http://127.0.0.1:${port}`);
+    if (fs.existsSync(path.join(buildDir, 'index.html'))) {
+      console.log(`Serving production frontend from ${buildDir}`);
+    }
   });
 
   const configuredTime = `${String(volunteerReminderSendTime.hour).padStart(2, '0')}:${String(volunteerReminderSendTime.minute).padStart(2, '0')}`;

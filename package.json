@@ -37,6 +37,7 @@
   },
   "scripts": {
     "start": "node scripts/start.js",
+    "start:production": "node scripts/start-production.js",
     "build": "node scripts/build-production.js",
     "test": "react-scripts test",
     "db:migrate:mysql": "node scripts/migrate-postgres-to-mysql.js",
