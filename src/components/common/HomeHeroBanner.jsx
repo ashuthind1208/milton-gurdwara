@@ -22,12 +22,24 @@ const fallbackContent = {
   ]
 };
 
+const findNextAvailableSlide = (currentIndex, slideCount, failedIndexes) => {
+  for (let offset = 1; offset <= slideCount; offset += 1) {
+    const candidateIndex = (currentIndex + offset) % slideCount;
+    if (!failedIndexes.includes(candidateIndex)) {
+      return candidateIndex;
+    }
+  }
+
+  return currentIndex;
+};
+
 const HomeHeroBanner = ({ content, actions, topRightSlot, onSlideAction }) => {
   const location = useLocation();
   const isHomeRoute = location.pathname === '/';
   const resolvedContent = content || fallbackContent;
   const slides = useMemo(() => resolvedContent.slides || [], [resolvedContent]);
   const [index, setIndex] = useState(0);
+  const [failedSlideIndexes, setFailedSlideIndexes] = useState([]);
 
   useEffect(() => {
     if (index >= slides.length && slides.length > 0) {
@@ -41,11 +53,11 @@ const HomeHeroBanner = ({ content, actions, topRightSlot, onSlideAction }) => {
     }
 
     const rotationTimer = window.setInterval(() => {
-      setIndex((prev) => (prev + 1) % slides.length);
+      setIndex((prev) => findNextAvailableSlide(prev, slides.length, failedSlideIndexes));
     }, 5000);
 
     return () => window.clearInterval(rotationTimer);
-  }, [isHomeRoute, slides.length]);
+  }, [failedSlideIndexes, isHomeRoute, slides.length]);
 
   const activeSlide = slides[index] || {};
   const activeEyebrow = activeSlide.eyebrow || resolvedContent.eyebrow;
@@ -53,21 +65,35 @@ const HomeHeroBanner = ({ content, actions, topRightSlot, onSlideAction }) => {
   const activeDescription = activeSlide.description || activeSlide.caption || resolvedContent.description;
   const heroSlides = slides.length > 0 ? slides : [fallbackContent.slides[0]];
 
+  const handleSlideImageError = (failedIndex) => {
+    const nextFailedIndexes = failedSlideIndexes.includes(failedIndex)
+      ? failedSlideIndexes
+      : [...failedSlideIndexes, failedIndex];
+
+    setFailedSlideIndexes(nextFailedIndexes);
+    if (failedIndex === index) {
+      setIndex(findNextAvailableSlide(failedIndex, heroSlides.length, nextFailedIndexes));
+    }
+  };
+
   return (
     <section className="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden">
       <div className="relative h-[500px] w-full md:h-[600px] lg:h-[680px]">
-        {heroSlides.map((slide, slideIndex) => (
-          <img
-            key={`${slide.title || slide.heading || 'hero'}-${slideIndex}`}
-            src={slide.image}
-            alt={slide.heading || slide.title || 'Hero slide'}
-            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ease-in-out ${slideIndex === index ? 'opacity-80' : 'opacity-0'}`}
-            loading={slideIndex === 0 ? 'eager' : 'lazy'}
-            decoding="async"
-          />
-        ))}
+        <img
+          key={`${activeSlide.title || activeSlide.heading || 'hero'}-${index}`}
+          src={activeSlide.image || heroSlides[0].image}
+          alt={activeSlide.heading || activeSlide.title || 'Hero slide'}
+          className="block h-full w-full object-cover md:absolute md:inset-0 md:z-[1] md:opacity-80"
+          loading="eager"
+          decoding="async"
+          style={{ display: 'none' }}
+          onLoad={(event) => {
+            event.currentTarget.style.display = 'block';
+          }}
+          onError={() => handleSlideImageError(index)}
+        />
 
-        <div className="pointer-events-none absolute inset-0 bg-black/70" />
+        <div className="pointer-events-none absolute inset-0 z-[2] bg-black/70" />
       </div>
 
       {topRightSlot ? (
@@ -76,7 +102,7 @@ const HomeHeroBanner = ({ content, actions, topRightSlot, onSlideAction }) => {
         </div>
       ) : null}
 
-      <div className="absolute inset-0 flex flex-col items-start justify-end p-6 pb-8 text-white md:p-10 md:pb-12">
+      <div className="absolute inset-0 z-10 flex flex-col items-start justify-end p-6 pb-8 text-white md:p-10 md:pb-12">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-saffron drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)]">{activeEyebrow}</p>
         <h1 className="mt-3 max-w-3xl font-heading text-3xl font-bold leading-tight text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.85)] md:text-5xl">{activeTitle}</h1>
         <p className="mt-3 max-w-3xl text-sm text-blue-50 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] md:text-base">{activeDescription}</p>
@@ -118,16 +144,16 @@ const HomeHeroBanner = ({ content, actions, topRightSlot, onSlideAction }) => {
 
       {isHomeRoute && slides.length > 1 ? (
         <div className="absolute bottom-5 right-5 z-10 flex gap-2 md:bottom-6 md:right-6">
-          {slides.map((slide, dotIndex) => (
-            <button
-              key={`${slide.title || slide.heading}-${dotIndex}`}
-              onClick={() => setIndex(dotIndex)}
-              className={`h-2.5 rounded-full transition ${
-                dotIndex === index ? 'w-7 bg-brand-saffron' : 'w-2.5 bg-white/65'
-              }`}
-              aria-label={`Show slide ${dotIndex + 1}`}
-            />
-          ))}
+          {slides.map((slide, dotIndex) => failedSlideIndexes.includes(dotIndex) ? null : (
+              <button
+                key={`${slide.title || slide.heading}-${dotIndex}`}
+                onClick={() => setIndex(dotIndex)}
+                className={`h-2.5 rounded-full transition ${
+                  dotIndex === index ? 'w-7 bg-brand-saffron' : 'w-2.5 bg-white/65'
+                }`}
+                aria-label={`Show slide ${dotIndex + 1}`}
+              />
+            ))}
         </div>
       ) : null}
     </section>

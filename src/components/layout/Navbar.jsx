@@ -2315,7 +2315,7 @@ const Navbar = () => {
   }, [isInlineSearchExpanded]);
 
   return (
-    <header className={`${isHomeOverlayMode ? 'fixed inset-x-0 top-0 z-50 bg-transparent shadow-none ring-0 backdrop-blur-0' : 'sticky top-0 z-50 bg-slate-950/95 shadow-[0_10px_26px_-10px_rgba(2,6,23,0.65)] ring-1 ring-slate-700/80 backdrop-blur-md'} transition-all duration-300 ${isCompact ? 'pb-1' : ''}`}>
+    <header className={`${isHomePage ? 'fixed inset-x-0' : 'sticky'} top-0 z-50 ${isHomeOverlayMode ? 'bg-transparent shadow-none ring-0 backdrop-blur-0' : 'bg-slate-950/95 shadow-[0_10px_26px_-10px_rgba(2,6,23,0.65)] ring-1 ring-slate-700/80 backdrop-blur-md'} transition-all duration-300 ${isCompact ? 'pb-1' : ''}`}>
       <div className="hidden border-b border-white/20 bg-[#0a1a33] px-4 py-0.5 text-xs text-blue-50 xl:block">
         <div className="mx-auto flex max-w-7xl items-center justify-between md:px-2">
           <div className="flex items-center gap-2">
