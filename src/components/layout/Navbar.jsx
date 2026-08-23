@@ -65,9 +65,8 @@ const streamGlyphClass = 'h-6 w-6';
 const NANAKSHAHI_WEEKDAY_LABELS_PA = ['ਐ', 'ਸੋ', 'ਮੰ', 'ਬੁੱ', 'ਵੀ', 'ਸ਼ੁੱ', 'ਸ਼ੱ'];
 const CALENDAR_NAV_DAY_MS = 24 * 60 * 60 * 1000;
 const PDF_HEADER_BG = [0, 64, 129];
-const COMPACT_ENTER_SCROLL_Y = 220;
-const COMPACT_EXIT_SCROLL_Y = 48;
-const COMPACT_TOGGLE_COOLDOWN_MS = 220;
+const COMPACT_ENTER_SCROLL_Y = 72;
+const COMPACT_EXIT_SCROLL_Y = 36;
 const PDF_HOLIDAY_PILL_PALETTE = [
   { bg: [220, 252, 231], text: [22, 101, 52] },
   { bg: [254, 243, 199], text: [146, 64, 14] },
@@ -497,9 +496,7 @@ const Navbar = () => {
   const compactScrollRestoreRef = useRef(null);
   const compactRestoreFramesRef = useRef({ first: 0, second: 0 });
   const preserveCompactUntilRef = useRef(0);
-  const compactToggleCooldownUntilRef = useRef(0);
   const isCompactRef = useRef(false);
-  const lastScrollYRef = useRef(0);
   const mobileNanakshahiDetailsRef = useRef(null);
   const [calendarViewDate, setCalendarViewDate] = useState(() => new Date());
   const nanakshahiDate = useMemo(() => getNanakshahiDate(new Date()), []);
@@ -862,7 +859,6 @@ const Navbar = () => {
       }
 
       isCompactRef.current = nextValue;
-      compactToggleCooldownUntilRef.current = Date.now() + COMPACT_TOGGLE_COOLDOWN_MS;
       setIsCompact(nextValue);
     };
 
@@ -870,32 +866,16 @@ const Navbar = () => {
       ticking = false;
 
       if (Date.now() < preserveCompactUntilRef.current) {
-        lastScrollYRef.current = Math.max(window.scrollY, 0);
         syncCompactState(true);
         return;
       }
 
-      if (Date.now() < compactToggleCooldownUntilRef.current) {
-        lastScrollYRef.current = Math.max(window.scrollY, 0);
-        return;
-      }
-
       const scrollY = Math.max(window.scrollY, 0);
-      const scrollDirection = scrollY === lastScrollYRef.current
-        ? 0
-        : (scrollY > lastScrollYRef.current ? 1 : -1);
+      const shouldCompact = isCompactRef.current
+        ? scrollY > COMPACT_EXIT_SCROLL_Y
+        : scrollY > COMPACT_ENTER_SCROLL_Y;
 
-      let nextCompact = isCompactRef.current;
-      if (isCompactRef.current) {
-        if (scrollY <= COMPACT_EXIT_SCROLL_Y && scrollDirection < 0) {
-          nextCompact = false;
-        }
-      } else if (scrollY >= COMPACT_ENTER_SCROLL_Y && scrollDirection > 0) {
-        nextCompact = true;
-      }
-
-      lastScrollYRef.current = scrollY;
-      syncCompactState(nextCompact);
+      syncCompactState(shouldCompact);
     };
 
     const onScroll = () => {
@@ -2597,34 +2577,22 @@ const Navbar = () => {
           <div className={`relative hidden items-center transition-[min-height,padding,height] duration-300 ease-in-out xl:flex ${(isCompact || !isHomePage) ? 'h-[88px] py-0' : 'min-h-[146px] py-2'}`}>
           <Link
             to="/"
-            className={`absolute left-1/2 top-1/2 z-20 flex -translate-y-1/2 -translate-x-1/2 items-center justify-center text-brand-blue transition-all duration-300 ease-in-out ${(isCompact || !isHomePage) ? 'pointer-events-none opacity-0 scale-[0.94]' : 'pointer-events-auto opacity-100 scale-100'}`}
-            aria-hidden={isCompact || !isHomePage}
-            tabIndex={(isCompact || !isHomePage) ? -1 : 0}
-          >
-            <img
-              src={gurdwaraLogo}
-              alt="Gurdwara Singh Sabha Milton logo"
-              className="h-[7.7rem] w-[7.7rem] rounded-full border-2 border-brand-saffron object-cover shadow-[0_4px_16px_rgba(245,166,35,0.25)] transition-all duration-300 ease-in-out"
-            />
-          </Link>
-
-          <Link
-            to="/"
             preventScrollReset={isCompact || !isHomePage}
             onClick={(isCompact || !isHomePage) ? handleCompactNavClick : undefined}
-            className={`absolute left-0 top-1/2 z-20 flex -translate-y-1/2 items-center justify-center text-brand-blue transition-all duration-300 ease-in-out ${(isCompact || !isHomePage) ? 'pointer-events-auto opacity-100 translate-x-0 scale-100' : 'pointer-events-none opacity-0 -translate-x-2 scale-[0.92]'}`}
-            aria-hidden={!(isCompact || !isHomePage)}
-            tabIndex={(isCompact || !isHomePage) ? 0 : -1}
+            className={`absolute top-1/2 z-20 flex -translate-y-1/2 items-center justify-center text-brand-blue transition-[left,transform] duration-300 ease-in-out ${(isCompact || !isHomePage) ? 'left-0 translate-x-0' : 'left-1/2 -translate-x-1/2'}`}
           >
             <img
               src={gurdwaraLogo}
               alt="Gurdwara Singh Sabha Milton logo"
-              className="h-[4.5rem] w-[4.5rem] rounded-full border-2 border-brand-saffron object-cover shadow-[0_4px_16px_rgba(245,166,35,0.25)] transition-all duration-300 ease-in-out"
+              className={`rounded-full border-2 border-brand-saffron object-cover shadow-[0_4px_16px_rgba(245,166,35,0.25)] transition-[width,height] duration-300 ease-in-out ${(isCompact || !isHomePage) ? 'h-[4.5rem] w-[4.5rem]' : 'h-[7.7rem] w-[7.7rem]'}`}
             />
           </Link>
 
-          {(!isCompact && isHomePage) ? (
-            <>
+          <div
+            className={`absolute inset-0 flex items-center transition-opacity duration-300 ease-in-out ${(!isCompact && isHomePage) ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}`}
+            aria-hidden={isCompact || !isHomePage}
+            inert={isCompact || !isHomePage}
+          >
               <nav className="flex w-full items-center justify-start gap-2 pr-10" aria-label="Left navigation">
                 {leftMenuBalanced.map((item) => {
                   const Icon = item.icon;
@@ -2650,9 +2618,13 @@ const Navbar = () => {
                   })}
                 </nav>
               </div>
-            </>
-          ) : (
-            <div className="grid w-full grid-cols-[minmax(0,1fr)_minmax(210px,36%)] items-center gap-2 pl-[5.4rem]">
+          </div>
+
+          <div
+            className={`absolute inset-0 grid grid-cols-[minmax(0,1fr)_minmax(210px,36%)] items-center gap-2 pl-[5.4rem] transition-opacity duration-300 ease-in-out ${(isCompact || !isHomePage) ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}`}
+            aria-hidden={!(isCompact || !isHomePage)}
+            inert={!(isCompact || !isHomePage)}
+          >
               <nav className="flex min-w-0 items-center overflow-x-auto pr-2" aria-label="Compact navigation">
                 {compactDesktopMenuItems.map((item) => {
                   const isLastItem = item.path === compactDesktopMenuItems[compactDesktopMenuItems.length - 1]?.path;
@@ -2704,8 +2676,7 @@ const Navbar = () => {
                   <span className="py-1.5">Donation</span>
                 </Link>
               </div>
-            </div>
-          )}
+          </div>
         </div>
 
       </div>
