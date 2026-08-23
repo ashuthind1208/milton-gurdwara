@@ -12,7 +12,7 @@ import {
 } from '@heroicons/react/24/outline';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
-import cmsService from '../../services/cmsService';
+import cmsService, { resolveScheduleForDate } from '../../services/cmsService';
 
 const HOURS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
 const MINUTES = ['00', '15', '30', '45'];
@@ -270,12 +270,13 @@ const AdminSchedulePage = () => {
       };
     }
 
+    const inheritedDay = resolveScheduleForDate(scheduleDays, selectedDateKey);
     return {
-      ...buildEmptyDay(selectedDateKey, defaultDay.entries || []),
+      ...buildEmptyDay(selectedDateKey, inheritedDay?.entries || defaultDay.entries || []),
       isSpecial: false,
-      entries: sortEntries(defaultDay.entries || [])
+      entries: sortEntries(inheritedDay?.entries || defaultDay.entries || [])
     };
-  }, [defaultDay, scheduleMap, selectedDateKey]);
+  }, [defaultDay, scheduleDays, scheduleMap, selectedDateKey]);
 
   const saveDayMutation = useMutation({
     mutationFn: ({ nextEntries, meta }) => cmsService.updateSchedule({

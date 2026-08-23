@@ -9,6 +9,28 @@ import authService from '../../services/authService';
 
 const PENDING_APPROVAL_NOTICE = 'Access is pending till your status is approved by an admin.';
 const FULL_ACCESS_ROLES = new Set(['Super Admin', 'Admin']);
+const GOOGLE_OAUTH_CALLBACK_STORAGE_KEY = 'ssm_google_oauth_callback_hash';
+
+const getGoogleOAuthCallbackHash = () => {
+  const currentHash = window.location.hash || '';
+  if (currentHash.includes('access_token=') || currentHash.includes('error=')) {
+    return currentHash;
+  }
+
+  try {
+    return window.sessionStorage.getItem(GOOGLE_OAUTH_CALLBACK_STORAGE_KEY) || '';
+  } catch {
+    return '';
+  }
+};
+
+const clearGoogleOAuthCallbackHash = () => {
+  try {
+    window.sessionStorage.removeItem(GOOGLE_OAUTH_CALLBACK_STORAGE_KEY);
+  } catch {
+    // Ignore storage errors.
+  }
+};
 
 const getApprovalMessage = (user, role) => {
   if (FULL_ACCESS_ROLES.has(String(role || ''))) {
@@ -197,8 +219,8 @@ const LoginPage = () => {
     let cancelled = false;
 
     const completeGoogleRedirect = async () => {
-      const hashValue = window.location.hash || '';
-      if (!hashValue.includes('access_token=')) {
+      const hashValue = getGoogleOAuthCallbackHash();
+      if (!hashValue.includes('access_token=') && !hashValue.includes('error=')) {
         return;
       }
 
@@ -208,6 +230,7 @@ const LoginPage = () => {
       const oauthError = hashParams.get('error');
 
       if (oauthError) {
+        clearGoogleOAuthCallbackHash();
         setError(`Google sign-in error: ${oauthError}`);
         return;
       }
@@ -241,6 +264,7 @@ const LoginPage = () => {
           avatarUrl: profile.picture,
           intent: activeIntent
         });
+        clearGoogleOAuthCallbackHash();
 
         if (activeIntent === 'signup' || recoveredIsJoinMode) {
           try {
@@ -385,7 +409,7 @@ const LoginPage = () => {
       // Ignore storage read errors and continue with default behavior.
     }
 
-    const hasOAuthToken = (window.location.hash || '').includes('access_token=');
+    const hasOAuthToken = getGoogleOAuthCallbackHash().includes('access_token=');
     if (hasOAuthToken || autoOAuthTriggered) {
       return;
     }

@@ -7,7 +7,7 @@ const sanitizeStreamUrl = (value = '') => {
   return trimmed.replace(/[;\s]+$/, '');
 };
 
-const darbarSahibStreamProxyUrl = '/api/streaming/darbar-sahib/hls/stream.m3u8';
+const darbarSahibStreamProxyUrl = '/api/streaming/darbar-sahib/audio';
 
 const normalizeDarbarSahibStreamUrl = (value = '') => {
   const sanitized = sanitizeStreamUrl(value);
@@ -16,7 +16,7 @@ const normalizeDarbarSahibStreamUrl = (value = '') => {
   }
 
   if (sanitized.startsWith('/api/streaming/darbar-sahib/')) {
-    return sanitized;
+    return darbarSahibStreamProxyUrl;
   }
 
   if (/live\.sgpc\.net|sgpc\.net/i.test(sanitized)) {

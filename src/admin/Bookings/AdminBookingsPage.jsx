@@ -255,7 +255,13 @@ const AdminBookingsPage = () => {
   });
 
   const emailMutation = useMutation({
-    mutationFn: (booking) => bookingService.sendBookingConfirmationEmail(booking).then((res) => res.data)
+    mutationFn: (booking) => bookingService.sendBookingConfirmationEmail(booking).then((res) => res.data),
+    onSuccess: (_, booking) => {
+      window.alert(`Booking receipt emailed to ${booking?.requesterEmail || booking?.requesterName || 'the requester'}.`);
+    },
+    onError: (error) => {
+      window.alert(error?.message || 'Unable to email the booking receipt right now.');
+    }
   });
 
   const paymentMutation = useMutation({
@@ -478,6 +484,22 @@ const AdminBookingsPage = () => {
 
   return (
     <div className="flex flex-col gap-6">
+      {emailMutation.isPending ? (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/45 px-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-sm rounded-2xl border border-brand-blue/20 bg-white p-5 text-center shadow-2xl">
+            <div className="donation-email-send-loader" aria-hidden="true">
+              <span className="donation-email-send-orb donation-email-send-orb-saffron" />
+              <span className="donation-email-send-orb donation-email-send-orb-blue" />
+              <span className="donation-email-send-orb donation-email-send-orb-gold" />
+              <div className="donation-email-send-envelope-wrap">
+                <EnvelopeIcon className="h-7 w-7" />
+              </div>
+            </div>
+            <p className="mt-3 text-sm font-bold text-slate-900">Please wait, sending email...</p>
+            <p className="mt-1 text-xs text-slate-600">Generating the booking receipt and delivering it to {emailMutation.variables?.requesterName || 'the requester'}.</p>
+          </div>
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="font-heading text-3xl font-semibold text-slate-900">Bookings Management</h1>
@@ -570,7 +592,7 @@ const AdminBookingsPage = () => {
                     <button type="button" onClick={() => openStatusModal(row)} className={iconButtonClass} title="Update status" aria-label="Update booking status"><ArrowsRightLeftIcon className="h-4 w-4" /></button>
                     {row.status === 'cancelled' && (row.refundStatus || ['paid', 'partial', 'refunded'].includes(String(row.paymentStatus || '').toLowerCase())) ? <button type="button" onClick={() => openRefundModal(row)} className={`${iconButtonClass} text-emerald-700`} title="Update refund status" aria-label="Update refund status"><ArrowUturnLeftIcon className="h-4 w-4" /></button> : null}
                     <button type="button" onClick={() => bookingService.downloadInvoice(row)} className={iconButtonClass} title="Download invoice" aria-label="Download invoice"><ArrowDownTrayIcon className="h-4 w-4" /></button>
-                    <button type="button" onClick={() => emailMutation.mutate(row)} className={iconButtonClass} title="Email receipt" aria-label="Email receipt"><EnvelopeIcon className="h-4 w-4" /></button>
+                    <button type="button" onClick={() => emailMutation.mutate(row)} disabled={emailMutation.isPending} className={iconButtonClass} title="Email receipt" aria-label="Email receipt"><EnvelopeIcon className="h-4 w-4" /></button>
                     <button type="button" onClick={() => window.confirm('Delete this booking?') && deleteMutation.mutate(row.id)} className={`${iconButtonClass} text-rose-600`} title="Delete booking" aria-label="Delete booking"><TrashIcon className="h-4 w-4" /></button>
                   </div></td>
                 </tr>

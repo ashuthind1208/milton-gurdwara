@@ -8,7 +8,13 @@ const GalleryCard = ({ album }) => {
 
   return (
     <Card className="overflow-hidden p-0">
-      <img src={imageSrc} alt={album.title} className="h-40 w-full object-cover" loading="lazy" onError={() => setImageSrc(gurdwaraLogo)} />
+      {album.folderUrl ? (
+        <a href={album.folderUrl} aria-label={`Open ${album.title} folder`} className="block">
+          <img src={imageSrc} alt={album.title} className="h-40 w-full object-cover" loading="lazy" onError={() => setImageSrc(gurdwaraLogo)} />
+        </a>
+      ) : (
+        <img src={imageSrc} alt={album.title} className="h-40 w-full object-cover" loading="lazy" onError={() => setImageSrc(gurdwaraLogo)} />
+      )}
       <div className="p-4">
         <h3 className="font-heading text-lg font-semibold text-slate-900 dark:text-white">{album.title}</h3>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{album.items} image links{album.eventDate ? ` • ${album.eventDate}` : ''}</p>

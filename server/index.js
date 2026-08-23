@@ -6,7 +6,6 @@ const { spawn } = require('child_process');
 const { URL } = require('url');
 const Stripe = require('stripe');
 const crypto = require('crypto');
-const ffmpegPath = require('ffmpeg-static');
 const { jsPDF } = require('jspdf');
 const autoTable = require('jspdf-autotable').default;
 const {
@@ -113,7 +112,14 @@ const usersPath = path.join(dataDir, 'users.json');
 const volunteerReminderLogPath = path.join(dataDir, 'volunteer-reminder-log.json');
 const eventReminderLogPath = path.join(dataDir, 'event-reminder-log.json');
 const bookingReminderLogPath = path.join(dataDir, 'booking-reminder-log.json');
-const uploadsDir = path.resolve(__dirname, 'uploads');
+const configuredUploadsDir = String(process.env.UPLOAD_DIR || '').trim();
+if (process.env.NODE_ENV === 'production' && !configuredUploadsDir) {
+  throw new Error('UPLOAD_DIR is required in production and must point to persistent storage.');
+}
+if (configuredUploadsDir && !path.isAbsolute(configuredUploadsDir)) {
+  throw new Error('UPLOAD_DIR must be an absolute filesystem path.');
+}
+const uploadsDir = configuredUploadsDir || path.resolve(__dirname, 'uploads');
 const quizBankDir = path.resolve(workspaceRoot, 'public', 'quiz');
 const maxUploadBytes = 15 * 1024 * 1024;
 const uploadServiceMimePolicies = {
@@ -142,11 +148,11 @@ const resolveLocalWebhookUrl = (value, fallbackPath = '/api/internal/mail-relay'
 };
 
 const internalMailRelayUrl = resolveLocalWebhookUrl(
-  process.env.INTERNAL_MAIL_RELAY_URL || process.env.WEBHOOK_URL || '/api/internal/mail-relay',
+  process.env.INTERNAL_MAIL_RELAY_URL || '/api/internal/mail-relay',
   '/api/internal/mail-relay'
 );
 const volunteerReminderWebhookUrl = resolveLocalWebhookUrl(
-  process.env.VOLUNTEER_REMINDER_WEBHOOK_URL || process.env.WEBHOOK_URL || process.env.REACT_APP_APPROVAL_EMAIL_WEBHOOK_URL || internalMailRelayUrl,
+  process.env.VOLUNTEER_REMINDER_WEBHOOK_URL || process.env.REACT_APP_APPROVAL_EMAIL_WEBHOOK_URL || internalMailRelayUrl,
   '/api/internal/mail-relay'
 );
 const volunteerReminderLogoUrl = String(process.env.VOLUNTEER_REMINDER_LOGO_URL || '').trim();
@@ -157,12 +163,11 @@ const volunteerReminderSendTimeRaw = String(process.env.VOLUNTEER_REMINDER_SEND_
 const volunteerReminderTimeZone = String(process.env.VOLUNTEER_REMINDER_TIME_ZONE || 'America/Toronto').trim() || 'America/Toronto';
 const volunteerReminderDays = [10, 5, 2, 1];
 const eventReminderWebhookUrl = resolveLocalWebhookUrl(
-  process.env.EVENT_REMINDER_WEBHOOK_URL || process.env.WEBHOOK_URL || volunteerReminderWebhookUrl || internalMailRelayUrl,
+  process.env.EVENT_REMINDER_WEBHOOK_URL || internalMailRelayUrl,
   '/api/internal/mail-relay'
 );
 const donationInvoiceWebhookUrl = resolveLocalWebhookUrl(
-  process.env.DONATION_INVOICE_WEBHOOK_URL || process.env.DONATION_EMAIL_WEBHOOK_URL || process.env.WEBHOOK_URL || volunteerReminderWebhookUrl || internalMailRelayUrl
-  ,
+  process.env.DONATION_INVOICE_WEBHOOK_URL || process.env.DONATION_EMAIL_WEBHOOK_URL || internalMailRelayUrl,
   '/api/internal/mail-relay'
 );
 const eventReminderSendTimeRaw = String(process.env.EVENT_REMINDER_SEND_TIME || volunteerReminderSendTimeRaw || '09:00').trim();
@@ -172,7 +177,7 @@ const eventReminderDays = String(process.env.EVENT_REMINDER_DAYS || '7,3,1')
   .map((value) => Number(String(value || '').trim()))
   .filter((value) => Number.isFinite(value) && value >= 0);
 const bookingReminderWebhookUrl = resolveLocalWebhookUrl(
-  process.env.BOOKING_REMINDER_WEBHOOK_URL || process.env.WEBHOOK_URL || eventReminderWebhookUrl || internalMailRelayUrl,
+  process.env.BOOKING_REMINDER_WEBHOOK_URL || internalMailRelayUrl,
   '/api/internal/mail-relay'
 );
 const bookingReminderSendTimeRaw = String(process.env.BOOKING_REMINDER_SEND_TIME || eventReminderSendTimeRaw || '09:00').trim();
@@ -223,10 +228,19 @@ let eventReminderLastRunDateKey = '';
 let bookingReminderSweepRunning = false;
 let bookingReminderLastRunDateKey = '';
 const darbarSahibStreamSource = String(process.env.DARBAR_SAHIB_STREAM_PROXY_TARGET || 'http://live.sgpc.net:4835/;').trim();
-const darbarSahibHlsDir = path.join(process.env.TMPDIR || dataDir, 'singhsabha-darbar-hls');
-const darbarSahibHlsPlaylistPath = path.join(darbarSahibHlsDir, 'stream.m3u8');
-let darbarSahibHlsProcess = null;
-let darbarSahibHlsStartedAt = 0;
+const darbarSahibAacSampleRates = [96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350];
+const darbarSahibHlsTargetDuration = 2;
+const darbarSahibHlsPlaylistSize = 6;
+const darbarSahibHlsMaxSegments = 12;
+let darbarSahibHlsRequest = null;
+let darbarSahibHlsResponse = null;
+let darbarSahibHlsReconnectTimer = null;
+let darbarSahibHlsBuffer = Buffer.alloc(0);
+let darbarSahibHlsFrames = [];
+let darbarSahibHlsFrameDuration = 0;
+let darbarSahibHlsSequence = 0;
+let darbarSahibHlsDecodeTime = 0;
+let darbarSahibHlsSegments = [];
 const adOrganicViewCooldownMs = Number(process.env.AD_ORGANIC_VIEW_COOLDOWN_MS || (24 * 60 * 60 * 1000));
 
 const resolveClientIp = (request) => {
@@ -330,20 +344,21 @@ const runScheduledVolunteerReminderSweep = async () => {
 
 const buildLogoDataUri = () => {
   const candidates = [
-    path.join(workspaceRoot, 'src', 'assets', 'gurdwara-logo.webp'),
-    path.join(workspaceRoot, 'public', 'gurdwara-logo.webp')
+    { filePath: path.join(workspaceRoot, 'public', 'logo192.png'), contentType: 'image/png' },
+    { filePath: path.join(workspaceRoot, 'src', 'assets', 'gurdwara-logo.webp'), contentType: 'image/webp' },
+    { filePath: path.join(workspaceRoot, 'public', 'gurdwara-logo.webp'), contentType: 'image/webp' }
   ];
 
   for (const candidate of candidates) {
     try {
-      if (!fs.existsSync(candidate)) {
+      if (!fs.existsSync(candidate.filePath)) {
         continue;
       }
-      const binary = fs.readFileSync(candidate);
+      const binary = fs.readFileSync(candidate.filePath);
       if (!binary?.length) {
         continue;
       }
-      return `data:image/webp;base64,${binary.toString('base64')}`;
+      return `data:${candidate.contentType};base64,${binary.toString('base64')}`;
     } catch {
       // Ignore logo read failure and continue to next source.
     }
@@ -353,6 +368,53 @@ const buildLogoDataUri = () => {
 };
 
 const embeddedVolunteerReminderLogo = buildLogoDataUri();
+const emailLogoContentId = 'singh-sabha-milton-logo';
+const emailLogoSrc = embeddedVolunteerReminderLogo
+  ? `cid:${emailLogoContentId}`
+  : volunteerReminderLogoUrl || `${volunteerReminderBaseUrl}/logo192.png`;
+const buildInlineEmailLogoAttachment = () => {
+  const match = embeddedVolunteerReminderLogo.match(/^data:([^;,]+);base64,(.+)$/);
+  if (!match) {
+    return null;
+  }
+
+  const contentType = match[1];
+  return {
+    filename: contentType === 'image/png' ? 'singh-sabha-milton-logo.png' : 'singh-sabha-milton-logo.webp',
+    contentType,
+    content: match[2],
+    encoding: 'base64',
+    contentId: emailLogoContentId,
+    disposition: 'inline'
+  };
+};
+const withInlineEmailLogo = (payload = {}) => {
+  const logoAttachment = buildInlineEmailLogoAttachment();
+  const htmlBody = String(payload.html || payload.bodyHtml || payload.content || '').trim();
+  if (!logoAttachment || !htmlBody.includes(`cid:${emailLogoContentId}`)) {
+    return payload;
+  }
+
+  const attachments = Array.isArray(payload.attachments) ? payload.attachments : [];
+  const hasLogo = attachments.some((entry) => String(entry?.contentId || '').trim() === emailLogoContentId);
+  return hasLogo ? payload : { ...payload, attachments: [...attachments, logoAttachment] };
+};
+const withNormalizedInlineEmailLogo = (htmlBody = '', attachments = []) => {
+  const logoAttachment = buildInlineEmailLogoAttachment();
+  const normalizedAttachments = Array.isArray(attachments) ? attachments : [];
+  if (!logoAttachment || !String(htmlBody || '').includes(`cid:${emailLogoContentId}`)) {
+    return normalizedAttachments;
+  }
+
+  const hasLogo = normalizedAttachments.some((entry) => String(entry?.contentId || '').trim() === emailLogoContentId);
+  return hasLogo ? normalizedAttachments : [...normalizedAttachments, {
+    filename: logoAttachment.filename,
+    contentType: logoAttachment.contentType,
+    contentBase64: logoAttachment.content,
+    contentId: logoAttachment.contentId,
+    disposition: logoAttachment.disposition
+  }];
+};
 const ADMIN_PAGE_PATHS = [
   '/admin',
   '/admin/cms',
@@ -880,11 +942,61 @@ const sendViaSmtp = async ({ from, toList, bccList, subject, textBody, htmlBody,
 };
 
 const sendViaConfiguredMailTransport = async ({ from, toList, bccList = [], subject, textBody, htmlBody, attachments }) => {
+  const deliveryAttachments = withNormalizedInlineEmailLogo(htmlBody, attachments);
   if (localMailTransport === 'smtp') {
-    return sendViaSmtp({ from, toList, bccList, subject, textBody, htmlBody, attachments });
+    return sendViaSmtp({ from, toList, bccList, subject, textBody, htmlBody, attachments: deliveryAttachments });
   }
 
-  return sendViaLocalSendmail({ from, toList, bccList, subject, textBody, htmlBody, attachments });
+  return sendViaLocalSendmail({ from, toList, bccList, subject, textBody, htmlBody, attachments: deliveryAttachments });
+};
+
+const isInternalMailRelayTarget = (value = '') => {
+  try {
+    const target = new URL(String(value || '').trim());
+    const hostname = target.hostname.replace(/^\[|\]$/g, '');
+    return isLoopbackAddress(hostname) && target.pathname === '/api/internal/mail-relay';
+  } catch {
+    return false;
+  }
+};
+
+const deliverWorkflowEmail = async (webhookUrl, payload = {}) => {
+  const deliveryPayload = withInlineEmailLogo(payload);
+  if (!isInternalMailRelayTarget(webhookUrl)) {
+    return fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(deliveryPayload)
+    });
+  }
+
+  const recipients = normalizeRecipientList(deliveryPayload);
+  const bccRecipients = normalizeBccRecipientList(deliveryPayload);
+  if (recipients.length === 0 && bccRecipients.length === 0) {
+    throwInputError('Recipient address required.');
+  }
+
+  const subject = sanitizeHeaderValue(deliveryPayload.subject || deliveryPayload.title || 'Singh Sabha Milton Notification')
+    || 'Singh Sabha Milton Notification';
+  const htmlBody = String(deliveryPayload.html || deliveryPayload.bodyHtml || deliveryPayload.content || deliveryPayload.message || '').trim();
+  const textBody = String(deliveryPayload.text || deliveryPayload.bodyText || deliveryPayload.message || '').trim();
+  const attachments = normalizeAttachmentList(deliveryPayload);
+
+  await sendViaConfiguredMailTransport({
+    from: localMailFromAddress,
+    toList: recipients,
+    bccList: bccRecipients,
+    subject,
+    textBody,
+    htmlBody,
+    attachments
+  });
+
+  return {
+    ok: true,
+    status: 200,
+    text: async () => ''
+  };
 };
 
 const createNewsletterUnsubscribeToken = (subscriber = {}) => {
@@ -1479,92 +1591,396 @@ if (typeof rateLimitPruneTimer?.unref === 'function') {
   rateLimitPruneTimer.unref();
 }
 
-const startDarbarSahibHls = () => {
-  if (darbarSahibHlsProcess && darbarSahibHlsProcess.exitCode == null) {
-    const now = Date.now();
-    let playlistUpdatedAt = 0;
-    try {
-      playlistUpdatedAt = fs.statSync(darbarSahibHlsPlaylistPath).mtimeMs;
-    } catch {
-      // A new transcoder needs time to create its first playlist.
-    }
-
-    const processIsStarting = now - darbarSahibHlsStartedAt < 15 * 1000;
-    const playlistIsCurrent = playlistUpdatedAt > 0 && now - playlistUpdatedAt < 15 * 1000;
-    if (processIsStarting || playlistIsCurrent) {
-      return;
-    }
-
-    darbarSahibHlsProcess.kill('SIGTERM');
-    darbarSahibHlsProcess = null;
-  }
-
-  fs.rmSync(darbarSahibHlsDir, { recursive: true, force: true });
-  fs.mkdirSync(darbarSahibHlsDir, { recursive: true });
-  const segmentPattern = path.join(darbarSahibHlsDir, 'segment-%08d.m4s');
-  const processHandle = spawn(ffmpegPath, [
-    '-hide_banner',
-    '-loglevel', 'error',
-    '-reconnect', '1',
-    '-reconnect_streamed', '1',
-    '-reconnect_delay_max', '5',
-    '-i', darbarSahibStreamSource,
-    '-map', '0:a:0',
-    '-vn',
-    '-codec:a', 'aac',
-    '-profile:a', 'aac_low',
-    '-b:a', '48k',
-    '-ar', '44100',
-    '-f', 'hls',
-    '-hls_time', '2',
-    '-hls_list_size', '6',
-    '-hls_flags', 'delete_segments+omit_endlist+independent_segments',
-    '-hls_segment_type', 'fmp4',
-    '-hls_fmp4_init_filename', 'init.mp4',
-    '-hls_segment_filename', segmentPattern,
-    darbarSahibHlsPlaylistPath
-  ], { stdio: ['ignore', 'ignore', 'pipe'] });
-  darbarSahibHlsProcess = processHandle;
-  darbarSahibHlsStartedAt = Date.now();
-  let errorOutput = '';
-
-  processHandle.stderr.on('data', (chunk) => {
-    if (errorOutput.length < 4000) {
-      errorOutput += chunk.toString();
-    }
-  });
-  processHandle.once('close', (code, signal) => {
-    if (darbarSahibHlsProcess === processHandle) {
-      darbarSahibHlsProcess = null;
-      darbarSahibHlsStartedAt = 0;
-    }
-    if (code !== 0 && signal !== 'SIGTERM') {
-      console.error('Darbar Sahib HLS transcoder failed:', errorOutput.trim() || `exit code ${code}`);
-    }
-  });
-};
-
-const waitForDarbarSahibHlsFile = async (filePath, timeoutMs = 12000) => {
+const waitForDarbarSahibHlsSegments = async (minimumSegments = 2, timeoutMs = 12000) => {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
-    try {
-      if (fs.statSync(filePath).size > 0) {
-        return true;
-      }
-    } catch {
-      // The first playlist and segment are created after FFmpeg receives enough audio.
+    if (darbarSahibHlsSegments.length >= minimumSegments) {
+      return true;
     }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   return false;
 };
 
-const stopDarbarSahibHls = () => {
-  if (darbarSahibHlsProcess && darbarSahibHlsProcess.exitCode == null) {
-    darbarSahibHlsProcess.kill('SIGTERM');
+const unsigned16 = (value) => {
+  const buffer = Buffer.alloc(2);
+  buffer.writeUInt16BE(value >>> 0);
+  return buffer;
+};
+
+const unsigned32 = (value) => {
+  const buffer = Buffer.alloc(4);
+  buffer.writeUInt32BE(value >>> 0);
+  return buffer;
+};
+
+const unsigned64 = (value) => {
+  const buffer = Buffer.alloc(8);
+  const normalized = BigInt(value);
+  buffer.writeUInt32BE(Number((normalized >> 32n) & 0xffffffffn), 0);
+  buffer.writeUInt32BE(Number(normalized & 0xffffffffn), 4);
+  return buffer;
+};
+
+const mp4Box = (type, ...payloads) => {
+  const body = Buffer.concat(payloads);
+  return Buffer.concat([unsigned32(body.length + 8), Buffer.from(type, 'ascii'), body]);
+};
+
+const mp4FullBox = (type, version, flags, ...payloads) => mp4Box(
+  type,
+  Buffer.from([version, (flags >> 16) & 0xff, (flags >> 8) & 0xff, flags & 0xff]),
+  ...payloads
+);
+
+const buildDarbarSahibHlsInitSegment = () => {
+  const matrix = Buffer.concat([
+    unsigned32(0x00010000), unsigned32(0), unsigned32(0),
+    unsigned32(0), unsigned32(0x00010000), unsigned32(0),
+    unsigned32(0), unsigned32(0), unsigned32(0x40000000)
+  ]);
+  const ftyp = mp4Box(
+    'ftyp',
+    Buffer.from('iso6', 'ascii'),
+    unsigned32(1),
+    Buffer.from('isomiso6mp41', 'ascii')
+  );
+  const mvhd = mp4FullBox(
+    'mvhd', 0, 0,
+    Buffer.alloc(8),
+    unsigned32(1000),
+    unsigned32(0),
+    unsigned32(0x00010000),
+    unsigned16(0x0100),
+    Buffer.alloc(10),
+    matrix,
+    Buffer.alloc(24),
+    unsigned32(2)
+  );
+  const tkhd = mp4FullBox(
+    'tkhd', 0, 0x000007,
+    Buffer.alloc(8),
+    unsigned32(1),
+    unsigned32(0),
+    unsigned32(0),
+    Buffer.alloc(8),
+    unsigned16(0),
+    unsigned16(0),
+    unsigned16(0x0100),
+    unsigned16(0),
+    matrix,
+    unsigned32(0),
+    unsigned32(0)
+  );
+  const mdhd = mp4FullBox(
+    'mdhd', 0, 0,
+    Buffer.alloc(8),
+    unsigned32(44100),
+    unsigned32(0),
+    unsigned16(0x55c4),
+    unsigned16(0)
+  );
+  const hdlr = mp4FullBox(
+    'hdlr', 0, 0,
+    unsigned32(0),
+    Buffer.from('soun', 'ascii'),
+    Buffer.alloc(12),
+    Buffer.from('SoundHandler\0', 'ascii')
+  );
+  const smhd = mp4FullBox('smhd', 0, 0, Buffer.alloc(4));
+  const dataReference = mp4FullBox(
+    'dref', 0, 0,
+    unsigned32(1),
+    mp4FullBox('url ', 0, 1)
+  );
+  const dinf = mp4Box('dinf', dataReference);
+  const audioSpecificConfig = Buffer.from([0x2b, 0x92, 0x08]);
+  const esDescriptor = Buffer.concat([
+    Buffer.from([0x03, 0x1a, 0x00, 0x01, 0x00, 0x04, 0x12, 0x40, 0x15, 0x00, 0x00, 0x00]),
+    unsigned32(28000),
+    unsigned32(28000),
+    Buffer.from([0x05, audioSpecificConfig.length]),
+    audioSpecificConfig,
+    Buffer.from([0x06, 0x01, 0x02])
+  ]);
+  const esds = mp4FullBox('esds', 0, 0, esDescriptor);
+  const mp4a = mp4Box(
+    'mp4a',
+    Buffer.alloc(6),
+    unsigned16(1),
+    Buffer.alloc(8),
+    unsigned16(2),
+    unsigned16(16),
+    unsigned16(0),
+    unsigned16(0),
+    unsigned32(44100 * 65536),
+    esds
+  );
+  const stbl = mp4Box(
+    'stbl',
+    mp4FullBox('stsd', 0, 0, unsigned32(1), mp4a),
+    mp4FullBox('stts', 0, 0, unsigned32(0)),
+    mp4FullBox('stsc', 0, 0, unsigned32(0)),
+    mp4FullBox('stsz', 0, 0, unsigned32(0), unsigned32(0)),
+    mp4FullBox('stco', 0, 0, unsigned32(0))
+  );
+  const minf = mp4Box('minf', smhd, dinf, stbl);
+  const mdia = mp4Box('mdia', mdhd, hdlr, minf);
+  const trak = mp4Box('trak', tkhd, mdia);
+  const trex = mp4FullBox(
+    'trex', 0, 0,
+    unsigned32(1),
+    unsigned32(1),
+    unsigned32(2048),
+    unsigned32(0),
+    unsigned32(0)
+  );
+  return Buffer.concat([ftyp, mp4Box('moov', mvhd, trak, mp4Box('mvex', trex))]);
+};
+
+const darbarSahibHlsInitSegment = buildDarbarSahibHlsInitSegment();
+
+const buildDarbarSahibHlsMediaSegment = (sequence, decodeTime, frames) => {
+  const mfhd = mp4FullBox('mfhd', 0, 0, unsigned32(sequence));
+  const tfhd = mp4FullBox('tfhd', 0, 0x020000, unsigned32(1));
+  const tfdt = mp4FullBox('tfdt', 1, 0, unsigned64(decodeTime));
+  const buildTrun = (dataOffset) => mp4FullBox(
+    'trun', 0, 0x000301,
+    unsigned32(frames.length),
+    unsigned32(dataOffset),
+    ...frames.flatMap((frame) => [unsigned32(2048), unsigned32(frame.length)])
+  );
+  let moof = mp4Box('moof', mfhd, mp4Box('traf', tfhd, tfdt, buildTrun(0)));
+  moof = mp4Box('moof', mfhd, mp4Box('traf', tfhd, tfdt, buildTrun(moof.length + 8)));
+  return Buffer.concat([moof, mp4Box('mdat', ...frames)]);
+};
+
+const appendDarbarSahibHlsSegment = () => {
+  if (!darbarSahibHlsFrames.length) {
+    return;
   }
-  darbarSahibHlsProcess = null;
-  darbarSahibHlsStartedAt = 0;
+
+  darbarSahibHlsSequence += 1;
+  const segmentFrameCount = darbarSahibHlsFrames.length;
+  darbarSahibHlsSegments.push({
+    sequence: darbarSahibHlsSequence,
+    duration: darbarSahibHlsFrameDuration,
+    data: buildDarbarSahibHlsMediaSegment(
+      darbarSahibHlsSequence,
+      darbarSahibHlsDecodeTime,
+      darbarSahibHlsFrames
+    )
+  });
+  darbarSahibHlsDecodeTime += segmentFrameCount * 2048;
+  darbarSahibHlsSegments = darbarSahibHlsSegments.slice(-darbarSahibHlsMaxSegments);
+  darbarSahibHlsFrames = [];
+  darbarSahibHlsFrameDuration = 0;
+};
+
+const consumeDarbarSahibAacChunk = (chunk) => {
+  darbarSahibHlsBuffer = Buffer.concat([darbarSahibHlsBuffer, chunk]);
+
+  while (darbarSahibHlsBuffer.length >= 7) {
+    if (darbarSahibHlsBuffer[0] !== 0xff || (darbarSahibHlsBuffer[1] & 0xf6) !== 0xf0) {
+      darbarSahibHlsBuffer = darbarSahibHlsBuffer.subarray(1);
+      continue;
+    }
+
+    const frameLength = ((darbarSahibHlsBuffer[3] & 0x03) << 11)
+      | (darbarSahibHlsBuffer[4] << 3)
+      | ((darbarSahibHlsBuffer[5] & 0xe0) >> 5);
+    const headerLength = (darbarSahibHlsBuffer[1] & 0x01) === 1 ? 7 : 9;
+    if (frameLength < headerLength || frameLength > 8192) {
+      darbarSahibHlsBuffer = darbarSahibHlsBuffer.subarray(1);
+      continue;
+    }
+    if (darbarSahibHlsBuffer.length < frameLength) {
+      break;
+    }
+
+    const sampleRateIndex = (darbarSahibHlsBuffer[2] & 0x3c) >> 2;
+    const sampleRate = darbarSahibAacSampleRates[sampleRateIndex];
+    if (!sampleRate) {
+      darbarSahibHlsBuffer = darbarSahibHlsBuffer.subarray(frameLength);
+      continue;
+    }
+
+    const rawDataBlocks = darbarSahibHlsBuffer[6] & 0x03;
+    darbarSahibHlsFrames.push(Buffer.from(darbarSahibHlsBuffer.subarray(headerLength, frameLength)));
+    darbarSahibHlsFrameDuration += (1024 * (rawDataBlocks + 1)) / sampleRate;
+    darbarSahibHlsBuffer = darbarSahibHlsBuffer.subarray(frameLength);
+
+    if (darbarSahibHlsFrameDuration >= darbarSahibHlsTargetDuration) {
+      appendDarbarSahibHlsSegment();
+    }
+  }
+};
+
+const scheduleDarbarSahibHlsReconnect = () => {
+  if (darbarSahibHlsReconnectTimer) {
+    return;
+  }
+  darbarSahibHlsReconnectTimer = setTimeout(() => {
+    darbarSahibHlsReconnectTimer = null;
+    startDarbarSahibHls();
+  }, 1500);
+  darbarSahibHlsReconnectTimer.unref?.();
+};
+
+const startDarbarSahibHls = (sourceUrl = darbarSahibStreamSource, redirectsRemaining = 2) => {
+  if (darbarSahibHlsRequest || darbarSahibHlsResponse) {
+    return;
+  }
+
+  let parsedSource;
+  try {
+    parsedSource = new URL(sourceUrl);
+  } catch {
+    scheduleDarbarSahibHlsReconnect();
+    return;
+  }
+
+  const transport = parsedSource.protocol === 'https:' ? https : http;
+  const upstreamRequest = transport.request(parsedSource, {
+    headers: {
+      Accept: 'audio/aac,audio/aacp,audio/*;q=0.9,*/*;q=0.1',
+      'Icy-MetaData': '0',
+      'User-Agent': 'SinghSabhaMilton/1.0'
+    }
+  }, (upstreamResponse) => {
+    const statusCode = Number(upstreamResponse.statusCode || 502);
+    const redirectLocation = String(upstreamResponse.headers.location || '').trim();
+    if (statusCode >= 300 && statusCode < 400 && redirectLocation && redirectsRemaining > 0) {
+      darbarSahibHlsRequest = null;
+      upstreamResponse.resume();
+      startDarbarSahibHls(new URL(redirectLocation, parsedSource).toString(), redirectsRemaining - 1);
+      return;
+    }
+    if (statusCode < 200 || statusCode >= 300) {
+      darbarSahibHlsRequest = null;
+      upstreamResponse.resume();
+      scheduleDarbarSahibHlsReconnect();
+      return;
+    }
+
+    darbarSahibHlsRequest = null;
+    darbarSahibHlsResponse = upstreamResponse;
+    upstreamResponse.on('data', consumeDarbarSahibAacChunk);
+    upstreamResponse.once('close', () => {
+      if (darbarSahibHlsResponse === upstreamResponse) {
+        darbarSahibHlsResponse = null;
+        scheduleDarbarSahibHlsReconnect();
+      }
+    });
+  });
+
+  darbarSahibHlsRequest = upstreamRequest;
+  upstreamRequest.setTimeout(15000, () => upstreamRequest.destroy(new Error('Darbar Sahib stream timed out.')));
+  upstreamRequest.once('error', () => {
+    if (darbarSahibHlsRequest === upstreamRequest) {
+      darbarSahibHlsRequest = null;
+    }
+    scheduleDarbarSahibHlsReconnect();
+  });
+  upstreamRequest.end();
+};
+
+const buildDarbarSahibHlsPlaylist = () => {
+  const segments = darbarSahibHlsSegments.slice(-darbarSahibHlsPlaylistSize);
+  const targetDuration = Math.max(
+    darbarSahibHlsTargetDuration,
+    ...segments.map((segment) => Math.ceil(segment.duration))
+  );
+  const lines = [
+    '#EXTM3U',
+    '#EXT-X-VERSION:7',
+    `#EXT-X-TARGETDURATION:${targetDuration}`,
+    `#EXT-X-MEDIA-SEQUENCE:${segments[0]?.sequence || 0}`,
+    '#EXT-X-INDEPENDENT-SEGMENTS',
+    '#EXT-X-MAP:URI="init.mp4"'
+  ];
+  segments.forEach((segment) => {
+    lines.push(`#EXTINF:${segment.duration.toFixed(3)},`);
+    lines.push(`segment-${segment.sequence}.m4s`);
+  });
+  return `${lines.join('\n')}\n`;
+};
+
+const proxyDarbarSahibAudio = (request, response, sourceUrl = darbarSahibStreamSource, redirectsRemaining = 2) => {
+  let parsedSource;
+  try {
+    parsedSource = new URL(sourceUrl);
+  } catch {
+    sendJson(response, 500, { ok: false, message: 'Darbar Sahib stream source is invalid.' });
+    return;
+  }
+
+  const transport = parsedSource.protocol === 'https:' ? https : http;
+  const upstreamRequest = transport.request(parsedSource, {
+    method: request.method === 'HEAD' ? 'HEAD' : 'GET',
+    headers: {
+      Accept: 'audio/aac,audio/aacp,audio/*;q=0.9,*/*;q=0.1',
+      'Icy-MetaData': '0',
+      'User-Agent': 'SinghSabhaMilton/1.0'
+    }
+  }, (upstreamResponse) => {
+    const statusCode = Number(upstreamResponse.statusCode || 502);
+    const redirectLocation = String(upstreamResponse.headers.location || '').trim();
+    if (statusCode >= 300 && statusCode < 400 && redirectLocation && redirectsRemaining > 0) {
+      upstreamResponse.resume();
+      proxyDarbarSahibAudio(
+        request,
+        response,
+        new URL(redirectLocation, parsedSource).toString(),
+        redirectsRemaining - 1
+      );
+      return;
+    }
+
+    if (statusCode < 200 || statusCode >= 300) {
+      upstreamResponse.resume();
+      sendJson(response, 502, { ok: false, message: `Darbar Sahib stream returned ${statusCode}.` });
+      return;
+    }
+
+    response.writeHead(200, {
+      'Content-Type': 'audio/aac',
+      'Cache-Control': 'private, no-cache, no-store, must-revalidate',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET,HEAD,OPTIONS',
+      'X-Content-Type-Options': 'nosniff'
+    });
+    if (request.method === 'HEAD') {
+      upstreamResponse.destroy();
+      response.end();
+      return;
+    }
+
+    upstreamResponse.pipe(response);
+    response.once('close', () => upstreamResponse.destroy());
+  });
+
+  upstreamRequest.setTimeout(15000, () => upstreamRequest.destroy(new Error('Darbar Sahib stream timed out.')));
+  upstreamRequest.once('error', (error) => {
+    if (!response.headersSent) {
+      sendJson(response, 502, { ok: false, message: error.message || 'Unable to connect to the Darbar Sahib stream.' });
+      return;
+    }
+    response.destroy(error);
+  });
+  request.once('close', () => upstreamRequest.destroy());
+  upstreamRequest.end();
+};
+
+const stopDarbarSahibHls = () => {
+  if (darbarSahibHlsReconnectTimer) {
+    clearTimeout(darbarSahibHlsReconnectTimer);
+    darbarSahibHlsReconnectTimer = null;
+  }
+  darbarSahibHlsRequest?.destroy();
+  darbarSahibHlsResponse?.destroy();
+  darbarSahibHlsRequest = null;
+  darbarSahibHlsResponse = null;
 };
 
 process.once('exit', stopDarbarSahibHls);
@@ -1928,7 +2344,7 @@ const escapeHtml = (value) => String(value || '')
   .replace(/'/g, '&#39;');
 
 const buildContactInquiryEmail = ({ name = '', email = '', phone = '', message = '', subject = '' }) => {
-  const logoSrc = volunteerReminderLogoUrl || `${volunteerReminderBaseUrl}/gurdwara-logo.webp` || embeddedVolunteerReminderLogo;
+  const logoSrc = emailLogoSrc;
   const siteName = String(volunteerReminderSiteName || 'Singh Sabha Milton Gurdwara').trim();
   const recipientSubject = sanitizeHeaderValue(subject || `Contact Us Inquiry from ${name}`) || 'Contact Us Inquiry';
   const contactMessage = String(message || '').trim();
@@ -2016,7 +2432,7 @@ const buildContactInquiryEmail = ({ name = '', email = '', phone = '', message =
 const buildVolunteerReminderEmail = ({ registration, daysRemaining = null, manual = false }) => {
   const sevaDateLabel = formatSevaDateLabel(registration.sevaDate);
   const timeLabel = registration.sevaTime || 'Time TBD';
-  const logoSrc = volunteerReminderLogoUrl || `${volunteerReminderBaseUrl}/gurdwara-logo.webp` || embeddedVolunteerReminderLogo;
+  const logoSrc = emailLogoSrc;
   const baseUrl = String(volunteerReminderBaseUrl || 'https://singhsabhamilton.com').trim().replace(/\/+$/, '');
   const sevaUrl = `${baseUrl}/seva`;
   const contactUrl = `${baseUrl}/contact`;
@@ -2172,11 +2588,7 @@ const sendVolunteerReminderEmail = async (registration, options = {}) => {
   };
 
   try {
-    const response = await fetch(volunteerReminderWebhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+    const response = await deliverWorkflowEmail(volunteerReminderWebhookUrl, payload);
 
     if (!response.ok) {
       return { sent: false, reason: 'webhook_error' };
@@ -2398,7 +2810,7 @@ const buildEventReminderEmail = ({ registration, daysRemaining = null }) => {
   const timeLabel = registration.eventEndDate
     ? `${formatDateTimeLabel(registration.eventDate, eventDateLabel)} - ${formatDateTimeLabel(registration.eventEndDate, 'End TBD')}`
     : eventDateLabel;
-  const logoSrc = volunteerReminderLogoUrl || `${volunteerReminderBaseUrl}/gurdwara-logo.webp` || embeddedVolunteerReminderLogo;
+  const logoSrc = emailLogoSrc;
   const baseUrl = String(volunteerReminderBaseUrl || 'https://singhsabhamilton.com').trim().replace(/\/+$/, '');
   const eventsUrl = `${baseUrl}/events`;
   const contactUrl = `${baseUrl}/contact`;
@@ -2545,11 +2957,7 @@ const sendEventReminderEmail = async (registration, options = {}) => {
   };
 
   try {
-    const response = await fetch(eventReminderWebhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+    const response = await deliverWorkflowEmail(eventReminderWebhookUrl, payload);
 
     if (!response.ok) {
       return { sent: false, reason: 'webhook_error' };
@@ -2579,7 +2987,7 @@ const buildRegistrationStatusEmail = ({ registration = {}, kind = 'event', promo
     ? volunteerReminderSiteName
     : String(registration.eventLocation || volunteerReminderSiteName).trim();
   const recipientName = String(registration.name || 'Sangat Member').trim();
-  const logoSrc = volunteerReminderLogoUrl || `${volunteerReminderBaseUrl}/gurdwara-logo.webp` || embeddedVolunteerReminderLogo;
+  const logoSrc = emailLogoSrc;
   const baseUrl = String(volunteerReminderBaseUrl || 'https://singhsabhamilton.com').trim().replace(/\/+$/, '');
   const detailsUrl = `${baseUrl}/${isSeva ? 'seva' : 'events'}`;
   const contactUrl = `${baseUrl}/contact`;
@@ -2664,10 +3072,7 @@ const sendRegistrationStatusEmail = async ({ registration, kind, promoted = fals
 
   const template = buildRegistrationStatusEmail({ registration, kind, promoted });
   try {
-    const response = await fetch(kind === 'seva' ? volunteerReminderWebhookUrl : eventReminderWebhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const response = await deliverWorkflowEmail(kind === 'seva' ? volunteerReminderWebhookUrl : eventReminderWebhookUrl, {
         type: `${kind}-registration-${promoted ? 'promoted' : 'acknowledgement'}`,
         to: email,
         email,
@@ -2685,7 +3090,6 @@ const sendRegistrationStatusEmail = async ({ registration, kind, promoted = fals
           promoted
         },
         sentAt: new Date().toISOString()
-      })
     });
     return response.ok ? { sent: true } : { sent: false, reason: 'webhook_error' };
   } catch {
@@ -2708,7 +3112,7 @@ const buildDonationInvoiceEmail = ({ donation = {}, organizationName = '', campa
   const sitePhone = String(phone || '').trim();
   const purposeText = String(campaignDescription || '').trim() || `Support for ${campaignName}`;
   const subject = `Donation Invoice ${receiptId || campaignName} - Thank You`;
-  const logoSrc = volunteerReminderLogoUrl || `${volunteerReminderBaseUrl}/gurdwara-logo.webp` || embeddedVolunteerReminderLogo;
+  const logoSrc = emailLogoSrc;
 
   const text = [
     `Sat Sri Akal ${donorName},`,
@@ -2921,11 +3325,7 @@ const sendDonationInvoiceEmail = async ({
   };
 
   try {
-    const response = await fetch(donationInvoiceWebhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+    const response = await deliverWorkflowEmail(donationInvoiceWebhookUrl, payload);
 
     if (!response.ok) {
       const upstreamBody = await response.text().catch(() => '');
@@ -2974,7 +3374,7 @@ const buildBulkDonationStatementEmail = ({
     : 'All dates';
   const normalizedCampaignName = String(campaignName || 'All campaigns').trim();
   const subject = `Donation Statement - ${periodText}`;
-  const logoSrc = volunteerReminderLogoUrl || `${volunteerReminderBaseUrl}/gurdwara-logo.webp` || embeddedVolunteerReminderLogo;
+  const logoSrc = emailLogoSrc;
   const text = [
     `Sat Sri Akal ${donorName},`,
     '',
@@ -3082,34 +3482,31 @@ const sendBulkDonationStatementEmail = async ({
   });
   const normalizedFileName = String(fileName || '').trim() || `donation-statement-${Date.now()}.pdf`;
   const canonicalAttachmentBase64 = attachmentBuffer.toString('base64');
-  const response = await fetch(donationInvoiceWebhookUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      type: 'donation-statement',
-      to: template.donorEmail,
-      email: template.donorEmail,
-      name: template.donorName,
-      subject: template.subject,
-      message: template.text,
-      text: template.text,
-      html: template.html,
-      bodyHtml: template.html,
-      bodyText: template.text,
-      templateType: 'html',
-      attachments: [{ filename: normalizedFileName, contentType: 'application/pdf', content: canonicalAttachmentBase64, encoding: 'base64', disposition: 'attachment' }],
-      invoicePdfFileName: normalizedFileName,
-      invoicePdfDataUrl: `data:application/pdf;base64,${canonicalAttachmentBase64}`,
-      metadata: {
-        campaignName: template.campaignName,
-        donationCount: selectedDonations.length,
-        amount: template.amountText,
-        statementPeriod: template.periodText,
-        organizationName: String(organizationName || volunteerReminderSiteName || '').trim()
-      },
-      sentAt: new Date().toISOString()
-    })
-  });
+  const payload = {
+    type: 'donation-statement',
+    to: template.donorEmail,
+    email: template.donorEmail,
+    name: template.donorName,
+    subject: template.subject,
+    message: template.text,
+    text: template.text,
+    html: template.html,
+    bodyHtml: template.html,
+    bodyText: template.text,
+    templateType: 'html',
+    attachments: [{ filename: normalizedFileName, contentType: 'application/pdf', content: canonicalAttachmentBase64, encoding: 'base64', disposition: 'attachment' }],
+    invoicePdfFileName: normalizedFileName,
+    invoicePdfDataUrl: `data:application/pdf;base64,${canonicalAttachmentBase64}`,
+    metadata: {
+      campaignName: template.campaignName,
+      donationCount: selectedDonations.length,
+      amount: template.amountText,
+      statementPeriod: template.periodText,
+      organizationName: String(organizationName || volunteerReminderSiteName || '').trim()
+    },
+    sentAt: new Date().toISOString()
+  };
+  const response = await deliverWorkflowEmail(donationInvoiceWebhookUrl, payload);
 
   if (!response.ok) {
     const error = new Error(`Donation statement email service returned ${response.status}.`);
@@ -3372,7 +3769,7 @@ const buildBookingNotificationEmail = ({ booking, daysRemaining = null, changeTy
   const refundPending = normalized.refundStatus === 'pending';
   const isRefundReleased = isCancelled && refundProcessed && changeType === 'refund-released';
   const refundStatusLabel = refundProcessed ? 'Released' : toBookingDisplayLabel(normalized.refundStatus, 'Not required');
-  const logoSrc = volunteerReminderLogoUrl || `${volunteerReminderBaseUrl}/gurdwara-logo.webp`;
+  const logoSrc = emailLogoSrc;
   const contactUrl = `${volunteerReminderBaseUrl}/contact`;
   const dateTimeLabel = `${normalized.date || 'Date TBD'}${normalized.startTime ? `, ${normalized.startTime}` : ''}${normalized.endTime ? ` - ${normalized.endTime}` : ''}`;
   const subject = isReminder
@@ -3490,11 +3887,7 @@ const sendBookingNotificationEmail = async (booking, options = {}) => {
     sentAt: new Date().toISOString()
   };
   try {
-    const response = await fetch(bookingReminderWebhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+    const response = await deliverWorkflowEmail(bookingReminderWebhookUrl, payload);
     return response.ok ? { sent: true } : { sent: false, reason: 'webhook_error' };
   } catch {
     return { sent: false, reason: 'network_error' };
@@ -5001,6 +5394,7 @@ const server = http.createServer(async (request, response) => {
       webhookConfigured: Boolean(stripeWebhookSecret),
       eventsDatabaseConfigured: eventsDb.hasDatabaseConnection,
       databaseEngine: eventsDb.engine,
+      uploadStorageConfigured: Boolean(configuredUploadsDir),
       mailTransport: localMailTransport,
       smtpProvider: localMailTransport === 'smtp' ? smtpProvider : null,
       apiVersion: API_VERSION,
@@ -5155,7 +5549,7 @@ const server = http.createServer(async (request, response) => {
 
   if (/^\/api\/streaming\/darbar-sahib\/live\/?$/i.test(requestUrl.pathname) && (request.method === 'GET' || request.method === 'HEAD')) {
     response.writeHead(302, {
-      Location: '/api/streaming/darbar-sahib/hls/stream.m3u8',
+      Location: '/api/streaming/darbar-sahib/audio',
       'Cache-Control': 'no-store',
       'Access-Control-Allow-Origin': '*'
     });
@@ -5163,42 +5557,17 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (/^\/api\/streaming\/darbar-sahib\/audio\/?$/i.test(requestUrl.pathname) && (request.method === 'GET' || request.method === 'HEAD')) {
+    proxyDarbarSahibAudio(request, response);
+    return;
+  }
+
   const darbarHlsMatch = requestUrl.pathname.match(/^\/api\/streaming\/darbar-sahib\/hls\/(stream\.m3u8|init\.mp4|segment-\d+\.m4s)$/i);
   if (darbarHlsMatch && (request.method === 'GET' || request.method === 'HEAD')) {
-    try {
-      startDarbarSahibHls();
-      const fileName = darbarHlsMatch[1];
-      const filePath = path.join(darbarSahibHlsDir, fileName);
-      const exists = await waitForDarbarSahibHlsFile(filePath);
-      if (!exists) {
-        sendJson(response, 503, { ok: false, message: 'Live Kirtan is starting. Please try again shortly.' });
-        return;
-      }
-
-      const contentType = fileName.endsWith('.m3u8')
-        ? 'application/vnd.apple.mpegurl'
-        : fileName.endsWith('.mp4')
-          ? 'video/mp4'
-          : 'video/iso.segment';
-      const stat = fs.statSync(filePath);
-      response.writeHead(200, {
-        'Content-Type': contentType,
-        'Content-Length': stat.size,
-        'Cache-Control': fileName.endsWith('.m3u8') ? 'no-store' : 'public, max-age=30',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET,HEAD,OPTIONS'
-      });
-      if (request.method === 'HEAD') {
-        response.end();
-        return;
-      }
-      fs.createReadStream(filePath).pipe(response);
-    } catch (error) {
-      sendJson(response, 500, {
-        ok: false,
-        message: error.message || 'Unable to serve the Darbar Sahib live stream.'
-      });
-    }
+    sendJson(response, 410, {
+      ok: false,
+      message: 'The HLS stream has moved to /api/streaming/darbar-sahib/audio.'
+    });
     return;
   }
 

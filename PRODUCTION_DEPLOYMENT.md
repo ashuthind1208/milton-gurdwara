@@ -88,6 +88,11 @@ Never place database credentials, SMTP credentials, Stripe secrets, Zeffy API ke
   - Public URL for email logo/assets.
 - `VOLUNTEER_REMINDER_LOGO_URL`
   - Public image URL for reminder emails.
+- `UPLOAD_DIR`
+  - Absolute filesystem path to a persistent uploads directory outside the deployed application tree.
+  - Required in production so redeployments do not replace uploaded files.
+  - Example: `/home/<hosting-user>/uploads`.
+  - There is no production fallback. The application refuses to start when this variable is missing.
 
 ## 3.1) Automatic Reminder Delivery (Events + Seva)
 
@@ -164,6 +169,20 @@ The backend also reconciles succeeded Zeffy payments from each configured campai
 ## 6) Uploads and Asset Persistence
 
 The app now uses uploaded sponsor/advertisement banners.
+
+Set `UPLOAD_DIR` to the absolute path of a persistent directory outside the deployment directory. The backend uses this path for both `POST /api/uploads/:service` writes and `GET /api/uploads/*` reads. It creates missing service/year/month directories automatically.
+
+Deployment archives must not contain `server/uploads`.
+
+For the current Hostinger application, set `UPLOAD_DIR=/home/u266483472/uploads`. This path was verified by uploading a new file, deploying a second archive containing no uploads, and retrieving that exact file from the new application startup. Representative files from all seven upload services also remained readable after redeployment.
+
+Before the first deployment with `UPLOAD_DIR`:
+
+1. Back up the current `server/uploads` directory.
+2. Copy its contents into the persistent directory, preserving service/year/month folders.
+3. Set `UPLOAD_DIR` in the hosting environment and apply the change.
+4. Confirm `GET /api/health` reports `"uploadStorageConfigured": true`.
+5. Verify several existing `/api/uploads/...` URLs before removing any backup.
 
 You must ensure uploaded files survive restarts/redeploys:
 

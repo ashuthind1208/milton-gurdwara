@@ -15,7 +15,7 @@ import HomeHeroBanner from '../../components/common/HomeHeroBanner';
 import SectionTitle from '../../components/common/SectionTitle';
 import eventService from '../../services/eventService';
 import galleryService from '../../services/galleryService';
-import cmsService from '../../services/cmsService';
+import cmsService, { resolveScheduleForDate } from '../../services/cmsService';
 import hukamnamaService from '../../services/hukamnamaService';
 import advertisementService from '../../services/advertisementService';
 import newsService from '../../services/newsService';
@@ -274,19 +274,17 @@ const HomePage = () => {
     ];
 
     if (scheduleDays.length === 0) {
-      return {
+      return resolveScheduleForDate([{
         dateKey: 'default',
         title: 'Daily Schedule',
         highlightTitle: '',
         highlightNoteEn: '',
         highlightNotePa: '',
         entries: fallbackEntries
-      };
+      }], todayDateKey);
     }
 
-    return scheduleDays.find((day) => day.dateKey === todayDateKey)
-      || scheduleDays.find((day) => day.dateKey === 'default')
-      || scheduleDays[0];
+    return resolveScheduleForDate(scheduleDays, todayDateKey);
   }, [cmsData, todayDateKey]);
   const scheduleRows = useMemo(() => {
     const entries = Array.isArray(resolvedScheduleDay?.entries) ? [...resolvedScheduleDay.entries] : [];

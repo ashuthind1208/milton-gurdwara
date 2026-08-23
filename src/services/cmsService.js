@@ -38,6 +38,45 @@ const defaultSchedule = {
   ]
 };
 
+const sundayDefaultEntries = [
+  {
+    id: 'sunday-default-sukhmani-sahib',
+    segment: 'morning',
+    timeEn: '10:30 AM - 12:00 PM',
+    timePa: '',
+    titleEn: 'Sri Sukhmani Sahib Path',
+    titlePa: '',
+    noteEn: '',
+    notePa: '',
+    isHighlighted: false,
+    isActive: true
+  },
+  {
+    id: 'sunday-default-kirtan',
+    segment: 'morning',
+    timeEn: '12:00 PM - 12:45 PM',
+    timePa: '',
+    titleEn: 'Kirtan',
+    titlePa: '',
+    noteEn: '',
+    notePa: '',
+    isHighlighted: false,
+    isActive: true
+  },
+  {
+    id: 'sunday-default-katha',
+    segment: 'morning',
+    timeEn: '12:45 PM - 1:30 PM',
+    timePa: '',
+    titleEn: 'Katha',
+    titlePa: '',
+    noteEn: '',
+    notePa: '',
+    isHighlighted: false,
+    isActive: true
+  }
+];
+
 const normalizeScheduleLabelKey = (value = '') => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 
 const scheduleTimeOverrides = {
@@ -143,11 +182,47 @@ const normalizeScheduleDays = (scheduleDays = [], legacySchedule = defaultSchedu
   return [normalizeScheduleDay(buildDefaultScheduleDay(legacySchedule), 0), ...sourceDays];
 };
 
-const resolveScheduleForDate = (scheduleDays = [], dateKey = 'default') => {
+const isSundayDateKey = (dateKey = '') => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+    return false;
+  }
+
+  const date = new Date(`${dateKey}T12:00:00`);
+  return !Number.isNaN(date.getTime()) && date.getDay() === 0;
+};
+
+const appendSundayDefaultEntries = (entries = []) => {
+  const existingKeys = new Set(entries.map((entry) => (
+    `${normalizeScheduleLabelKey(entry.titleEn || entry.label)}|${String(entry.timeEn || entry.time || '').replace(/\s+/g, '').toLowerCase()}`
+  )));
+
+  const additions = sundayDefaultEntries.filter((entry) => {
+    const key = `${normalizeScheduleLabelKey(entry.titleEn)}|${entry.timeEn.replace(/\s+/g, '').toLowerCase()}`;
+    return !existingKeys.has(key);
+  });
+
+  return [...entries, ...additions].map((entry, index) => ({
+    ...entry,
+    sortOrder: index + 1
+  }));
+};
+
+export const resolveScheduleForDate = (scheduleDays = [], dateKey = 'default') => {
   const normalizedDays = normalizeScheduleDays(scheduleDays, defaultSchedule);
-  return normalizedDays.find((day) => day.dateKey === dateKey)
-    || normalizedDays.find((day) => day.dateKey === 'default')
-    || normalizedDays[0];
+  const savedDay = normalizedDays.find((day) => day.dateKey === dateKey);
+  if (savedDay) {
+    return savedDay;
+  }
+
+  const defaultDay = normalizedDays.find((day) => day.dateKey === 'default') || normalizedDays[0];
+  if (!isSundayDateKey(dateKey)) {
+    return defaultDay;
+  }
+
+  return {
+    ...defaultDay,
+    entries: appendSundayDefaultEntries(defaultDay.entries || [])
+  };
 };
 
 const deriveLegacyScheduleFromDay = (day) => {

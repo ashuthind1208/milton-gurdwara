@@ -34,7 +34,7 @@ import eventService from '../../services/eventService';
 import volunteerService from '../../services/volunteerService';
 import userService from '../../services/userService';
 import donationService from '../../services/donationService';
-import cmsService from '../../services/cmsService';
+import cmsService, { resolveScheduleForDate } from '../../services/cmsService';
 import newsService from '../../services/newsService';
 import sponsorService from '../../services/sponsorService';
 import advertisementService from '../../services/advertisementService';
@@ -524,9 +524,7 @@ const AdminDashboardPage = () => {
 
   const resolvedScheduleDay = useMemo(() => {
     const scheduleDays = Array.isArray(cmsData?.scheduleDays) ? cmsData.scheduleDays : [];
-    return scheduleDays.find((day) => day.dateKey === todayDateKey)
-      || scheduleDays.find((day) => day.dateKey === 'default')
-      || null;
+    return resolveScheduleForDate(scheduleDays, todayDateKey);
   }, [cmsData, todayDateKey]);
 
   const todayScheduleCount = Array.isArray(resolvedScheduleDay?.entries) ? resolvedScheduleDay.entries.length : 0;

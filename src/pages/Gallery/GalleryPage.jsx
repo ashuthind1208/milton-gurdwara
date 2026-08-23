@@ -13,7 +13,6 @@ const GalleryPage = () => {
   const meta = useSeoMeta('Gallery', 'Photo and video albums with searchable highlights.');
   const location = useLocation();
   const [selectedAlbum, setSelectedAlbum] = useState(null);
-  const [sourcePreview, setSourcePreview] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const { data: albums = [] } = useQuery({ queryKey: ['gallery-public'], queryFn: () => galleryService.getPublicAlbums().then((res) => res.data) });
   const { data: content } = useQuery({
@@ -33,25 +32,17 @@ const GalleryPage = () => {
     }
   }, [albums, location.state]);
 
-  const openSourcePreview = (source) => {
-    if (!source?.url) {
-      return;
-    }
-
-    setSourcePreview({
-      label: source.label || 'Folder Preview',
-      embedUrl: source.embedUrl || source.url,
-      fallbackUrl: source.url
-    });
-  };
-
   return (
     <div className="space-y-8">
       <Seo {...meta} />
       <PageHero title={content?.heroTitle ?? 'Gallery'} description={content?.heroDescription ?? 'Browse albums of photos and videos from samagams, seva drives, and celebrations.'} />
       {content?.mediaUrl ? <img src={content.mediaUrl} alt="Gallery banner" className="h-56 w-full rounded-xl object-cover" loading="lazy" /> : null}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {albums.map((album) => (
+        {albums.map((album) => album.folderUrl ? (
+          <div key={album.id} className="text-left">
+            <GalleryCard album={album} />
+          </div>
+        ) : (
           <button key={album.id} type="button" className="text-left" onClick={() => setSelectedAlbum(album)}>
             <GalleryCard album={album} />
           </button>
@@ -72,6 +63,20 @@ const GalleryPage = () => {
             <div className="mt-4 max-h-[75vh] space-y-4 overflow-y-auto pr-1">
               {selectedAlbum.folderUrl ? (
                 <div className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    {(selectedAlbum.folderSources || []).map((source) => (
+                      <a
+                        key={`${selectedAlbum.id}-${source.type}`}
+                        href={source.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 rounded-lg border border-brand-blue/30 px-3 py-2 text-sm font-semibold text-brand-blue hover:bg-brand-blue/5"
+                      >
+                        <span>&gt;</span>
+                        Open {source.label}
+                      </a>
+                    ))}
+                  </div>
                   {selectedAlbum.folderEmbedUrl ? (
                     <iframe
                       title={`${selectedAlbum.title} folder`}
@@ -81,19 +86,6 @@ const GalleryPage = () => {
                       referrerPolicy="no-referrer"
                     />
                   ) : null}
-                  <div className="flex flex-wrap gap-2">
-                    {(selectedAlbum.folderSources || []).map((source) => (
-                      <button
-                        key={`${selectedAlbum.id}-${source.type}`}
-                        type="button"
-                        onClick={() => openSourcePreview(source)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-brand-blue/30 px-3 py-2 text-sm font-semibold text-brand-blue hover:bg-brand-blue/5"
-                      >
-                        <span>&gt;</span>
-                        Open {source.label}
-                      </button>
-                    ))}
-                  </div>
                   {!selectedAlbum.folderEmbedUrl ? <p className="text-sm text-slate-500">Folder linked. Open it to view all images.</p> : null}
                 </div>
               ) : (selectedAlbum.images || []).length > 0 ? (selectedAlbum.images || []).map((image) => (
@@ -114,49 +106,20 @@ const GalleryPage = () => {
                 <div className="pt-2">
                   <div className="flex flex-wrap gap-2">
                     {(selectedAlbum.folderSources || []).map((source) => (
-                      <button
+                      <a
                         key={`${selectedAlbum.id}-image-source-${source.type}`}
-                        type="button"
-                        onClick={() => openSourcePreview(source)}
+                        href={source.url}
+                        target="_blank"
+                        rel="noreferrer"
                         className="inline-flex items-center gap-1 rounded-lg border border-brand-blue/30 px-3 py-2 text-sm font-semibold text-brand-blue hover:bg-brand-blue/5"
                       >
                         <span>&gt;</span>
                         Open {source.label}
-                      </button>
+                      </a>
                     ))}
                   </div>
                 </div>
               ) : null}
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {sourcePreview ? (
-        <div className="fixed inset-0 z-[105] flex items-center justify-center bg-slate-900/65 px-3 py-4" onClick={() => setSourcePreview(null)}>
-          <div className="w-full max-w-6xl rounded-xl bg-white p-4 shadow-xl" onClick={(event) => event.stopPropagation()}>
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="font-heading text-xl font-semibold text-slate-900">{sourcePreview.label}</h3>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => window.open(sourcePreview.fallbackUrl, '_blank', 'noopener,noreferrer')}
-                  className="rounded-md border border-brand-blue/30 px-3 py-1 text-sm font-semibold text-brand-blue hover:bg-brand-blue/5"
-                >
-                  Open in new tab
-                </button>
-                <button type="button" onClick={() => setSourcePreview(null)} className="rounded-md border border-slate-300 px-3 py-1 text-sm">Close</button>
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <iframe
-                title={sourcePreview.label}
-                src={sourcePreview.embedUrl}
-                className="h-[75vh] w-full rounded-xl border border-slate-200"
-                sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-popups allow-popups-to-escape-sandbox"
-                referrerPolicy="no-referrer"
-              />
             </div>
           </div>
         </div>
