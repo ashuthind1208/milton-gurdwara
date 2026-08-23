@@ -2,6 +2,10 @@
   "name": "singhsabha-milton",
   "version": "0.1.0",
   "private": true,
+  "main": "server.js",
+  "engines": {
+    "node": "20.x"
+  },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "@tanstack/react-query": "^5.101.2",

@@ -11,6 +11,8 @@
 # production
 /build
 /server/uploads/
+/*.zip
+/*.tar.gz
 
 # misc
 .DS_Store

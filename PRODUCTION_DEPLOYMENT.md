@@ -224,6 +224,18 @@ If storage is ephemeral, sponsor/advertisement banners may disappear after deplo
 3. For separate frontend/backend hosts, deploy `build/` statically and configure the frontend host's reverse proxy to forward `/api/*` to the backend.
 4. Never deploy only `build/` when using same-origin `/api/*`; static files cannot execute the backend.
 
+### Hostinger Git Deployment Settings
+
+Hostinger must deploy this repository as a Node application, not as a static Create React App:
+
+- Node version: `20`
+- Application type: `other`
+- Build script: `build`
+- Entry file: `server.js`
+- Output directory: leave empty
+
+After every deployment, verify `/api/health` returns JSON. If it returns `text/html`, Hostinger selected the static Create React App profile and the backend is not running.
+
 ## 9) Reverse Proxy / Routing
 
 If using Nginx/Cloudflare/ingress:
