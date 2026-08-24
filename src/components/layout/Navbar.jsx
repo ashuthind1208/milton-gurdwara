@@ -2577,14 +2577,29 @@ const Navbar = () => {
           <div className={`relative hidden items-center transition-[min-height,padding,height] duration-300 ease-in-out xl:flex ${(isCompact || !isHomePage) ? 'h-[88px] py-0' : 'min-h-[146px] py-2'}`}>
           <Link
             to="/"
-            preventScrollReset={isCompact || !isHomePage}
-            onClick={(isCompact || !isHomePage) ? handleCompactNavClick : undefined}
-            className={`absolute top-1/2 z-20 flex -translate-y-1/2 items-center justify-center text-brand-blue transition-[left,transform] duration-300 ease-in-out ${(isCompact || !isHomePage) ? 'left-0 translate-x-0' : 'left-1/2 -translate-x-1/2'}`}
+            className={`absolute left-1/2 top-1/2 z-20 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center text-brand-blue transition-opacity duration-150 ease-in-out ${(isCompact || !isHomePage) ? 'pointer-events-none opacity-0' : 'delay-150 opacity-100'}`}
+            aria-hidden={isCompact || !isHomePage}
+            tabIndex={(isCompact || !isHomePage) ? -1 : 0}
           >
             <img
               src={gurdwaraLogo}
               alt="Gurdwara Singh Sabha Milton logo"
-              className={`rounded-full border-2 border-brand-saffron object-cover shadow-[0_4px_16px_rgba(245,166,35,0.25)] transition-[width,height] duration-300 ease-in-out ${(isCompact || !isHomePage) ? 'h-[4.5rem] w-[4.5rem]' : 'h-[7.7rem] w-[7.7rem]'}`}
+              className="h-[7.7rem] w-[7.7rem] rounded-full border-2 border-brand-saffron object-cover shadow-[0_4px_16px_rgba(245,166,35,0.25)]"
+            />
+          </Link>
+
+          <Link
+            to="/"
+            preventScrollReset
+            onClick={handleCompactNavClick}
+            className={`absolute left-0 top-1/2 z-20 flex -translate-y-1/2 items-center justify-center text-brand-blue transition-opacity duration-150 ease-in-out ${(isCompact || !isHomePage) ? 'delay-150 opacity-100' : 'pointer-events-none opacity-0'}`}
+            aria-hidden={!(isCompact || !isHomePage)}
+            tabIndex={(isCompact || !isHomePage) ? 0 : -1}
+          >
+            <img
+              src={gurdwaraLogo}
+              alt="Gurdwara Singh Sabha Milton logo"
+              className="h-[4.5rem] w-[4.5rem] rounded-full border-2 border-brand-saffron object-cover shadow-[0_4px_16px_rgba(245,166,35,0.25)]"
             />
           </Link>
 
