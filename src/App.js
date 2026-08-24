@@ -3,6 +3,7 @@ import './App.css';
 import AppRoutes from './routes/AppRoutes';
 import DeleteConfirmationGuard from './components/common/DeleteConfirmationGuard';
 import FormValidationGuard from './components/common/FormValidationGuard';
+import AppInstallPrompt from './components/common/AppInstallPrompt';
 
 function App() {
   useEffect(() => {
@@ -50,6 +51,7 @@ function App() {
       <AppRoutes />
       <FormValidationGuard />
       <DeleteConfirmationGuard />
+      <AppInstallPrompt />
     </>
   );
 }

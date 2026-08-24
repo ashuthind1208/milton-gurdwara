@@ -4362,6 +4362,9 @@ const normalizeUser = (user = {}) => {
     memberType,
     authProvider: String(user.authProvider || 'LOCAL').trim() || 'LOCAL',
     avatarUrl: String(user.avatarUrl || user.picture || '').trim(),
+    title: String(user.title || '').trim(),
+    description: String(user.description || '').trim(),
+    showOnAbout: user.showOnAbout === true,
     adminPageAccess: adminPageAccess.length > 0 ? adminPageAccess : getDefaultAdminPageAccessForRole(role),
     registrationComplete: Boolean(user.registrationComplete),
     isActive: user.isActive !== false,
@@ -5980,6 +5983,28 @@ const server = http.createServer(async (request, response) => {
         ok: false,
         message: error.message || 'Unable to remove seva registration.'
       });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/public/members' && request.method === 'GET') {
+    try {
+      const users = await eventsDb.listItems('users');
+      const data = users
+        .filter((user) => user?.isActive !== false && user?.showOnAbout === true)
+        .map((user) => ({
+          id: String(user.id || ''),
+          name: String(user.name || '').trim(),
+          title: String(user.title || '').trim(),
+          description: String(user.description || '').trim(),
+          avatarUrl: String(user.avatarUrl || '').trim(),
+          phone: String(user.phone || '').trim()
+        }))
+        .filter((user) => user.name && user.title)
+        .sort((left, right) => left.title.localeCompare(right.title) || left.name.localeCompare(right.name));
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, { ok: false, message: error.message || 'Unable to fetch community members.' });
     }
     return;
   }

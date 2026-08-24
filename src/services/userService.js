@@ -1,6 +1,7 @@
 import { serviceResponse } from './serviceResponse';
 import contentApiService from './contentApiService';
 import { adminNav } from '../constants/navigation';
+import apiClient from './apiClient';
 
 const RESOURCE = 'users';
 const ADMIN_PAGE_PATHS = adminNav.map((item) => item.path);
@@ -249,6 +250,9 @@ const normalizeUser = (user = {}, roleDefinitions = []) => {
     memberType,
     authProvider: user.authProvider || 'LOCAL',
     avatarUrl: resolvedAvatarUrl,
+    title: String(user.title || '').trim(),
+    description: String(user.description || '').trim(),
+    showOnAbout: user.showOnAbout === true,
     adminPageAccess: resolveRoleAdminPageAccess(role, user.adminPageAccess, roleDefinitions),
     registrationComplete: Boolean(user.registrationComplete),
     isActive: user.isActive !== false,
@@ -285,6 +289,11 @@ const userService = {
     return serviceResponse(users);
   },
 
+  getPublicMembers: async () => {
+    const response = await apiClient.get('/public/members');
+    return serviceResponse(response.data?.data || []);
+  },
+
   getUserByEmail: async (email) => {
     const user = await findUserByEmail(email);
     return serviceResponse(user);
@@ -299,6 +308,9 @@ const userService = {
     const hasAddressInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'address');
     const hasAuthProviderInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'authProvider');
     const hasAvatarUrlInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'avatarUrl');
+    const hasTitleInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'title');
+    const hasDescriptionInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'description');
+    const hasShowOnAboutInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'showOnAbout');
     const hasAdminPageAccessInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'adminPageAccess');
     const hasRoleInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'role');
     const hasMemberTypeInPayload = Object.prototype.hasOwnProperty.call(payload || {}, 'memberType');
@@ -328,6 +340,9 @@ const userService = {
       address: hasAddressInPayload ? normalized.address : existing.address,
       authProvider: hasAuthProviderInPayload ? normalized.authProvider : existing.authProvider,
       avatarUrl: hasAvatarUrlInPayload ? normalized.avatarUrl : existing.avatarUrl,
+      title: hasTitleInPayload ? normalized.title : existing.title,
+      description: hasDescriptionInPayload ? normalized.description : existing.description,
+      showOnAbout: hasShowOnAboutInPayload ? normalized.showOnAbout : existing.showOnAbout,
       role: nextRole,
       memberType: hasMemberTypeInPayload ? normalized.memberType : existing.memberType,
       approvalStatus: hasApprovalStatusInPayload ? normalized.approvalStatus : existing.approvalStatus,
@@ -434,6 +449,9 @@ const userService = {
       memberType: payload.memberType || '',
       authProvider: payload.authProvider || 'LOCAL',
       avatarUrl: payload.avatarUrl,
+      title: payload.title,
+      description: payload.description,
+      showOnAbout: payload.showOnAbout === true,
       registrationComplete: Boolean(payload.registrationComplete),
       isActive: payload.isActive !== false,
       approvalUpdatedAt: new Date().toISOString()

@@ -50,6 +50,9 @@ const relationalSchemaStatements = [
     address TEXT NOT NULL,
     auth_provider VARCHAR(100) NOT NULL DEFAULT 'LOCAL',
     avatar_url TEXT NOT NULL,
+    profile_title VARCHAR(191) NOT NULL DEFAULT '',
+    profile_description TEXT NOT NULL,
+    show_on_about TINYINT(1) NOT NULL DEFAULT 0,
     registration_complete TINYINT(1) NOT NULL DEFAULT 0,
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     approval_status VARCHAR(100) NOT NULL DEFAULT 'pending',
@@ -57,6 +60,9 @@ const relationalSchemaStatements = [
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `ALTER TABLE admin_users ADD COLUMN profile_title VARCHAR(191) NOT NULL DEFAULT ''`,
+  `ALTER TABLE admin_users ADD COLUMN profile_description TEXT NOT NULL`,
+  `ALTER TABLE admin_users ADD COLUMN show_on_about TINYINT(1) NOT NULL DEFAULT 0`,
   `CREATE TABLE IF NOT EXISTS cms_pages (
     id VARCHAR(191) PRIMARY KEY,
     slug VARCHAR(191) NOT NULL UNIQUE,

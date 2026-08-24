@@ -1,6 +1,8 @@
 {
   "short_name": "Singh Sabha",
   "name": "Singh Sabha Milton Gurdwara",
+  "description": "Events, seva, Hukamnama, and community updates from Singh Sabha Milton Gurdwara.",
+  "id": "/",
   "icons": [
     {
       "src": "gurdwara-logo.webp",
@@ -18,7 +20,8 @@
       "sizes": "512x512"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "theme_color": "#0B4EA2",
   "background_color": "#ffffff"

@@ -1,4 +1,5 @@
 import contentApiService from './contentApiService';
+import apiClient from './apiClient';
 import userService from './userService';
 
 jest.mock('./contentApiService', () => ({
@@ -9,6 +10,13 @@ jest.mock('./contentApiService', () => ({
     update: jest.fn(),
     remove: jest.fn(),
     getSingleton: jest.fn()
+  }
+}));
+
+jest.mock('./apiClient', () => ({
+  __esModule: true,
+  default: {
+    get: jest.fn()
   }
 }));
 
@@ -147,5 +155,46 @@ describe('membership state rules', () => {
     );
     expect(response.data.membershipFeeRecords).toEqual([expect.objectContaining(paidRecord)]);
     expect(response.data.approvalStatus).toBe('approved');
+  });
+
+  test('persists public profile fields on create and partial update', async () => {
+    contentApiService.create.mockImplementation(async (_resource, payload) => payload);
+
+    const created = await userService.createUser({
+      name: 'Community Lead',
+      email: 'lead@example.com',
+      role: 'Admin',
+      title: 'President',
+      description: 'Supports the sangat.',
+      showOnAbout: true
+    });
+
+    expect(created.data).toEqual(expect.objectContaining({
+      title: 'President',
+      description: 'Supports the sangat.',
+      showOnAbout: true
+    }));
+
+    contentApiService.list.mockResolvedValue([created.data]);
+    contentApiService.update.mockImplementation(async (_resource, _id, payload) => payload);
+    const updated = await userService.updateUser(created.data.id, { phone: '9055550100' });
+
+    expect(updated.data).toEqual(expect.objectContaining({
+      title: 'President',
+      description: 'Supports the sangat.',
+      showOnAbout: true,
+      phone: '9055550100'
+    }));
+  });
+
+  test('loads the privacy-safe public member collection', async () => {
+    apiClient.get.mockResolvedValue({
+      data: { data: [{ id: 'member-1', name: 'Visible Member', title: 'Manager' }] }
+    });
+
+    const response = await userService.getPublicMembers();
+
+    expect(apiClient.get).toHaveBeenCalledWith('/public/members');
+    expect(response.data).toEqual([{ id: 'member-1', name: 'Visible Member', title: 'Manager' }]);
   });
 });

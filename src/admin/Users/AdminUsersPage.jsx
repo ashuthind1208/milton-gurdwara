@@ -122,6 +122,9 @@ const userFormDefaults = {
   email: '',
   phone: '',
   address: '',
+  title: '',
+  description: '',
+  showOnAbout: false,
   role: 'Member',
   dateOfBirth: '',
   canadianStatus: '',
@@ -338,6 +341,14 @@ const AdminUsersPage = () => {
     }
   });
 
+  const toggleAboutMutation = useMutation({
+    mutationFn: ({ id, showOnAbout }) => userService.updateUser(id, { showOnAbout }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      queryClient.invalidateQueries({ queryKey: ['public-members'] });
+    }
+  });
+
   const removeMutation = useMutation({
     mutationFn: (id) => userService.removeUser(id),
     onSuccess: (_, id) => {
@@ -423,6 +434,9 @@ const AdminUsersPage = () => {
       email: user.email || '',
       phone: user.phone || '',
       address: user.address || '',
+      title: user.title || '',
+      description: user.description || '',
+      showOnAbout: user.showOnAbout === true,
       role: user.role || 'Member',
       dateOfBirth: user.membershipProfile?.dateOfBirth || '',
       canadianStatus: user.membershipProfile?.canadianStatus || '',
@@ -679,6 +693,20 @@ const AdminUsersPage = () => {
     </span>
   );
 
+  const renderAboutPill = (user) => {
+    const isVisible = user.showOnAbout === true;
+    return (
+      <button
+        type="button"
+        onClick={() => toggleAboutMutation.mutate({ id: user.id, showOnAbout: !isVisible })}
+        disabled={toggleAboutMutation.isPending}
+        className={`inline-flex w-full items-center justify-center rounded-full border px-2.5 py-1 text-xs font-semibold transition ${activeStatusClassMap[isVisible ? 'active' : 'inactive']} disabled:cursor-not-allowed disabled:opacity-50`}
+      >
+        {isVisible ? 'Shown' : 'Hidden'}
+      </button>
+    );
+  };
+
   useEffect(() => {
     setHeaderAction(<AdminHeaderActionButton label="Add User" onClick={openCreateUser} />);
 
@@ -765,6 +793,7 @@ const AdminUsersPage = () => {
                 <th className="px-3 py-2.5">Joined</th>
                 <th className="px-3 py-2.5">Approval</th>
                 <th className="px-3 py-2.5">Status</th>
+                <th className="px-3 py-2.5">About</th>
                 <th className="px-3 py-2.5">Actions</th>
               </tr>
             </thead>
@@ -810,6 +839,7 @@ const AdminUsersPage = () => {
                       </span>
                     </td>
                     <td className="admin-compact-mobile-hidden px-3 py-2.5">{renderActivePill(user)}</td>
+                    <td className="admin-compact-mobile-hidden px-3 py-2.5">{renderAboutPill(user)}</td>
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-2">
                         <button
@@ -860,7 +890,7 @@ const AdminUsersPage = () => {
 
               {desktopFilteredUsers.length === 0 ? (
                 <tr>
-                  <td className="px-3 py-4 text-center text-slate-500" colSpan={7}>No users found for this tab.</td>
+                  <td className="px-3 py-4 text-center text-slate-500" colSpan={8}>No users found for this tab.</td>
                 </tr>
               ) : null}
             </tbody>
@@ -893,9 +923,10 @@ const AdminUsersPage = () => {
                       <span className="rounded-full bg-slate-100 px-2.5 py-1">Joined: {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '-'}</span>
                     </div>
 
-                    <div className="mt-3 grid w-full grid-cols-2 gap-2">
+                    <div className="mt-3 grid w-full grid-cols-3 gap-2">
                       <div className="min-w-0">{renderApprovalPill(approvalStatus)}</div>
                       <div className="min-w-0">{renderActivePill(user)}</div>
+                      <div className="min-w-0">{renderAboutPill(user)}</div>
                     </div>
                   </div>
 
@@ -1006,6 +1037,16 @@ const AdminUsersPage = () => {
                       <option key={role} value={role}>{role}</option>
                     ))}
                   </select>
+                </label>
+                <label className="text-sm">Public title
+                  <input {...form.register('title')} placeholder="President, Manager..." className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                </label>
+                <label className="text-sm md:col-span-2">Public description
+                  <textarea {...form.register('description')} rows={3} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                </label>
+                <label className="flex items-center gap-2 text-sm md:col-span-3">
+                  <input type="checkbox" {...form.register('showOnAbout')} className="h-4 w-4 rounded border-slate-300 text-brand-blue" />
+                  Show this profile on the About page
                 </label>
                 <div className="md:col-span-3 flex gap-2">
                   <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? 'Adding...' : 'Add User'}</Button>
@@ -1231,6 +1272,16 @@ const AdminUsersPage = () => {
                             <option key={role} value={role}>{role}</option>
                           ))}
                         </select>
+                      </label>
+                      <label className="text-sm font-semibold text-slate-700">Public title
+                        <input {...editForm.register('title')} placeholder="President, Manager..." className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 shadow-sm outline-none transition focus:border-brand-blue" />
+                      </label>
+                      <label className="flex items-center gap-2 self-end rounded-xl border border-slate-200 bg-white p-3 text-sm font-semibold text-slate-700">
+                        <input type="checkbox" {...editForm.register('showOnAbout')} className="h-4 w-4 rounded border-slate-300 text-brand-blue" />
+                        Show on About page
+                      </label>
+                      <label className="text-sm font-semibold text-slate-700 md:col-span-2">Public description
+                        <textarea {...editForm.register('description')} rows={4} className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 shadow-sm outline-none transition focus:border-brand-blue" />
                       </label>
                     </div>
                   </div>

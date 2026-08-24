@@ -89,6 +89,9 @@ CREATE TABLE IF NOT EXISTS admin_users (
       address TEXT NOT NULL DEFAULT '',
       auth_provider TEXT NOT NULL DEFAULT 'LOCAL',
       avatar_url TEXT NOT NULL DEFAULT '',
+      profile_title TEXT NOT NULL DEFAULT '',
+      profile_description TEXT NOT NULL DEFAULT '',
+      show_on_about BOOLEAN NOT NULL DEFAULT FALSE,
       registration_complete BOOLEAN NOT NULL DEFAULT FALSE,
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
       approval_status TEXT NOT NULL DEFAULT 'pending',
@@ -96,6 +99,11 @@ CREATE TABLE IF NOT EXISTS admin_users (
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+ALTER TABLE admin_users
+  ADD COLUMN IF NOT EXISTS profile_title TEXT NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS profile_description TEXT NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS show_on_about BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE TABLE IF NOT EXISTS cms_pages (
       id TEXT PRIMARY KEY,

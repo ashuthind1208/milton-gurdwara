@@ -301,7 +301,7 @@ const AdminCmsPage = () => {
           <Button type="button" variant="secondary" onClick={() => setSlideModal({ open: true, mode: 'add', slideId: null })}>Add New Slide</Button>
         </div>
 
-        <div className="mt-4 overflow-x-auto">
+        <div className="mt-4 overflow-x-hidden">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
@@ -321,9 +321,15 @@ const AdminCmsPage = () => {
                   <td className="px-3 py-2">{slide.primaryCtaLabel || '-'} {slide.primaryCtaPath ? `(${slide.primaryCtaPath})` : ''}</td>
                   <td className="px-3 py-2">
                     <div className="flex flex-wrap gap-2">
-                      <button type="button" className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold" onClick={() => setSlideModal({ open: true, mode: 'view', slideId: slide.id })}>View</button>
-                      <button type="button" className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold" onClick={() => setSlideModal({ open: true, mode: 'edit', slideId: slide.id })}>Edit</button>
-                      <button type="button" className="rounded-lg border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-700" onClick={() => deleteSlideMutation.mutate(slide.id)}>Delete</button>
+                      <button type="button" className="inline-flex h-8 w-8 items-center justify-center gap-1.5 rounded-lg border border-slate-300 text-xs font-semibold xl:w-auto xl:px-2.5" onClick={() => setSlideModal({ open: true, mode: 'view', slideId: slide.id })} aria-label="View slide" title="View">
+                        <EyeIcon className="h-4 w-4" /><span className="admin-cms-action-label hidden xl:inline">View</span>
+                      </button>
+                      <button type="button" className="inline-flex h-8 w-8 items-center justify-center gap-1.5 rounded-lg border border-slate-300 text-xs font-semibold xl:w-auto xl:px-2.5" onClick={() => setSlideModal({ open: true, mode: 'edit', slideId: slide.id })} aria-label="Edit slide" title="Edit">
+                        <PencilSquareIcon className="h-4 w-4" /><span className="admin-cms-action-label hidden xl:inline">Edit</span>
+                      </button>
+                      <button type="button" className="inline-flex h-8 w-8 items-center justify-center gap-1.5 rounded-lg border border-red-200 text-xs font-semibold text-red-700 xl:w-auto xl:px-2.5" onClick={() => deleteSlideMutation.mutate(slide.id)} aria-label="Delete slide" title="Delete">
+                        <TrashIcon className="h-4 w-4" /><span className="admin-cms-action-label hidden xl:inline">Delete</span>
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -411,7 +417,7 @@ const AdminCmsPage = () => {
             <button type="button" className="rounded-lg bg-brand-saffron px-3 py-1 text-xs font-semibold text-black" onClick={() => setSectionModal({ open: true, mode: 'add', sectionId: null })}>Add Section</button>
           </div>
 
-          <div className="mt-3 overflow-x-auto">
+          <div className="mt-3 overflow-x-hidden">
             <table className="min-w-full divide-y divide-slate-200 text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wide text-slate-500">

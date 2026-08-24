@@ -146,6 +146,9 @@ const ensureEventsSchema = async () => {
       address TEXT NOT NULL DEFAULT '',
       auth_provider TEXT NOT NULL DEFAULT 'LOCAL',
       avatar_url TEXT NOT NULL DEFAULT '',
+      profile_title TEXT NOT NULL DEFAULT '',
+      profile_description TEXT NOT NULL DEFAULT '',
+      show_on_about BOOLEAN NOT NULL DEFAULT FALSE,
       registration_complete BOOLEAN NOT NULL DEFAULT FALSE,
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
       approval_status TEXT NOT NULL DEFAULT 'pending',
@@ -153,6 +156,13 @@ const ensureEventsSchema = async () => {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `);
+
+  await pool.query(`
+    ALTER TABLE admin_users
+      ADD COLUMN IF NOT EXISTS profile_title TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS profile_description TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS show_on_about BOOLEAN NOT NULL DEFAULT FALSE;
   `);
 
   await pool.query(`
@@ -700,10 +710,12 @@ const mirrorItemResource = async (resource, payload) => {
       `
       INSERT INTO admin_users(
         id, name, email, role, member_type, phone, address, auth_provider, avatar_url,
-        registration_complete, is_active, approval_status, approval_updated_at, created_at, updated_at
+        profile_title, profile_description, show_on_about, registration_complete,
+        is_active, approval_status, approval_updated_at, created_at, updated_at
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9,
-        $10, $11, $12, $13, COALESCE($14::timestamptz, NOW()), COALESCE($15::timestamptz, NOW())
+        $10, $11, $12, $13, $14, $15, $16,
+        COALESCE($17::timestamptz, NOW()), COALESCE($18::timestamptz, NOW())
       )
       ON CONFLICT (id) DO UPDATE SET
         name = EXCLUDED.name,
@@ -714,6 +726,9 @@ const mirrorItemResource = async (resource, payload) => {
         address = EXCLUDED.address,
         auth_provider = EXCLUDED.auth_provider,
         avatar_url = EXCLUDED.avatar_url,
+        profile_title = EXCLUDED.profile_title,
+        profile_description = EXCLUDED.profile_description,
+        show_on_about = EXCLUDED.show_on_about,
         registration_complete = EXCLUDED.registration_complete,
         is_active = EXCLUDED.is_active,
         approval_status = EXCLUDED.approval_status,
@@ -730,6 +745,9 @@ const mirrorItemResource = async (resource, payload) => {
         item.address || '',
         item.authProvider || 'LOCAL',
         item.avatarUrl || '',
+        item.title || '',
+        item.description || '',
+        item.showOnAbout === true,
         Boolean(item.registrationComplete),
         item.isActive !== false,
         item.approvalStatus || 'pending',

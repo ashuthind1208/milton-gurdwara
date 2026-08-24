@@ -112,7 +112,15 @@ const ensureEventsSchema = async () => {
     ...relationalSchemaStatements
   ];
   for (const statement of statements) {
-    await db.query(statement);
+    try {
+      await db.query(statement);
+    } catch (error) {
+      const isIdempotentColumnMigration = error?.code === 'ER_DUP_FIELDNAME'
+        && /^ALTER TABLE\s+\w+\s+ADD COLUMN\s+/i.test(statement.trim());
+      if (!isIdempotentColumnMigration) {
+        throw error;
+      }
+    }
   }
   return true;
 };

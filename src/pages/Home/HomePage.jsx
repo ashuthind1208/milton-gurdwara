@@ -114,6 +114,16 @@ const resolvePublicLangarNeedLabel = (item = {}) => {
   return 'Needed now';
 };
 
+const isRecentlyAddedLangarItem = (addedOn = '') => {
+  const addedDate = new Date(`${addedOn}T12:00:00`);
+  if (!addedOn || Number.isNaN(addedDate.getTime())) {
+    return false;
+  }
+
+  const ageInDays = Math.floor((Date.now() - addedDate.getTime()) / (1000 * 60 * 60 * 24));
+  return ageInDays >= 0 && ageInDays < 7;
+};
+
 const HomePage = () => {
   const navigate = useNavigate();
   const meta = useSeoMeta('Home', 'Daily hukamnama, events, seva, donations, and Sikh education for the sangat.');
@@ -388,7 +398,7 @@ const HomePage = () => {
         items: publicLangarNeeds.map((entry) => ({
           primary: entry.name,
           category: entry.category || 'General',
-          secondary: `${entry.addedOn || 'Current request'} • ${resolvePublicLangarNeedLabel(entry)}`
+          isNew: isRecentlyAddedLangarItem(entry.addedOn)
         }))
       },
       '/donation': {
@@ -925,7 +935,7 @@ const HomePage = () => {
 
       {selectedContentLink ? (
         <div className="fixed inset-0 z-[75] flex items-center justify-center bg-slate-900/45 px-3 py-4 sm:px-4">
-          <div className={`w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-xl bg-white shadow-xl ${selectedContentLink.type === 'seva' ? 'overflow-hidden p-0' : 'p-4 sm:p-5'}`}>
+          <div role="dialog" aria-modal="true" aria-label={selectedContentLink.type === 'seva' ? 'Langar Items Needed' : selectedContentLink.title} className={`w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-xl bg-white shadow-xl ${selectedContentLink.type === 'seva' ? 'overflow-hidden p-0' : 'p-4 sm:p-5'}`}>
             <div className={`${selectedContentLink.type === 'seva' ? 'flex items-start justify-between gap-3 rounded-t-xl bg-slate-900 px-4 py-3 text-white' : '-mx-4 -mt-4 mb-4 flex items-start justify-between gap-3 rounded-t-xl px-4 py-3'}`}>
               <div className="min-w-0">
                 {selectedContentLink.type === 'hukamnama' ? (
@@ -1025,13 +1035,13 @@ const HomePage = () => {
                           <>
                             <ul className="divide-y divide-slate-100">
                               {pageItems.map((item) => (
-                                <li key={`${item.primary}-${item.secondary}`} className="py-1.5">
-                                  <div className="space-y-0.5">
-                                    <p className="text-sm font-semibold leading-tight text-slate-800">{item.primary}</p>
-                                    <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] leading-tight text-slate-600">
-                                      <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">{item.category}</span>
-                                      <span>{item.secondary}</span>
-                                    </p>
+                                <li key={`${item.primary}-${item.category}`} className="py-2.5">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div className="flex min-w-0 items-center gap-2">
+                                      <p className="truncate text-base font-bold leading-tight text-slate-800 sm:text-lg">{item.primary}</p>
+                                      {item.isNew ? <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-800">New</span> : null}
+                                    </div>
+                                    <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{item.category}</span>
                                   </div>
                                 </li>
                               ))}

@@ -515,6 +515,10 @@
     max-width: 100%;
   }
 
+  .admin-main-content .admin-cms-action-label {
+    display: none !important;
+  }
+
   .admin-main-content table td:last-child {
     width: 1%;
     max-width: none;
