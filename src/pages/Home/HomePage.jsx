@@ -780,16 +780,15 @@ const HomePage = () => {
             {featuredAlbum ? (
               <article className="rounded-xl border border-slate-200 bg-white px-4 py-4">
                 <SectionTitle title="Gallery Highlight" subtitle={featuredAlbum.eventDate || 'Featured folder'} />
-                <button
-                  type="button"
-                  onClick={() => navigate('/gallery', { state: { openAlbumId: featuredAlbum.id } })}
+                <Link
+                  to="/media"
                   className="mt-2 w-full overflow-hidden rounded-lg"
                 >
                   <img src={featuredAlbum.frontImage || featuredAlbum.coverUrl || featuredAlbum.coverImage || featuredAlbum.cover || ''} alt={featuredAlbum.title} className="h-36 w-full object-cover" loading="lazy" />
-                </button>
+                </Link>
                 <h3 className="mt-2 font-heading text-lg font-semibold">{featuredAlbum.title}</h3>
                 <div className="mt-1 flex justify-end">
-                  <button type="button" onClick={() => navigate('/gallery', { state: { openAlbumId: featuredAlbum.id } })} className="inline-flex items-center gap-1 text-sm font-semibold text-brand-blue hover:underline"><span>&gt;</span> View gallery</button>
+                  <Link to="/media" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-blue hover:underline"><span>&gt;</span> View gallery</Link>
                 </div>
               </article>
             ) : null}
