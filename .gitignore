@@ -16,6 +16,7 @@
 
 # misc
 .DS_Store
+/DevTunnels/
 .env
 .env.local
 .env.development.local
