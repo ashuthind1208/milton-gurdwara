@@ -5995,12 +5995,12 @@ const server = http.createServer(async (request, response) => {
         .map((user) => ({
           id: String(user.id || ''),
           name: String(user.name || '').trim(),
-          title: String(user.title || '').trim(),
+          title: String(user.title || '').trim() || 'Community Members',
           description: String(user.description || '').trim(),
           avatarUrl: String(user.avatarUrl || '').trim(),
           phone: String(user.phone || '').trim()
         }))
-        .filter((user) => user.name && user.title)
+        .filter((user) => user.name)
         .sort((left, right) => left.title.localeCompare(right.title) || left.name.localeCompare(right.name));
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
