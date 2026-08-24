@@ -66,18 +66,21 @@ const AboutPage = () => {
           <div className="space-y-8">
             {Object.entries(membersByTitle).map(([title, members]) => (
               <div key={title}>
-                <h3 className="mb-4 border-b border-slate-200 pb-2 font-heading text-xl font-semibold text-brand-blue">{title}</h3>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                <div className="mb-4 flex items-center gap-3">
+                  <h3 className="shrink-0 font-heading text-xl font-semibold text-brand-blue">{title}</h3>
+                  <span className="h-px flex-1 bg-slate-200" aria-hidden="true" />
+                </div>
+                <div className="flex flex-wrap gap-4">
                   {members.map((member) => (
-                    <button key={member.id} type="button" onClick={() => setSelectedMember(member)} className="group min-w-0 text-left" aria-label={`View details for ${member.name}`}>
+                    <button key={member.id} type="button" onClick={() => setSelectedMember(member)} className="group w-32 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white text-left shadow-sm transition hover:border-brand-blue hover:shadow-md sm:w-36" aria-label={`View details for ${member.name}`}>
                       <img
                         src={member.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name || 'Member')}`}
                         alt={member.name}
-                        className="aspect-square w-full rounded-lg border border-slate-200 object-cover shadow-sm transition group-hover:border-brand-blue group-hover:shadow-md"
+                        className="aspect-square w-full object-cover"
                         loading="lazy"
                         referrerPolicy="no-referrer"
                       />
-                      <span className="mt-2 block text-center text-sm font-bold text-slate-900 group-hover:text-brand-blue">{member.name}</span>
+                      <span className="block border-t border-slate-200 px-2 py-2 text-center text-sm font-bold leading-tight text-slate-900 group-hover:text-brand-blue">{member.name}</span>
                     </button>
                   ))}
                 </div>
