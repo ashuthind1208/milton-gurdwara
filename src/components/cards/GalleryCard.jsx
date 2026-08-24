@@ -9,7 +9,7 @@ const GalleryCard = ({ album }) => {
   return (
     <Card className="overflow-hidden p-0">
       {album.folderUrl ? (
-        <a href={album.folderUrl} aria-label={`Open ${album.title} folder`} className="block">
+        <a href={album.folderUrl} target="_blank" rel="noreferrer" aria-label={`Open ${album.title} folder in a new tab`} className="block">
           <img src={imageSrc} alt={album.title} className="h-40 w-full object-cover" loading="lazy" onError={() => setImageSrc(gurdwaraLogo)} />
         </a>
       ) : (
