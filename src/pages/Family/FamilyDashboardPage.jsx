@@ -670,7 +670,10 @@ const FamilyDashboardPage = () => {
                       <p className="mt-0.5 text-xs text-slate-600">{booking.date || 'Date not set'}</p>
                       <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-brand-blue">Type: {booking.categoryName || 'Other'}</p>
                     </div>
-                    <button type="button" onClick={() => setSelectedBooking(booking)} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-brand-blue/25 bg-blue-50 text-brand-blue transition hover:border-brand-blue hover:bg-brand-blue hover:text-white" aria-label={`View booking details for ${booking.title || booking.categoryName || 'booking'}`} title="View booking details"><EyeIcon className="h-4 w-4" /></button>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className={`rounded-full border px-2.5 py-1 text-[11px] font-extrabold uppercase shadow-sm ${bookingStatusPillClass(booking.status)}`}>{booking.status || 'pending'}</span>
+                      <button type="button" onClick={() => setSelectedBooking(booking)} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-brand-blue/25 bg-blue-50 text-brand-blue transition hover:border-brand-blue hover:bg-brand-blue hover:text-white" aria-label={`View booking details for ${booking.title || booking.categoryName || 'booking'}`} title="View booking details"><EyeIcon className="h-4 w-4" /></button>
+                    </div>
                   </div>
                 </div>
               ))}
