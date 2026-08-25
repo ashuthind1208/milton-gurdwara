@@ -7,6 +7,7 @@ import {
   ClockIcon,
   CurrencyDollarIcon,
   EyeIcon,
+  EyeSlashIcon,
   PencilSquareIcon,
   Squares2X2Icon,
   TrashIcon,
@@ -49,6 +50,9 @@ const activeStatusClassMap = {
 const actionIconClass = 'h-4 w-4';
 const STANDARD_ROLES = ['Family', 'Member', 'Volunteer', 'Admin', 'Super Admin'];
 const CUSTOM_ROLE_RESOURCE = 'admin_roles';
+const PUBLIC_TITLE_RESOURCE = 'public_titles';
+const OTHER_PUBLIC_TITLE_VALUE = '__other__';
+const DEFAULT_PUBLIC_TITLES = ['President', 'Member', 'Volunteer'];
 const adminPageOptions = adminNav.map((item) => ({ label: item.label, path: item.path }));
 const memberAllowedAdminPagePaths = [
   '/admin',
@@ -111,6 +115,17 @@ const normalizeRoleDefinitions = (value) => {
     .filter((entry) => entry.name && !isStandardRole(entry.name) && !seen.has(entry.name) && seen.add(entry.name));
 };
 
+const normalizePublicTitles = (value) => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const seen = new Set();
+  return value
+    .map((entry) => String(entry?.name || entry || '').trim())
+    .filter((title) => title && !seen.has(title.toLowerCase()) && seen.add(title.toLowerCase()));
+};
+
 const getAvatarSrc = (user = {}) => (
   getAvatarUrl(user) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}`
 );
@@ -123,6 +138,7 @@ const userFormDefaults = {
   phone: '',
   address: '',
   title: '',
+  customTitle: '',
   description: '',
   showOnAbout: false,
   role: 'Member',
@@ -263,6 +279,10 @@ const AdminUsersPage = () => {
     queryKey: ['admin-role-definitions'],
     queryFn: () => contentApiService.getSingleton(CUSTOM_ROLE_RESOURCE, []).then((res) => normalizeRoleDefinitions(res || []))
   });
+  const { data: managedPublicTitles = [] } = useQuery({
+    queryKey: ['admin-public-titles'],
+    queryFn: () => contentApiService.getSingleton(PUBLIC_TITLE_RESOURCE, DEFAULT_PUBLIC_TITLES).then((res) => normalizePublicTitles(res || []))
+  });
   const [desktopSearchTerm, setDesktopSearchTerm] = useState('');
   const [mobileSearchTerm, setMobileSearchTerm] = useState('');
   const [mobilePage, setMobilePage] = useState(1);
@@ -271,21 +291,49 @@ const AdminUsersPage = () => {
     () => [...new Set([...STANDARD_ROLES, ...customRoleDefinitions.map((entry) => entry.name)])],
     [customRoleDefinitions]
   );
+  const publicTitleOptions = useMemo(
+    () => normalizePublicTitles([...managedPublicTitles, ...users.map((entry) => entry.title)]),
+    [managedPublicTitles, users]
+  );
+  const createPublicTitleSelection = form.watch('title');
+  const editPublicTitleSelection = editForm.watch('title');
 
   const getCustomRoleAccessByName = (roleName) => {
     const role = customRoleDefinitions.find((entry) => entry.name === String(roleName || '').trim());
     return role ? normalizeAdminPageAccess(role.adminPageAccess) : undefined;
   };
 
+  const resolveAndPersistPublicTitle = async (values) => {
+    const selectedTitle = String(values.title || '').trim();
+    if (selectedTitle !== OTHER_PUBLIC_TITLE_VALUE) {
+      return selectedTitle;
+    }
+
+    const customTitle = String(values.customTitle || '').trim();
+    if (!customTitle) {
+      throw new Error('Enter a public title.');
+    }
+
+    const latestTitles = await contentApiService.getSingleton(PUBLIC_TITLE_RESOURCE, DEFAULT_PUBLIC_TITLES);
+    const normalizedTitles = normalizePublicTitles(latestTitles || []);
+    if (!normalizedTitles.some((title) => title.toLowerCase() === customTitle.toLowerCase())) {
+      await contentApiService.setSingleton(PUBLIC_TITLE_RESOURCE, [...normalizedTitles, customTitle]);
+    }
+    return customTitle;
+  };
+
   const createMutation = useMutation({
-    mutationFn: (values) => {
+    mutationFn: async (values) => {
       const resolvedRole = String(values.role || '').trim() || 'Member';
       const customRoleAccess = getCustomRoleAccessByName(resolvedRole);
       const isCustomRole = !isStandardRole(resolvedRole);
+      const resolvedTitle = await resolveAndPersistPublicTitle(values);
+      const { customTitle, ...userValues } = values;
 
       return userService.createUser({
-        ...values,
+        ...userValues,
         role: resolvedRole,
+        title: resolvedTitle,
         adminPageAccess: isCustomRole ? customRoleAccess : undefined,
         isActive: true,
         registrationComplete: true
@@ -293,21 +341,25 @@ const AdminUsersPage = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-public-titles'] });
       form.reset(userFormDefaults);
       setCreateUserOpen(false);
     }
   });
 
   const editMutation = useMutation({
-    mutationFn: ({ id, values }) => {
+    mutationFn: async ({ id, values }) => {
       const resolvedRole = String(values.role || '').trim() || 'Member';
       const customRoleAccess = getCustomRoleAccessByName(resolvedRole);
       const isCustomRole = !isStandardRole(resolvedRole);
       const existingUser = users.find((u) => u.id === id);
+      const resolvedTitle = await resolveAndPersistPublicTitle(values);
+      const { customTitle, ...userValues } = values;
 
       return userService.updateUser(id, {
-        ...values,
+        ...userValues,
         role: resolvedRole,
+        title: resolvedTitle,
         adminPageAccess: isCustomRole ? customRoleAccess : undefined,
         avatarUrl: String(editAvatarUrl || '').trim(),
         membershipProfile: {
@@ -321,6 +373,8 @@ const AdminUsersPage = () => {
     },
     onSuccess: (response, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-public-titles'] });
+      queryClient.invalidateQueries({ queryKey: ['public-members'] });
       setEditUserId('');
       if (currentUser?.id && currentUser.id === variables?.id && response?.data) {
         persistUser(response.data);
@@ -435,6 +489,7 @@ const AdminUsersPage = () => {
       phone: user.phone || '',
       address: user.address || '',
       title: user.title || '',
+      customTitle: '',
       description: user.description || '',
       showOnAbout: user.showOnAbout === true,
       role: user.role || 'Member',
@@ -695,14 +750,18 @@ const AdminUsersPage = () => {
 
   const renderAboutPill = (user) => {
     const isVisible = user.showOnAbout === true;
+    const VisibilityIcon = isVisible ? EyeIcon : EyeSlashIcon;
     return (
       <button
         type="button"
         onClick={() => toggleAboutMutation.mutate({ id: user.id, showOnAbout: !isVisible })}
         disabled={toggleAboutMutation.isPending}
-        className={`inline-flex w-full items-center justify-center rounded-full border px-2.5 py-1 text-xs font-semibold transition ${activeStatusClassMap[isVisible ? 'active' : 'inactive']} disabled:cursor-not-allowed disabled:opacity-50`}
+        className={`mx-auto inline-flex h-8 w-8 items-center justify-center rounded-full border transition ${activeStatusClassMap[isVisible ? 'active' : 'inactive']} disabled:cursor-not-allowed disabled:opacity-50`}
+        aria-label={isVisible ? `Hide ${user.name} from About page` : `Show ${user.name} on About page`}
+        aria-pressed={isVisible}
+        title={isVisible ? 'Shown on About page' : 'Hidden from About page'}
       >
-        {isVisible ? 'Shown' : 'Hidden'}
+        <VisibilityIcon className="h-4 w-4" />
       </button>
     );
   };
@@ -1039,8 +1098,19 @@ const AdminUsersPage = () => {
                   </select>
                 </label>
                 <label className="text-sm">Public title
-                  <input {...form.register('title')} placeholder="President, Manager..." className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                  <select {...form.register('title')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
+                    <option value="">— Select —</option>
+                    {publicTitleOptions.map((title) => (
+                      <option key={title} value={title}>{title}</option>
+                    ))}
+                    <option value={OTHER_PUBLIC_TITLE_VALUE}>Other</option>
+                  </select>
                 </label>
+                {createPublicTitleSelection === OTHER_PUBLIC_TITLE_VALUE ? (
+                  <label className="text-sm">New public title
+                    <input {...form.register('customTitle', { required: true })} required placeholder="e.g. Treasurer" className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                  </label>
+                ) : null}
                 <label className="text-sm md:col-span-2">Public description
                   <textarea {...form.register('description')} rows={3} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
                 </label>
@@ -1274,8 +1344,19 @@ const AdminUsersPage = () => {
                         </select>
                       </label>
                       <label className="text-sm font-semibold text-slate-700">Public title
-                        <input {...editForm.register('title')} placeholder="President, Manager..." className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 shadow-sm outline-none transition focus:border-brand-blue" />
+                        <select {...editForm.register('title')} className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 shadow-sm outline-none transition focus:border-brand-blue">
+                          <option value="">— Select —</option>
+                          {publicTitleOptions.map((title) => (
+                            <option key={title} value={title}>{title}</option>
+                          ))}
+                          <option value={OTHER_PUBLIC_TITLE_VALUE}>Other</option>
+                        </select>
                       </label>
+                      {editPublicTitleSelection === OTHER_PUBLIC_TITLE_VALUE ? (
+                        <label className="text-sm font-semibold text-slate-700">New public title
+                          <input {...editForm.register('customTitle', { required: true })} required placeholder="e.g. Treasurer" className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 shadow-sm outline-none transition focus:border-brand-blue" />
+                        </label>
+                      ) : null}
                       <label className="flex items-center gap-2 self-end rounded-xl border border-slate-200 bg-white p-3 text-sm font-semibold text-slate-700">
                         <input type="checkbox" {...editForm.register('showOnAbout')} className="h-4 w-4 rounded border-slate-300 text-brand-blue" />
                         Show on About page

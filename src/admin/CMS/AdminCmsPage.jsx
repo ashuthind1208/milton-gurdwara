@@ -289,7 +289,7 @@ const AdminCmsPage = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="admin-cms-page space-y-6">
       <h1 className="sr-only">CMS Management</h1>
 
       <Card>
@@ -302,7 +302,7 @@ const AdminCmsPage = () => {
         </div>
 
         <div className="mt-4 overflow-x-hidden">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
+          <table className="admin-cms-table min-w-full divide-y divide-slate-200 text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-3 py-2">Order</th>
@@ -320,7 +320,7 @@ const AdminCmsPage = () => {
                   <td className="px-3 py-2">{slide.eyebrow || '-'}</td>
                   <td className="px-3 py-2">{slide.primaryCtaLabel || '-'} {slide.primaryCtaPath ? `(${slide.primaryCtaPath})` : ''}</td>
                   <td className="px-3 py-2">
-                    <div className="flex flex-wrap gap-2">
+                    <div className="admin-cms-actions flex flex-wrap gap-2">
                       <button type="button" className="inline-flex h-8 w-8 items-center justify-center gap-1.5 rounded-lg border border-slate-300 text-xs font-semibold xl:w-auto xl:px-2.5" onClick={() => setSlideModal({ open: true, mode: 'view', slideId: slide.id })} aria-label="View slide" title="View">
                         <EyeIcon className="h-4 w-4" /><span className="admin-cms-action-label hidden xl:inline">View</span>
                       </button>
@@ -418,7 +418,7 @@ const AdminCmsPage = () => {
           </div>
 
           <div className="mt-3 overflow-x-hidden">
-            <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <table className="admin-cms-table min-w-full divide-y divide-slate-200 text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
                   <th className="px-3 py-2">Title</th>
@@ -444,14 +444,14 @@ const AdminCmsPage = () => {
                       ) : '-'}
                     </td>
                     <td className="px-3 py-2">
-                      <div className="flex items-center gap-1">
-                        <button type="button" className="rounded-md border border-slate-300 p-1.5 text-slate-700" onClick={() => setSectionModal({ open: true, mode: 'view', sectionId: section.id })} title="View">
+                      <div className="admin-cms-actions flex items-center gap-1">
+                        <button type="button" className="h-8 w-8 rounded-md border border-slate-300 p-1.5 text-slate-700" onClick={() => setSectionModal({ open: true, mode: 'view', sectionId: section.id })} title="View" aria-label="View section">
                           <EyeIcon className="h-4 w-4" />
                         </button>
-                        <button type="button" className="rounded-md border border-slate-300 p-1.5 text-slate-700" onClick={() => setSectionModal({ open: true, mode: 'edit', sectionId: section.id })} title="Edit">
+                        <button type="button" className="h-8 w-8 rounded-md border border-slate-300 p-1.5 text-slate-700" onClick={() => setSectionModal({ open: true, mode: 'edit', sectionId: section.id })} title="Edit" aria-label="Edit section">
                           <PencilSquareIcon className="h-4 w-4" />
                         </button>
-                        <button type="button" className="rounded-md border border-red-200 p-1.5 text-red-700" onClick={() => saveSectionsMutation.mutate(sections.filter((item) => item.id !== section.id))} title="Delete">
+                        <button type="button" className="h-8 w-8 rounded-md border border-red-200 p-1.5 text-red-700" onClick={() => saveSectionsMutation.mutate(sections.filter((item) => item.id !== section.id))} title="Delete" aria-label="Delete section">
                           <TrashIcon className="h-4 w-4" />
                         </button>
                       </div>

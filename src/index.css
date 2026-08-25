@@ -519,6 +519,32 @@
     display: none !important;
   }
 
+  .admin-main-content .admin-cms-table tr {
+    grid-template-columns: minmax(0, 1fr) 32px;
+    column-gap: 8px;
+    overflow: hidden;
+  }
+
+  .admin-main-content .admin-cms-table td:not(:last-child) {
+    max-width: 100%;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-main-content .admin-cms-table td:last-child {
+    width: 32px !important;
+    min-width: 32px;
+    max-width: 32px;
+    justify-self: stretch;
+  }
+
+  .admin-main-content .admin-cms-table td:last-child > .admin-cms-actions {
+    width: 32px;
+    max-width: 32px;
+    align-items: center;
+    flex-direction: column;
+  }
+
   .admin-main-content table td:last-child {
     width: 1%;
     max-width: none;

@@ -12,6 +12,8 @@ import userService from '../../services/userService';
 
 const STANDARD_ROLES = new Set(['Family', 'Member', 'Volunteer', 'Admin', 'Super Admin']);
 const CUSTOM_ROLE_RESOURCE = 'admin_roles';
+const PUBLIC_TITLE_RESOURCE = 'public_titles';
+const DEFAULT_PUBLIC_TITLES = ['President', 'Member', 'Volunteer'];
 const FULL_ACCESS_ROLES = new Set(['Super Admin', 'Admin']);
 const adminPageOptions = adminNav.map((item) => ({ label: item.label, path: item.path }));
 const MEMBER_ALLOWED_ADMIN_PAGE_PATHS = [
@@ -60,6 +62,17 @@ const normalizeRoleRecords = (value) => {
     .filter((entry) => entry.name && !seen.has(entry.name) && seen.add(entry.name));
 };
 
+const normalizePublicTitles = (value) => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const seen = new Set();
+  return value
+    .map((entry) => String(entry?.name || entry || '').trim())
+    .filter((title) => title && !seen.has(title.toLowerCase()) && seen.add(title.toLowerCase()));
+};
+
 const emptyEditor = { name: '', adminPageAccess: [] };
 const MEMBERS_PAGE_SIZE = 10;
 
@@ -80,6 +93,10 @@ const AdminRolesAccessPage = () => {
   const [editorState, setEditorState] = useState(emptyEditor);
   const [membersRole, setMembersRole] = useState(null);
   const [membersPage, setMembersPage] = useState(1);
+  const [titleEditorOpen, setTitleEditorOpen] = useState(false);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [titleName, setTitleName] = useState('');
+  const [titleNotice, setTitleNotice] = useState('');
 
   const { data: roleDefinitions = [] } = useQuery({
     queryKey: ['admin-role-definitions'],
@@ -90,6 +107,11 @@ const AdminRolesAccessPage = () => {
   const { data: users = [] } = useQuery({
     queryKey: ['admin-users'],
     queryFn: () => contentApiService.list('users'),
+    enabled: hasFullAccess
+  });
+  const { data: managedPublicTitles = [] } = useQuery({
+    queryKey: ['admin-public-titles'],
+    queryFn: () => contentApiService.getSingleton(PUBLIC_TITLE_RESOURCE, DEFAULT_PUBLIC_TITLES).then((res) => normalizePublicTitles(res || [])),
     enabled: hasFullAccess
   });
 
@@ -115,6 +137,34 @@ const AdminRolesAccessPage = () => {
       setEditorOpen(false);
       await queryClient.invalidateQueries({ queryKey: ['admin-role-definitions'] });
       await queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+    }
+  });
+
+  const savePublicTitlesMutation = useMutation({
+    mutationFn: async ({ titles, renamedFrom = '', renamedTo = '' }) => {
+      if (renamedFrom && renamedTo && renamedFrom !== renamedTo) {
+        const assignedUsers = users.filter((entry) => String(entry?.title || '').trim() === renamedFrom);
+        await Promise.all(assignedUsers.map((entry) => contentApiService.update('users', entry.id, {
+          ...entry,
+          title: renamedTo,
+          updatedAt: new Date().toISOString()
+        })));
+      }
+
+      await contentApiService.setSingleton(PUBLIC_TITLE_RESOURCE, titles);
+      return titles;
+    },
+    onSuccess: async () => {
+      setTitleNotice('');
+      setEditingTitle('');
+      setTitleName('');
+      setTitleEditorOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ['admin-public-titles'] });
+      await queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      await queryClient.invalidateQueries({ queryKey: ['public-members'] });
+    },
+    onError: (error) => {
+      setTitleNotice(String(error?.message || 'Unable to save public titles.'));
     }
   });
 
@@ -200,6 +250,64 @@ const AdminRolesAccessPage = () => {
       renamedTo: !isEditingSystemRole && editingName && normalizedName !== editingName ? normalizedName : '',
       renamedAccess: normalizedAccess
     });
+  };
+
+  const publicTitleRows = useMemo(() => {
+    const titles = normalizePublicTitles([...managedPublicTitles, ...users.map((entry) => entry.title)]);
+    return titles.map((title) => ({
+      name: title,
+      userCount: users.filter((entry) => String(entry?.title || '').trim() === title).length
+    }));
+  }, [managedPublicTitles, users]);
+
+  const openAddPublicTitle = () => {
+    setTitleNotice('');
+    setEditingTitle('');
+    setTitleName('');
+    setTitleEditorOpen(true);
+  };
+
+  const openEditPublicTitle = (title) => {
+    setTitleNotice('');
+    setEditingTitle(title);
+    setTitleName(title);
+    setTitleEditorOpen(true);
+  };
+
+  const savePublicTitle = () => {
+    const normalizedName = String(titleName || '').trim();
+    if (!normalizedName) {
+      setTitleNotice('Public title is required.');
+      return;
+    }
+
+    const duplicate = publicTitleRows.some((entry) => entry.name.toLowerCase() === normalizedName.toLowerCase() && entry.name !== editingTitle);
+    if (duplicate) {
+      setTitleNotice('A public title with this name already exists.');
+      return;
+    }
+
+    const currentTitles = publicTitleRows.map((entry) => entry.name);
+    const nextTitles = editingTitle
+      ? currentTitles.map((title) => (title === editingTitle ? normalizedName : title))
+      : [...currentTitles, normalizedName];
+    savePublicTitlesMutation.mutate({
+      titles: normalizePublicTitles(nextTitles),
+      renamedFrom: editingTitle,
+      renamedTo: normalizedName
+    });
+  };
+
+  const deletePublicTitle = async (title) => {
+    const latestUsers = await userService.getUsers().then((res) => res.data || []);
+    const isAssigned = latestUsers.some((entry) => String(entry?.title || '').trim() === title);
+    if (isAssigned) {
+      setTitleNotice(`Cannot delete ${title} because users are assigned to this public title.`);
+      return;
+    }
+
+    setTitleNotice('');
+    savePublicTitlesMutation.mutate({ titles: publicTitleRows.map((entry) => entry.name).filter((entry) => entry !== title) });
   };
 
   const roleRows = useMemo(() => {
@@ -426,6 +534,65 @@ const AdminRolesAccessPage = () => {
         </div>
       </Card>
 
+      <Card>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="font-heading text-xl font-semibold text-slate-900">Public Titles</h2>
+            <p className="mt-1 text-sm text-slate-600">Titles shown on public member profiles.</p>
+          </div>
+          <Button type="button" onClick={openAddPublicTitle}>Add Title</Button>
+        </div>
+
+        {titleNotice ? (
+          <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{titleNotice}</p>
+        ) : null}
+
+        <div className="hidden overflow-x-auto rounded-xl border border-slate-200 lg:block">
+          <table className="min-w-full text-left text-sm">
+            <thead className="bg-slate-50 text-slate-500">
+              <tr>
+                <th className="px-3 py-2.5">Public Title</th>
+                <th className="px-3 py-2.5">Users</th>
+                <th className="px-3 py-2.5">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {publicTitleRows.map((title) => (
+                <tr key={title.name} className="border-t border-slate-100">
+                  <td className="px-3 py-2.5 font-semibold text-slate-800">{title.name}</td>
+                  <td className="px-3 py-2.5 text-slate-700">{title.userCount}</td>
+                  <td className="px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => openEditPublicTitle(title.name)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50" aria-label={`Edit ${title.name} public title`} title="Edit">
+                        <PencilSquareIcon className="h-4 w-4" />
+                      </button>
+                      <button type="button" onClick={() => deletePublicTitle(title.name)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-700 hover:bg-red-50" aria-label={`Delete ${title.name} public title`} title="Delete">
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="space-y-3 lg:hidden">
+          {publicTitleRows.map((title) => (
+            <div key={title.name} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-slate-900">{title.name}</p>
+                <p className="text-xs text-slate-600">{title.userCount} assigned user{title.userCount === 1 ? '' : 's'}</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <button type="button" onClick={() => openEditPublicTitle(title.name)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-200 text-blue-700" aria-label={`Edit ${title.name} public title`}><PencilSquareIcon className="h-4 w-4" /></button>
+                <button type="button" onClick={() => deletePublicTitle(title.name)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-700" aria-label={`Delete ${title.name} public title`}><TrashIcon className="h-4 w-4" /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
       {editorOpen ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-3 sm:items-center sm:p-4">
           <div className="absolute inset-0 bg-slate-900/50" onClick={() => setEditorOpen(false)} aria-hidden="true" />
@@ -476,6 +643,32 @@ const AdminRolesAccessPage = () => {
               <div className="mt-5 flex items-center justify-end gap-2 border-t border-slate-200 pt-4">
                 <Button type="button" variant="ghost" onClick={() => setEditorOpen(false)}>Cancel</Button>
                 <Button type="button" onClick={saveRole} disabled={saveMutation.isPending}>{saveMutation.isPending ? 'Saving...' : (editingName ? 'Update Role' : 'Create Role')}</Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {titleEditorOpen ? (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-3 sm:items-center sm:p-4">
+          <div className="absolute inset-0 bg-slate-900/50" onClick={() => setTitleEditorOpen(false)} aria-hidden="true" />
+          <div className="relative z-10 my-4 flex max-h-[calc(100vh-1.5rem)] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200 sm:my-6">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-brand-blue px-6 py-5 text-white">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-white/70">Public Profile</p>
+                <h3 className="mt-1 font-heading text-2xl font-semibold">{editingTitle ? 'Edit Public Title' : 'Add Public Title'}</h3>
+              </div>
+              <button type="button" onClick={() => setTitleEditorOpen(false)} className="rounded-md p-1.5 text-white/80 hover:bg-white/10 hover:text-white" aria-label="Close public title editor">
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="px-6 py-5">
+              <label className="text-sm font-semibold text-slate-700">Public title
+                <input value={titleName} onChange={(event) => setTitleName(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 shadow-sm outline-none transition focus:border-brand-blue" placeholder="e.g. Treasurer" autoFocus />
+              </label>
+              <div className="mt-5 flex items-center justify-end gap-2 border-t border-slate-200 pt-4">
+                <Button type="button" variant="ghost" onClick={() => setTitleEditorOpen(false)}>Cancel</Button>
+                <Button type="button" onClick={savePublicTitle} disabled={savePublicTitlesMutation.isPending}>{savePublicTitlesMutation.isPending ? 'Saving...' : (editingTitle ? 'Update Title' : 'Create Title')}</Button>
               </div>
             </div>
           </div>

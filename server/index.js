@@ -1277,6 +1277,30 @@ const parseAndValidateGenericObjectBody = async (request, options = {}) => {
   return body;
 };
 
+const parseAndValidateGenericStructuredBody = async (request, options = {}) => {
+  const maxBytes = Number.isFinite(Number(options.maxBytes)) ? Number(options.maxBytes) : maxJsonBodyBytes;
+  const buffer = await readBody(request);
+  if (buffer.length > maxBytes) {
+    throwInputError('Request body too large.', 413);
+  }
+
+  const raw = buffer.toString('utf8').trim();
+  if (!raw) {
+    throwInputError('Request body is required.');
+  }
+
+  let body;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    throwInputError('Invalid JSON payload.');
+  }
+
+  assertInput(Array.isArray(body) || isPlainObject(body), 'Request body must be a JSON object or array.');
+  validateGenericJsonValue(body, 'body');
+  return body;
+};
+
 const parsePositiveIntEnv = (envName, fallback) => {
   const parsed = Number(process.env[envName]);
   if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -5992,16 +6016,32 @@ const server = http.createServer(async (request, response) => {
       const users = await eventsDb.listItems('users');
       const data = users
         .filter((user) => user?.isActive !== false && user?.showOnAbout === true)
-        .map((user) => ({
-          id: String(user.id || ''),
-          name: String(user.name || '').trim(),
-          title: String(user.title || '').trim() || 'Community Members',
-          description: String(user.description || '').trim(),
-          avatarUrl: String(user.avatarUrl || '').trim(),
-          phone: String(user.phone || '').trim()
-        }))
+        .map((user) => {
+          const title = String(user.title || user.role || user.memberType || '').trim() || 'Community Members';
+          const hierarchyValue = `${title} ${user.role || ''}`.toLowerCase();
+          const hierarchyRank = hierarchyValue.includes('president')
+            ? 0
+            : hierarchyValue.includes('member')
+              ? 1
+              : hierarchyValue.includes('volunteer')
+                ? 3
+                : 2;
+
+          return {
+            id: String(user.id || ''),
+            name: String(user.name || '').trim(),
+            title,
+            description: String(user.description || '').trim(),
+            avatarUrl: String(user.avatarUrl || '').trim(),
+            phone: String(user.phone || '').trim(),
+            email: String(user.email || '').trim().toLowerCase(),
+            memberSince: String(user.createdAt || '').trim(),
+            hierarchyRank
+          };
+        })
         .filter((user) => user.name)
-        .sort((left, right) => left.title.localeCompare(right.title) || left.name.localeCompare(right.name));
+        .sort((left, right) => left.hierarchyRank - right.hierarchyRank || left.title.localeCompare(right.title) || left.name.localeCompare(right.name))
+        .map(({ hierarchyRank, ...member }) => member);
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
       sendJson(response, 500, { ok: false, message: error.message || 'Unable to fetch community members.' });
@@ -6204,7 +6244,7 @@ const server = http.createServer(async (request, response) => {
   if (contentSingleMatch && request.method === 'PUT') {
     try {
       const resource = String(contentSingleMatch[1]).toLowerCase();
-      const body = await parseAndValidateGenericObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
+      const body = await parseAndValidateGenericStructuredBody(request, { maxBytes: maxJsonBodyBytes });
       const data = await eventsDb.setSingleton(resource, body);
       await appendAuditLog(request, {
         action: 'content.singleton.update',
