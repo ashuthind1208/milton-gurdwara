@@ -92,8 +92,17 @@ const AdminBookingDutiesPage = () => {
     && String(entry.approvalStatus || 'approved').toLowerCase() === 'approved'
     && String(entry.email || '').trim()
   )), [dutyRoles, users]);
-  const allConfirmedBookings = useMemo(() => bookings
-    .filter((booking) => String(booking.status || '').toLowerCase() === 'confirmed'), [bookings]);
+  const allConfirmedBookings = useMemo(() => {
+    const userId = String(user?.id || '').trim();
+    const userEmail = String(user?.email || '').trim().toLowerCase();
+    return bookings.filter((booking) => {
+      if (String(booking.status || '').toLowerCase() !== 'confirmed') return false;
+      if (canManage) return true;
+      const assigneeId = String(booking.dutyAssigneeId || '').trim();
+      const assigneeEmail = String(booking.dutyAssigneeEmail || '').trim().toLowerCase();
+      return Boolean((userId && assigneeId === userId) || (userEmail && assigneeEmail === userEmail));
+    });
+  }, [bookings, canManage, user?.email, user?.id]);
   const assigneeOptions = useMemo(() => {
     const options = new Map();
     allConfirmedBookings.forEach((booking) => {
