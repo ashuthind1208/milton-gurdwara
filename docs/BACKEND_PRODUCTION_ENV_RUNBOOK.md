@@ -149,7 +149,7 @@ EVENT_REMINDER_TIME_ZONE=America/Toronto
 EVENT_REMINDER_DAYS=7,3,1
 BOOKING_REMINDER_SEND_TIME=09:00
 BOOKING_REMINDER_TIME_ZONE=America/Toronto
-BOOKING_REMINDER_DAYS=7,4,2,1
+BOOKING_REMINDER_DAYS=5,3,2,1
 
 # Stripe - omit these lines until live Stripe is enabled
 STRIPE_SECRET_KEY=<stripe-live-secret-key>

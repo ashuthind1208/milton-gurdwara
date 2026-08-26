@@ -429,6 +429,7 @@ const iconByPath = {
   '/admin/sponsors': CameraIcon,
   '/admin/events': QueueListIcon,
   '/admin/bookings': CalendarDaysIcon,
+  '/admin/booking-duties': UserGroupIcon,
   '/admin/kids-learning': BookOpenIcon,
   '/admin/phase2-config': SparklesIcon,
   '/admin/donations': CurrencyDollarIcon,

@@ -1,4 +1,5 @@
 import contentApiService from './contentApiService';
+import apiClient from './apiClient';
 import { serviceResponse } from './serviceResponse';
 import { siteConfig } from '../constants/siteConfig';
 import { createBookingReceiptPdfBlob, downloadBookingReceiptPdf } from '../utils/csvExport';
@@ -35,6 +36,7 @@ const normalizeBooking = (record = {}, index = 0) => {
     categoryId: String(record.categoryId || '').trim(),
     categoryName: String(record.categoryName || 'Other').trim() || 'Other',
     date: String(record.date || '').trim(),
+    toDate: String(record.toDate || record.date || '').trim(),
     startTime: String(record.startTime || '').trim(),
     endTime: String(record.endTime || '').trim(),
     bookingLocation: String(record.bookingLocation || record.location || 'Gurdwara Singh Sabha Milton, 7035 Sixth Line, Milton, ON').trim(),
@@ -42,6 +44,9 @@ const normalizeBooking = (record = {}, index = 0) => {
     requesterEmail: String(record.requesterEmail || '').trim().toLowerCase(),
     requesterPhone: String(record.requesterPhone || '').trim(),
     requesterAddress: String(record.requesterAddress || '').trim(),
+    dutyAssigneeId: String(record.dutyAssigneeId || '').trim(),
+    dutyAssigneeName: String(record.dutyAssigneeName || '').trim(),
+    dutyAssigneeEmail: String(record.dutyAssigneeEmail || '').trim().toLowerCase(),
     bookingForDifferentPerson: record.bookingForDifferentPerson === true,
     notes: String(record.notes || '').trim(),
     status: STATUS_VALUES.has(status) ? status : 'pending',
@@ -216,6 +221,11 @@ const bookingService = {
     const payload = normalizeBookingSettings(settings);
     const saved = await contentApiService.setSingleton(BOOKING_SETTINGS_RESOURCE, payload);
     return serviceResponse(normalizeBookingSettings(saved || payload));
+  },
+
+  sendDutyNotification: async ({ bookingId = '', role, scope = 'single' }) => {
+    const response = await apiClient.post('/bookings/duty-notifications/send', { bookingId, role, scope });
+    return serviceResponse(response.data?.data || {});
   },
 
   downloadInvoice: (booking = {}) => downloadBookingReceiptPdf({

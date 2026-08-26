@@ -32,6 +32,7 @@ export const adminNav = [
   { label: 'Sponsors', path: '/admin/sponsors' },
   { label: 'Events', path: '/admin/events' },
   { label: 'Bookings', path: '/admin/bookings' },
+  { label: 'Booking Duties', path: '/admin/booking-duties' },
   { label: 'Kids Learning', path: '/admin/kids-learning' },
   { label: 'Donations', path: '/admin/donations' },
   { label: 'Newsletter', path: '/admin/newsletter' },

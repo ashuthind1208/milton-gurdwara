@@ -266,7 +266,8 @@ const AdminEventsPage = () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
       createForm.reset(defaultForm);
       setCreateOpen(false);
-    }
+    },
+    onError: (error) => window.alert(error?.message || 'Unable to create this event.')
   });
 
   const updateMutation = useMutation({
@@ -275,7 +276,8 @@ const AdminEventsPage = () => {
       queryClient.invalidateQueries({ queryKey: ['admin-events'] });
       queryClient.invalidateQueries({ queryKey: ['events'] });
       setEditingEvent(null);
-    }
+    },
+    onError: (error) => window.alert(error?.message || 'Unable to update this event.')
   });
 
   const toggleActiveMutation = useMutation({

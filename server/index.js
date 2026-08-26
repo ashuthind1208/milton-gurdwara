@@ -182,7 +182,7 @@ const bookingReminderWebhookUrl = resolveLocalWebhookUrl(
 );
 const bookingReminderSendTimeRaw = String(process.env.BOOKING_REMINDER_SEND_TIME || eventReminderSendTimeRaw || '09:00').trim();
 const bookingReminderTimeZone = String(process.env.BOOKING_REMINDER_TIME_ZONE || eventReminderTimeZone || 'America/Toronto').trim() || 'America/Toronto';
-const bookingReminderDays = String(process.env.BOOKING_REMINDER_DAYS || '7,4,2,1')
+const bookingReminderDays = String(process.env.BOOKING_REMINDER_DAYS || '5,3,2,1')
   .split(',')
   .map((value) => Number(String(value || '').trim()))
   .filter((value) => Number.isFinite(value) && value >= 0);
@@ -430,6 +430,7 @@ const ADMIN_PAGE_PATHS = [
   '/admin/advertisements',
   '/admin/sponsors',
   '/admin/events',
+  '/admin/booking-duties',
   '/admin/kids-learning',
   '/admin/donations',
   '/admin/newsletter',
@@ -2254,6 +2255,11 @@ const canManageDonations = (request) => {
   return role === 'admin' || role === 'super admin';
 };
 
+const canManageBookingDuties = (request) => {
+  const role = String(getRequestActor(request).role || '').trim().toLowerCase();
+  return role === 'admin' || role === 'super admin';
+};
+
 const appendAuditLog = async (request, details = {}) => {
   try {
     const actor = getRequestActor(request);
@@ -3626,8 +3632,12 @@ const normalizeBookingForNotification = (entry = {}) => ({
   id: String(entry.id || '').trim(),
   requesterName: String(entry.requesterName || 'Sangat Member').trim(),
   requesterEmail: String(entry.requesterEmail || '').trim().toLowerCase(),
+  dutyAssigneeId: String(entry.dutyAssigneeId || '').trim(),
+  dutyAssigneeName: String(entry.dutyAssigneeName || '').trim(),
+  dutyAssigneeEmail: String(entry.dutyAssigneeEmail || '').trim().toLowerCase(),
   categoryName: String(entry.categoryName || entry.title || 'Booking').trim(),
   date: String(entry.date || '').trim(),
+  toDate: String(entry.toDate || entry.date || '').trim(),
   startTime: String(entry.startTime || '').trim(),
   endTime: String(entry.endTime || '').trim(),
   bookingLocation: String(entry.bookingLocation || entry.location || 'Gurdwara Singh Sabha Milton, 7035 Sixth Line, Milton, ON').trim(),
@@ -3647,6 +3657,112 @@ const normalizeBookingForNotification = (entry = {}) => ({
   refundNotes: String(entry.refundNotes || '').trim()
 });
 
+const buildBookingDutyBriefingEmail = ({ recipient, bookings, role, daysRemaining = null }) => {
+  const rows = bookings.map((booking) => {
+    const normalized = normalizeBookingForNotification(booking);
+    return {
+      ...normalized,
+      dateLabel: normalized.toDate && normalized.toDate !== normalized.date ? `${normalized.date} to ${normalized.toDate}` : normalized.date,
+      requesterPhone: String(booking.requesterPhone || '').trim(),
+      requesterAddress: String(booking.requesterAddress || '').trim(),
+      notes: String(booking.notes || '').trim()
+    };
+  });
+  const isReminder = Number.isFinite(Number(daysRemaining));
+  const reminderLabel = isReminder ? `${Number(daysRemaining)} day${Number(daysRemaining) === 1 ? '' : 's'}` : '';
+  const subject = rows.length === 1
+    ? `${isReminder ? `Booking Duty Reminder (${reminderLabel})` : 'Booking Duty Briefing'}: ${rows[0].categoryName} on ${rows[0].date}`
+    : `Upcoming Booking Duty Briefing (${rows.length} bookings)`;
+  const text = [
+    `Dear ${recipient.name || role},`,
+    '',
+    isReminder ? `This confirmed booking is scheduled in ${reminderLabel}:` : `The following confirmed booking${rows.length === 1 ? '' : 's'} require attention:`,
+    '',
+    ...rows.flatMap((booking) => [
+      `${booking.categoryName} - ${booking.dateLabel}`,
+      `Time: ${booking.startTime || 'TBD'}${booking.endTime ? ` - ${booking.endTime}` : ''}`,
+      `Location: ${booking.bookingLocation}`,
+      `Contact: ${booking.requesterName} | ${booking.requesterEmail || '-'} | ${booking.requesterPhone || '-'}`,
+      booking.requesterAddress ? `Address: ${booking.requesterAddress}` : '',
+      booking.notes ? `Notes: ${booking.notes}` : '',
+      ''
+    ]),
+    'Please sign in to the Booking Duties page for full details.',
+    volunteerReminderSiteName
+  ].filter(Boolean).join('\n');
+  const htmlRows = rows.map((booking) => `
+    <div style="margin:0 0 14px;border:1px solid #d7e3f3;border-radius:10px;overflow:hidden;">
+      <div style="background:#eef5ff;padding:11px 13px;font-weight:800;color:#0a4d9f;">${escapeHtml(booking.categoryName)} · ${escapeHtml(booking.dateLabel)}</div>
+      <div style="padding:12px 13px;line-height:1.7;color:#334155;"><strong>Time:</strong> ${escapeHtml(booking.startTime || 'TBD')}${booking.endTime ? ` - ${escapeHtml(booking.endTime)}` : ''}<br/><strong>Location:</strong> ${escapeHtml(booking.bookingLocation)}<br/><strong>Contact:</strong> ${escapeHtml(booking.requesterName)} · ${escapeHtml(booking.requesterEmail || '-')} · ${escapeHtml(booking.requesterPhone || '-')}<br/>${booking.requesterAddress ? `<strong>Address:</strong> ${escapeHtml(booking.requesterAddress)}<br/>` : ''}${booking.notes ? `<strong>Notes:</strong> ${escapeHtml(booking.notes)}` : ''}</div>
+    </div>`).join('');
+  const html = `<div style="background:#f5f8fc;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;"><div style="max-width:720px;margin:auto;background:white;border:1px solid #dbe7f6;border-radius:14px;overflow:hidden;"><div style="padding:18px 22px;background:#0a4d9f;color:white;"><div style="font-size:12px;font-weight:700;text-transform:uppercase;">${escapeHtml(volunteerReminderSiteName)}</div><div style="margin-top:4px;font-size:21px;font-weight:800;">${isReminder ? `Booking Duty Reminder · ${escapeHtml(reminderLabel)}` : 'Booking Duty Briefing'}</div></div><div style="padding:22px;"><p style="font-size:16px;font-weight:700;">Dear ${escapeHtml(recipient.name || role)},</p><p style="color:#475569;line-height:1.7;">${isReminder ? `This confirmed booking is scheduled in ${escapeHtml(reminderLabel)}.` : `The following confirmed booking${rows.length === 1 ? '' : 's'} require attention.`}</p>${htmlRows}<p style="color:#64748b;font-size:12px;">Please sign in to the Booking Duties page for full details.</p></div></div></div>`;
+  return { subject, text, html };
+};
+
+const resolveBookingDutyRecipients = async () => {
+  const [users, roleDefinitions] = await Promise.all([
+    eventsDb.listItems('users'),
+    eventsDb.getSingleton('admin_roles', [])
+  ]);
+  const dutyPath = '/admin/booking-duties';
+  const dutyRoles = new Set((Array.isArray(roleDefinitions) ? roleDefinitions : [])
+    .filter((entry) => Array.isArray(entry?.adminPageAccess) && entry.adminPageAccess.includes(dutyPath))
+    .map((entry) => String(entry?.name || '').trim().toLowerCase())
+    .filter(Boolean));
+  const recipients = (Array.isArray(users) ? users : []).filter((user) => {
+    const role = String(user.role || '').trim();
+    const normalizedRole = role.toLowerCase();
+    const hasDutyAccess = dutyRoles.has(normalizedRole)
+      || (Array.isArray(user.adminPageAccess) && user.adminPageAccess.includes(dutyPath));
+    return !['admin', 'super admin'].includes(normalizedRole)
+      && hasDutyAccess
+      && user.isActive !== false
+      && String(user.approvalStatus || 'approved').trim().toLowerCase() === 'approved'
+      && isValidEmailAddress(String(user.email || '').trim());
+  });
+  const roleLabel = [...dutyRoles].join(', ') || 'Booking Duties';
+  return { recipients, roleLabel };
+};
+
+const isRecipientAssignedToBooking = (recipient, booking) => {
+  const assigneeId = String(booking?.dutyAssigneeId || '').trim();
+  const assigneeEmail = String(booking?.dutyAssigneeEmail || '').trim().toLowerCase();
+  if (assigneeId) return String(recipient?.id || '').trim() === assigneeId;
+  return Boolean(assigneeEmail) && String(recipient?.email || '').trim().toLowerCase() === assigneeEmail;
+};
+
+const enforceEligibleBookingDutyAssignee = async (booking = {}) => {
+  const assigneeId = String(booking.dutyAssigneeId || '').trim();
+  if (!assigneeId) return booking;
+  const { recipients } = await resolveBookingDutyRecipients();
+  const assignee = recipients.find((recipient) => String(recipient.id || '').trim() === assigneeId);
+  assertInput(Boolean(assignee), 'Duty performer must be an active user with access to Booking Duties.');
+  return {
+    ...booking,
+    dutyAssigneeId: assigneeId,
+    dutyAssigneeName: String(assignee.name || assignee.email || '').trim(),
+    dutyAssigneeEmail: String(assignee.email || '').trim().toLowerCase()
+  };
+};
+
+const sendBookingDutyBriefingEmail = async ({ recipient, bookings, role, scope = 'single', daysRemaining = null }) => {
+  const template = buildBookingDutyBriefingEmail({ recipient, bookings, role, daysRemaining });
+  return deliverWorkflowEmail(bookingReminderWebhookUrl, {
+    type: Number.isFinite(Number(daysRemaining)) ? 'booking-duty-reminder' : 'booking-duty-briefing',
+    to: recipient.email,
+    name: recipient.name,
+    subject: template.subject,
+    text: template.text,
+    html: template.html,
+    metadata: {
+      role,
+      scope,
+      reminderDays: Number.isFinite(Number(daysRemaining)) ? Number(daysRemaining) : null,
+      bookingIds: bookings.map((booking) => booking.id)
+    }
+  });
+};
+
 const enforceBookingPaymentStatus = (entry = {}) => {
   const paymentStatus = String(entry.paymentStatus || 'pending').trim().toLowerCase();
   const rawStatus = String(entry.status || 'pending').trim().toLowerCase();
@@ -3665,6 +3781,82 @@ const enforceBookingPaymentStatus = (entry = {}) => {
           ? 'confirmed'
           : allowedStatus
   };
+};
+
+const parseScheduleDateTime = (dateValue, timeValue = '') => {
+  const rawDate = String(dateValue || '').trim();
+  const rawTime = String(timeValue || '').trim();
+  const combined = rawTime && /^\d{4}-\d{2}-\d{2}$/.test(rawDate)
+    ? `${rawDate}T${rawTime}:00`
+    : rawDate;
+  const parsed = new Date(combined);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const getScheduleIntervals = (entry = {}, kind = 'booking') => {
+  if (kind === 'event') {
+    const start = parseScheduleDateTime(entry.date);
+    const explicitEnd = parseScheduleDateTime(entry.endDate);
+    const end = explicitEnd || (start ? new Date(start.getTime() + (60 * 60 * 1000)) : null);
+    return start && end && end > start ? [{ start, end }] : [];
+  }
+
+  const startDate = String(entry.date || '').trim();
+  const endDate = String(entry.toDate || entry.date || '').trim();
+  const startTime = String(entry.startTime || '').trim();
+  const endTime = String(entry.endTime || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate) || !/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime)) {
+    return [];
+  }
+  const firstDay = parseScheduleDateTime(startDate, startTime);
+  const lastDay = parseScheduleDateTime(endDate, startTime);
+  if (!firstDay || !lastDay || lastDay < firstDay) return [];
+  const intervals = [];
+  const cursor = new Date(firstDay);
+  while (cursor <= lastDay && intervals.length < 3660) {
+    const dateKey = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
+    const start = parseScheduleDateTime(dateKey, startTime);
+    const end = parseScheduleDateTime(dateKey, endTime);
+    if (start && end && end > start) intervals.push({ start, end });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return intervals;
+};
+
+const schedulesOverlap = (firstIntervals, secondIntervals) => firstIntervals.some((first) => (
+  secondIntervals.some((second) => first.start < second.end && second.start < first.end)
+));
+
+const assertNoScheduleOverlap = async (candidate, { kind = 'booking', excludeId = '' } = {}) => {
+  if ((kind === 'booking' && String(candidate.status || '').trim().toLowerCase() === 'cancelled')
+    || (kind === 'event' && (candidate.active === false || candidate.isActive === false))) {
+    return;
+  }
+  const candidateIntervals = getScheduleIntervals(candidate, kind);
+  assertInput(candidateIntervals.length > 0, kind === 'event'
+    ? 'Event start and end date/time must form a valid interval.'
+    : 'Booking dates and times must form a valid interval.');
+
+  const [bookings, events] = await Promise.all([
+    eventsDb.listItems('bookings'),
+    eventsDb.getEvents()
+  ]);
+  const conflicts = [];
+  for (const booking of Array.isArray(bookings) ? bookings : []) {
+    if (kind === 'booking' && String(booking.id || '') === String(excludeId || '')) continue;
+    if (String(booking.status || '').trim().toLowerCase() === 'cancelled') continue;
+    if (schedulesOverlap(candidateIntervals, getScheduleIntervals(booking, 'booking'))) {
+      conflicts.push(String(booking.categoryName || booking.title || 'booking').trim());
+    }
+  }
+  for (const event of Array.isArray(events) ? events : []) {
+    if (kind === 'event' && String(event.id || '') === String(excludeId || '')) continue;
+    if (event.active === false || event.isActive === false) continue;
+    if (schedulesOverlap(candidateIntervals, getScheduleIntervals(event, 'event'))) {
+      conflicts.push(String(event.title || 'event').trim());
+    }
+  }
+  assertInput(conflicts.length === 0, `This schedule overlaps with ${conflicts[0]}. Choose a different date or time.`, 409);
 };
 
 const shouldDelayBookingEmailUntilPayment = (booking = {}) => {
@@ -3938,15 +4130,19 @@ const runBookingReminderSweep = async (options = {}) => {
   bookingReminderSweepRunning = true;
   const force = options.force === true;
   try {
-    const bookings = await eventsDb.listItems('bookings');
+    const [bookings, dutyContext] = await Promise.all([
+      eventsDb.listItems('bookings'),
+      resolveBookingDutyRecipients()
+    ]);
     const logStore = readBookingReminderLog();
     let processed = 0;
     let sent = 0;
+    let dutySent = 0;
     let skipped = 0;
     for (const entry of Array.isArray(bookings) ? bookings : []) {
       const booking = normalizeBookingForNotification(entry);
       processed += 1;
-      if (!booking.id || !booking.date || !isValidEmailAddress(booking.requesterEmail) || booking.status === 'cancelled') {
+      if (!booking.id || !booking.date || booking.status === 'cancelled') {
         skipped += 1;
         continue;
       }
@@ -3955,21 +4151,48 @@ const runBookingReminderSweep = async (options = {}) => {
         skipped += 1;
         continue;
       }
-      const reminderKey = `${booking.id}:${booking.date}:${daysRemaining}`;
-      if (!force && logStore.sent[reminderKey]) {
-        skipped += 1;
-        continue;
+      let sentForBooking = 0;
+      const requesterReminderKey = `${booking.id}:${booking.date}:${daysRemaining}`;
+      if (isValidEmailAddress(booking.requesterEmail) && (force || !logStore.sent[requesterReminderKey])) {
+        const result = await sendBookingNotificationEmail(booking, { daysRemaining });
+        if (result.sent) {
+          sent += 1;
+          sentForBooking += 1;
+          logStore.sent[requesterReminderKey] = new Date().toISOString();
+        }
       }
-      const result = await sendBookingNotificationEmail(booking, { daysRemaining });
-      if (!result.sent) {
-        skipped += 1;
-        continue;
+
+      if (booking.status === 'confirmed') {
+        const assignedRecipients = dutyContext.recipients.filter((recipient) => isRecipientAssignedToBooking(recipient, entry));
+        for (const recipient of assignedRecipients) {
+          const recipientEmail = String(recipient.email || '').trim().toLowerCase();
+          const recipientKey = String(recipient.id || '').trim()
+            || crypto.createHash('sha256').update(recipientEmail).digest('hex').slice(0, 16);
+          const dutyReminderKey = `duty:${booking.id}:${booking.date}:${daysRemaining}:${recipientKey}`;
+          if (!force && logStore.sent[dutyReminderKey]) {
+            continue;
+          }
+          try {
+            const delivery = await sendBookingDutyBriefingEmail({
+              recipient,
+              bookings: [entry],
+              role: dutyContext.roleLabel,
+              scope: 'scheduled',
+              daysRemaining
+            });
+            if (delivery.ok) {
+              sent += 1;
+              dutySent += 1;
+              sentForBooking += 1;
+              logStore.sent[dutyReminderKey] = new Date().toISOString();
+            }
+          } catch {}
+        }
       }
-      sent += 1;
-      logStore.sent[reminderKey] = new Date().toISOString();
+      if (sentForBooking === 0) skipped += 1;
     }
     writeBookingReminderLog(logStore);
-    return { processed, sent, skipped, force, reminderDays: bookingReminderDays, webhookConfigured: Boolean(bookingReminderWebhookUrl) };
+    return { processed, sent, dutySent, skipped, force, dutyRecipientCount: dutyContext.recipients.length, reminderDays: bookingReminderDays, webhookConfigured: Boolean(bookingReminderWebhookUrl) };
   } finally {
     bookingReminderSweepRunning = false;
   }
@@ -6085,11 +6308,15 @@ const server = http.createServer(async (request, response) => {
     try {
       const resource = String(contentResourceMatch[1]).toLowerCase();
       const body = await parseAndValidateGenericObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
-      const validatedBody = resource === 'users'
+      let validatedBody = resource === 'users'
         ? enforceUserMembershipActivity(body, body)
         : resource === 'bookings'
           ? enforceBookingPaymentStatus(body)
           : body;
+      if (resource === 'bookings') {
+        validatedBody = await enforceEligibleBookingDutyAssignee(validatedBody);
+        await assertNoScheduleOverlap(validatedBody, { kind: 'booking' });
+      }
       const data = await eventsDb.createItem(resource, validatedBody);
       if (resource !== 'audit_logs') {
         await appendAuditLog(request, {
@@ -6125,7 +6352,7 @@ const server = http.createServer(async (request, response) => {
       const changedRoleToMember = resource === 'users'
         && String(existingUser?.role || '').trim().toLowerCase() !== 'member'
         && String(body?.role || '').trim().toLowerCase() === 'member';
-      const validatedBody = resource === 'users'
+      let validatedBody = resource === 'users'
         ? enforceUserMembershipActivity({
           ...(existingUser || {}),
           ...body,
@@ -6135,6 +6362,10 @@ const server = http.createServer(async (request, response) => {
         : resource === 'bookings'
           ? enforceBookingPaymentStatus({ ...(existingBooking || {}), ...body, id })
           : body;
+      if (resource === 'bookings') {
+        validatedBody = await enforceEligibleBookingDutyAssignee(validatedBody);
+        await assertNoScheduleOverlap(validatedBody, { kind: 'booking', excludeId: id });
+      }
       const data = await eventsDb.updateItem(resource, id, validatedBody);
 
       if (resource === 'users' && eventsDb.hasDatabaseConnection) {
@@ -6182,6 +6413,9 @@ const server = http.createServer(async (request, response) => {
     try {
       const resource = String(contentResourceIdMatch[1]).toLowerCase();
       const id = parseStringPathId(decodeURIComponent(contentResourceIdMatch[2]), 'id');
+      if (resource === 'bookings') {
+        assertInput(canManageBookingDuties(request), 'Only Admin and Super Admin can delete bookings.', 403);
+      }
 
       if (resource === 'users' && eventsDb.hasDatabaseConnection) {
         const users = await eventsDb.listItems('users');
@@ -6244,6 +6478,9 @@ const server = http.createServer(async (request, response) => {
   if (contentSingleMatch && request.method === 'PUT') {
     try {
       const resource = String(contentSingleMatch[1]).toLowerCase();
+      if (resource === 'booking_duty_settings') {
+        assertInput(canManageBookingDuties(request), 'Only Admin and Super Admin can assign booking duties.', 403);
+      }
       const body = await parseAndValidateGenericStructuredBody(request, { maxBytes: maxJsonBodyBytes });
       const data = await eventsDb.setSingleton(resource, body);
       await appendAuditLog(request, {
@@ -6491,6 +6728,7 @@ const server = http.createServer(async (request, response) => {
       assertInput(!Number.isNaN(new Date(date).getTime()), 'date must be a valid date string.');
       body.title = title;
       body.date = date;
+      await assertNoScheduleOverlap(body, { kind: 'event' });
       const data = await eventsDb.createEvent(body);
       await appendAuditLog(request, {
         action: 'event.create',
@@ -6597,6 +6835,10 @@ const server = http.createServer(async (request, response) => {
     try {
       const id = parseNumericPathId(decodeURIComponent(eventPathMatch[1]), 'event id');
       const body = await parseAndValidateGenericObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
+      const existingEvents = await eventsDb.getEvents();
+      const existingEvent = (Array.isArray(existingEvents) ? existingEvents : []).find((entry) => String(entry?.id || '') === String(id));
+      const validatedEvent = { ...(existingEvent || {}), ...body, id };
+      await assertNoScheduleOverlap(validatedEvent, { kind: 'event', excludeId: id });
       const data = await eventsDb.updateEvent(id, body);
       await appendAuditLog(request, {
         action: 'event.update',
@@ -6862,6 +7104,47 @@ const server = http.createServer(async (request, response) => {
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
       sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to run booking reminders.' });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/bookings/duty-notifications/send' && request.method === 'POST') {
+    try {
+      assertInput(canManageBookingDuties(request), 'Only Admin and Super Admin can send booking duty notifications.', 403);
+      const body = await parseJsonObjectBody(request, { maxBytes: 64 * 1024, allowEmpty: false });
+      ensureNoUnknownKeys(body, ['bookingId', 'role', 'scope']);
+      const requestedRole = readStringField(body, 'role', { max: 100 });
+      const bookingId = readStringField(body, 'bookingId', { max: 160 });
+      const scope = readStringField(body, 'scope', { max: 20 }) || 'single';
+      assertInput(['single', 'upcoming'].includes(scope), 'scope must be single or upcoming.');
+
+      const [dutyContext, storedBookings] = await Promise.all([resolveBookingDutyRecipients(), eventsDb.listItems('bookings')]);
+      const role = requestedRole || dutyContext.roleLabel;
+      const recipients = dutyContext.recipients;
+      assertInput(recipients.length > 0, 'No active approved users with email addresses have access to Booking Duties.');
+
+      const todayKey = toDateKeyFromParts(getDatePartsInTimeZone(new Date(), bookingReminderTimeZone));
+      const bookings = (Array.isArray(storedBookings) ? storedBookings : [])
+        .filter((booking) => String(booking.status || '').trim().toLowerCase() === 'confirmed')
+        .filter((booking) => scope === 'single' ? String(booking.id) === bookingId : String(booking.toDate || booking.date || '') >= todayKey)
+        .sort((first, second) => `${first.date || ''}${first.startTime || ''}`.localeCompare(`${second.date || ''}${second.startTime || ''}`))
+        .slice(0, scope === 'single' ? 1 : 50);
+      assertInput(bookings.length > 0, scope === 'single' ? 'Booking not found or is not confirmed.' : 'No upcoming confirmed bookings found.');
+
+      let sent = 0;
+      let recipientCount = 0;
+      for (const recipient of recipients) {
+        const assignedBookings = bookings.filter((booking) => isRecipientAssignedToBooking(recipient, booking));
+        if (assignedBookings.length === 0) continue;
+        recipientCount += 1;
+        const delivery = await sendBookingDutyBriefingEmail({ recipient, bookings: assignedBookings, role, scope });
+        if (delivery.ok) sent += 1;
+      }
+      assertInput(recipientCount > 0, 'The selected booking does not have an eligible duty performer assigned.');
+      await appendAuditLog(request, { action: 'booking.duty-notifications.send', targetType: 'bookings', targetId: bookingId || 'upcoming', description: `Sent booking duty briefing to ${role}`, payload: { role, scope, bookingCount: bookings.length, recipientCount, sent } });
+      sendJson(response, 200, { ok: true, data: { role, scope, bookingCount: bookings.length, recipientCount, sent } });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to send booking duty notifications.' });
     }
     return;
   }

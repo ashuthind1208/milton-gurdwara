@@ -43,6 +43,7 @@ const AdminAdvertisementsPage = lazy(() => import('../admin/Advertisements/Admin
 const AdminSponsorsPage = lazy(() => import('../admin/Sponsors/AdminSponsorsPage'));
 const AdminEventsPage = lazy(() => import('../admin/Events/AdminEventsPage'));
 const AdminBookingsPage = lazy(() => import('../admin/Bookings/AdminBookingsPage'));
+const AdminBookingDutiesPage = lazy(() => import('../admin/BookingDuties/AdminBookingDutiesPage'));
 const AdminDonationsPage = lazy(() => import('../admin/Donations/AdminDonationsPage'));
 const AdminUsersPage = lazy(() => import('../admin/Users/AdminUsersPage'));
 const AdminRolesAccessPage = lazy(() => import('../admin/RolesAccess/AdminRolesAccessPage'));
@@ -104,6 +105,7 @@ const AppRoutes = () => {
             <Route path="/admin/seva-opportunities" element={<AdminSevaOpportunitiesPage />} />
             <Route path="/admin/events" element={<AdminEventsPage />} />
             <Route path="/admin/bookings" element={<AdminBookingsPage />} />
+            <Route path="/admin/booking-duties" element={<AdminBookingDutiesPage />} />
             <Route path="/admin/donations" element={<AdminDonationsPage />} />
             <Route path="/admin/users" element={<AdminUsersPage />} />
             <Route path="/admin/newsletter" element={<AdminNewsletterPage />} />

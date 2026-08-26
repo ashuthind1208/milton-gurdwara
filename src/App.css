@@ -225,6 +225,487 @@
   background: #f8fafc;
 }
 
+.booking-admin-calendar.react-calendar {
+  width: 100%;
+  border: 0;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  font-family: inherit;
+}
+
+.booking-admin-calendar .react-calendar__navigation {
+  height: 2.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.booking-admin-calendar .react-calendar__navigation button {
+  min-width: 2rem;
+  border-radius: 0.4rem;
+  color: #0f172a;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.booking-admin-calendar .react-calendar__month-view__weekdays {
+  color: #64748b;
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.booking-admin-calendar .react-calendar__month-view__weekdays abbr {
+  text-decoration: none;
+}
+
+.booking-admin-calendar .react-calendar__tile {
+  position: relative;
+  height: 2.8rem;
+  min-height: 2.8rem;
+  border-radius: 0.4rem;
+  padding: 0.35rem 0.15rem 0.8rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.booking-admin-calendar .booking-admin-calendar-booked {
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+.booking-admin-calendar .booking-admin-calendar-event {
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.booking-admin-calendar .booking-admin-calendar-booked.booking-admin-calendar-event {
+  background: linear-gradient(135deg, #dbeafe 0 50%, #ffedd5 50% 100%);
+}
+
+.booking-admin-calendar .react-calendar__tile--range {
+  box-shadow: inset 0 0 0 2px #0a4d9f;
+}
+
+.booking-admin-calendar .react-calendar__tile--active {
+  background-color: #eff6ff;
+  color: #0a4d9f;
+}
+
+.booking-admin-calendar-markers {
+  position: absolute;
+  right: 0;
+  bottom: 0.3rem;
+  left: 0;
+  display: flex;
+  justify-content: center;
+  gap: 0.18rem;
+}
+
+.booking-admin-calendar-markers > span {
+  width: 0.3rem;
+  height: 0.3rem;
+  border-radius: 9999px;
+}
+
+.booking-duty-calendar-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(18rem, 0.65fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.booking-duty-calendar-panel,
+.booking-duty-day-panel {
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+}
+
+.booking-duty-calendar-heading {
+  display: flex;
+  min-height: 4.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 3px solid #f5a623;
+  background: #0a4d9f;
+  padding: 0.85rem 1rem;
+  color: #ffffff;
+}
+
+.booking-duty-calendar-heading h2 {
+  margin: 0.1rem 0 0;
+  font-family: var(--font-heading);
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.booking-duty-calendar-kicker,
+.booking-duty-day-heading p,
+.booking-duty-detail-header > div > p {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.booking-duty-calendar-kicker {
+  color: #dbeafe;
+}
+
+.booking-duty-calendar-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.72rem;
+}
+
+.booking-duty-calendar-legend > span {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 9999px;
+  background: #f5a623;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
+}
+
+.booking-duty-calendar.react-calendar {
+  width: 100%;
+  border: 0;
+  background: #ffffff;
+  padding: 0.85rem;
+  font-family: inherit;
+}
+
+.booking-duty-calendar .react-calendar__navigation {
+  height: 3rem;
+  margin-bottom: 0.5rem;
+}
+
+.booking-duty-calendar .react-calendar__navigation button {
+  min-width: 2.25rem;
+  border-radius: 0.5rem;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.booking-duty-calendar .react-calendar__navigation__label {
+  color: #0a4d9f;
+  font-family: var(--font-heading);
+  font-size: 1rem;
+}
+
+.booking-duty-calendar .react-calendar__navigation button:enabled:hover,
+.booking-duty-calendar .react-calendar__navigation button:enabled:focus {
+  background: #eaf3ff;
+}
+
+.booking-duty-calendar .react-calendar__month-view__weekdays abbr {
+  color: #64748b;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.booking-duty-calendar .react-calendar__tile {
+  position: relative;
+  height: 4.5rem;
+  min-height: 4.5rem;
+  border: 1px solid #e2e8f0;
+  padding: 0.6rem 0.25rem;
+  color: #334155;
+  font-weight: 700;
+}
+
+.booking-duty-calendar .booking-duty-calendar-has-booking {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #0a4d9f;
+}
+
+.booking-duty-calendar .react-calendar__tile--active {
+  background: #0a4d9f;
+  color: #ffffff;
+}
+
+.booking-duty-calendar .react-calendar__tile--now:not(.react-calendar__tile--active) {
+  box-shadow: inset 0 0 0 2px #f5a623;
+  background: #fffaf0;
+}
+
+.booking-duty-calendar-count {
+  position: absolute;
+  right: 0.3rem;
+  bottom: 0.3rem;
+  display: inline-flex;
+  min-width: 1.2rem;
+  height: 1.2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: #f5a623;
+  padding: 0 0.25rem;
+  color: #111827;
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+
+.booking-duty-day-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  border-bottom: 1px solid #dbe7f6;
+  background: #eaf3ff;
+  padding: 1rem;
+  color: #0a4d9f;
+}
+
+.booking-duty-day-heading h2 {
+  margin: 0.15rem 0 0;
+  color: #0f172a;
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.booking-duty-day-list {
+  min-height: 15rem;
+  padding: 0.85rem;
+}
+
+.booking-duty-day-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-left: 4px solid #f5a623;
+  border-radius: 0.375rem;
+  background: #f8fafc;
+  padding: 0.85rem;
+}
+
+.booking-duty-day-item + .booking-duty-day-item {
+  margin-top: 0.65rem;
+}
+
+.booking-duty-empty-day {
+  display: flex;
+  min-height: 13rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  color: #047857;
+  text-align: center;
+}
+
+.booking-duty-empty-day p {
+  margin: 0;
+  color: #475569;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.booking-duty-detail-dialog {
+  width: 100%;
+  max-width: 44rem;
+  max-height: calc(100vh - 1.5rem);
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 0.5rem;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.35);
+}
+
+.booking-duty-detail-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+  border-bottom: 4px solid #f5a623;
+  background: #0a4d9f;
+  padding: 1.2rem;
+  color: #ffffff;
+}
+
+.booking-duty-detail-icon {
+  display: inline-flex;
+  width: 3rem;
+  height: 3rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.booking-duty-detail-header h2 {
+  margin: 0.15rem 0 0;
+  font-family: var(--font-heading);
+  font-size: 1.45rem;
+  line-height: 1.2;
+}
+
+.booking-duty-detail-header > div > p {
+  color: #bfdbfe;
+}
+
+.booking-duty-detail-time {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.booking-duty-detail-time span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 9999px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.booking-duty-detail-close {
+  display: inline-flex;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 0.375rem;
+  color: #ffffff;
+}
+
+.booking-duty-detail-body {
+  display: grid;
+  gap: 1rem;
+  padding: 1.2rem;
+}
+
+.booking-duty-location {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  border: 1px solid #bfdbfe;
+  border-radius: 0.5rem;
+  background: #eff6ff;
+  padding: 0.85rem;
+  color: #0a4d9f;
+}
+
+.booking-duty-location p,
+.booking-duty-detail-grid p,
+.booking-duty-notes > p {
+  margin: 0 0 0.2rem;
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.booking-duty-location strong,
+.booking-duty-detail-grid strong {
+  display: block;
+  overflow-wrap: anywhere;
+  color: #1e293b;
+  font-size: 0.86rem;
+}
+
+.booking-duty-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+}
+
+.booking-duty-detail-grid > div {
+  min-width: 0;
+  padding: 0.85rem;
+}
+
+.booking-duty-detail-grid > div:nth-child(odd) {
+  border-right: 1px solid #e2e8f0;
+}
+
+.booking-duty-detail-grid > div:nth-child(-n + 2) {
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.booking-duty-notes > div {
+  min-height: 4.5rem;
+  border-left: 4px solid #f5a623;
+  background: #fffbeb;
+  padding: 0.85rem;
+  color: #334155;
+  font-size: 0.86rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.booking-duty-detail-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+  padding: 0.9rem 1.2rem;
+}
+
+@media (max-width: 640px) {
+  .booking-duty-calendar-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .booking-duty-calendar-heading {
+    align-items: flex-start;
+  }
+
+  .booking-duty-calendar .react-calendar__tile {
+    height: 3.25rem;
+    min-height: 3.25rem;
+    padding-top: 0.35rem;
+    font-size: 0.72rem;
+  }
+
+  .booking-duty-detail-header {
+    padding: 1rem;
+  }
+
+  .booking-duty-detail-icon {
+    display: none;
+  }
+
+  .booking-duty-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .booking-duty-detail-grid > div:nth-child(odd),
+  .booking-duty-detail-grid > div:nth-child(-n + 2) {
+    border-right: 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .booking-duty-detail-grid > div:last-child {
+    border-bottom: 0;
+  }
+
+  .booking-duty-detail-footer {
+    flex-direction: column-reverse;
+  }
+
+  .booking-duty-detail-footer > * {
+    justify-content: center;
+  }
+}
+
 .booking-calendar-pills {
   position: relative;
   z-index: 2;

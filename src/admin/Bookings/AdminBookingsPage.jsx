@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Calendar from 'react-calendar';
+import 'react-calendar/dist/Calendar.css';
 import {
   ArrowsRightLeftIcon,
   ArrowDownTrayIcon,
   ArrowUturnLeftIcon,
+  CalendarDaysIcon,
   CheckCircleIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -20,8 +23,12 @@ import { ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tool
 import RichTextEditor from '../../components/forms/RichTextEditor';
 import bookingService from '../../services/bookingService';
 import donationService from '../../services/donationService';
+import eventService from '../../services/eventService';
+import contentApiService from '../../services/contentApiService';
 
 const BOOKINGS_PAGE_SIZE = 10;
+const DUTY_PAGE_PATH = '/admin/booking-duties';
+const FULL_ACCESS_ROLES = new Set(['admin', 'super admin']);
 const CATEGORY_COLORS = ['#1d4ed8', '#0f766e', '#b45309', '#b91c1c', '#7c3aed', '#334155'];
 const BOOKING_TIME_OPTIONS = Array.from({ length: 96 }, (_, index) => {
   const hours = Math.floor(index / 4);
@@ -48,6 +55,68 @@ const emptyPayment = {
 };
 
 const iconButtonClass = 'inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40';
+
+const toDateKey = (value) => {
+  const dateOnly = String(value || '').match(/^(\d{4}-\d{2}-\d{2})/);
+  if (dateOnly) {
+    return dateOnly[1];
+  }
+  const date = value instanceof Date ? value : new Date(value || '');
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+
+const toCalendarDate = (value) => {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12) : new Date();
+};
+
+const eachDateKey = (startValue, endValue = startValue) => {
+  const start = toCalendarDate(startValue);
+  const end = toCalendarDate(endValue || startValue);
+  if (!toDateKey(startValue) || !toDateKey(endValue || startValue) || end < start) {
+    return [];
+  }
+  const keys = [];
+  const cursor = new Date(start);
+  while (cursor <= end && keys.length < 3660) {
+    keys.push(toDateKey(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return keys;
+};
+
+const getBookingIntervals = (booking = {}) => eachDateKey(booking.date, booking.toDate || booking.date)
+  .map((dateKey) => ({
+    start: new Date(`${dateKey}T${booking.startTime || '00:00'}:00`),
+    end: new Date(`${dateKey}T${booking.endTime || '00:00'}:00`)
+  }))
+  .filter((interval) => !Number.isNaN(interval.start.getTime()) && !Number.isNaN(interval.end.getTime()) && interval.end > interval.start);
+
+const getEventIntervals = (event = {}) => {
+  const start = new Date(event.date || '');
+  const parsedEnd = new Date(event.endDate || '');
+  const end = Number.isNaN(parsedEnd.getTime()) ? new Date(start.getTime() + (60 * 60 * 1000)) : parsedEnd;
+  return Number.isNaN(start.getTime()) || end <= start ? [] : [{ start, end }];
+};
+
+const intervalsOverlap = (first, second) => first.some((left) => second.some((right) => left.start < right.end && right.start < left.end));
+
+const findScheduleConflict = (candidate, bookings, events) => {
+  const candidateIntervals = getBookingIntervals(candidate);
+  const bookingConflict = bookings.find((entry) => (
+    String(entry.id || '') !== String(candidate.id || '')
+    && String(entry.status || '').toLowerCase() !== 'cancelled'
+    && intervalsOverlap(candidateIntervals, getBookingIntervals(entry))
+  ));
+  if (bookingConflict) return bookingConflict.categoryName || bookingConflict.title || 'another booking';
+  const eventConflict = events.find((entry) => (
+    entry.active !== false && intervalsOverlap(candidateIntervals, getEventIntervals(entry))
+  ));
+  return eventConflict ? eventConflict.title || 'an event' : '';
+};
 
 const monthKeyFromDate = (value) => {
   const date = new Date(value || '');
@@ -105,6 +174,8 @@ const AdminBookingsPage = () => {
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [paymentDraft, setPaymentDraft] = useState(emptyPayment);
   const [paymentError, setPaymentError] = useState('');
+  const [bookingFormError, setBookingFormError] = useState('');
+  const [bookingCalendarOpen, setBookingCalendarOpen] = useState(false);
   const [bookingFilters, setBookingFilters] = useState({ search: '', status: '', paymentStatus: '', categoryId: '', sort: 'newest' });
 
   const { data: bookings = [], isLoading: bookingsLoading, error: bookingsError } = useQuery({
@@ -116,6 +187,35 @@ const AdminBookingsPage = () => {
     queryKey: ['booking-categories'],
     queryFn: () => bookingService.getBookingCategories().then((res) => res.data)
   });
+
+  const { data: events = [] } = useQuery({
+    queryKey: ['events'],
+    queryFn: () => eventService.getEvents().then((res) => res.data)
+  });
+
+  const { data: roleDefinitions = [] } = useQuery({
+    queryKey: ['admin-role-definitions'],
+    queryFn: () => contentApiService.getSingleton('admin_roles', [])
+  });
+
+  const { data: adminUsers = [] } = useQuery({
+    queryKey: ['admin-users', 'booking-assignees'],
+    queryFn: () => contentApiService.list('users')
+  });
+
+  const dutyAssignees = useMemo(() => {
+    const dutyRoles = new Set((Array.isArray(roleDefinitions) ? roleDefinitions : [])
+      .filter((entry) => Array.isArray(entry?.adminPageAccess) && entry.adminPageAccess.includes(DUTY_PAGE_PATH))
+      .map((entry) => String(entry?.name || '').trim().toLowerCase())
+      .filter(Boolean));
+    return adminUsers.filter((entry) => {
+      const role = String(entry.role || '').trim().toLowerCase();
+      return !FULL_ACCESS_ROLES.has(role)
+        && (dutyRoles.has(role) || (Array.isArray(entry.adminPageAccess) && entry.adminPageAccess.includes(DUTY_PAGE_PATH)))
+        && entry.isActive !== false
+        && String(entry.approvalStatus || 'approved').toLowerCase() === 'approved';
+    }).sort((first, second) => String(first.name || first.email || '').localeCompare(String(second.name || second.email || '')));
+  }, [adminUsers, roleDefinitions]);
 
   const { data: bookingPageSettings } = useQuery({
     queryKey: ['booking-page-settings'],
@@ -223,6 +323,44 @@ const AdminBookingsPage = () => {
     return [...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month)).slice(-12);
   }, [bookings]);
 
+  const occupiedDates = useMemo(() => {
+    const dates = new Map();
+    const addRange = (start, end, kind) => {
+      eachDateKey(start, end).forEach((dateKey) => {
+        const kinds = dates.get(dateKey) || new Set();
+        kinds.add(kind);
+        dates.set(dateKey, kinds);
+      });
+    };
+    bookings
+      .filter((booking) => String(booking.status || '').toLowerCase() !== 'cancelled')
+      .forEach((booking) => addRange(booking.date, booking.toDate || booking.date, 'booking'));
+    events
+      .filter((event) => event.active !== false)
+      .forEach((event) => addRange(event.date, event.endDate || event.date, 'event'));
+    return dates;
+  }, [bookings, events]);
+
+  const occupiedEntriesByDate = useMemo(() => {
+    const entriesByDate = new Map();
+    const addEntry = (entry, kind) => {
+      eachDateKey(entry.date, entry.toDate || entry.endDate || entry.date).forEach((dateKey) => {
+        const entries = entriesByDate.get(dateKey) || [];
+        entries.push({
+          id: `${kind}-${entry.id}-${dateKey}`,
+          kind,
+          title: entry.categoryName || entry.title || (kind === 'booking' ? 'Booking' : 'Event'),
+          startTime: entry.startTime || (entry.date?.includes('T') ? new Date(entry.date).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' }) : ''),
+          endTime: entry.endTime || (entry.endDate?.includes('T') ? new Date(entry.endDate).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' }) : '')
+        });
+        entriesByDate.set(dateKey, entries);
+      });
+    };
+    bookings.filter((booking) => String(booking.status || '').toLowerCase() !== 'cancelled').forEach((booking) => addEntry(booking, 'booking'));
+    events.filter((event) => event.active !== false).forEach((event) => addEntry(event, 'event'));
+    return entriesByDate;
+  }, [bookings, events]);
+
   const settingsMutation = useMutation({
     mutationFn: (settings) => bookingService.setBookingPageSettings(settings).then((res) => res.data),
     onSuccess: async () => {
@@ -246,7 +384,8 @@ const AdminBookingsPage = () => {
       setBookingModal({ open: false, mode: 'view', booking: null });
       setStatusModal({ open: false, booking: null, status: 'pending' });
       setRefundModal({ open: false, booking: null, refundStatus: 'pending', refundAmount: 0, refundMethod: 'original-payment-method', refundReference: '', refundDate: '', refundNotes: '' });
-    }
+    },
+    onError: (error) => setBookingFormError(error?.message || 'Unable to update this booking.')
   });
 
   const deleteMutation = useMutation({
@@ -309,8 +448,10 @@ const AdminBookingsPage = () => {
     mutationFn: (payload) => bookingService.createBooking(payload).then((res) => res.data),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      setBookingFormError('');
       setBookingModal({ open: false, mode: 'view', booking: null });
-    }
+    },
+    onError: (error) => setBookingFormError(error?.message || 'Unable to create this booking.')
   });
 
   const openCategoryModal = (mode, category = emptyCategory) => {
@@ -436,6 +577,44 @@ const AdminBookingsPage = () => {
     if (!booking) {
       return;
     }
+    const requiredFields = [
+      ['date', 'From date'],
+      ['toDate', 'To date'],
+      ['startTime', 'Start time'],
+      ['endTime', 'End time'],
+      ['categoryId', 'Booking type'],
+      ['bookingLocation', 'Booking location'],
+      ['requesterName', 'Name'],
+      ['requesterEmail', 'Email'],
+      ['requesterPhone', 'Phone'],
+      ['requesterAddress', 'Address'],
+      ['dutyAssigneeId', 'Duty performer'],
+      ['paymentStatus', 'Payment status'],
+      ['paymentMethod', 'Payment method']
+    ];
+    const missingField = requiredFields.find(([field]) => !String(booking[field] || '').trim());
+    if (missingField) {
+      setBookingFormError(`${missingField[1]} is required.`);
+      return;
+    }
+    if (booking.toDate < booking.date) {
+      setBookingFormError('To date cannot be earlier than the from date.');
+      return;
+    }
+    if (booking.endTime <= booking.startTime) {
+      setBookingFormError('End time must be later than start time.');
+      return;
+    }
+    const conflictTitle = findScheduleConflict(booking, bookings, events);
+    if (conflictTitle) {
+      setBookingFormError(`This date and time overlaps with ${conflictTitle}. Choose a different time.`);
+      return;
+    }
+    if (Number(booking.amount) < 0) {
+      setBookingFormError('Amount cannot be negative.');
+      return;
+    }
+    setBookingFormError('');
     if (bookingModal.mode === 'create') {
       createBookingMutation.mutate({
         ...booking,
@@ -461,7 +640,8 @@ const AdminBookingsPage = () => {
         categoryName: category.name,
         title: category.name,
         color: category.color,
-        date: new Date().toISOString().slice(0, 10),
+        date: toDateKey(new Date()),
+        toDate: toDateKey(new Date()),
         startTime: '10:00',
         endTime: '11:00',
         bookingLocation: 'Gurdwara Singh Sabha Milton, 7035 Sixth Line, Milton, ON',
@@ -469,17 +649,21 @@ const AdminBookingsPage = () => {
         requesterEmail: '',
         requesterPhone: '',
         requesterAddress: '',
+        dutyAssigneeId: '',
+        dutyAssigneeName: '',
+        dutyAssigneeEmail: '',
         status: 'confirmed',
         paymentStatus: 'pending',
         paymentMethod: 'cash',
         paymentProvider: '',
         amount: 0,
         receiptNumber: '',
-        paymentReference: '',
         notes: '',
         source: 'admin-manual'
       }
     });
+    setBookingFormError('');
+    setBookingCalendarOpen(false);
   };
 
   return (
@@ -559,8 +743,8 @@ const AdminBookingsPage = () => {
           </div>
         </div>
         {bookingsError ? <p className="m-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">Unable to load bookings: {bookingsError.message}</p> : null}
-        <div className="overflow-x-auto">
-          <table className="min-w-[1020px] w-full border-collapse text-sm">
+        <div className="overflow-x-hidden">
+          <table className="admin-bookings-table min-w-[1020px] w-full border-collapse text-sm">
             <thead>
               <tr className="bg-slate-50 text-left text-xs uppercase text-slate-500">
                 <th className="px-3 py-2">Date</th>
@@ -578,7 +762,7 @@ const AdminBookingsPage = () => {
               {bookingsLoading ? <tr><td className="px-3 py-8 text-center text-slate-500" colSpan={9}>Loading bookings…</td></tr> : null}
               {pagedBookings.map((row) => (
                 <tr key={row.id} className="border-t border-slate-200 hover:bg-slate-50/70">
-                  <td className="whitespace-nowrap px-3 py-2">{row.date || '-'}</td>
+                  <td className="whitespace-nowrap px-3 py-2">{row.date || '-'}{row.toDate && row.toDate !== row.date ? ` to ${row.toDate}` : ''}</td>
                   <td className="px-3 py-2 font-semibold text-slate-900">{row.requesterName || '-'}</td>
                   <td className="px-3 py-2">{row.categoryName || '-'}</td>
                   <td className="whitespace-nowrap px-3 py-2">{row.startTime || '-'} - {row.endTime || '-'}</td>
@@ -587,8 +771,8 @@ const AdminBookingsPage = () => {
                   <td className="px-3 py-2">{row.status === 'cancelled' && row.refundStatus ? <button type="button" onClick={() => openRefundModal(row)} className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold transition hover:brightness-95 ${refundBadgeClass(row.refundStatus)}`} title="Update refund status">{row.refundStatus === 'processed' ? 'released' : row.refundStatus}</button> : <span className="text-slate-400">-</span>}</td>
                   <td className="whitespace-nowrap px-3 py-2">${Number(row.amount || 0).toFixed(2)}</td>
                   <td className="px-3 py-2"><div className="flex justify-end gap-1.5">
-                    <button type="button" onClick={() => setBookingModal({ open: true, mode: 'view', booking: { ...row } })} className={iconButtonClass} title="View booking" aria-label="View booking"><EyeIcon className="h-4 w-4" /></button>
-                    <button type="button" onClick={() => setBookingModal({ open: true, mode: 'edit', booking: { ...row } })} className={iconButtonClass} title="Edit booking" aria-label="Edit booking"><PencilSquareIcon className="h-4 w-4" /></button>
+                    <button type="button" onClick={() => { setBookingFormError(''); setBookingModal({ open: true, mode: 'view', booking: { ...row, toDate: row.toDate || row.date } }); }} className={iconButtonClass} title="View booking" aria-label="View booking"><EyeIcon className="h-4 w-4" /></button>
+                    <button type="button" onClick={() => { setBookingFormError(''); setBookingModal({ open: true, mode: 'edit', booking: { ...row, toDate: row.toDate || row.date } }); }} className={iconButtonClass} title="Edit booking" aria-label="Edit booking"><PencilSquareIcon className="h-4 w-4" /></button>
                     <button type="button" onClick={() => openStatusModal(row)} className={iconButtonClass} title="Update status" aria-label="Update booking status"><ArrowsRightLeftIcon className="h-4 w-4" /></button>
                     {row.status === 'cancelled' && (row.refundStatus || ['paid', 'partial', 'refunded'].includes(String(row.paymentStatus || '').toLowerCase())) ? <button type="button" onClick={() => openRefundModal(row)} className={`${iconButtonClass} text-emerald-700`} title="Update refund status" aria-label="Update refund status"><ArrowUturnLeftIcon className="h-4 w-4" /></button> : null}
                     <button type="button" onClick={() => bookingService.downloadInvoice(row)} className={iconButtonClass} title="Download invoice" aria-label="Download invoice"><ArrowDownTrayIcon className="h-4 w-4" /></button>
@@ -656,31 +840,49 @@ const AdminBookingsPage = () => {
       </section>
 
       {bookingModal.open && bookingModal.booking ? (
-        <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-950/65 p-4" onClick={() => setBookingModal({ open: false, mode: 'view', booking: null })}>
-          <form className="max-h-[calc(100vh-2rem)] w-full max-w-3xl overflow-y-auto rounded-lg bg-white shadow-2xl" onSubmit={saveBooking} onClick={(event) => event.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-              <div><p className="text-xs font-semibold uppercase text-brand-blue">Booking Record</p><h3 className="font-heading text-xl font-semibold text-slate-900">{bookingModal.mode === 'create' ? 'Manual' : bookingModal.mode === 'edit' ? 'Edit' : 'View'} Booking</h3></div>
+        <div className="fixed inset-0 z-[140] flex items-center justify-center overflow-x-hidden bg-slate-950/65 p-3 sm:p-4" onClick={() => setBookingModal({ open: false, mode: 'view', booking: null })}>
+          <form className="max-h-[calc(100vh-1.5rem)] w-full max-w-5xl overflow-x-hidden overflow-y-auto rounded-lg bg-slate-50 shadow-2xl sm:max-h-[calc(100vh-2rem)]" onSubmit={saveBooking} onClick={(event) => event.stopPropagation()}>
+            <div className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-blue-200 bg-gradient-to-r from-blue-50 via-white to-amber-50 px-4 py-3 sm:px-6">
+              <div className="flex min-w-0 items-center gap-3"><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-blue text-white"><CalendarDaysIcon className="h-5 w-5" /></span><div><p className="text-xs font-semibold uppercase text-brand-blue">Booking Record</p><h3 className="font-heading text-xl font-semibold text-slate-900">{bookingModal.mode === 'create' ? 'Manual' : bookingModal.mode === 'edit' ? 'Edit' : 'View'} Booking</h3></div></div>
               <button type="button" onClick={() => setBookingModal({ open: false, mode: 'view', booking: null })} className={iconButtonClass} aria-label="Close booking"><XMarkIcon className="h-4 w-4" /></button>
             </div>
-            <div className="space-y-5 p-5">
-              <section className="rounded-lg border border-slate-200 p-4">
-                <h4 className="font-heading text-base font-semibold text-slate-900">Programme Details</h4>
-                <div className="mt-3 grid gap-4 sm:grid-cols-2">
-              {[
-                ['date', 'Booking Date', 'date'],
-                ['startTime', 'Start Time', 'time'],
-                ['endTime', 'End Time', 'time']
-              ].map(([field, label, type]) => (
-                <label key={field} className="min-w-0 text-sm font-semibold text-slate-700">{label}{type === 'time' ? <select disabled={bookingModal.mode === 'view'} value={bookingModal.booking[field] || ''} onChange={(event) => updateBookingDraft(field, event.target.value)} className="mt-1 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 disabled:bg-slate-100"><option value="">Select time</option>{BOOKING_TIME_OPTIONS.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}</select> : <input type={type} disabled={bookingModal.mode === 'view'} value={bookingModal.booking[field] || ''} onChange={(event) => updateBookingDraft(field, event.target.value)} className="mt-1 w-full min-w-0 rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" />}</label>
-              ))}
-              <label className="text-sm font-semibold text-slate-700">Booking Type<select disabled={bookingModal.mode === 'view'} value={bookingModal.booking.categoryId || ''} onChange={(event) => { const category = categories.find((entry) => entry.id === event.target.value); setBookingModal((current) => ({ ...current, booking: { ...current.booking, categoryId: event.target.value, categoryName: category?.name || '', title: category?.name || '', color: category?.color || '' } })); }} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100">{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
-              <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Booking Location<input disabled={bookingModal.mode === 'view'} value={bookingModal.booking.bookingLocation || ''} onChange={(event) => updateBookingDraft('bookingLocation', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label>
-              <div className="text-sm font-semibold text-slate-700">Booking Status<div className="mt-1 flex min-h-10 items-center"><span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${statusBadgeClass(bookingModal.booking.status)}`}>{bookingModal.booking.status || 'pending'}</span></div>{bookingModal.mode === 'edit' ? <p className="mt-1 text-xs font-normal text-slate-500">Use the status action in the bookings table to change this status.</p> : null}</div>
+            <div className="space-y-4 p-4 sm:p-5">
+              {bookingFormError ? <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{bookingFormError}</div> : null}
+              <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                  <div className="flex items-center gap-2"><CalendarDaysIcon className="h-5 w-5 text-brand-blue" /><h4 className="font-heading text-base font-semibold text-slate-900">Programme Details</h4></div>
+                  <div className="relative ml-auto">
+                    <button type="button" onClick={() => setBookingCalendarOpen((open) => !open)} className="inline-flex items-center gap-2 rounded-full border border-brand-blue bg-brand-blue px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-blue-800" aria-expanded={bookingCalendarOpen}>
+                      <CalendarDaysIcon className="h-4 w-4" /> Booking Calendar
+                    </button>
+                    {bookingCalendarOpen ? (
+                      <div className="fixed inset-x-3 top-24 z-30 max-h-[calc(100vh-7rem)] overflow-y-auto rounded-xl border border-blue-200 bg-white p-3 shadow-2xl sm:absolute sm:left-auto sm:right-0 sm:top-12 sm:w-[390px]">
+                        <div className="mb-2 flex items-start justify-between gap-3"><div><p className="text-sm font-bold text-slate-900">Availability</p><p className="text-xs text-slate-600">Highlighted dates contain bookings or events. Select a date or range.</p></div><button type="button" onClick={() => setBookingCalendarOpen(false)} className={iconButtonClass} aria-label="Close booking calendar"><XMarkIcon className="h-4 w-4" /></button></div>
+                        <Calendar className="booking-admin-calendar" selectRange value={[toCalendarDate(bookingModal.booking.date), toCalendarDate(bookingModal.booking.toDate || bookingModal.booking.date)]} onChange={(value) => { if (bookingModal.mode === 'view' || !Array.isArray(value)) return; updateBookingDraft('date', toDateKey(value[0])); updateBookingDraft('toDate', toDateKey(value[1] || value[0])); }} tileClassName={({ date, view }) => { if (view !== 'month') return ''; const kinds = occupiedDates.get(toDateKey(date)); return kinds ? `booking-admin-calendar-occupied ${kinds.has('booking') ? 'booking-admin-calendar-booked' : ''} ${kinds.has('event') ? 'booking-admin-calendar-event' : ''}` : ''; }} tileContent={({ date, view }) => { const kinds = view === 'month' ? occupiedDates.get(toDateKey(date)) : null; return kinds ? <span className="booking-admin-calendar-markers" aria-hidden="true">{kinds.has('booking') ? <span className="bg-brand-blue" /> : null}{kinds.has('event') ? <span className="bg-brand-saffron" /> : null}</span> : null; }} />
+                        <p className="mt-2 rounded-md bg-slate-50 px-2 py-1.5 text-xs font-semibold text-slate-700">Selected: {bookingModal.booking.date || 'Choose a date'}{bookingModal.booking.toDate && bookingModal.booking.toDate !== bookingModal.booking.date ? ` to ${bookingModal.booking.toDate}` : ' (single day)'}</p>
+                        <div className="mt-2 space-y-1.5">{(occupiedEntriesByDate.get(bookingModal.booking.date) || []).map((entry) => <div key={entry.id} className="flex items-center justify-between gap-3 rounded-md border border-slate-200 px-2.5 py-2 text-xs"><span className="min-w-0 truncate font-semibold text-slate-800">{entry.title}</span><span className="shrink-0 text-slate-600">{entry.startTime || 'Time TBD'}{entry.endTime ? ` - ${entry.endTime}` : ''}</span></div>)}{(occupiedEntriesByDate.get(bookingModal.booking.date) || []).length === 0 ? <p className="rounded-md bg-emerald-50 px-2.5 py-2 text-xs font-semibold text-emerald-700">No booking or event occupies this date.</p> : <p className="text-xs text-slate-500">Other non-overlapping times on this date can still be booked.</p>}</div>
+                        <div className="flex flex-wrap gap-3 pt-2 text-xs font-semibold text-slate-600"><span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-brand-blue" />Booking</span><span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-brand-saffron" />Event</span></div>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="mt-3 grid content-start gap-3 sm:grid-cols-4">
+                    {[
+                      ['date', 'From Date', 'date'],
+                      ['toDate', 'To Date', 'date'],
+                      ['startTime', 'Start Time', 'time'],
+                      ['endTime', 'End Time', 'time']
+                    ].map(([field, label, type]) => (
+                      <label key={field} className="min-w-0 text-sm font-semibold text-slate-700">{label} <span className="text-rose-600">*</span>{type === 'time' ? <select required disabled={bookingModal.mode === 'view'} value={bookingModal.booking[field] || ''} onChange={(event) => updateBookingDraft(field, event.target.value)} className="mt-1 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 disabled:bg-slate-100"><option value="">Select time</option>{BOOKING_TIME_OPTIONS.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}</select> : <input required type={type} disabled={bookingModal.mode === 'view'} value={bookingModal.booking[field] || ''} min={field === 'toDate' ? bookingModal.booking.date || undefined : undefined} onChange={(event) => updateBookingDraft(field, event.target.value)} className="mt-1 w-full min-w-0 rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" />}</label>
+                    ))}
+                    <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Booking Type <span className="text-rose-600">*</span><select required disabled={bookingModal.mode === 'view'} value={bookingModal.booking.categoryId || ''} onChange={(event) => { const category = categories.find((entry) => entry.id === event.target.value); setBookingModal((current) => ({ ...current, booking: { ...current.booking, categoryId: event.target.value, categoryName: category?.name || '', title: category?.name || '', color: category?.color || '' } })); }} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100">{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+                    <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Booking Location <span className="text-rose-600">*</span><input required disabled={bookingModal.mode === 'view'} value={bookingModal.booking.bookingLocation || ''} onChange={(event) => updateBookingDraft('bookingLocation', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label>
+                    <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Duty Performer <span className="text-rose-600">*</span><select required disabled={bookingModal.mode === 'view'} value={bookingModal.booking.dutyAssigneeId || ''} onChange={(event) => { const assignee = dutyAssignees.find((entry) => String(entry.id) === event.target.value); setBookingModal((current) => ({ ...current, booking: { ...current.booking, dutyAssigneeId: String(assignee?.id || ''), dutyAssigneeName: String(assignee?.name || assignee?.email || ''), dutyAssigneeEmail: String(assignee?.email || '').toLowerCase() } })); }} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 disabled:bg-slate-100"><option value="">Select duty performer</option>{bookingModal.booking.dutyAssigneeId && !dutyAssignees.some((entry) => String(entry.id) === String(bookingModal.booking.dutyAssigneeId)) ? <option value={bookingModal.booking.dutyAssigneeId}>{bookingModal.booking.dutyAssigneeName || 'Previously assigned user'}</option> : null}{dutyAssignees.map((entry) => <option key={entry.id} value={entry.id}>{entry.name || entry.email}{entry.role ? ` (${entry.role})` : ''}</option>)}</select></label>
                 </div>
               </section>
-
-              <section className="rounded-lg border border-slate-200 p-4">
-                <h4 className="font-heading text-base font-semibold text-slate-900">Contact Details</h4>
+              <div className="grid gap-4 lg:grid-cols-2">
+              <section className="rounded-lg border border-slate-200 bg-white p-4">
+                <h4 className="border-b border-slate-200 pb-3 font-heading text-base font-semibold text-slate-900">Contact Details</h4>
                 <div className="mt-3 grid gap-4 sm:grid-cols-2">
                   {[
                     ['requesterName', 'Name', 'text'],
@@ -688,28 +890,27 @@ const AdminBookingsPage = () => {
                     ['requesterPhone', 'Phone', 'text'],
                     ['requesterAddress', 'Address', 'text']
                   ].map(([field, label, type]) => (
-                    <label key={field} className="text-sm font-semibold text-slate-700">{label}<input type={type} disabled={bookingModal.mode === 'view'} value={bookingModal.booking[field] || ''} onChange={(event) => updateBookingDraft(field, event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label>
+                    <label key={field} className="text-sm font-semibold text-slate-700">{label} <span className="text-rose-600">*</span><input required type={type} disabled={bookingModal.mode === 'view'} value={bookingModal.booking[field] || ''} onChange={(event) => updateBookingDraft(field, event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label>
                   ))}
                 </div>
               </section>
 
               <section className="rounded-lg border border-blue-200 bg-blue-50/40 p-4">
-                <h4 className="font-heading text-base font-semibold text-slate-900">Payment Details</h4>
+                <h4 className="border-b border-blue-200 pb-3 font-heading text-base font-semibold text-slate-900">Payment Details</h4>
                 <div className="mt-3 grid gap-4 sm:grid-cols-2">
-              <label className="text-sm font-semibold text-slate-700">Payment Status<select disabled={bookingModal.mode === 'view'} value={bookingModal.booking.paymentStatus || 'pending'} onChange={(event) => updateBookingDraft('paymentStatus', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100"><option value="pending">Pending</option><option value="paid">Paid</option><option value="partial">Partial</option><option value="refunded">Refunded</option></select></label>
-              <label className="text-sm font-semibold text-slate-700">Payment Method<select disabled={bookingModal.mode === 'view'} value={bookingModal.booking.paymentMethod || ''} onChange={(event) => updateBookingDraft('paymentMethod', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 disabled:bg-slate-100">{bookingModal.booking.source !== 'admin-manual' && bookingModal.booking.paymentMethod && !['cash', 'credit-card', 'interac'].includes(bookingModal.booking.paymentMethod) ? <option value={bookingModal.booking.paymentMethod}>{bookingModal.booking.paymentMethod}</option> : null}<option value="cash">Cash</option><option value="credit-card">Credit Card</option><option value="interac">Interac</option></select></label>
-              <label className="text-sm font-semibold text-slate-700">Amount (CAD)<input type="number" min="0" step="0.01" disabled={bookingModal.mode === 'view'} value={bookingModal.booking.amount || 0} onChange={(event) => updateBookingDraft('amount', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label>
+              <label className="text-sm font-semibold text-slate-700">Payment Status <span className="text-rose-600">*</span><select required disabled={bookingModal.mode === 'view'} value={bookingModal.booking.paymentStatus || 'pending'} onChange={(event) => updateBookingDraft('paymentStatus', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100"><option value="pending">Pending</option><option value="paid">Paid</option><option value="partial">Partial</option><option value="refunded">Refunded</option></select></label>
+              <label className="text-sm font-semibold text-slate-700">Payment Method <span className="text-rose-600">*</span><select required disabled={bookingModal.mode === 'view'} value={bookingModal.booking.paymentMethod || ''} onChange={(event) => updateBookingDraft('paymentMethod', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 disabled:bg-slate-100">{bookingModal.booking.source !== 'admin-manual' && bookingModal.booking.paymentMethod && !['cash', 'credit-card', 'interac'].includes(bookingModal.booking.paymentMethod) ? <option value={bookingModal.booking.paymentMethod}>{bookingModal.booking.paymentMethod}</option> : null}<option value="cash">Cash</option><option value="credit-card">Credit Card</option><option value="interac">Interac</option></select></label>
+              <label className="text-sm font-semibold text-slate-700">Amount (CAD) <span className="text-rose-600">*</span><input required type="number" min="0" step="0.01" disabled={bookingModal.mode === 'view'} value={bookingModal.booking.amount ?? ''} onChange={(event) => updateBookingDraft('amount', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label>
               <label className="text-sm font-semibold text-slate-700">Receipt Number<input disabled={bookingModal.mode === 'view'} value={bookingModal.booking.receiptNumber || ''} onChange={(event) => updateBookingDraft('receiptNumber', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label>
-              <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Payment Reference<input disabled={bookingModal.mode === 'view'} value={bookingModal.booking.paymentReference || ''} onChange={(event) => updateBookingDraft('paymentReference', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label>
                 </div>
               </section>
-
-              <section className="rounded-lg border border-slate-200 p-4">
-                <h4 className="font-heading text-base font-semibold text-slate-900">Additional Notes</h4>
+              </div>
+              <section className="rounded-lg border border-slate-200 bg-white p-4">
+                <h4 className="border-b border-slate-200 pb-3 font-heading text-base font-semibold text-slate-900">Additional Notes</h4>
                 <label className="mt-3 block text-sm font-semibold text-slate-700">Notes<textarea disabled={bookingModal.mode === 'view'} value={bookingModal.booking.notes || ''} onChange={(event) => updateBookingDraft('notes', event.target.value)} rows={3} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label>
               </section>
             </div>
-            {bookingModal.mode !== 'view' ? <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4"><button type="button" onClick={() => setBookingModal({ open: false, mode: 'view', booking: null })} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold">Cancel</button><button type="submit" disabled={bookingMutation.isPending || createBookingMutation.isPending} className="rounded-lg bg-brand-blue px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{bookingMutation.isPending || createBookingMutation.isPending ? 'Saving…' : bookingModal.mode === 'create' ? 'Create Booking' : 'Save Booking'}</button></div> : null}
+            {bookingModal.mode !== 'view' ? <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white px-4 py-4 sm:px-6"><button type="button" onClick={() => setBookingModal({ open: false, mode: 'view', booking: null })} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold">Cancel</button><button type="submit" disabled={bookingMutation.isPending || createBookingMutation.isPending} className="rounded-lg bg-brand-blue px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{bookingMutation.isPending || createBookingMutation.isPending ? 'Saving…' : bookingModal.mode === 'create' ? 'Create Booking' : 'Save Booking'}</button></div> : null}
           </form>
         </div>
       ) : null}
