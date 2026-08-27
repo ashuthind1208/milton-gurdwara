@@ -33,7 +33,7 @@ const HukamnamaText = ({ entry }) => {
   return (
     <div className="mt-2 space-y-2">
       <p className="text-sm font-semibold text-brand-blue">Ang {entry.ang}</p>
-      {(entry.lines || []).map((line) => (
+      {hukamnamaService.getSelectedShabadLines(entry).map((line) => (
         <div key={line.id}>
           <p className="font-gurmukhi text-lg font-normal text-brand-navy">{line.gurmukhi}</p>
           {line.translationPunjabi ? <p className="mt-1 text-sm text-brand-saffron">Punjabi: {line.translationPunjabi}</p> : null}
@@ -55,9 +55,11 @@ const AdminHukamnamaPage = () => {
   const form = useForm({
     defaultValues: {
       date: toDateKey(new Date()),
-      ang: ''
+      ang: '',
+      shabadId: ''
     }
   });
+  const selectedShabadId = form.watch('shabadId');
 
   const selectedDateKey = toDateKey(selectedDate);
 
@@ -83,6 +85,10 @@ const AdminHukamnamaPage = () => {
     mutationFn: (ang) => hukamnamaService.getAngPreview(ang),
     onSuccess: (response) => {
       setPreviewData(response.data);
+      const options = response.data.shabads || hukamnamaService.getShabadOptions(response.data);
+      if (!options.some((option) => option.id === form.getValues('shabadId'))) {
+        form.setValue('shabadId', '');
+      }
     },
     onError: (error) => {
       window.alert(error?.message || 'Could not load preview for this ang.');
@@ -103,7 +109,7 @@ const AdminHukamnamaPage = () => {
       setAddModalOpen(false);
       setEditingDateKey('');
       setPreviewData(null);
-      form.reset({ date: toDateKey(new Date()), ang: '' });
+      form.reset({ date: toDateKey(new Date()), ang: '', shabadId: '' });
       window.alert(editingDateKey ? 'Hukamnama updated successfully.' : 'Hukamnama added successfully.');
     },
     onError: (error) => {
@@ -131,7 +137,7 @@ const AdminHukamnamaPage = () => {
   const openAddModal = () => {
     setPreviewData(null);
     setEditingDateKey('');
-    form.reset({ date: selectedDateKey, ang: '' });
+    form.reset({ date: selectedDateKey, ang: '', shabadId: '' });
     setAddModalOpen(true);
   };
 
@@ -142,7 +148,11 @@ const AdminHukamnamaPage = () => {
 
     setEditingDateKey(selectedDateKey);
     setPreviewData(selectedDateArchive.entry);
-    form.reset({ date: selectedDateKey, ang: String(selectedDateArchive.entry.ang || '') });
+    form.reset({
+      date: selectedDateKey,
+      ang: String(selectedDateArchive.entry.ang || ''),
+      shabadId: String(selectedDateArchive.entry.selectedShabadId || '')
+    });
     setAddModalOpen(true);
   };
 
@@ -163,7 +173,8 @@ const AdminHukamnamaPage = () => {
     const payload = {
       ...values,
       date: toDateKey(values.date),
-      ang: Number(values.ang)
+      ang: Number(values.ang),
+      shabadId: String(values.shabadId || '').trim()
     };
     addMutation.mutate(payload);
   });
@@ -184,6 +195,15 @@ const AdminHukamnamaPage = () => {
       </div>
     );
   };
+
+  const shabadOptions = previewData
+    ? (previewData.shabads || hukamnamaService.getShabadOptions(previewData))
+    : [];
+  const selectedShabadOption = shabadOptions.find((option) => option.id === selectedShabadId) || null;
+  const selectedShabad = selectedShabadOption && previewData?.selectedShabadId === selectedShabadId
+    && previewData.selectedShabadLines?.length
+    ? { ...selectedShabadOption, lines: previewData.selectedShabadLines }
+    : selectedShabadOption;
 
   useEffect(() => {
     setHeaderAction(<AdminHeaderActionButton label="Add Hukamnama" onClick={openAddModal} />);
@@ -236,63 +256,73 @@ const AdminHukamnamaPage = () => {
                 <label className="text-sm">Date
                   <input type="date" {...form.register('date', { required: true })} required className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
                 </label>
-                <label className="text-sm">Ang
-                  <input type="number" min="1" max="1430" {...form.register('ang', { required: true, valueAsNumber: true })} required className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                <div>
+                  <label htmlFor="hukamnama-ang" className="text-sm">Ang</label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <input id="hukamnama-ang" type="number" min="1" max="1430" {...form.register('ang', { required: true, valueAsNumber: true })} required className="h-9 w-20 rounded-lg border border-slate-300 px-2.5 text-sm" />
+                    <button
+                      type="button"
+                      onClick={() => previewMutation.mutate(form.getValues('ang'))}
+                      disabled={previewMutation.isPending}
+                      className="h-9 rounded-lg border border-brand-saffron/50 bg-brand-saffron/10 px-3 text-xs font-semibold text-slate-900 transition hover:bg-brand-saffron/20 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {previewMutation.isPending ? 'Loading...' : 'Load Shabads'}
+                    </button>
+                  </div>
+                </div>
+                <label className="block text-sm">Shabad
+                  <select
+                    {...form.register('shabadId', { required: true })}
+                    disabled={!shabadOptions.length || previewMutation.isPending}
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 disabled:bg-slate-100"
+                  >
+                    <option value="">Select a Shabad</option>
+                    {shabadOptions.map((shabad) => {
+                      const firstLine = shabad.firstLine || `Shabad ${shabad.id}`;
+                      const label = firstLine.length > 60 ? `${firstLine.slice(0, 60)}...` : firstLine;
+                      return <option key={shabad.id} value={shabad.id}>{label}</option>;
+                    })}
+                  </select>
                 </label>
-                {(form.formState.errors?.date || form.formState.errors?.ang) ? (
-                  <p className="rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-700">Date and Ang are required.</p>
+                {(form.formState.errors?.date || form.formState.errors?.ang || form.formState.errors?.shabadId) ? (
+                  <p className="rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-700">Date, Ang, and Shabad are required.</p>
                 ) : null}
-                <div className="flex flex-wrap items-center gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => previewMutation.mutate(form.getValues('ang'))}
-                    disabled={previewMutation.isPending}
-                    className="rounded-lg border border-brand-saffron/50 bg-brand-saffron/10 px-3 py-1.5 text-xs font-semibold text-slate-900 transition hover:bg-brand-saffron/20 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {previewMutation.isPending ? 'Loading...' : 'Load Preview'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSubmitHukamnama}
-                    disabled={addMutation.isPending}
-                    className="rounded-lg border border-brand-blue bg-brand-blue px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-blue/90 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
+                <div className="flex justify-end gap-2 pt-1">
+                  <button type="button" onClick={() => setAddModalOpen(false)} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">Cancel</button>
+                  <button type="submit" disabled={addMutation.isPending || !selectedShabad} className="rounded-lg border border-brand-blue bg-brand-blue px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-blue/90 disabled:cursor-not-allowed disabled:opacity-60">
                     {addMutation.isPending ? 'Saving...' : 'Submit'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAddModalOpen(false)}
-                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
-                  >
-                    Cancel
                   </button>
                 </div>
               </div>
 
-              <div className="rounded-lg bg-slate-50 p-4">
-                <p className="text-sm font-bold text-slate-800">Hukamnama Preview</p>
-                {previewMutation.isPending ? (
-                  <div className="mt-4 grid min-h-[220px] place-items-center text-center">
-                    <div className="space-y-3">
-                      <span className="mx-auto inline-block h-10 w-10 animate-spin rounded-full border-[3px] border-brand-blue/20 border-t-brand-blue" />
-                      <p className="text-base font-bold text-brand-blue">Fetching divine verses for your selected Ang...</p>
-                    </div>
-                  </div>
-                ) : !previewData ? (
-                  <p className="mt-2 text-sm text-slate-500">Load preview to verify the selected ang before submitting.</p>
-                ) : (
-                  <div className="mt-2 space-y-2">
-                    <p className="text-sm font-semibold text-brand-blue">Ang {previewData.ang}</p>
-                    {(previewData.lines || []).slice(0, 4).map((line) => (
-                      <div key={line.id}>
-                        <p className="font-gurmukhi text-lg font-normal text-brand-navy">{line.gurmukhi}</p>
-                        {line.translationPunjabi ? <p className="mt-1 text-sm text-brand-saffron">Punjabi: {line.translationPunjabi}</p> : null}
-                        {line.translationEnglish ? <p className="mt-0.5 text-sm text-brand-blue">English: {line.translationEnglish}</p> : null}
+              <div>
+                <div className="rounded-lg bg-slate-50 p-4">
+                  <p className="text-lg font-bold text-slate-800">Hukamnama Preview</p>
+                  <hr className="mt-2 border-slate-200" />
+                  {previewMutation.isPending ? (
+                    <div className="mt-4 grid min-h-[220px] place-items-center text-center">
+                      <div className="space-y-3">
+                        <span className="mx-auto inline-block h-10 w-10 animate-spin rounded-full border-[3px] border-brand-blue/20 border-t-brand-blue" />
+                        <p className="text-base font-bold text-brand-blue">Fetching Shabads for your selected Ang...</p>
                       </div>
-                    ))}
-                    {(previewData.lines || []).length > 4 ? <p className="text-xs text-slate-500">Showing first 4 lines in preview.</p> : null}
-                  </div>
-                )}
+                    </div>
+                  ) : !previewData ? (
+                    <p className="mt-2 text-sm text-slate-500">Enter an Ang and load its Shabads.</p>
+                  ) : !selectedShabad ? (
+                    <p className="mt-2 text-sm text-slate-500">Select a Shabad to load its preview.</p>
+                  ) : (
+                    <div className="mt-2 space-y-2">
+                      <p className="text-sm font-semibold text-brand-blue">Ang {previewData.ang}</p>
+                      {selectedShabad.lines.map((line) => (
+                        <div key={line.id}>
+                          <p className="font-gurmukhi text-lg font-normal text-brand-navy">{line.gurmukhi}</p>
+                          {line.translationPunjabi ? <p className="mt-1 text-sm text-brand-saffron">Punjabi: {line.translationPunjabi}</p> : null}
+                          {line.translationEnglish ? <p className="mt-0.5 text-sm text-brand-blue">English: {line.translationEnglish}</p> : null}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </form>
           </div>

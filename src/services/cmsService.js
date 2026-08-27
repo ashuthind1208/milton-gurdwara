@@ -27,14 +27,13 @@ const resolveLangarStatusLabel = (item = {}) => {
 const defaultSchedule = {
   morning: [
     { id: 'morning-1', time: '5:00AM - 5:15AM', label: 'Parkash Sri Guru Granth Sahib' },
-    { id: 'morning-2', time: '5:15AM - 6:15AM', label: '5 Baani da Paath' },
-    { id: 'morning-3', time: '6:15 AM - 6:40 AM', label: 'Ardaas and Hukamnama' }
+    { id: 'morning-2', time: '5:15AM - 6:00AM', label: '5 Baani da Paath' },
+    { id: 'morning-3', time: '6:00 AM - 6:15 AM', label: 'Ardaas and Hukamnama' }
   ],
   evening: [
     { id: 'evening-1', time: '7:00PM - 7:30PM', label: 'Rehraas Sahib' },
     { id: 'evening-2', time: '7:30 PM - 7:45 PM', label: 'Hukamnama Katha' },
-    { id: 'evening-3', time: '7:45 PM - 8:00 PM', label: 'Kirtan Sohila Sahib' },
-    { id: 'evening-4', time: '8:00PM - 8:30PM', label: 'Sukh Asan Sri Guru Granth Sahib' }
+    { id: 'evening-3', time: '7:45 PM - 8:00 PM', label: 'Kirtan Sohila Sahib and Sukh Asan Sri Guru Granth Sahib' }
   ]
 };
 
@@ -81,9 +80,11 @@ const normalizeScheduleLabelKey = (value = '') => String(value || '').toLowerCas
 
 const scheduleTimeOverrides = {
   [normalizeScheduleLabelKey('Parkash Sri Guru Granth Sahib')]: '5:00AM - 5:15AM',
-  [normalizeScheduleLabelKey('5 Baani da Paath')]: '5:15AM - 6:15AM',
+  [normalizeScheduleLabelKey('5 Baani da Paath')]: '5:15AM - 6:00AM',
+  [normalizeScheduleLabelKey('Ardaas and Hukamnama')]: '6:00 AM - 6:15 AM',
   [normalizeScheduleLabelKey('Rehraas Sahib')]: '7:00PM - 7:30PM',
-  [normalizeScheduleLabelKey('Sukh Asan Sri Guru Granth Sahib')]: '8:00PM - 8:30PM'
+  [normalizeScheduleLabelKey('Hukamnama Katha')]: '7:30 PM - 7:45 PM',
+  [normalizeScheduleLabelKey('Kirtan Sohila Sahib and Sukh Asan Sri Guru Granth Sahib')]: '7:45 PM - 8:00 PM'
 };
 
 const resolveScheduleTime = (title = '', time = '') => {
@@ -148,6 +149,34 @@ const normalizeScheduleTimelineEntry = (entry = {}, index = 0) => ({
   sortOrder: Number.isFinite(Number(entry.sortOrder)) ? Number(entry.sortOrder) : index + 1
 });
 
+const migrateDefaultScheduleEntries = (entries = []) => {
+  const kirtanKey = normalizeScheduleLabelKey('Kirtan Sohila Sahib');
+  const sukhAsanKey = normalizeScheduleLabelKey('Sukh Asan Sri Guru Granth Sahib');
+  const combinedKey = normalizeScheduleLabelKey('Kirtan Sohila Sahib and Sukh Asan Sri Guru Granth Sahib');
+  let combinedAdded = false;
+
+  return entries.flatMap((entry) => {
+    const key = normalizeScheduleLabelKey(entry.titleEn || entry.label || '');
+    if ([kirtanKey, sukhAsanKey, combinedKey].includes(key)) {
+      if (combinedAdded) {
+        return [];
+      }
+      combinedAdded = true;
+      return [{
+        ...entry,
+        segment: 'evening',
+        timeEn: '7:45 PM - 8:00 PM',
+        titleEn: 'Kirtan Sohila Sahib and Sukh Asan Sri Guru Granth Sahib'
+      }];
+    }
+
+    return [{
+      ...entry,
+      timeEn: resolveScheduleTime(entry.titleEn || entry.label || '', entry.timeEn || entry.time || '')
+    }];
+  });
+};
+
 const normalizeScheduleDay = (day = {}, index = 0) => {
   const normalizedDateKey = day.dateKey || day.date || (index === 0 ? 'default' : `override-${index + 1}`);
   const entries = Array.isArray(day.entries) ? day.entries : [];
@@ -155,6 +184,9 @@ const normalizeScheduleDay = (day = {}, index = 0) => {
     .map((entry, entryIndex) => normalizeScheduleTimelineEntry(entry, entryIndex))
     .sort((left, right) => Number(left.sortOrder || 0) - Number(right.sortOrder || 0))
     .map((entry, entryIndex) => ({ ...entry, sortOrder: entryIndex + 1 }));
+  const migratedEntries = normalizedDateKey === 'default'
+    ? migrateDefaultScheduleEntries(normalizedEntries)
+    : normalizedEntries;
 
   return {
     id: day.id || `schedule-day-${normalizedDateKey}`,
@@ -165,7 +197,7 @@ const normalizeScheduleDay = (day = {}, index = 0) => {
     highlightTitle: day.highlightTitle || '',
     highlightNoteEn: day.highlightNoteEn || '',
     highlightNotePa: day.highlightNotePa || '',
-    entries: normalizedEntries
+    entries: migratedEntries.map((entry, entryIndex) => ({ ...entry, sortOrder: entryIndex + 1 }))
   };
 };
 

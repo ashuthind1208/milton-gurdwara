@@ -69,11 +69,53 @@ const readTextValue = (value) => {
 const normalizeLine = (line = {}, index = 0) => ({
   id: line.id || `line-${index}`,
   lineNo: Number(line.lineNo) || Number(line.lineno) || index + 1,
+  lineType: Number(line.lineType || line.type) || 0,
+  shabadId: String(line.shabadId || line.shabadid || '').trim(),
   gurmukhi: readTextValue(line.gurmukhi) || readTextValue(line.gurmukhiUnicode) || '',
   translationEnglish: readTextValue(line.translationEnglish) || readTextValue(line.translation) || '',
   translationPunjabi: readTextValue(line.translationPunjabi) || readTextValue(line.translationPunjabiDefault) || '',
   transliteration: readTextValue(line.transliteration) || ''
 });
+
+const getShabadOptions = (entry = {}) => {
+  const shabads = new Map();
+  (entry.lines || []).forEach((line) => {
+    const shabadId = String(line.shabadId || line.shabadid || '').trim();
+    if (!shabadId) {
+      return;
+    }
+
+    const existing = shabads.get(shabadId) || {
+      id: shabadId,
+      firstLine: String(line.gurmukhi || '').trim(),
+      lines: []
+    };
+    existing.lines.push(line);
+    shabads.set(shabadId, existing);
+  });
+  return [...shabads.values()].map((shabad) => ({
+    ...shabad,
+    firstLine: String(
+      shabad.lines.find((line) => ![1, 2].includes(Number(line.lineType)))?.gurmukhi
+      || shabad.firstLine
+      || ''
+    ).trim()
+  }));
+};
+
+const getSelectedShabadLines = (entry = {}) => {
+  const selectedShabadId = String(entry.selectedShabadId || '').trim();
+  if (!selectedShabadId) {
+    return entry.lines || [];
+  }
+
+  if (entry.selectedShabadLines?.length) {
+    return entry.selectedShabadLines;
+  }
+
+  const selected = getShabadOptions(entry).find((shabad) => shabad.id === selectedShabadId);
+  return selected?.lines?.length ? selected.lines : (entry.lines || []);
+};
 
 const normalizeMetadata = (metadata = {}, lineSamples = []) => {
   const normalized = {
@@ -93,6 +135,8 @@ const normalizeEntry = (entry) => {
   const normalizedLines = (entry.lines || []).map((line, index) => normalizeLine(line, index));
   return {
     ...entry,
+    selectedShabadId: String(entry.selectedShabadId || '').trim(),
+    selectedShabadLines: (entry.selectedShabadLines || []).map((line, index) => normalizeLine(line, index)),
     lines: normalizedLines,
     metadata: normalizeMetadata(entry.metadata || {}, normalizedLines)
   };
@@ -417,6 +461,8 @@ const transformAngResponse = (data, ang) => ({
   lines: (data.page || []).map((entry, index) => normalizeLine({
     id: entry.line?.id || `line-${index}`,
     lineNo: Number(entry.line?.lineno) || index + 1,
+    lineType: entry.line?.type || 0,
+    shabadId: entry.line?.shabadid || '',
     gurmukhi: entry.line?.gurmukhi?.unicode || '',
     translationEnglish: entry.line?.translation?.english?.default || '',
     translationPunjabi: entry.line?.translation?.punjabi?.default || '',
@@ -424,31 +470,54 @@ const transformAngResponse = (data, ang) => ({
   }, index))
 });
 
-const fetchAngData = async (ang) => {
-  const cache = await readJson(CACHE_KEY, {});
-  if (cache[ang]) {
-    return { ...normalizeEntry(cache[ang]), isFallback: false };
-  }
-
-  const tryFetch = async (url) => {
-    const response = await fetch(url);
+const fetchGurbaniNowJson = async (url) => {
+  const tryFetch = async (targetUrl) => {
+    const response = await fetch(targetUrl);
     if (!response.ok) {
-      throw new Error(`Fetch failed: ${url}`);
+      throw new Error(`Fetch failed: ${targetUrl}`);
     }
     return response.json();
   };
 
+  try {
+    return await tryFetch(url);
+  } catch {
+    return tryFetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
+  }
+};
+
+const fetchShabadData = async (shabadId) => {
+  const normalizedId = String(shabadId || '').trim();
+  const payload = await fetchGurbaniNowJson(`https://api.gurbaninow.com/v2/shabad/${normalizedId}`);
+  const lines = (payload.shabad || []).map((entry, index) => normalizeLine({
+    id: entry.line?.id || `line-${index}`,
+    lineNo: Number(entry.line?.linenum) || index + 1,
+    lineType: entry.line?.type || 0,
+    shabadId: normalizedId,
+    gurmukhi: entry.line?.gurmukhi?.unicode || '',
+    translationEnglish: entry.line?.translation?.english?.default || '',
+    translationPunjabi: entry.line?.translation?.punjabi?.default?.unicode || '',
+    transliteration: entry.line?.transliteration?.english?.text || ''
+  }, index));
+
+  if (!lines.length) {
+    throw new Error(`No lines found for Shabad ${normalizedId}.`);
+  }
+
+  return getShabadOptions({ lines })[0];
+};
+
+const fetchAngData = async (ang) => {
+  const cache = await readJson(CACHE_KEY, {});
+  const cachedEntry = cache[ang] ? normalizeEntry(cache[ang]) : null;
+  if (cachedEntry?.lines?.some((line) => line.shabadId) && cachedEntry.lines.some((line) => line.lineType)) {
+    return { ...cachedEntry, isFallback: false };
+  }
+
   const directUrl = `https://api.gurbaninow.com/v2/ang/${ang}`;
-  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`;
 
   try {
-    let payload;
-    try {
-      payload = await tryFetch(directUrl);
-    } catch {
-      payload = await tryFetch(proxyUrl);
-    }
-
+    const payload = await fetchGurbaniNowJson(directUrl);
     const transformed = normalizeEntry(transformAngResponse(payload, ang));
     await writeJson(CACHE_KEY, { ...cache, [ang]: transformed });
     return { ...transformed, isFallback: false };
@@ -480,6 +549,8 @@ const runHistoryWriteSafely = async (action) => {
 };
 
 const hukamnamaService = {
+  getShabadOptions,
+  getSelectedShabadLines,
   getReadAlongConfig: () => ({
     enabled: READ_ALONG_ENABLED,
     source: READ_ALONG_EXACT_BASE_URL,
@@ -494,9 +565,18 @@ const hukamnamaService = {
       throw new Error('Unable to fetch hukamnama lines for this ang at the moment. Please try again.');
     }
 
+    const shabads = await Promise.all(getShabadOptions(angData).map(async (shabad) => {
+      try {
+        return await fetchShabadData(shabad.id);
+      } catch {
+        return shabad;
+      }
+    }));
+
     return serviceResponse({
       ...angData,
-      ang: safeAng
+      ang: safeAng,
+      shabads
     });
   },
   getDailyHukamnama: async (dateValue) => {
@@ -539,7 +619,7 @@ const hukamnamaService = {
 
     return serviceResponse({ ...fallbackEntry, ang: settings.ang, audioUrl: settings.audioUrl || DAILY_MUKHWAK_AUDIO });
   },
-  setScheduledHukamnama: async ({ ang, date, slot }) => {
+  setScheduledHukamnama: async ({ ang, date, slot, shabadId }) => {
     const safeAng = Math.max(1, Number(ang) || 1);
     const dateKey = toDateKey(date || new Date());
     const normalizedSlot = normalizeSlot(slot);
@@ -553,10 +633,22 @@ const hukamnamaService = {
     if (angData.isFallback || !angData.lines?.length) {
       throw new Error('Unable to fetch hukamnama lines for this ang at the moment. Please try again.');
     }
+    const selectedAngShabad = getShabadOptions(angData).find((entry) => entry.id === String(shabadId || '').trim());
+    if (!selectedAngShabad) {
+      throw new Error('Please select a Shabad from the selected Ang.');
+    }
+    let selectedShabad = selectedAngShabad;
+    try {
+      selectedShabad = await fetchShabadData(selectedAngShabad.id);
+    } catch {
+      // Keep the Ang-local lines available when the complete Shabad endpoint is unavailable.
+    }
 
     const nextEntry = normalizeScheduledEntry({
       ...angData,
       ang: safeAng,
+      selectedShabadId: selectedShabad.id,
+      selectedShabadLines: selectedShabad.lines,
       date: dateKey,
       slot: normalizedSlot,
       updatedAt: new Date().toISOString(),
@@ -583,18 +675,25 @@ const hukamnamaService = {
       date: dateKey,
       slot: normalizedSlot,
       updatedAt: nextEntry.updatedAt,
-      preview: nextEntry.lines[0]?.gurmukhi || '',
-      translation: nextEntry.lines[0]?.translationEnglish || '',
+      preview: selectedShabad.lines[0]?.gurmukhi || '',
+      translation: selectedShabad.lines[0]?.translationEnglish || '',
       raag: nextEntry.metadata?.raag || '',
       writer: nextEntry.metadata?.writer || ''
     }));
 
     return serviceResponse(nextEntry);
   },
-  setCurrentAng: async (ang) => {
-    return hukamnamaService.setScheduledHukamnama({ ang, date: toDateKey(new Date()), slot: 'morning' });
+  setCurrentAng: async (ang, shabadId = '') => {
+    const preview = await hukamnamaService.getAngPreview(ang);
+    const resolvedShabadId = String(shabadId || preview.data?.shabads?.[0]?.id || '').trim();
+    return hukamnamaService.setScheduledHukamnama({
+      ang,
+      date: toDateKey(new Date()),
+      slot: 'morning',
+      shabadId: resolvedShabadId
+    });
   },
-  updateScheduledHukamnama: async ({ ang, date }) => {
+  updateScheduledHukamnama: async ({ ang, date, shabadId }) => {
     const safeAng = Math.max(1, Number(ang) || 1);
     const dateKey = toDateKey(date || new Date());
     const entries = await readScheduledEntries();
@@ -608,10 +707,22 @@ const hukamnamaService = {
     if (angData.isFallback || !angData.lines?.length) {
       throw new Error('Unable to fetch hukamnama lines for this ang at the moment. Please try again.');
     }
+    const selectedAngShabad = getShabadOptions(angData).find((entry) => entry.id === String(shabadId || '').trim());
+    if (!selectedAngShabad) {
+      throw new Error('Please select a Shabad from the selected Ang.');
+    }
+    let selectedShabad = selectedAngShabad;
+    try {
+      selectedShabad = await fetchShabadData(selectedAngShabad.id);
+    } catch {
+      // Keep the Ang-local lines available when the complete Shabad endpoint is unavailable.
+    }
 
     const updatedEntry = normalizeScheduledEntry({
       ...angData,
       ang: safeAng,
+      selectedShabadId: selectedShabad.id,
+      selectedShabadLines: selectedShabad.lines,
       date: dateKey,
       slot: existingEntry.slot || 'morning',
       updatedAt: new Date().toISOString(),
@@ -637,8 +748,8 @@ const hukamnamaService = {
       date: dateKey,
       slot: updatedEntry.slot || 'morning',
       updatedAt: updatedEntry.updatedAt,
-      preview: updatedEntry.lines[0]?.gurmukhi || '',
-      translation: updatedEntry.lines[0]?.translationEnglish || '',
+      preview: selectedShabad.lines[0]?.gurmukhi || '',
+      translation: selectedShabad.lines[0]?.translationEnglish || '',
       raag: updatedEntry.metadata?.raag || '',
       writer: updatedEntry.metadata?.writer || ''
     }));
@@ -689,16 +800,19 @@ const hukamnamaService = {
       .map((day) => resolveDailyEntry(day))
       .filter(Boolean)
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-      .map((entry) => ({
-        ang: entry.ang,
-        date: entry.date,
-        slot: entry.slot,
-        updatedAt: entry.updatedAt,
-        preview: entry.lines?.[0]?.gurmukhi || '',
-        translation: entry.lines?.[0]?.translationEnglish || '',
-        raag: entry.metadata?.raag || '',
-        writer: entry.metadata?.writer || ''
-      }));
+      .map((entry) => {
+        const selectedLines = getSelectedShabadLines(entry);
+        return {
+          ang: entry.ang,
+          date: entry.date,
+          slot: entry.slot,
+          updatedAt: entry.updatedAt,
+          preview: selectedLines[0]?.gurmukhi || '',
+          translation: selectedLines[0]?.translationEnglish || '',
+          raag: entry.metadata?.raag || '',
+          writer: entry.metadata?.writer || ''
+        };
+      });
 
     if (flattened.length > 0) {
       return serviceResponse(flattened);

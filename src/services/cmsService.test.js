@@ -48,3 +48,23 @@ test('keeps a saved Sunday schedule as the manual override', () => {
 
   expect(resolved.entries.map((entry) => entry.titleEn)).toEqual(['Adjusted Sunday Program']);
 });
+
+test('migrates the legacy default schedule to the Monday-Saturday timings', () => {
+  const legacyDefault = {
+    dateKey: 'default',
+    entries: [
+      { segment: 'morning', timeEn: '5:15AM - 6:15AM', titleEn: '5 Baani da Paath' },
+      { segment: 'morning', timeEn: '6:15 AM - 6:40 AM', titleEn: 'Ardaas and Hukamnama' },
+      { segment: 'evening', timeEn: '7:45 PM - 8:00 PM', titleEn: 'Kirtan Sohila Sahib' },
+      { segment: 'evening', timeEn: '8:00PM - 8:30PM', titleEn: 'Sukh Asan Sri Guru Granth Sahib' }
+    ]
+  };
+
+  const resolved = resolveScheduleForDate([legacyDefault], '2026-08-24');
+
+  expect(resolved.entries.map((entry) => [entry.timeEn, entry.titleEn])).toEqual([
+    ['5:15AM - 6:00AM', '5 Baani da Paath'],
+    ['6:00 AM - 6:15 AM', 'Ardaas and Hukamnama'],
+    ['7:45 PM - 8:00 PM', 'Kirtan Sohila Sahib and Sukh Asan Sri Guru Granth Sahib']
+  ]);
+});

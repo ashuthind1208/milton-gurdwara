@@ -10,7 +10,6 @@ import {
   ShoppingBagIcon,
   SparklesIcon
 } from '@heroicons/react/24/outline';
-import AudioPillPlayer from '../../components/common/AudioPillPlayer';
 import HomeHeroBanner from '../../components/common/HomeHeroBanner';
 import SectionTitle from '../../components/common/SectionTitle';
 import eventService from '../../services/eventService';
@@ -138,9 +137,7 @@ const HomePage = () => {
   const [selectedContentLink, setSelectedContentLink] = useState(null);
   const [selectedSevaCategory, setSelectedSevaCategory] = useState('All');
   const [selectedSevaPage, setSelectedSevaPage] = useState(1);
-  const [homeReadAlongStopToken, setHomeReadAlongStopToken] = useState(0);
   const [tickerMotionSeed, setTickerMotionSeed] = useState(0);
-  const previousSelectedContentTypeRef = useRef(null);
   const homeTickerTrackRef = useRef(null);
   const specialTickerTrackRef = useRef(null);
 
@@ -335,34 +332,16 @@ const HomePage = () => {
   );
   const specialDayTickerTextVisible = specialDayTickerParts.length > 0;
   const specialDayTickerTextClass = isTodaySpecial ? 'text-amber-50' : 'text-brand-navy';
-  const hukamnamaLines = activeHukamnama?.lines || [];
+  const fullHukamnamaLines = activeHukamnama?.lines || [];
+  const hukamnamaLines = hukamnamaService.getSelectedShabadLines(activeHukamnama || {});
   const hukamnamaMeta = activeHukamnama?.metadata || {};
   const hasDailyHukamnama = Boolean(activeHukamnama?.ang && hukamnamaLines.length > 0);
   const volunteerOptions = ['Langar', 'Cleaning', 'Parking', 'Teaching', 'Events'];
-  const readAlongConfig = useMemo(() => hukamnamaService.getReadAlongConfig(), []);
-  const homeHukamnamaAng = Math.max(0, Number(activeHukamnama?.ang || 0));
   const hukamnamaMetaPills = [
     activeHukamnama?.updatedAt ? { key: 'date', label: new Date(activeHukamnama.updatedAt).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' }) } : null,
     activeHukamnama?.metadata?.raag ? { key: 'raag', label: `Raag: ${activeHukamnama.metadata.raag}` } : null,
     activeHukamnama?.metadata?.writer ? { key: 'writer', label: `Written by: ${activeHukamnama.metadata.writer}` } : null
   ].filter(Boolean);
-  const { data: homeReadAlongAudio, isFetching: homeReadAlongLoading } = useQuery({
-    queryKey: ['home-hukamnama-read-along', homeHukamnamaAng],
-    queryFn: () => hukamnamaService.getReadAlongAudioUrl(homeHukamnamaAng).then((res) => res.data),
-    enabled: homeHukamnamaAng > 0 && readAlongConfig.enabled && hasDailyHukamnama
-  });
-
-  useEffect(() => {
-    const previousSelectedContentType = previousSelectedContentTypeRef.current;
-    const currentSelectedContentType = selectedContentLink?.type || null;
-
-    if (previousSelectedContentType === 'hukamnama' && currentSelectedContentType !== 'hukamnama') {
-      setHomeReadAlongStopToken((value) => value + 1);
-    }
-
-    previousSelectedContentTypeRef.current = currentSelectedContentType;
-  }, [selectedContentLink]);
-
   const featuredAlbum = albums[0];
   const globalBannerAds = ads.filter((ad) => ad.active && ad.placement === 'Global Banner');
   const globalBannerImageHeightClass = globalBannerAds.length > 2 ? 'h-16 md:h-20' : 'h-24 md:h-28';
@@ -387,7 +366,7 @@ const HomePage = () => {
         path: '/hukamnama',
         description: hasDailyHukamnama ? `Ang ${activeHukamnama?.ang || '-'} with full lines and translations.` : 'Today\'s hukamnama is not available yet.',
         metadata: hukamnamaMeta,
-        items: hukamnamaLines
+        items: fullHukamnamaLines
       },
       '/seva': {
         type: 'seva',
@@ -515,34 +494,14 @@ const HomePage = () => {
         <div className="min-w-0 grid gap-3 lg:grid-cols-[1.5fr_0.85fr]">
           <div className="min-w-0 space-y-3">
             <div className="rounded-xl border border-brand-blue/20 bg-white px-5 py-4">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex-1">
-                  <SectionTitle title="Daily Hukamnama" subtitle="Today's Gurbani with translation." />
-                </div>
-                <div className="w-full sm:w-[260px] sm:flex-shrink-0">
-                  {hasDailyHukamnama && homeReadAlongAudio?.url ? (
-                    <AudioPillPlayer
-                      label="Singh Sabha Milton"
-                      subtitle={`Ang ${homeHukamnamaAng}`}
-                      src={homeReadAlongAudio.url}
-                      stopSignal={homeReadAlongStopToken}
-                    />
-                  ) : (
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                      {!hasDailyHukamnama
-                        ? "Read along audio will appear after today's hukamnama is added."
-                        : !readAlongConfig.enabled
-                        ? 'Read along audio is currently disabled.'
-                        : (homeReadAlongLoading ? 'Loading read along audio...' : `Read along audio is unavailable for Ang ${homeHukamnamaAng}.`)}
-                    </div>
-                  )}
-                </div>
+              <div>
+                <SectionTitle title="Daily Hukamnama" subtitle="Today's Gurbani with translation." />
               </div>
               <div className="mt-3 h-px w-full bg-slate-200" />
               <div className="space-y-3 pt-4">
                 {!hasDailyHukamnama ? (
                   <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">Today's hukamnama is not available yet.</p>
-                ) : (hukamnamaLines.slice(0, 4)).map((line) => (
+                ) : hukamnamaLines.map((line) => (
                   <div key={line.id}>
                     <p className="font-gurmukhi text-lg font-bold leading-relaxed text-brand-navy">{line.gurmukhi}</p>
                     {line.translationPunjabi ? <p className="mt-1 text-sm font-normal text-brand-saffron">Punjabi: {line.translationPunjabi}</p> : null}
@@ -552,7 +511,7 @@ const HomePage = () => {
               </div>
               {hasDailyHukamnama ? (
                 <div className="mt-4 flex justify-end">
-                  <button type="button" onClick={() => openContentModal('/hukamnama')} className="inline-flex items-center gap-1 text-sm font-semibold text-brand-blue hover:underline"><span>&gt;</span> Read all hukamnama</button>
+                  <button type="button" onClick={() => navigate('/hukamnama')} className="inline-flex items-center gap-1 text-sm font-semibold text-brand-blue hover:underline"><span>&gt;</span> Read all hukamnama</button>
                 </div>
               ) : null}
             </div>

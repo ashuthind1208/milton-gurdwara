@@ -306,9 +306,15 @@ const AdminBookingsPage = () => {
     const total = bookings.length;
     const pending = bookings.filter((entry) => entry.status === 'pending').length;
     const confirmed = bookings.filter((entry) => entry.status === 'confirmed').length;
-    const paid = bookings.filter((entry) => entry.paymentStatus === 'paid').length;
-    const revenue = bookings.reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
-    return { total, pending, confirmed, paid, revenue };
+    const cancelled = bookings.filter((entry) => entry.status === 'cancelled').length;
+    const refunded = bookings.filter((entry) => (
+      entry.paymentStatus === 'refunded'
+      || String(entry.refundStatus || '').toLowerCase() === 'processed'
+    )).length;
+    const revenue = bookings
+      .filter((entry) => entry.status === 'confirmed' && entry.paymentStatus === 'paid')
+      .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+    return { total, pending, confirmed, cancelled, refunded, revenue };
   }, [bookings]);
 
   const trendRows = useMemo(() => {
@@ -317,7 +323,9 @@ const AdminBookingsPage = () => {
       const key = monthKeyFromDate(entry.date || entry.createdAt);
       const existing = byMonth.get(key) || { month: key, bookings: 0, revenue: 0 };
       existing.bookings += 1;
-      existing.revenue += Number(entry.amount || 0);
+      if (entry.status === 'confirmed' && entry.paymentStatus === 'paid') {
+        existing.revenue += Number(entry.amount || 0);
+      }
       byMonth.set(key, existing);
     });
     return [...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month)).slice(-12);
@@ -700,10 +708,11 @@ const AdminBookingsPage = () => {
             ['Total bookings', kpis.total, 'text-slate-900'],
             ['Pending', kpis.pending, 'text-amber-700'],
             ['Confirmed', kpis.confirmed, 'text-emerald-700'],
-            ['Paid', kpis.paid, 'text-blue-700'],
+            ['Cancelled', kpis.cancelled, 'text-rose-700'],
+            ['Refunded', kpis.refunded, 'text-cyan-700'],
             ['Revenue (CAD)', kpis.revenue.toFixed(2), 'text-slate-900']
-          ].map(([label, value, valueClass], index) => (
-            <article key={label} className={`rounded-lg border border-slate-200 bg-white p-4 ${index === 4 ? 'sm:col-span-2' : ''}`}>
+          ].map(([label, value, valueClass]) => (
+            <article key={label} className="rounded-lg border border-slate-200 bg-white p-4">
               <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
               <p className={`mt-1 text-2xl font-bold ${valueClass}`}>{value}</p>
             </article>
