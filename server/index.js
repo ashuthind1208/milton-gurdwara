@@ -4889,12 +4889,21 @@ const getConfiguredZeffyCampaigns = async () => {
   }));
 
   if (zeffyApiKey) {
-    const environmentCampaign = resolveZeffyCampaign({ campaignName: zeffyCampaignName }, campaigns) || null;
-    const alreadyConfigured = configurations.some((entry) => (
-      entry.apiKey === zeffyApiKey && Number(entry.campaign?.id || 0) === Number(environmentCampaign?.id || 0)
+    const localZeffyCampaigns = campaigns.filter((campaign) => (
+      String(campaign?.paymentProvider || '').trim().toUpperCase() === 'ZEFFY'
+      && Boolean(normalizeZeffyCampaignSlug(campaign?.paymentLink))
     ));
-    if (!alreadyConfigured) {
-      configurations.push({ apiKey: zeffyApiKey, campaign: environmentCampaign });
+    const environmentCampaigns = localZeffyCampaigns.length > 0
+      ? localZeffyCampaigns
+      : [resolveZeffyCampaign({ campaignName: zeffyCampaignName }, campaigns) || null];
+
+    for (const campaign of environmentCampaigns) {
+      const alreadyConfigured = configurations.some((entry) => (
+        Number(entry.campaign?.id || 0) === Number(campaign?.id || 0)
+      ));
+      if (!alreadyConfigured) {
+        configurations.push({ apiKey: zeffyApiKey, campaign });
+      }
     }
   }
 
@@ -4996,7 +5005,8 @@ const persistVerifiedZeffyPayment = async (payment, campaigns = [], campaignOver
     ...donationRecord,
     sourcePendingId: correlatedPending?.id || donationRecord.sourcePendingId,
     campaignId: matchedCampaign ? Number(matchedCampaign.id) : null,
-    campaignName: matchedCampaign?.name || donationRecord.campaignName || zeffyCampaignName
+    campaignName: matchedCampaign?.name || donationRecord.campaignName || zeffyCampaignName,
+    donorPhone: donationRecord.donorPhone || correlatedPending?.donorPhone || ''
   });
   await attachDonationReceiptToBooking(persistedDonation);
   return persistedDonation;
@@ -7733,7 +7743,7 @@ const server = http.createServer(async (request, response) => {
     try {
       const body = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
       ensureNoUnknownKeys(body, [
-        'id', 'campaignId', 'campaignName', 'donorName', 'donorEmail', 'amount', 'amountCents', 'frequency', 'paymentProvider',
+        'id', 'campaignId', 'campaignName', 'donorName', 'donorEmail', 'donorPhone', 'amount', 'amountCents', 'frequency', 'paymentProvider',
         'sessionId', 'paymentIntentId', 'checkoutUrl', 'origin', 'donationPurpose', 'createdAt', 'metadata'
       ]);
       readStringField(body, 'id', { max: 160, pattern: simpleIdPattern });
@@ -7741,6 +7751,7 @@ const server = http.createServer(async (request, response) => {
       readStringField(body, 'campaignName', { max: 180 });
       readStringField(body, 'donorName', { max: 140 });
       readEmailField(body, 'donorEmail', { required: false });
+      readPhoneField(body, 'donorPhone');
       readNumberField(body, 'amount', { min: 0.01, max: 500000 });
       readNumberField(body, 'amountCents', { integer: true, min: 1, max: 50000000 });
       readStringField(body, 'frequency', { max: 40 });

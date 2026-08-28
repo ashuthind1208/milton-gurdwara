@@ -106,4 +106,27 @@ describe('Zeffy webhook mapping', () => {
     expect(() => mapZeffyApiPayment({ id: 'pending', status: 'pending', amount: 1000 }))
       .toThrow('Zeffy payment must be a succeeded transaction with a positive amount.');
   });
+
+  test('maps phone from verified Zeffy custom fields when buyer phone is absent', () => {
+    const arrayFieldDonation = mapZeffyApiPayment({
+      id: 'payment-phone-array',
+      status: 'succeeded',
+      amount: 2500,
+      buyer: { email: 'donor@example.com' },
+      custom_fields: [
+        { label: 'Preferred language', value: 'Punjabi' },
+        { label: 'Mobile phone', answer: '(905) 555-0199' }
+      ]
+    });
+    const objectFieldDonation = mapZeffyApiPayment({
+      id: 'payment-phone-object',
+      status: 'succeeded',
+      amount: 3000,
+      buyer: { email: 'second@example.com' },
+      custom_fields: { telephone_number: { value: '905-555-0123' } }
+    });
+
+    expect(arrayFieldDonation.donorPhone).toBe('(905) 555-0199');
+    expect(objectFieldDonation.donorPhone).toBe('905-555-0123');
+  });
 });

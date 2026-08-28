@@ -18,10 +18,12 @@ import cmsService, { resolveScheduleForDate } from '../../services/cmsService';
 import hukamnamaService from '../../services/hukamnamaService';
 import advertisementService from '../../services/advertisementService';
 import newsService from '../../services/newsService';
+import donationService from '../../services/donationService';
 import useSeoMeta from '../../hooks/useSeoMeta';
 import Seo from '../../components/common/Seo';
 import gurdwaraLogo from '../../assets/gurdwara-logo.webp';
 import { isEventCurrent } from '../../utils/eventAvailability';
+import { getZeffyDonationFormSlug } from '../../utils/zeffy';
 
 const toDateKey = (value = new Date()) => {
   const date = value instanceof Date ? value : new Date(value);
@@ -133,6 +135,7 @@ const HomePage = () => {
   const { data: dailyHukamnama } = useQuery({ queryKey: ['daily-hukamnama', todayDateKey], queryFn: () => hukamnamaService.getDailyHukamnama(todayDateKey).then((res) => res.data) });
   const { data: ads = [] } = useQuery({ queryKey: ['advertisements'], queryFn: () => advertisementService.getAds().then((res) => res.data) });
   const { data: newsArticles = [] } = useQuery({ queryKey: ['news-articles'], queryFn: () => newsService.getArticles().then((res) => res.data) });
+  const { data: donationCampaigns = [] } = useQuery({ queryKey: ['donation-campaigns'], queryFn: () => donationService.getCampaigns().then((res) => res.data) });
   const [selectedTickerEvent, setSelectedTickerEvent] = useState(null);
   const [selectedContentLink, setSelectedContentLink] = useState(null);
   const [selectedSevaCategory, setSelectedSevaCategory] = useState('All');
@@ -332,6 +335,37 @@ const HomePage = () => {
   );
   const specialDayTickerTextVisible = specialDayTickerParts.length > 0;
   const specialDayTickerTextClass = isTodaySpecial ? 'text-amber-50' : 'text-brand-navy';
+
+  useEffect(() => {
+    const homeTrack = homeTickerTrackRef.current;
+    const specialTrack = specialTickerTrackRef.current;
+    if (!homeTrack || !specialTrack || !specialDayTickerTextVisible) {
+      return undefined;
+    }
+
+    const syncTickerSpeed = () => {
+      const homeDuration = Number.parseFloat(window.getComputedStyle(homeTrack).animationDuration) || 160;
+      const homeTravelDistance = homeTrack.scrollWidth / 2;
+      const specialTravelDistance = specialTrack.scrollWidth / 2;
+      if (homeTravelDistance <= 0 || specialTravelDistance <= 0) {
+        return;
+      }
+
+      const specialDuration = homeDuration * (specialTravelDistance / homeTravelDistance);
+      specialTrack.style.setProperty('animation-duration', `${specialDuration}s`, 'important');
+    };
+
+    const animationFrameId = window.requestAnimationFrame(syncTickerSpeed);
+    const resizeObserver = new ResizeObserver(syncTickerSpeed);
+    resizeObserver.observe(homeTrack);
+    resizeObserver.observe(specialTrack);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrameId);
+      resizeObserver.disconnect();
+    };
+  }, [specialDayTickerTextVisible, specialDayReason, specialDayReasonPa, tickerMotionSeed, tickerRenderKey]);
+
   const fullHukamnamaLines = activeHukamnama?.lines || [];
   const hukamnamaLines = hukamnamaService.getSelectedShabadLines(activeHukamnama || {});
   const hukamnamaMeta = activeHukamnama?.metadata || {};
@@ -419,6 +453,22 @@ const HomePage = () => {
     setSelectedContentLink(previewMap[path] || null);
   };
 
+  const handleHeroSlideAction = (path) => {
+    const zeffySlug = getZeffyDonationFormSlug(path);
+    if (zeffySlug) {
+      const matchedCampaign = donationCampaigns.find((campaign) => (
+        String(campaign.paymentProvider || '').toUpperCase() === 'ZEFFY'
+        && getZeffyDonationFormSlug(campaign.paymentLink) === zeffySlug
+      ));
+      if (matchedCampaign?.id) {
+        navigate(`/donation?campaignId=${encodeURIComponent(matchedCampaign.id)}`);
+        return;
+      }
+    }
+
+    navigate(path);
+  };
+
   return (
     <div className="min-w-0 space-y-0">
       <Seo {...meta} />
@@ -426,7 +476,7 @@ const HomePage = () => {
       <HomeHeroBanner
         content={cmsData?.hero}
         actions={null}
-        onSlideAction={(path) => navigate(path)}
+        onSlideAction={handleHeroSlideAction}
         topRightSlot={null}
       />
 

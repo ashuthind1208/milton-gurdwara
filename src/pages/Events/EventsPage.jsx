@@ -478,7 +478,7 @@ const EventsPage = () => {
           </div>
         </div>
         <div className="min-w-0 space-y-6">
-          <div className="events-calendar-shell hidden h-[740px] overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-b from-white to-blue-50/35 p-3 shadow-[0_18px_46px_-28px_rgba(30,64,175,0.38)] md:block">
+          <div className="events-calendar-shell hidden h-[860px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-b from-white to-blue-50/35 p-3 shadow-[0_18px_46px_-28px_rgba(30,64,175,0.38)] md:flex">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Calendar View</p>
               <span className="rounded-full bg-brand-blue/10 px-2.5 py-1 text-[11px] font-bold text-brand-blue">{calendarEvents.length} events in view</span>

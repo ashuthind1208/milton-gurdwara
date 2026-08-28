@@ -81,6 +81,57 @@ const extractZeffyPaymentId = (event = {}) => String(firstValue(
   pickPath(event, ['payment.id', 'transaction.id', 'payment_id', 'transaction_id'])
 ) || '').trim();
 
+const readCustomFieldValue = (value) => {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return firstValue(value.value, value.answer, value.response, value.text);
+  }
+  return value;
+};
+
+const extractZeffyPhone = (payment = {}, buyer = {}) => {
+  const directPhone = firstValue(buyer.phone, buyer.phone_number, buyer.phoneNumber);
+  if (directPhone) {
+    return String(directPhone).trim();
+  }
+
+  const isPhoneField = (label) => /(^|[^a-z])(phone|telephone|mobile|cell)([^a-z]|$)/i.test(String(label || ''));
+  const fieldGroups = [payment.custom_fields, payment.customFields, payment.answers];
+  for (const fields of fieldGroups) {
+    if (Array.isArray(fields)) {
+      const phoneField = fields.find((field) => isPhoneField(firstValue(
+        field?.label,
+        field?.name,
+        field?.question,
+        field?.key,
+        field?.slug,
+        field?.field_name
+      )));
+      const phoneValue = readCustomFieldValue(phoneField);
+      const resolvedValue = firstValue(
+        phoneField?.value,
+        phoneField?.answer,
+        phoneField?.response,
+        phoneField?.text,
+        phoneValue
+      );
+      if (resolvedValue) {
+        return String(resolvedValue).trim();
+      }
+      continue;
+    }
+
+    if (fields && typeof fields === 'object') {
+      const phoneEntry = Object.entries(fields).find(([key]) => isPhoneField(key));
+      const phoneValue = readCustomFieldValue(phoneEntry?.[1]);
+      if (phoneValue) {
+        return String(phoneValue).trim();
+      }
+    }
+  }
+
+  return '';
+};
+
 const mapZeffyApiPayment = (payment = {}) => {
   const transactionId = String(payment.id || '').trim();
   const amount = Number(payment.amount || 0) / 100;
@@ -112,7 +163,7 @@ const mapZeffyApiPayment = (payment = {}) => {
     campaignName: String(payment.description || 'Help Us Build Our Gurdwara').trim(),
     donorName,
     donorEmail: String(buyer.email || '').trim().toLowerCase(),
-    donorPhone: String(buyer.phone || buyer.phone_number || '').trim(),
+    donorPhone: extractZeffyPhone(payment, buyer),
     amount,
     frequency: normalizeFrequency(payment.recurring?.interval || payment.items?.[0]?.recurrence_interval),
     paymentProvider: 'ZEFFY',

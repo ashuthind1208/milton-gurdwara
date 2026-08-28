@@ -7,6 +7,21 @@ const parseZeffyUrl = (value) => {
   return url;
 };
 
+export const getZeffyDonationFormSlug = (value = '') => {
+  try {
+    const url = parseZeffyUrl(value);
+    if (!url) {
+      return '';
+    }
+
+    const segments = url.pathname.split('/').filter(Boolean);
+    const donationFormIndex = segments.indexOf('donation-form');
+    return String(segments[donationFormIndex + 1] || '').trim().toLowerCase();
+  } catch {
+    return '';
+  }
+};
+
 export const withZeffyDonorDetails = (value = '', { donorName = '', donorEmail = '' } = {}) => {
   try {
     const url = parseZeffyUrl(value);

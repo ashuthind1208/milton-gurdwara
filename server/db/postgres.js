@@ -2651,6 +2651,7 @@ const mapPendingRow = (row) => ({
   campaignName: row.campaign_name || '',
   donorName: row.donor_name || 'Anonymous',
   donorEmail: row.donor_email || '',
+  donorPhone: row.donor_phone || '',
   amount: row.amount == null ? null : Number(row.amount),
   frequency: row.frequency || 'one-time',
   paymentProvider: row.payment_provider || 'STRIPE',
@@ -2666,7 +2667,7 @@ const getPendingDonations = async () => {
 
   const result = await pool.query(
     `
-    SELECT id, campaign_id, campaign_name, donor_name, donor_email, amount,
+    SELECT id, campaign_id, campaign_name, donor_name, donor_email, donor_phone, amount,
            frequency, payment_provider, checkout_url, session_id, created_at
     FROM donation_pending
     ORDER BY created_at DESC;
@@ -2684,9 +2685,9 @@ const createPendingDonation = async (payload = {}) => {
   const result = await pool.query(
     `
     INSERT INTO donation_pending
-    (id, campaign_id, campaign_name, donor_name, donor_email, amount, frequency, payment_provider, checkout_url, session_id, created_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, COALESCE($11, NOW()))
-    RETURNING id, campaign_id, campaign_name, donor_name, donor_email, amount,
+    (id, campaign_id, campaign_name, donor_name, donor_email, donor_phone, amount, frequency, payment_provider, checkout_url, session_id, created_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, COALESCE($12, NOW()))
+    RETURNING id, campaign_id, campaign_name, donor_name, donor_email, donor_phone, amount,
               frequency, payment_provider, checkout_url, session_id, created_at;
     `,
     [
@@ -2695,9 +2696,12 @@ const createPendingDonation = async (payload = {}) => {
       String(payload.campaignName || ''),
       String(payload.donorName || 'Anonymous'),
       String(payload.donorEmail || ''),
+      String(payload.donorPhone || ''),
       payload.amount == null ? null : Number(payload.amount),
       String(payload.frequency || 'one-time'),
-      String(payload.paymentProvider || 'STRIPE').toUpperCase() === 'PAYPAL' ? 'PAYPAL' : 'STRIPE',
+      ['STRIPE', 'PAYPAL', 'ZEFFY'].includes(String(payload.paymentProvider || '').toUpperCase())
+        ? String(payload.paymentProvider).toUpperCase()
+        : 'STRIPE',
       String(payload.checkoutUrl || ''),
       String(payload.sessionId || ''),
       payload.createdAt || null

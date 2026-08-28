@@ -135,6 +135,7 @@ const normalizePending = (record = {}) => ({
   campaignName: record.campaignName || record.campaign_name || '',
   donorName: record.donorName || record.donor_name || 'Anonymous',
   donorEmail: record.donorEmail || record.donor_email || '',
+  donorPhone: record.donorPhone || record.donor_phone || '',
   amount: record.amount == null ? null : Number(record.amount),
   frequency: record.frequency || 'one-time',
   paymentProvider: String(record.paymentProvider || record.payment_provider || 'STRIPE').toUpperCase(),
@@ -440,7 +441,7 @@ const resolveStripePaymentDetails = async ({ sessionId = '', paymentIntentId = '
   return data.data || null;
 };
 
-const resolveCheckoutUrl = async ({ campaign, amount, donorName, donorEmail, pendingId }) => {
+const resolveCheckoutUrl = async ({ campaign, amount, donorName, donorEmail, donorPhone, pendingId }) => {
   const paymentLink = String(campaign.paymentLink || '').trim();
   if (!paymentLink) {
     throw new Error('Payment setup missing. Add a checkout URL in admin campaign settings.');
@@ -459,6 +460,7 @@ const resolveCheckoutUrl = async ({ campaign, amount, donorName, donorEmail, pen
         amountCents: hasAmount ? Math.round(amount * 100) : undefined,
         donorName,
         donorEmail,
+        donorPhone,
         clientReferenceId: pendingId
       })
     });
@@ -744,6 +746,7 @@ const donationService = {
         amount: payload.amount,
         donorName: payload.donorName,
         donorEmail: payload.donorEmail,
+        donorPhone: payload.donorPhone,
         pendingId
       });
     }
@@ -758,6 +761,7 @@ const donationService = {
       campaignName: campaign.name,
       donorName: payload.donorName || 'Anonymous',
       donorEmail: payload.donorEmail || '',
+      donorPhone: payload.donorPhone || '',
       amount: resolvedAmount,
       frequency: payload.frequency || 'one-time',
       paymentProvider: campaign.paymentProvider,
@@ -785,6 +789,7 @@ const donationService = {
       amount: createdPending.amount,
       donorName: createdPending.donorName,
       donorEmail: createdPending.donorEmail,
+      donorPhone: createdPending.donorPhone,
       frequency: createdPending.frequency,
       paymentProvider: createdPending.paymentProvider
     });

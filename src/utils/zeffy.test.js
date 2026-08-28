@@ -1,6 +1,11 @@
-import { toZeffyEmbedUrl, withZeffyDonorDetails } from './zeffy';
+import { getZeffyDonationFormSlug, toZeffyEmbedUrl, withZeffyDonorDetails } from './zeffy';
 
 describe('toZeffyEmbedUrl', () => {
+  test('extracts the form slug only from Zeffy donation links', () => {
+    expect(getZeffyDonationFormSlug('https://www.zeffy.com/embed/donation-form/langar-seva?modal=true')).toBe('langar-seva');
+    expect(getZeffyDonationFormSlug('https://example.com/donation-form/langar-seva')).toBe('');
+  });
+
   test('converts a public Zeffy campaign link to an embedded modal form', () => {
     expect(toZeffyEmbedUrl('https://www.zeffy.com/en-CA/donation-form/build-our-gurdwara'))
       .toBe('https://www.zeffy.com/embed/donation-form/build-our-gurdwara?modal=true');

@@ -171,6 +171,8 @@
 }
 
 .events-calendar-shell .rbc-calendar {
+  flex: 1;
+  min-height: 0;
   border-radius: 14px;
   overflow: hidden;
   background: #ffffff;
