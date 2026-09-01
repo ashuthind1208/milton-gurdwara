@@ -363,12 +363,14 @@ const upsertDonation = async (record = {}) => {
   const id = normalizeId(record.id || `don-${Date.now()}`);
   const stripeSessionId = String(record.stripeSessionId || '').trim();
   const gatewayTransactionId = String(record.gatewayTransactionId || '').trim();
+  const stripeSessionLookup = stripeSessionId || null;
+  const gatewayTransactionLookup = gatewayTransactionId || null;
   const [matches] = await db.execute(
     `SELECT id FROM donations WHERE id = ?
-      OR (? <> '' AND JSON_UNQUOTE(JSON_EXTRACT(payload, '$.stripeSessionId')) = ?)
-      OR (? <> '' AND JSON_UNQUOTE(JSON_EXTRACT(payload, '$.gatewayTransactionId')) = ?)
+      OR (? IS NOT NULL AND CAST(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.stripeSessionId')) AS BINARY) = CAST(? AS BINARY))
+      OR (? IS NOT NULL AND CAST(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.gatewayTransactionId')) AS BINARY) = CAST(? AS BINARY))
      LIMIT 1`,
-    [id, stripeSessionId, stripeSessionId, gatewayTransactionId, gatewayTransactionId]
+    [id, stripeSessionLookup, stripeSessionLookup, gatewayTransactionLookup, gatewayTransactionLookup]
   );
   const finalId = matches[0]?.id || id;
   const payload = { ...record, id: finalId, updatedAt: nowIso(), createdAt: record.createdAt || nowIso() };
