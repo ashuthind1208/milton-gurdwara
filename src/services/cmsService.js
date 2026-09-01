@@ -3,6 +3,7 @@ import contentApiService from './contentApiService';
 
 const HOME_CONTENT_RESOURCE = 'cms_home_content';
 const PAGE_CONTENT_RESOURCE = 'cms_page_content';
+const DEFAULT_HERO_SLIDE_INTERVAL_SECONDS = 5;
 
 const defaultLangarItems = [
   { id: 'langar-1', name: 'Ginger', category: 'Grocery', addedOn: '2026-07-07', expiryDate: '', needed: true, stockStatus: 'required_soon', customStatusLabel: '' },
@@ -421,6 +422,7 @@ const normalizeAllPageContent = (allContent = {}) => ({
 const normalizeContent = (content) => {
   const normalizedScheduleDays = normalizeScheduleDays(content.scheduleDays, content.schedule || defaultSchedule);
   const defaultScheduleDay = resolveScheduleForDate(normalizedScheduleDays, 'default');
+  const requestedSlideInterval = Number(content.hero?.slideIntervalSeconds);
 
   return {
   ...defaultContent,
@@ -428,6 +430,9 @@ const normalizeContent = (content) => {
   hero: {
     ...defaultContent.hero,
     ...(content.hero || {}),
+    slideIntervalSeconds: Number.isFinite(requestedSlideInterval)
+      ? Math.min(60, Math.max(3, Math.round(requestedSlideInterval)))
+      : DEFAULT_HERO_SLIDE_INTERVAL_SECONDS,
     slides: normalizeSlides(content.hero?.slides || defaultContent.hero.slides)
   },
   scheduleDays: normalizedScheduleDays,
@@ -476,6 +481,7 @@ const defaultContent = {
     title: 'Gurdwara Singh Sabha Milton',
     description:
       'Daily hukamnama, Sunday samagams, seva opportunities, and community updates for the sangat in Milton and beyond.',
+    slideIntervalSeconds: DEFAULT_HERO_SLIDE_INTERVAL_SECONDS,
     primaryCta: 'Donate for Langar',
     primaryCtaPath: '/donation',
     secondaryCta: 'Join Seva',

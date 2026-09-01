@@ -2,6 +2,27 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import HomeHeroBanner from './HomeHeroBanner';
 
+test('uses the configured number of seconds for slide rotation', () => {
+  const intervalSpy = jest.spyOn(window, 'setInterval');
+
+  render(
+    <BrowserRouter>
+      <HomeHeroBanner
+        content={{
+          slideIntervalSeconds: 15,
+          slides: [
+            { title: 'First hero', image: '/first.jpg' },
+            { title: 'Second hero', image: '/second.jpg' }
+          ]
+        }}
+      />
+    </BrowserRouter>
+  );
+
+  expect(intervalSpy).toHaveBeenCalledWith(expect.any(Function), 15000);
+  intervalSpy.mockRestore();
+});
+
 test('advances to the next hero slide when the active upload is missing', () => {
   render(
     <BrowserRouter>

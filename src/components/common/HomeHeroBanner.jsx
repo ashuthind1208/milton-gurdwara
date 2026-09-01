@@ -5,6 +5,7 @@ const fallbackContent = {
   eyebrow: 'Waheguru Ji Ka Khalsa, Waheguru Ji Ki Fateh',
   title: 'Gurdwara Singh Sabha Milton',
   description: 'Daily hukamnama, samagams, seva, and community support in one place.',
+  slideIntervalSeconds: 5,
   slides: [
     {
       image:
@@ -38,6 +39,10 @@ const HomeHeroBanner = ({ content, actions, topRightSlot, onSlideAction }) => {
   const isHomeRoute = location.pathname === '/';
   const resolvedContent = content || fallbackContent;
   const slides = useMemo(() => resolvedContent.slides || [], [resolvedContent]);
+  const requestedSlideInterval = Number(resolvedContent.slideIntervalSeconds);
+  const slideIntervalSeconds = Number.isFinite(requestedSlideInterval)
+    ? Math.min(60, Math.max(3, Math.round(requestedSlideInterval)))
+    : fallbackContent.slideIntervalSeconds;
   const [index, setIndex] = useState(0);
   const [failedSlideIndexes, setFailedSlideIndexes] = useState([]);
 
@@ -54,10 +59,10 @@ const HomeHeroBanner = ({ content, actions, topRightSlot, onSlideAction }) => {
 
     const rotationTimer = window.setInterval(() => {
       setIndex((prev) => findNextAvailableSlide(prev, slides.length, failedSlideIndexes));
-    }, 5000);
+    }, slideIntervalSeconds * 1000);
 
     return () => window.clearInterval(rotationTimer);
-  }, [failedSlideIndexes, isHomeRoute, slides.length]);
+  }, [failedSlideIndexes, isHomeRoute, slideIntervalSeconds, slides.length]);
 
   const activeSlide = slides[index] || {};
   const activeEyebrow = activeSlide.eyebrow || resolvedContent.eyebrow;

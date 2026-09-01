@@ -41,6 +41,8 @@ const pageOptions = [
   { value: 'contact', label: 'Contact' }
 ];
 
+const heroSlideIntervalOptions = [5, 7, 10, 15, 20, 30];
+
 const isImageUrl = (value = '') => /\.(png|jpe?g|gif|webp|svg|avif)(\?.*)?$/i.test(String(value || ''));
 
 const AdminCmsPage = () => {
@@ -57,6 +59,7 @@ const AdminCmsPage = () => {
   const [uploadStatus, setUploadStatus] = useState({ type: 'success', message: '' });
   const [introHtml, setIntroHtml] = useState('');
   const [sectionBodyHtml, setSectionBodyHtml] = useState('');
+  const [heroSlideIntervalSeconds, setHeroSlideIntervalSeconds] = useState(5);
 
   const slideForm = useForm({ defaultValues: emptySlide });
   const pageForm = useForm({
@@ -77,6 +80,17 @@ const AdminCmsPage = () => {
     queryKey: ['hero-slides'],
     queryFn: () => cmsService.getHeroSlides().then((res) => res.data)
   });
+
+  const { data: homeContent } = useQuery({
+    queryKey: ['cms-home'],
+    queryFn: () => cmsService.getHomeContent().then((res) => res.data)
+  });
+
+  useEffect(() => {
+    if (homeContent?.hero?.slideIntervalSeconds) {
+      setHeroSlideIntervalSeconds(Number(homeContent.hero.slideIntervalSeconds));
+    }
+  }, [homeContent?.hero?.slideIntervalSeconds]);
 
   const { data: pageData } = useQuery({
     queryKey: ['page-content-admin', selectedPage],
@@ -167,6 +181,15 @@ const AdminCmsPage = () => {
     mutationFn: (id) => cmsService.removeHeroSlide(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hero-slides'] });
+      queryClient.invalidateQueries({ queryKey: ['cms-home'] });
+    }
+  });
+
+  const updateSlideIntervalMutation = useMutation({
+    mutationFn: (slideIntervalSeconds) => cmsService.updateHomeContent({
+      hero: { slideIntervalSeconds }
+    }),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cms-home'] });
     }
   });
@@ -298,7 +321,28 @@ const AdminCmsPage = () => {
             <h2 className="font-heading text-xl font-semibold">Hero Slides</h2>
             <p className="mt-1 text-sm text-slate-600">Slides are managed as a table with modal view/edit/add.</p>
           </div>
-          <Button type="button" variant="secondary" onClick={() => setSlideModal({ open: true, mode: 'add', slideId: null })}>Add New Slide</Button>
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="text-sm font-semibold text-slate-700">
+              Seconds per slide
+              <select
+                aria-label="Seconds per hero slide"
+                value={heroSlideIntervalSeconds}
+                disabled={updateSlideIntervalMutation.isPending}
+                onChange={(event) => {
+                  const seconds = Number(event.target.value);
+                  setHeroSlideIntervalSeconds(seconds);
+                  updateSlideIntervalMutation.mutate(seconds);
+                }}
+                className="mt-1 block rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-blue-100 disabled:cursor-wait disabled:bg-slate-100"
+              >
+                {heroSlideIntervalOptions.map((seconds) => (
+                  <option key={seconds} value={seconds}>{seconds} seconds</option>
+                ))}
+              </select>
+              {updateSlideIntervalMutation.isPending ? <span className="mt-1 block text-xs font-normal text-slate-500">Saving...</span> : null}
+            </label>
+            <Button type="button" variant="secondary" onClick={() => setSlideModal({ open: true, mode: 'add', slideId: null })}>Add New Slide</Button>
+          </div>
         </div>
 
         <div className="mt-4 overflow-x-hidden">
