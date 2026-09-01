@@ -4913,16 +4913,24 @@ const getConfiguredZeffyCampaigns = async () => {
     if (!configuration.apiKey) {
       continue;
     }
-    let remoteCampaigns = remoteCampaignCache.get(configuration.apiKey);
-    if (!remoteCampaigns) {
-      remoteCampaigns = await fetchZeffyCampaigns(configuration.apiKey);
-      remoteCampaignCache.set(configuration.apiKey, remoteCampaigns);
+    try {
+      let remoteCampaigns = remoteCampaignCache.get(configuration.apiKey);
+      if (!remoteCampaigns) {
+        remoteCampaigns = await fetchZeffyCampaigns(configuration.apiKey);
+        remoteCampaignCache.set(configuration.apiKey, remoteCampaigns);
+      }
+      const remoteCampaign = resolveRemoteZeffyCampaign(configuration.campaign, remoteCampaigns);
+      hydrated.push({
+        ...configuration,
+        remoteCampaignId: String(remoteCampaign?.id || '').trim()
+      });
+    } catch (error) {
+      hydrated.push({
+        ...configuration,
+        remoteCampaignId: '',
+        configurationError: error.message || 'Unable to load Zeffy campaign configuration.'
+      });
     }
-    const remoteCampaign = resolveRemoteZeffyCampaign(configuration.campaign, remoteCampaigns);
-    hydrated.push({
-      ...configuration,
-      remoteCampaignId: String(remoteCampaign?.id || '').trim()
-    });
   }
 
   return { campaigns, configurations: hydrated };
@@ -5034,8 +5042,19 @@ const reconcileZeffyDonations = async ({ force = false } = {}) => {
     const touchedCampaigns = new Map();
     let imported = 0;
     let checked = 0;
+    const failures = [];
 
     for (const configuration of configurations) {
+      const campaignId = Number(configuration.campaign?.id || 0) || null;
+      if (configuration.configurationError) {
+        failures.push({
+          campaignId,
+          stage: 'campaigns',
+          message: configuration.configurationError
+        });
+        continue;
+      }
+
       let cursor = '';
       for (let page = 0; page < 5; page += 1) {
         const url = new URL('https://api.zeffy.com/api/v1/payments');
@@ -5045,12 +5064,28 @@ const reconcileZeffyDonations = async ({ force = false } = {}) => {
           url.searchParams.set('starting_after', cursor);
         }
 
-        const zeffyResponse = await fetch(url, {
-          headers: { Authorization: `Bearer ${configuration.apiKey}` }
-        });
+        let zeffyResponse;
+        try {
+          zeffyResponse = await fetch(url, {
+            headers: { Authorization: `Bearer ${configuration.apiKey}` }
+          });
+        } catch (error) {
+          failures.push({
+            campaignId,
+            stage: 'payments',
+            message: error.message || 'Unable to connect to Zeffy payments.'
+          });
+          break;
+        }
         const zeffyBody = await zeffyResponse.json().catch(() => ({}));
         if (!zeffyResponse.ok) {
-          throw new Error(`Unable to reconcile Zeffy payments (${zeffyResponse.status}).`);
+          failures.push({
+            campaignId,
+            stage: 'payments',
+            status: zeffyResponse.status,
+            message: `Unable to reconcile Zeffy payments (${zeffyResponse.status}).`
+          });
+          break;
         }
 
         const payments = Array.isArray(zeffyBody.data) ? zeffyBody.data : [];
@@ -5059,13 +5094,22 @@ const reconcileZeffyDonations = async ({ force = false } = {}) => {
             continue;
           }
           checked += 1;
-          const persistedDonation = await persistVerifiedZeffyPayment(payment, campaigns, configuration.campaign);
-          if (!existingTransactionIds.has(String(payment.id || '').trim())) {
-            imported += 1;
+          try {
+            const persistedDonation = await persistVerifiedZeffyPayment(payment, campaigns, configuration.campaign);
+            if (!existingTransactionIds.has(String(payment.id || '').trim())) {
+              imported += 1;
+            }
+            existingTransactionIds.add(String(payment.id || '').trim());
+            const campaignKey = persistedDonation.campaignId || persistedDonation.campaignName;
+            touchedCampaigns.set(campaignKey, persistedDonation);
+          } catch (error) {
+            failures.push({
+              campaignId,
+              stage: 'persist',
+              paymentId: String(payment.id || '').trim(),
+              message: error.message || 'Unable to persist verified Zeffy payment.'
+            });
           }
-          existingTransactionIds.add(String(payment.id || '').trim());
-          const campaignKey = persistedDonation.campaignId || persistedDonation.campaignName;
-          touchedCampaigns.set(campaignKey, persistedDonation);
         }
 
         cursor = String(zeffyBody.next_cursor || '').trim();
@@ -5082,7 +5126,7 @@ const reconcileZeffyDonations = async ({ force = false } = {}) => {
       });
     }
     lastZeffyReconciliationAt = Date.now();
-    return { imported, checked };
+    return { imported, checked, failures };
   })();
 
   try {
@@ -7361,6 +7405,24 @@ const server = http.createServer(async (request, response) => {
       return r - l;
     });
     sendJson(response, 200, { ok: true, data });
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/donations/reconcile-zeffy' && request.method === 'POST') {
+    if (!canManageDonations(request)) {
+      sendJson(response, 403, { ok: false, message: 'Only Admin and Super Admin can reconcile Zeffy donations.' });
+      return;
+    }
+    try {
+      const data = await reconcileZeffyDonations({ force: true });
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      logServerError(error, '[donations] Forced Zeffy reconciliation failed');
+      sendJson(response, error.status || 500, {
+        ok: false,
+        message: error.message || 'Unable to reconcile Zeffy donations.'
+      });
+    }
     return;
   }
 
