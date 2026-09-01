@@ -18,12 +18,10 @@ import cmsService, { resolveScheduleForDate } from '../../services/cmsService';
 import hukamnamaService from '../../services/hukamnamaService';
 import advertisementService from '../../services/advertisementService';
 import newsService from '../../services/newsService';
-import donationService from '../../services/donationService';
 import useSeoMeta from '../../hooks/useSeoMeta';
 import Seo from '../../components/common/Seo';
 import gurdwaraLogo from '../../assets/gurdwara-logo.webp';
 import { isEventCurrent } from '../../utils/eventAvailability';
-import { getZeffyDonationFormSlug } from '../../utils/zeffy';
 
 const toDateKey = (value = new Date()) => {
   const date = value instanceof Date ? value : new Date(value);
@@ -135,7 +133,6 @@ const HomePage = () => {
   const { data: dailyHukamnama } = useQuery({ queryKey: ['daily-hukamnama', todayDateKey], queryFn: () => hukamnamaService.getDailyHukamnama(todayDateKey).then((res) => res.data) });
   const { data: ads = [] } = useQuery({ queryKey: ['advertisements'], queryFn: () => advertisementService.getAds().then((res) => res.data) });
   const { data: newsArticles = [] } = useQuery({ queryKey: ['news-articles'], queryFn: () => newsService.getArticles().then((res) => res.data) });
-  const { data: donationCampaigns = [] } = useQuery({ queryKey: ['donation-campaigns'], queryFn: () => donationService.getCampaigns().then((res) => res.data) });
   const [selectedTickerEvent, setSelectedTickerEvent] = useState(null);
   const [selectedContentLink, setSelectedContentLink] = useState(null);
   const [selectedSevaCategory, setSelectedSevaCategory] = useState('All');
@@ -454,16 +451,9 @@ const HomePage = () => {
   };
 
   const handleHeroSlideAction = (path) => {
-    const zeffySlug = getZeffyDonationFormSlug(path);
-    if (zeffySlug) {
-      const matchedCampaign = donationCampaigns.find((campaign) => (
-        String(campaign.paymentProvider || '').toUpperCase() === 'ZEFFY'
-        && getZeffyDonationFormSlug(campaign.paymentLink) === zeffySlug
-      ));
-      if (matchedCampaign?.id) {
-        navigate(`/donation?campaignId=${encodeURIComponent(matchedCampaign.id)}`);
-        return;
-      }
+    if (/^https?:\/\//i.test(String(path || '').trim())) {
+      window.open(path, '_blank', 'noopener,noreferrer');
+      return;
     }
 
     navigate(path);
