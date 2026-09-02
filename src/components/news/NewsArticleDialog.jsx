@@ -37,7 +37,9 @@ const NewsArticleDialog = ({ article, onClose }) => {
         </button>
 
         {heroImage ? (
-          <img src={heroImage} alt={article.heading || 'News article'} className="max-h-[70vh] w-full object-cover" />
+          <div className="flex w-full items-center justify-center bg-slate-100">
+            <img src={heroImage} alt={article.heading || 'News article'} className="max-h-[70vh] h-auto w-full object-contain" />
+          </div>
         ) : (
           <div className="h-32 w-full bg-slate-900" />
         )}
