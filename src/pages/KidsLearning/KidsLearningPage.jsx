@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { SparklesIcon } from '@heroicons/react/24/outline';
 import PageHero from '../../components/common/PageHero';
 import Seo from '../../components/common/Seo';
 import useSeoMeta from '../../hooks/useSeoMeta';
@@ -33,6 +34,8 @@ const isPublishedNow = (item = {}) => {
 const KidsLearningPage = () => {
   const meta = useSeoMeta('Kids Learning', 'Weekly Sikh quizzes, stories, and Punjabi word cards for children.');
   const [selectedQuizId, setSelectedQuizId] = useState('');
+  const [gurmatWord, setGurmatWord] = useState('');
+  const [gurmatGuide, setGurmatGuide] = useState(null);
 
   const { data } = useQuery({
     queryKey: ['kids-learning-content'],
@@ -55,6 +58,21 @@ const KidsLearningPage = () => {
   );
 
   const wordCard = isPublishedNow(data?.wordOfWeek) ? data?.wordOfWeek : null;
+
+  const gurmatGuideMutation = useMutation({
+    mutationFn: (word) => kidsLearningService.generateGurmatGuide(word).then((res) => res.data),
+    onSuccess: (guide) => setGurmatGuide(guide)
+  });
+
+  const submitGurmatWord = (event) => {
+    event.preventDefault();
+    const word = gurmatWord.trim();
+    if (!word || gurmatGuideMutation.isPending) {
+      return;
+    }
+    setGurmatGuide(null);
+    gurmatGuideMutation.mutate(word);
+  };
 
   const breadcrumbItems = useMemo(() => {
     const items = [
@@ -94,6 +112,70 @@ const KidsLearningPage = () => {
             <p className="mt-1 text-sm font-semibold text-slate-700">{wordCard.transliteration || ''}</p>
             <p className="mt-3 text-sm text-slate-700"><span className="font-bold">Meaning:</span> {wordCard.englishMeaning || '-'}</p>
             <p className="mt-2 text-sm text-slate-700"><span className="font-bold">Example:</span> {wordCard.example || '-'}</p>
+          </div>
+
+          <div className="mt-5 border-t border-slate-200 pt-5">
+            <div className="flex items-start gap-3">
+              <SparklesIcon className="mt-0.5 h-5 w-5 shrink-0 text-brand-saffron" aria-hidden="true" />
+              <div>
+                <h3 className="text-base font-bold text-slate-900">AI Gurmat Learning Guide</h3>
+                <p className="mt-1 text-sm text-slate-600">Enter one Punjabi or English word to explore it through a trusted Gurbani line.</p>
+              </div>
+            </div>
+
+            <form className="mt-4 flex flex-col gap-2 sm:flex-row" onSubmit={submitGurmatWord}>
+              <label className="sr-only" htmlFor="gurmat-word">Punjabi or English word</label>
+              <input
+                id="gurmat-word"
+                type="text"
+                value={gurmatWord}
+                onChange={(event) => setGurmatWord(event.target.value)}
+                minLength={2}
+                maxLength={40}
+                placeholder="Try Seva, courage, or ਦਇਆ"
+                className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
+                required
+              />
+              <button
+                type="submit"
+                disabled={gurmatGuideMutation.isPending}
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-brand-blue px-4 py-2 text-sm font-bold text-white transition hover:bg-brand-navy disabled:cursor-wait disabled:opacity-60"
+              >
+                <SparklesIcon className="h-4 w-4" aria-hidden="true" />
+                {gurmatGuideMutation.isPending ? 'Creating lesson...' : 'Create lesson'}
+              </button>
+            </form>
+
+            {gurmatGuideMutation.isError ? (
+              <p role="alert" className="mt-3 text-sm font-semibold text-rose-700">{gurmatGuideMutation.error?.message || 'The local AI guide is unavailable right now.'}</p>
+            ) : null}
+
+            {gurmatGuide ? (
+              <div className="mt-5 space-y-5 border-l-4 border-brand-saffron pl-4">
+                <div>
+                  <p className="font-gurmukhi text-2xl font-bold text-brand-navy">{gurmatGuide.wordPunjabi || gurmatGuide.requestedWord}</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-700">{gurmatGuide.wordTransliteration || gurmatGuide.wordEnglish}</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-700">{gurmatGuide.meaningEnglish}</p>
+                  <p lang="pa" className="mt-1 font-gurmukhi text-sm leading-7 text-slate-700">{gurmatGuide.meaningPunjabi}</p>
+                </div>
+
+                <div>
+                  <p className="text-xs font-bold uppercase text-brand-blue">Gurbani connection</p>
+                  <blockquote lang="pa" className="mt-2 font-gurmukhi text-lg font-semibold leading-8 text-brand-navy">{gurmatGuide.gurbani?.gurmukhi}</blockquote>
+                  <p className="mt-1 text-xs font-semibold text-slate-500">{gurmatGuide.gurbani?.source}</p>
+                  <p className="mt-3 text-sm leading-6 text-slate-700"><span className="font-bold">English:</span> {gurmatGuide.gurbani?.translationEnglish}</p>
+                  <p lang="pa" className="mt-1 font-gurmukhi text-sm leading-7 text-slate-700"><span className="font-bold">ਪੰਜਾਬੀ:</span> {gurmatGuide.gurbani?.translationPunjabi}</p>
+                </div>
+
+                <div>
+                  <p className="text-sm leading-6 text-slate-700"><span className="font-bold">Why it matters:</span> {gurmatGuide.importanceEnglish}</p>
+                  <p lang="pa" className="mt-1 font-gurmukhi text-sm leading-7 text-slate-700">{gurmatGuide.importancePunjabi}</p>
+                  {gurmatGuide.reflectionQuestion ? <p className="mt-3 text-sm font-semibold text-brand-blue">Think about it: {gurmatGuide.reflectionQuestion}</p> : null}
+                </div>
+
+                <p className="text-xs text-slate-500">AI-created learning support. Please explore deeper questions with a parent, teacher, or granthi.</p>
+              </div>
+            ) : null}
           </div>
         </Card>
       ) : null}

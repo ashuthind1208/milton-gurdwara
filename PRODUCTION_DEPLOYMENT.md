@@ -66,6 +66,14 @@ Never place database credentials, SMTP credentials, Stripe secrets, Zeffy API ke
   - Local campaign-name fallback. Example: `Help Us Build Our Gurdwara`.
 - `YOUTUBE_API_KEY`
   - Server-side key with YouTube Data API access.
+- `GURMAT_AI_PROVIDER`
+  - Set to `gemini` for the Kids Learning Word of the Week AI guide.
+- `GEMINI_API_KEY`
+  - Server-only Google AI Studio key. To prevent charges, use a project with billing disabled; requests stop when its free quota is exhausted.
+- `GEMINI_MODEL`
+  - Defaults to `gemini-2.5-flash-lite` and can be changed without rebuilding the frontend.
+- `RATE_LIMIT_GURMAT_AI_MAX_REQUESTS`
+  - Maximum generated lessons per visitor in the configured window. Defaults to `10` per hour to protect free quota.
 - `VOLUNTEER_REMINDER_WEBHOOK_URL`
   - Reminder email webhook.
 - `VOLUNTEER_REMINDER_SEND_TIME`

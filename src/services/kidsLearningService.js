@@ -1,5 +1,6 @@
 import { serviceResponse } from './serviceResponse';
 import contentApiService from './contentApiService';
+import apiClient from './apiClient';
 
 const RESOURCE = 'kids_learning_content';
 
@@ -260,6 +261,11 @@ const kidsLearningService = {
     await contentApiService.setSingleton(RESOURCE, normalized);
     const latest = await getStoredKidsLearningContent();
     return serviceResponse(latest);
+  },
+
+  generateGurmatGuide: async (word) => {
+    const response = await apiClient.post('/kids-learning/gurmat-guide', { word }, { timeout: 75000 });
+    return serviceResponse(response.data?.data);
   },
 
   getDefaultContent: () => normalizeKidsLearningContent(defaultKidsLearningContent)

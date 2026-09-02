@@ -14,6 +14,7 @@ const {
   normalizeEventType,
   verifyZeffyWebhookToken
 } = require('./zeffyWebhook');
+const { createGurmatGuide } = require('./gurmatGuide');
 
 const loadEnvFile = (filePath) => {
   if (!fs.existsSync(filePath)) {
@@ -1338,6 +1339,8 @@ const rateLimitConfig = {
   authAccountMaxAttempts: parsePositiveIntEnv('RATE_LIMIT_AUTH_ACCOUNT_MAX_ATTEMPTS', 6),
   authBackoffBaseMs: parsePositiveIntEnv('RATE_LIMIT_AUTH_BACKOFF_BASE_MS', 1000),
   authBackoffMaxMs: parsePositiveIntEnv('RATE_LIMIT_AUTH_BACKOFF_MAX_MS', 30 * 60 * 1000),
+  gurmatAiWindowMs: parsePositiveIntEnv('RATE_LIMIT_GURMAT_AI_WINDOW_MS', 60 * 60 * 1000),
+  gurmatAiMaxRequests: parsePositiveIntEnv('RATE_LIMIT_GURMAT_AI_MAX_REQUESTS', 10),
   cleanupIntervalMs: parsePositiveIntEnv('RATE_LIMIT_CLEANUP_INTERVAL_MS', 5 * 60 * 1000),
   authRouteRules: parseCsvEnv('RATE_LIMIT_AUTH_ROUTE_RULES', [
     'POST:/api/auth/*',
@@ -5705,6 +5708,33 @@ const server = http.createServer(async (request, response) => {
       startupId: API_STARTUP_ID,
       serverPort: port
     });
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/kids-learning/gurmat-guide' && request.method === 'POST') {
+    try {
+      const aiRateLimit = evaluateFixedWindowLimit(
+        fixedWindowRateState,
+        `gurmat-ai:${resolveClientIp(request) || 'unknown-ip'}`,
+        rateLimitConfig.gurmatAiMaxRequests,
+        rateLimitConfig.gurmatAiWindowMs,
+        Date.now()
+      );
+      if (aiRateLimit.limited) {
+        sendRateLimitExceeded(response, aiRateLimit.retryAfterMs, 'The free AI lesson limit has been reached. Please try again later.', 'gurmat-ai');
+        return;
+      }
+      const payload = await parseJsonObjectBody(request, { maxBytes: 4 * 1024, allowEmpty: false });
+      ensureNoUnknownKeys(payload, ['word']);
+      const word = readStringField(payload, 'word', { required: true, min: 2, max: 40 });
+      const data = await createGurmatGuide(word);
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, error.status || 500, {
+        ok: false,
+        message: error.message || 'Unable to create the Gurmat learning guide.'
+      });
+    }
     return;
   }
 
