@@ -783,11 +783,11 @@ const HomePage = () => {
             <section className="rounded-xl border border-slate-200 bg-white px-4 py-4">
               <SectionTitle title="Latest Update" subtitle={latestArticle ? '' : 'No active update'} />
               <hr className="-mt-1 mb-4 border-slate-200" />
-              <h3 className="truncate font-heading text-2xl font-bold text-slate-900" title={latestArticle?.heading || ''}>{truncateHeading(latestArticle?.heading || 'No active updates', 40)}</h3>
+              <h3 className="truncate font-heading text-xl font-semibold text-slate-900" title={latestArticle?.heading || ''}>{truncateHeading(latestArticle?.heading || 'No active updates', 40)}</h3>
               {latestArticle ? (
                 <div
                   className="mt-2 text-sm leading-6 text-slate-600 [&_a]:font-semibold [&_a]:text-brand-saffron [&_a]:underline [&_a]:underline-offset-2 [&_h1]:font-heading [&_h1]:text-xl [&_h1]:font-bold [&_h2]:font-heading [&_h2]:text-lg [&_h2]:font-bold [&_h3]:font-semibold [&_li]:ml-5 [&_ol]:list-decimal [&_p]:my-2 [&_ul]:list-disc"
-                  dangerouslySetInnerHTML={{ __html: truncateHtmlByCharacters(latestArticle.content, 80) }}
+                  dangerouslySetInnerHTML={{ __html: truncateHtmlByCharacters(latestArticle.content, 200) }}
                 />
               ) : (
                 <p className="mt-2 text-sm text-slate-600">Please check the News page for upcoming announcements.</p>

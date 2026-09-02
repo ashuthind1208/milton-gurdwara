@@ -21,11 +21,11 @@ test('keeps a truncated heading within 40 characters', () => {
   expect(heading.length).toBeLessThanOrEqual(40);
 });
 
-test('preserves markup while limiting an excerpt to 80 visible characters', () => {
-  const article = `<p>Read our <a href="https://example.com">important community announcement</a> ${'and more details '.repeat(8)}</p>`;
-  const excerpt = truncateHtmlByCharacters(article, 80);
+test('preserves markup while limiting an excerpt to 200 visible characters', () => {
+  const article = `<p>Read our <a href="https://example.com">important community announcement</a> ${'and more details '.repeat(20)}</p>`;
+  const excerpt = truncateHtmlByCharacters(article, 200);
 
   expect(excerpt).toContain('<a href="https://example.com">important community announcement</a>');
-  expect(stripHtml(excerpt)).toHaveLength(80);
+  expect(stripHtml(excerpt)).toHaveLength(200);
   expect(stripHtml(excerpt)).toMatch(/\.\.\.$/);
 });
