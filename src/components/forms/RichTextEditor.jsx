@@ -139,6 +139,19 @@ const RichTextEditor = ({ value = '', onChange, minHeight = 220 }) => {
 
         <select
           className="rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700"
+          defaultValue="Manrope"
+          onChange={(event) => exec('fontName', event.target.value)}
+          title="Font family"
+        >
+          <option value="Manrope">Manrope</option>
+          <option value="Crimson Text">Crimson Text</option>
+          <option value="Georgia">Georgia</option>
+          <option value="Arial">Arial</option>
+          <option value="Verdana">Verdana</option>
+        </select>
+
+        <select
+          className="rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700"
           defaultValue="3"
           onChange={(event) => exec('fontSize', event.target.value)}
           title="Font size"

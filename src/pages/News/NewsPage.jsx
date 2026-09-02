@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { XMarkIcon } from '@heroicons/react/24/outline';
 import PageHero from '../../components/common/PageHero';
 import { useQuery } from '@tanstack/react-query';
 import useSeoMeta from '../../hooks/useSeoMeta';
 import Seo from '../../components/common/Seo';
 import newsService from '../../services/newsService';
 import Card from '../../components/ui/Card';
+import NewsArticleDialog from '../../components/news/NewsArticleDialog';
+import { stripHtml } from '../../utils/newsContent';
 
 const PAGE_SIZE = 9;
 
-const stripHtml = (value) => String(value || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 const truncateText = (value, maxLength = 150) => {
   const text = String(value || '').trim();
   if (text.length <= maxLength) {
@@ -196,56 +196,7 @@ const NewsPage = () => {
         ) : null}
       </section>
 
-      {activeArticle ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-1.5 sm:p-4">
-          <div className="absolute inset-0 bg-slate-900/70" aria-hidden="true" onClick={() => setActiveArticle(null)} />
-          <div className="relative z-10 w-full max-w-5xl overflow-hidden rounded-xl bg-white shadow-2xl max-h-[96vh] overflow-y-auto sm:rounded-2xl sm:max-h-[92vh]">
-            {(activeArticle.imageLinks || []).length > 0 ? (
-              <div className="grid gap-1.5 bg-black p-1.5 sm:grid-cols-2 sm:gap-2 sm:p-2">
-                {(activeArticle.imageLinks || []).slice(0, 4).map((url, index) => (
-                  <div key={`${activeArticle.id}-popup-image-${index}`} className="aspect-video overflow-hidden rounded-lg bg-slate-900">
-                    <img src={url} alt={`${activeArticle.heading} ${index + 1}`} className="h-full w-full object-cover" loading="lazy" />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="h-28 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-700" />
-            )}
-
-            <div className="p-3 sm:p-5">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h3 className="font-heading text-lg font-semibold text-slate-800 sm:text-xl">{activeArticle.heading || 'Untitled'}</h3>
-                  <p className="text-[11px] text-slate-500 sm:text-xs">Published: {activeArticle.publishedAt} · Expiry: {activeArticle.expiryDate || 'No expiry'}</p>
-                </div>
-                <button type="button" className="rounded-md p-1 text-slate-500 hover:bg-slate-100" onClick={() => setActiveArticle(null)}><XMarkIcon className="h-5 w-5" /></button>
-              </div>
-
-              {stripHtml(activeArticle.content) ? (
-                <div className="prose prose-sm mt-3 max-w-none text-slate-700 sm:mt-4" dangerouslySetInnerHTML={{ __html: String(activeArticle.content || '') }} />
-              ) : (
-                <p className="mt-3 text-sm text-slate-600 sm:mt-4">No content available.</p>
-              )}
-
-              {(activeArticle.links || []).length > 0 ? (
-                <div className="mt-3 flex flex-col gap-2 sm:mt-4 sm:flex-row sm:flex-wrap">
-                  {(activeArticle.links || []).map((url, index) => (
-                    <a
-                      key={`${activeArticle.id}-popup-link-${index}`}
-                      href={url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex w-full items-center justify-center rounded-lg bg-brand-blue px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 sm:w-auto sm:justify-start sm:py-1.5"
-                    >
-                      Open Link {index + 1}
-                    </a>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <NewsArticleDialog article={activeArticle} onClose={() => setActiveArticle(null)} />
     </div>
   );
 };

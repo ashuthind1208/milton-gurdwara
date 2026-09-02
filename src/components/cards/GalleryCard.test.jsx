@@ -19,5 +19,7 @@ test('opens an external gallery folder in a new tab', () => {
   expect(folderLink).toHaveAttribute('href', 'https://drive.google.com/drive/folders/example');
   expect(folderLink).toHaveAttribute('target', '_blank');
   expect(folderLink).toHaveAttribute('rel', 'noreferrer');
+  expect(folderLink).toContainElement(screen.getByText('Community Event'));
   expect(screen.getByAltText('Community Event')).toBeInTheDocument();
+  expect(screen.queryByText(/image links/i)).not.toBeInTheDocument();
 });

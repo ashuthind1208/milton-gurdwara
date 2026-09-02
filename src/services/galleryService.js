@@ -5,10 +5,14 @@ const RESOURCE = 'gallery_albums';
 
 const hasProtocol = (value) => /^https?:\/\//i.test(String(value || '').trim());
 
-const normalizeUrl = (value) => {
+export const normalizeUrl = (value) => {
   const trimmed = String(value || '').trim();
   if (!trimmed) {
     return '';
+  }
+
+  if (trimmed.startsWith('/')) {
+    return trimmed;
   }
 
   return hasProtocol(trimmed) ? trimmed : `https://${trimmed}`;

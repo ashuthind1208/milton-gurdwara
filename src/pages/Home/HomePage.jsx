@@ -20,8 +20,10 @@ import advertisementService from '../../services/advertisementService';
 import newsService from '../../services/newsService';
 import useSeoMeta from '../../hooks/useSeoMeta';
 import Seo from '../../components/common/Seo';
+import NewsArticleDialog from '../../components/news/NewsArticleDialog';
 import gurdwaraLogo from '../../assets/gurdwara-logo.webp';
 import { isEventCurrent } from '../../utils/eventAvailability';
+import { truncateHeading, truncateHtmlByWords } from '../../utils/newsContent';
 
 const toDateKey = (value = new Date()) => {
   const date = value instanceof Date ? value : new Date(value);
@@ -135,6 +137,7 @@ const HomePage = () => {
   const { data: newsArticles = [] } = useQuery({ queryKey: ['news-articles'], queryFn: () => newsService.getArticles().then((res) => res.data) });
   const [selectedTickerEvent, setSelectedTickerEvent] = useState(null);
   const [selectedContentLink, setSelectedContentLink] = useState(null);
+  const [selectedNewsArticle, setSelectedNewsArticle] = useState(null);
   const [selectedSevaCategory, setSelectedSevaCategory] = useState('All');
   const [selectedSevaPage, setSelectedSevaPage] = useState(1);
   const [tickerMotionSeed, setTickerMotionSeed] = useState(0);
@@ -778,10 +781,19 @@ const HomePage = () => {
             </aside>
 
             <section className="rounded-xl border border-slate-200 bg-white px-4 py-4">
-              <SectionTitle title="Latest Update" subtitle={latestArticle ? 'Community Update' : 'No active update'} />
-              <h3 className="font-heading text-lg font-semibold text-slate-900">{latestArticle?.heading || 'No active updates at the moment.'}</h3>
-              <p className="mt-1 text-sm text-slate-600">{latestArticle?.content || 'Please check the News page for upcoming announcements.'}</p>
-              <div className="mt-2 flex justify-end">
+              <SectionTitle title="Latest Update" subtitle={latestArticle ? '' : 'No active update'} />
+              <hr className="-mt-1 mb-4 border-slate-200" />
+              <h3 className="truncate font-heading text-2xl font-bold text-slate-900" title={latestArticle?.heading || ''}>{truncateHeading(latestArticle?.heading || 'No active updates')}</h3>
+              {latestArticle ? (
+                <div
+                  className="mt-2 text-sm leading-6 text-slate-600 [&_a]:font-semibold [&_a]:text-brand-saffron [&_a]:underline [&_a]:underline-offset-2 [&_h1]:font-heading [&_h1]:text-xl [&_h1]:font-bold [&_h2]:font-heading [&_h2]:text-lg [&_h2]:font-bold [&_h3]:font-semibold [&_li]:ml-5 [&_ol]:list-decimal [&_p]:my-2 [&_ul]:list-disc"
+                  dangerouslySetInnerHTML={{ __html: truncateHtmlByWords(latestArticle.content, 150) }}
+                />
+              ) : (
+                <p className="mt-2 text-sm text-slate-600">Please check the News page for upcoming announcements.</p>
+              )}
+              <div className="mt-3 flex items-center justify-end gap-4 border-t border-slate-200 pt-3">
+                {latestArticle ? <button type="button" onClick={() => setSelectedNewsArticle(latestArticle)} className="inline-flex items-center gap-1 text-sm font-semibold text-brand-saffron hover:underline"><span>&gt;</span> Read full update</button> : null}
                 <button type="button" onClick={() => navigate('/news')} className="inline-flex items-center gap-1 text-sm font-semibold text-brand-blue hover:underline"><span>&gt;</span> Read all updates</button>
               </div>
             </section>
@@ -1089,6 +1101,7 @@ const HomePage = () => {
           </div>
         </div>
       ) : null}
+      <NewsArticleDialog article={selectedNewsArticle} onClose={() => setSelectedNewsArticle(null)} />
     </div>
   );
 };
