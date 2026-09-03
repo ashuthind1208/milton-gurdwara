@@ -591,30 +591,7 @@ const LibraryPage = () => {
           <Card className="border border-sky-200/70 bg-gradient-to-br from-sky-100 via-white to-cyan-100">
             <h4 className="text-lg font-bold text-slate-900">Kids Learning</h4>
             <p className="mt-2 text-sm text-slate-700">{kidsLearningContent?.intro || 'Interactive Sikh learning for children ages 6-12.'}</p>
-            {kidsLearningContent?.wordOfWeek ? (
-              <div className="mt-3 rounded-xl border border-brand-blue/20 bg-white/90 p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-brand-blue">Word of the Week</p>
-                <p className="mt-1 text-lg font-black text-brand-blue">{kidsLearningContent.wordOfWeek.punjabi || '-'}</p>
-                <p className="text-sm font-semibold text-slate-700">{kidsLearningContent.wordOfWeek.transliteration || ''}</p>
-                <p className="mt-2 text-sm text-slate-700">{kidsLearningContent.wordOfWeek.englishMeaning || ''}</p>
-
-                {(Array.isArray(kidsLearningContent?.previousWordWeeks) ? kidsLearningContent.previousWordWeeks : []).length > 0 ? (
-                  <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-2 py-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Last 3 Weeks</p>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      {(kidsLearningContent.previousWordWeeks || []).slice(0, 3).map((entry, index) => (
-                        <span key={entry.id || `word-history-${index}`} className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700">
-                          {entry.punjabi || '-'}
-                          {entry.transliteration ? <span className="ml-1 text-slate-500">({entry.transliteration})</span> : null}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-
-                <GurmatLearningGuide compact />
-              </div>
-            ) : null}
+            <GurmatLearningGuide compact />
           </Card>
 
           <Card className="border border-violet-200/70 bg-gradient-to-br from-violet-100 via-white to-indigo-100">

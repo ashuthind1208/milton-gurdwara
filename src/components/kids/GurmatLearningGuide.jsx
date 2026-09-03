@@ -1,16 +1,30 @@
 import { useId, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { SparklesIcon } from '@heroicons/react/24/outline';
 import kidsLearningService from '../../services/kidsLearningService';
 
 const GurmatLearningGuide = ({ compact = false }) => {
   const inputId = useId();
+  const queryClient = useQueryClient();
   const [word, setWord] = useState('');
-  const [guide, setGuide] = useState(null);
+  const [selectedGuide, setSelectedGuide] = useState(null);
+
+  const { data: recentGuides = [] } = useQuery({
+    queryKey: ['gurmat-word-searches'],
+    queryFn: () => kidsLearningService.getRecentGurmatGuides().then((res) => res.data)
+  });
+
+  const guide = selectedGuide || recentGuides[0] || null;
 
   const guideMutation = useMutation({
     mutationFn: (requestedWord) => kidsLearningService.generateGurmatGuide(requestedWord).then((res) => res.data),
-    onSuccess: (nextGuide) => setGuide(nextGuide)
+    onSuccess: (nextGuide) => {
+      setSelectedGuide(nextGuide);
+      queryClient.setQueryData(['gurmat-word-searches'], (current = []) => [
+        nextGuide,
+        ...current.filter((entry) => entry.searchId !== nextGuide.searchId)
+      ].slice(0, 5));
+    }
   });
 
   const submitWord = (event) => {
@@ -19,7 +33,7 @@ const GurmatLearningGuide = ({ compact = false }) => {
     if (!requestedWord || guideMutation.isPending) {
       return;
     }
-    setGuide(null);
+    setSelectedGuide(null);
     guideMutation.mutate(requestedWord);
   };
 
@@ -28,8 +42,8 @@ const GurmatLearningGuide = ({ compact = false }) => {
       <div className="flex items-start gap-3">
         <SparklesIcon className="mt-0.5 h-5 w-5 shrink-0 text-brand-saffron" aria-hidden="true" />
         <div>
-          <h3 className="text-base font-bold text-slate-900">AI Gurmat Learning Guide</h3>
-          <p className="mt-1 text-sm text-slate-600">Enter one Punjabi or English word to explore it through a trusted Gurbani line.</p>
+          <h3 className="text-base font-bold text-slate-900">Word of the Day</h3>
+          <p className="mt-1 text-sm text-slate-600">Search one Punjabi or English word to explore its meaning and connection to Gurbani.</p>
         </div>
       </div>
 
@@ -58,6 +72,26 @@ const GurmatLearningGuide = ({ compact = false }) => {
 
       {guideMutation.isError ? (
         <p role="alert" className="mt-3 text-sm font-semibold text-rose-700">{guideMutation.error?.message || 'The AI guide is unavailable right now.'}</p>
+      ) : null}
+
+      {recentGuides.length > 0 ? (
+        <div className="mt-4">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Last 5 Searches</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {recentGuides.slice(0, 5).map((entry) => (
+              <button
+                key={entry.searchId}
+                type="button"
+                onClick={() => setSelectedGuide(entry)}
+                aria-pressed={guide?.searchId === entry.searchId}
+                className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition hover:border-brand-blue/50 hover:text-brand-blue aria-pressed:border-brand-blue aria-pressed:bg-brand-blue aria-pressed:text-white"
+              >
+                {entry.wordEnglish || entry.requestedWord}
+                {entry.wordPunjabi ? <span className="ml-1 font-gurmukhi">· {entry.wordPunjabi}</span> : null}
+              </button>
+            ))}
+          </div>
+        </div>
       ) : null}
 
       {guide ? (

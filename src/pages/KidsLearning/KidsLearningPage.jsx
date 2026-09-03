@@ -55,8 +55,6 @@ const KidsLearningPage = () => {
     [publishedQuizzes, selectedQuizId]
   );
 
-  const wordCard = isPublishedNow(data?.wordOfWeek) ? data?.wordOfWeek : null;
-
   const breadcrumbItems = useMemo(() => {
     const items = [
       { label: 'Home', path: '/' },
@@ -87,19 +85,9 @@ const KidsLearningPage = () => {
         </Card>
       ) : null}
 
-      {wordCard ? (
-        <Card>
-          <h2 className="text-lg font-bold text-slate-900">Punjabi Word of the Week</h2>
-          <div className="mt-3 rounded-xl border border-brand-blue/20 bg-brand-blue/5 p-4">
-            <p className="text-2xl font-black text-brand-blue">{wordCard.punjabi || '-'}</p>
-            <p className="mt-1 text-sm font-semibold text-slate-700">{wordCard.transliteration || ''}</p>
-            <p className="mt-3 text-sm text-slate-700"><span className="font-bold">Meaning:</span> {wordCard.englishMeaning || '-'}</p>
-            <p className="mt-2 text-sm text-slate-700"><span className="font-bold">Example:</span> {wordCard.example || '-'}</p>
-          </div>
-
+      <Card>
           <GurmatLearningGuide />
-        </Card>
-      ) : null}
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>

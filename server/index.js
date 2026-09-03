@@ -15,6 +15,11 @@ const {
   verifyZeffyWebhookToken
 } = require('./zeffyWebhook');
 const { createGurmatGuide } = require('./gurmatGuide');
+const {
+  findStoredGurmatGuide,
+  listRecentGurmatGuides,
+  storeGurmatGuide
+} = require('./gurmatGuideStore');
 
 const loadEnvFile = (filePath) => {
   if (!fs.existsSync(filePath)) {
@@ -5711,8 +5716,32 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (requestUrl.pathname === '/api/kids-learning/gurmat-guide/recent' && request.method === 'GET') {
+    try {
+      assertInput(eventsDb.hasDatabaseConnection, 'The Word of the Day database is unavailable.', 503);
+      const data = await listRecentGurmatGuides(eventsDb, 5);
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, error.status || 500, {
+        ok: false,
+        message: error.message || 'Unable to load recent words.'
+      });
+    }
+    return;
+  }
+
   if (requestUrl.pathname === '/api/kids-learning/gurmat-guide' && request.method === 'POST') {
     try {
+      assertInput(eventsDb.hasDatabaseConnection, 'The Word of the Day database is unavailable.', 503);
+      const payload = await parseJsonObjectBody(request, { maxBytes: 4 * 1024, allowEmpty: false });
+      ensureNoUnknownKeys(payload, ['word']);
+      const word = readStringField(payload, 'word', { required: true, min: 2, max: 40 });
+      const storedGuide = await findStoredGurmatGuide(eventsDb, word);
+      if (storedGuide) {
+        sendJson(response, 200, { ok: true, data: storedGuide });
+        return;
+      }
+
       const aiRateLimit = evaluateFixedWindowLimit(
         fixedWindowRateState,
         `gurmat-ai:${resolveClientIp(request) || 'unknown-ip'}`,
@@ -5724,10 +5753,8 @@ const server = http.createServer(async (request, response) => {
         sendRateLimitExceeded(response, aiRateLimit.retryAfterMs, 'The free AI lesson limit has been reached. Please try again later.', 'gurmat-ai');
         return;
       }
-      const payload = await parseJsonObjectBody(request, { maxBytes: 4 * 1024, allowEmpty: false });
-      ensureNoUnknownKeys(payload, ['word']);
-      const word = readStringField(payload, 'word', { required: true, min: 2, max: 40 });
-      const data = await createGurmatGuide(word);
+      const generatedGuide = await createGurmatGuide(word);
+      const data = await storeGurmatGuide(eventsDb, generatedGuide);
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
       sendJson(response, error.status || 500, {

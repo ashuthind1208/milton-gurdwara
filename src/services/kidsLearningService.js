@@ -268,6 +268,11 @@ const kidsLearningService = {
     return serviceResponse(response.data?.data);
   },
 
+  getRecentGurmatGuides: async () => {
+    const response = await apiClient.get('/kids-learning/gurmat-guide/recent');
+    return serviceResponse(Array.isArray(response.data?.data) ? response.data.data : []);
+  },
+
   getDefaultContent: () => normalizeKidsLearningContent(defaultKidsLearningContent)
 };
 
