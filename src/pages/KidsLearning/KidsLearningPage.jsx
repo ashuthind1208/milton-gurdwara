@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import PageHero from '../../components/common/PageHero';
 import Seo from '../../components/common/Seo';
@@ -6,6 +6,7 @@ import useSeoMeta from '../../hooks/useSeoMeta';
 import Card from '../../components/ui/Card';
 import BreadcrumbTrail from '../../components/common/BreadcrumbTrail';
 import GurmatLearningGuide from '../../components/kids/GurmatLearningGuide';
+import AiQuizFlashcards from '../../components/kids/AiQuizFlashcards';
 import kidsLearningService from '../../services/kidsLearningService';
 
 const todayDateOnly = () => {
@@ -32,43 +33,24 @@ const isPublishedNow = (item = {}) => {
 };
 
 const KidsLearningPage = () => {
-  const meta = useSeoMeta('Kids Learning', 'Weekly Sikh quizzes, stories, and Punjabi word cards for children.');
-  const [selectedQuizId, setSelectedQuizId] = useState('');
+  const meta = useSeoMeta('Kids Learning', 'AI-assisted Sikh quizzes, stories, and bilingual Gurmat vocabulary for children.');
 
   const { data } = useQuery({
     queryKey: ['kids-learning-content'],
     queryFn: () => kidsLearningService.getContent().then((res) => res.data)
   });
 
-  const publishedQuizzes = useMemo(
-    () => (Array.isArray(data?.quizzes) ? data.quizzes : []).filter((item) => isPublishedNow(item)),
-    [data?.quizzes]
-  );
-
   const publishedStories = useMemo(
     () => (Array.isArray(data?.stories) ? data.stories : []).filter((item) => isPublishedNow(item)),
     [data?.stories]
   );
 
-  const selectedQuiz = useMemo(
-    () => publishedQuizzes.find((item) => item.id === selectedQuizId) || null,
-    [publishedQuizzes, selectedQuizId]
-  );
-
   const breadcrumbItems = useMemo(() => {
-    const items = [
+    return [
       { label: 'Home', path: '/' },
-      { label: 'Kids Learning', path: '/kids-learning' }
+      { label: 'Kids Learning', path: '/kids-learning', isCurrent: true }
     ];
-
-    if (selectedQuizId) {
-      items.push({ label: 'Quiz', isCurrent: true });
-      return items;
-    }
-
-    items[items.length - 1] = { ...items[items.length - 1], isCurrent: true };
-    return items;
-  }, [selectedQuizId]);
+  }, []);
 
   return (
     <div className="space-y-8">
@@ -91,32 +73,7 @@ const KidsLearningPage = () => {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <h2 className="text-lg font-bold text-slate-900">Weekly Quizzes</h2>
-          <div className="mt-4 space-y-3">
-            {publishedQuizzes.map((quiz) => (
-              <button
-                key={quiz.id}
-                type="button"
-                onClick={() => setSelectedQuizId((current) => (current === quiz.id ? '' : quiz.id))}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-left transition hover:border-brand-blue/50"
-              >
-                <p className="text-sm font-bold text-slate-900">{quiz.title || 'Untitled Quiz'}</p>
-                <p className="mt-1 text-xs text-slate-600">Age Group: {quiz.ageGroup || 'All'}</p>
-                {selectedQuiz?.id === quiz.id ? (
-                  <div className="mt-3 space-y-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
-                    <p className="font-semibold">{quiz.question || 'Question pending'}</p>
-                    <ul className="list-disc pl-5">
-                      {(Array.isArray(quiz.options) ? quiz.options : []).map((option) => (
-                        <li key={`${quiz.id}-${option}`}>{option}</li>
-                      ))}
-                    </ul>
-                    {quiz.explanation ? <p className="text-xs text-slate-600">{quiz.explanation}</p> : null}
-                  </div>
-                ) : null}
-              </button>
-            ))}
-            {publishedQuizzes.length === 0 ? <p className="text-sm text-slate-500">No quizzes published yet.</p> : null}
-          </div>
+          <AiQuizFlashcards />
         </Card>
 
         <Card>

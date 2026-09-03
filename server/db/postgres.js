@@ -1787,8 +1787,6 @@ const searchPublicContent = async (queryText, options = {}) => {
         ('advertisements', '/admin/advertisements', 'Advertisements'),
         ('sponsors', '/admin/sponsors', 'Sponsors'),
         ('events', '/admin/events', 'Events'),
-        ('kids_learning', '/admin/kids-learning', 'Kids Learning'),
-        ('kids_learning_content', '/admin/kids-learning', 'Kids Learning'),
         ('subscribers', '/admin/newsletter', 'Newsletter'),
         ('newsletter_campaigns', '/admin/newsletter', 'Newsletter'),
         ('newsletter_topics', '/admin/newsletter', 'Newsletter'),

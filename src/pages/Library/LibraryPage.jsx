@@ -30,12 +30,12 @@ import eventService from '../../services/eventService';
 import { isLibraryProgramCurrent } from '../../utils/eventAvailability';
 import advertisementService from '../../services/advertisementService';
 import kidsLearningService from '../../services/kidsLearningService';
-import kidsQuizBankService from '../../services/kidsQuizBankService';
 import { getYouTubeEmbedUrl, getYouTubeThumbnail } from '../../services/videoService';
 import Button from '../../components/ui/Button';
 import { useAuth } from '../../context/AuthContext';
 import PhoneInput from '../../components/forms/PhoneInput';
 import GurmatLearningGuide from '../../components/kids/GurmatLearningGuide';
+import AiQuizFlashcards from '../../components/kids/AiQuizFlashcards';
 import { formatTenDigitPhone, isTenDigitPhone, TEN_DIGIT_PHONE_ERROR } from '../../utils/phone';
 
 const PAGE_SIZE = 10;
@@ -74,29 +74,6 @@ const getYouTubeVideoId = (url) => {
   const embedUrl = getYouTubeEmbedUrl(url);
   const match = embedUrl.match(/embed\/([A-Za-z0-9_-]{11})/);
   return match ? match[1] : '';
-};
-
-const resolveCorrectAnswerIndex = (question = {}) => {
-  const options = Array.isArray(question?.options) ? question.options : [];
-  const raw = Number(question?.correctAnswer);
-  if (Number.isFinite(raw) && raw >= 0 && raw < options.length) {
-    return raw;
-  }
-  if (Number.isFinite(raw) && raw >= 1 && raw <= options.length) {
-    return raw - 1;
-  }
-  return 0;
-};
-
-const getDifficultyRibbonClasses = (difficulty = '') => {
-  const normalized = String(difficulty || '').trim().toLowerCase();
-  if (normalized === 'hard') {
-    return 'border-rose-300 bg-rose-100 text-rose-800';
-  }
-  if (normalized === 'medium') {
-    return 'border-amber-300 bg-amber-100 text-amber-900';
-  }
-  return 'border-emerald-300 bg-emerald-100 text-emerald-800';
 };
 
 const loadYouTubeIFrameApi = (() => {
@@ -199,13 +176,6 @@ const LibraryPage = () => {
   const [issueModalBookId, setIssueModalBookId] = useState('');
   const [sessionModalId, setSessionModalId] = useState('');
   const [mediaModalId, setMediaModalId] = useState('');
-  const [flashCardQuestionIndex, setFlashCardQuestionIndex] = useState(0);
-  const [flashCardSelectedOption, setFlashCardSelectedOption] = useState(null);
-  const [flashCardFlipped, setFlashCardFlipped] = useState(false);
-  const [quizAnsweredCount, setQuizAnsweredCount] = useState(0);
-  const [quizCorrectCount, setQuizCorrectCount] = useState(0);
-  const [quizStreak, setQuizStreak] = useState(0);
-  const [quizBestStreak, setQuizBestStreak] = useState(0);
   const registrationDefaults = useMemo(() => ({
     name: String(user?.name || ''),
     email: String(user?.email || ''),
@@ -235,11 +205,6 @@ const LibraryPage = () => {
     queryFn: () => kidsLearningService.getContent().then((res) => res.data)
   });
 
-  const { data: quizBankQuestions = [] } = useQuery({
-    queryKey: ['kids-quiz-bank-filesystem'],
-    queryFn: () => kidsQuizBankService.getAllQuestions().then((res) => res.data)
-  });
-
   const physicalBooks = useMemo(() => libraryData?.physicalBooks || [], [libraryData]);
   const digitalResources = useMemo(() => libraryData?.digitalResources || [], [libraryData]);
   const programUpdates = useMemo(() => libraryData?.programUpdates || [], [libraryData]);
@@ -254,18 +219,6 @@ const LibraryPage = () => {
   const libraryFooterAdImageHeightClass = libraryFooterAds.length > 2 ? 'h-16 md:h-20' : 'h-24 md:h-28';
   const libraryTopAdsGridStyle = useMemo(() => ({ gridTemplateColumns: `repeat(${Math.max(1, libraryTopAds.length)}, minmax(0, 1fr))` }), [libraryTopAds.length]);
   const libraryFooterAdsGridStyle = useMemo(() => ({ gridTemplateColumns: `repeat(${Math.max(1, libraryFooterAds.length)}, minmax(0, 1fr))` }), [libraryFooterAds.length]);
-  const filteredFlashCardQuestions = useMemo(() => (Array.isArray(quizBankQuestions) ? quizBankQuestions : []), [quizBankQuestions]);
-  const flashCardQuestion = useMemo(() => {
-    if (!Array.isArray(filteredFlashCardQuestions) || filteredFlashCardQuestions.length === 0) {
-      return null;
-    }
-    const safeIndex = ((flashCardQuestionIndex % filteredFlashCardQuestions.length) + filteredFlashCardQuestions.length) % filteredFlashCardQuestions.length;
-    return filteredFlashCardQuestions[safeIndex];
-  }, [flashCardQuestionIndex, filteredFlashCardQuestions]);
-  const quizScoreOutOf100 = Math.min(100, quizCorrectCount * 10);
-  const quizProgressPercent = filteredFlashCardQuestions.length > 0
-    ? Math.min(100, ((Math.min(flashCardQuestionIndex, filteredFlashCardQuestions.length - 1) + 1) / filteredFlashCardQuestions.length) * 100)
-    : 0;
 
   const physicalTotalPages = Math.max(1, Math.ceil(physicalBooks.length / PAGE_SIZE));
   const digitalTotalPages = Math.max(1, Math.ceil(digitalResources.length / PAGE_SIZE));
@@ -471,60 +424,6 @@ const LibraryPage = () => {
     }
   });
 
-  const handleQuizAnswerClick = (optionIndex) => {
-    if (!flashCardQuestion || flashCardFlipped) {
-      return;
-    }
-
-    const correctIndex = resolveCorrectAnswerIndex(flashCardQuestion);
-    const isCorrect = optionIndex === correctIndex;
-
-    setFlashCardSelectedOption(optionIndex);
-    setFlashCardFlipped(true);
-    setQuizAnsweredCount((current) => current + 1);
-    if (isCorrect) {
-      setQuizCorrectCount((current) => current + 1);
-      setQuizStreak((current) => {
-        const next = current + 1;
-        setQuizBestStreak((best) => Math.max(best, next));
-        return next;
-      });
-    } else {
-      setQuizStreak(0);
-    }
-  };
-
-  const handleNextFlashCard = () => {
-    if (!Array.isArray(filteredFlashCardQuestions) || filteredFlashCardQuestions.length === 0) {
-      return;
-    }
-    setFlashCardQuestionIndex((current) => (current + 1) % filteredFlashCardQuestions.length);
-    setFlashCardSelectedOption(null);
-    setFlashCardFlipped(false);
-  };
-
-  const handlePreviousFlashCard = () => {
-    if (!Array.isArray(filteredFlashCardQuestions) || filteredFlashCardQuestions.length === 0) {
-      return;
-    }
-    setFlashCardQuestionIndex((current) => {
-      const total = filteredFlashCardQuestions.length;
-      return (current - 1 + total) % total;
-    });
-    setFlashCardSelectedOption(null);
-    setFlashCardFlipped(false);
-  };
-
-  const handleResetQuizSession = () => {
-    setFlashCardQuestionIndex(0);
-    setFlashCardSelectedOption(null);
-    setFlashCardFlipped(false);
-    setQuizAnsweredCount(0);
-    setQuizCorrectCount(0);
-    setQuizStreak(0);
-    setQuizBestStreak(0);
-  };
-
   return (
     <div className="space-y-8">
       <Seo {...meta} />
@@ -595,130 +494,7 @@ const LibraryPage = () => {
           </Card>
 
           <Card className="border border-violet-200/70 bg-gradient-to-br from-violet-100 via-white to-indigo-100">
-            <div className="flex items-center justify-between gap-2">
-              <h4 className="text-lg font-bold text-slate-900">Quiz Flashcard</h4>
-              <div className="flex items-center gap-1.5">
-                <span className="rounded-full bg-white/90 px-2.5 py-1 text-xs font-black text-violet-900 shadow-sm">Score {quizScoreOutOf100}/100</span>
-                <button
-                  type="button"
-                  onClick={handleResetQuizSession}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-violet-300 bg-white/90 text-sm font-black text-violet-900 transition hover:bg-violet-100"
-                  aria-label="Start over quiz"
-                  title="Start over"
-                >
-                  ↺
-                </button>
-              </div>
-            </div>
-            {flashCardQuestion ? (
-              <>
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                  <span className="rounded-full bg-white/80 px-2 py-1 font-semibold text-slate-700">Streak: {quizStreak}</span>
-                  <span className="rounded-full bg-white/80 px-2 py-1 font-semibold text-slate-700">Best: {quizBestStreak}</span>
-                  <span className="rounded-full bg-white/80 px-2 py-1 font-semibold text-slate-700">Answered: {quizAnsweredCount}</span>
-                </div>
-
-                <div className="mt-3">
-                  <div className="mb-1 flex items-center justify-between text-[11px] font-semibold text-slate-700">
-                    <span>{Math.min(flashCardQuestionIndex + 1, filteredFlashCardQuestions.length)} / {filteredFlashCardQuestions.length}</span>
-                    <span>{Math.round(quizProgressPercent)}%</span>
-                  </div>
-                  <div className="h-2.5 overflow-hidden rounded-full bg-white/80">
-                    <div
-                      className="h-full rounded-full transition-all"
-                      style={{
-                        width: `${quizProgressPercent}%`,
-                        background: 'linear-gradient(90deg, #16a34a 0%, #eab308 55%, #dc2626 100%)'
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-2 flex items-center justify-between gap-2 text-xs">
-                  <p className="text-slate-600">{flashCardQuestion.category}</p>
-                  <span
-                    className={`inline-flex rounded-full border px-2 py-0.5 font-black uppercase tracking-wide ${getDifficultyRibbonClasses(flashCardQuestion?.difficulty)}`}
-                    aria-label={`Difficulty ${flashCardQuestion?.difficulty || 'Easy'}`}
-                  >
-                    {flashCardQuestion?.difficulty || 'Easy'}
-                  </span>
-                </div>
-                <div className="mt-3" style={{ perspective: '1200px' }}>
-                  <div
-                    className="relative min-h-[300px] w-full transition-transform duration-500"
-                    style={{ transformStyle: 'preserve-3d', transform: flashCardFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
-                  >
-                    <div className="absolute inset-0 rounded-xl border border-violet-200 bg-white p-4 pb-6" style={{ backfaceVisibility: 'hidden' }}>
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm font-bold text-slate-900">{flashCardQuestion.question?.en || 'Question'}</p>
-                        <div className="inline-flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={handlePreviousFlashCard}
-                            className="inline-flex h-6 w-6 items-center justify-center rounded border border-violet-300 bg-violet-50 text-xs font-black text-violet-800 transition hover:bg-violet-100"
-                            aria-label="Previous flashcard"
-                            title="Previous"
-                          >
-                            &lt;
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleNextFlashCard}
-                            className="inline-flex h-6 w-6 items-center justify-center rounded border border-violet-300 bg-violet-50 text-xs font-black text-violet-800 transition hover:bg-violet-100"
-                            aria-label="Next flashcard"
-                            title="Next"
-                          >
-                            &gt;
-                          </button>
-                        </div>
-                      </div>
-                      <p className="mt-1 text-sm text-slate-600">{flashCardQuestion.question?.pa || ''}</p>
-                      <div className="mt-4 space-y-2">
-                        {(Array.isArray(flashCardQuestion.options) ? flashCardQuestion.options : []).map((option, optionIndex) => (
-                          <button
-                            key={`${flashCardQuestion.id}-option-${optionIndex}`}
-                            type="button"
-                            onClick={() => handleQuizAnswerClick(optionIndex)}
-                            className="block w-full rounded-lg border border-slate-300 bg-slate-50 px-2 py-1.5 text-left text-sm text-slate-700 transition hover:border-violet-400 hover:bg-violet-50"
-                          >
-                            <span className="font-semibold">{option.en}</span>
-                            <span className="ml-1 text-xs text-slate-600">({option.pa})</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="absolute inset-0 rounded-xl border border-violet-300 bg-violet-50 p-4 pb-6" style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
-                      <p className="text-sm font-black text-violet-900">Answer Revealed</p>
-                      <p className="mt-2 text-sm text-slate-800">
-                        Correct: {(flashCardQuestion.options?.[resolveCorrectAnswerIndex(flashCardQuestion)]?.en) || '-'}
-                      </p>
-                      {flashCardSelectedOption !== null ? (
-                        flashCardSelectedOption === resolveCorrectAnswerIndex(flashCardQuestion) ? (
-                          <p className="mt-2 text-xs font-bold text-emerald-700">Correct answer selected.</p>
-                        ) : (
-                          <p className="mt-2 text-xs font-bold text-rose-700">
-                            Wrong answer selected: {(flashCardQuestion.options?.[flashCardSelectedOption]?.en) || '-'}
-                          </p>
-                        )
-                      ) : null}
-                      <p className="mt-2 text-sm text-slate-700">{flashCardQuestion.explanation?.en || ''}</p>
-                      <p className="mt-1 text-sm text-slate-600">{flashCardQuestion.explanation?.pa || ''}</p>
-                      <div className="mt-3 flex justify-end">
-                        <button
-                          type="button"
-                          onClick={handleNextFlashCard}
-                          className="rounded border border-violet-300 bg-white px-2 py-1 text-xs font-semibold text-violet-900 transition hover:bg-violet-100"
-                        >
-                          Next &gt;
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <p className="mt-2 text-sm text-slate-500">No quiz questions available.</p>
-            )}
+            <AiQuizFlashcards />
           </Card>
 
         </div>

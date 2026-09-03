@@ -225,7 +225,7 @@ const searchPublicContent = async (queryText, options = {}) => {
     langar_items: ['/admin/langar', 'Seva Items'], seva_opportunities: ['/admin/seva-opportunities', 'Seva Opportunities'],
     volunteer_registrations: ['/admin/seva-opportunities', 'Seva Opportunities'], gallery_albums: ['/admin/gallery', 'Gallery Folders'],
     videos: ['/admin/videos', 'Videos'], streaming_configs: ['/admin/streaming', 'Streaming'], advertisements: ['/admin/advertisements', 'Advertisements'],
-    sponsors: ['/admin/sponsors', 'Sponsors'], kids_learning: ['/admin/kids-learning', 'Kids Learning'], kids_learning_content: ['/admin/kids-learning', 'Kids Learning'],
+    sponsors: ['/admin/sponsors', 'Sponsors'],
     subscribers: ['/admin/newsletter', 'Newsletter'], newsletter_campaigns: ['/admin/newsletter', 'Newsletter'], newsletter_topics: ['/admin/newsletter', 'Newsletter'],
     library_physical_books: ['/admin/library', 'Library'], library_digital_resources: ['/admin/library', 'Library'],
     library_program_updates: ['/admin/library', 'Library'], library_media_resources: ['/admin/library', 'Library'], roles_access: ['/admin/roles-access', 'Roles and Access'],

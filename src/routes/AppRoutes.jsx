@@ -47,7 +47,6 @@ const AdminBookingDutiesPage = lazy(() => import('../admin/BookingDuties/AdminBo
 const AdminDonationsPage = lazy(() => import('../admin/Donations/AdminDonationsPage'));
 const AdminUsersPage = lazy(() => import('../admin/Users/AdminUsersPage'));
 const AdminRolesAccessPage = lazy(() => import('../admin/RolesAccess/AdminRolesAccessPage'));
-const AdminKidsLearningPage = lazy(() => import('../admin/KidsLearning/AdminKidsLearningPage'));
 const AdminNewsletterPage = lazy(() => import('../admin/Newsletter/AdminNewsletterPage'));
 const AdminAuditTrailPage = lazy(() => import('../admin/AuditTrail/AdminAuditTrailPage'));
 
@@ -112,7 +111,6 @@ const AppRoutes = () => {
             <Route element={<ProtectedRoute allowedRoles={ROLES_ACCESS_ALLOWED_ROLES} allowAssignedAdminAccess={false} />}>
               <Route path="/admin/roles-access" element={<AdminRolesAccessPage />} />
             </Route>
-            <Route path="/admin/kids-learning" element={<AdminKidsLearningPage />} />
             <Route path="/admin/audit-trail" element={<AdminAuditTrailPage />} />
           </Route>
         </Route>

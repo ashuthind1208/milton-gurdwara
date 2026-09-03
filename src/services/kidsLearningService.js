@@ -273,6 +273,11 @@ const kidsLearningService = {
     return serviceResponse(Array.isArray(response.data?.data) ? response.data.data : []);
   },
 
+  generateAiQuiz: async ({ topic, difficulty }) => {
+    const response = await apiClient.post('/kids-learning/ai-quiz', { topic, difficulty }, { timeout: 75000 });
+    return serviceResponse(response.data?.data);
+  },
+
   getDefaultContent: () => normalizeKidsLearningContent(defaultKidsLearningContent)
 };
 

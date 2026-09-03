@@ -147,7 +147,6 @@ const adminPageByTargetType = {
   schedule: '/admin/schedule',
   sponsor: '/admin/sponsors',
   advertisement: '/admin/advertisements',
-  kids: '/admin/kids-learning',
   langar: '/admin/langar'
 };
 
@@ -430,7 +429,6 @@ const iconByPath = {
   '/admin/events': QueueListIcon,
   '/admin/bookings': CalendarDaysIcon,
   '/admin/booking-duties': UserGroupIcon,
-  '/admin/kids-learning': BookOpenIcon,
   '/admin/phase2-config': SparklesIcon,
   '/admin/donations': CurrencyDollarIcon,
   '/admin/audit-trail': BellAlertIcon,

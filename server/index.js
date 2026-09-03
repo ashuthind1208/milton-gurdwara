@@ -20,6 +20,8 @@ const {
   listRecentGurmatGuides,
   storeGurmatGuide
 } = require('./gurmatGuideStore');
+const { createAiQuiz } = require('./aiQuiz');
+const { findDailyAiQuiz, storeDailyAiQuiz } = require('./aiQuizStore');
 
 const loadEnvFile = (filePath) => {
   if (!fs.existsSync(filePath)) {
@@ -437,7 +439,6 @@ const ADMIN_PAGE_PATHS = [
   '/admin/sponsors',
   '/admin/events',
   '/admin/booking-duties',
-  '/admin/kids-learning',
   '/admin/donations',
   '/admin/newsletter',
   '/admin/audit-trail',
@@ -5725,6 +5726,43 @@ const server = http.createServer(async (request, response) => {
       sendJson(response, error.status || 500, {
         ok: false,
         message: error.message || 'Unable to load recent words.'
+      });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/kids-learning/ai-quiz' && request.method === 'POST') {
+    try {
+      assertInput(eventsDb.hasDatabaseConnection, 'The AI quiz database is unavailable.', 503);
+      const payload = await parseJsonObjectBody(request, { maxBytes: 4 * 1024, allowEmpty: false });
+      ensureNoUnknownKeys(payload, ['topic', 'difficulty']);
+      const topic = readStringField(payload, 'topic', { required: true, min: 2, max: 60 });
+      const difficulty = readStringField(payload, 'difficulty', { required: true, min: 4, max: 10 });
+      const storedQuiz = await findDailyAiQuiz(eventsDb, topic, difficulty);
+      if (storedQuiz) {
+        sendJson(response, 200, { ok: true, data: storedQuiz });
+        return;
+      }
+
+      const aiRateLimit = evaluateFixedWindowLimit(
+        fixedWindowRateState,
+        `kids-ai-quiz:${resolveClientIp(request) || 'unknown-ip'}`,
+        rateLimitConfig.gurmatAiMaxRequests,
+        rateLimitConfig.gurmatAiWindowMs,
+        Date.now()
+      );
+      if (aiRateLimit.limited) {
+        sendRateLimitExceeded(response, aiRateLimit.retryAfterMs, 'The free AI quiz limit has been reached. Please try again later.', 'kids-ai-quiz');
+        return;
+      }
+
+      const generatedQuiz = await createAiQuiz(topic, difficulty);
+      const data = await storeDailyAiQuiz(eventsDb, generatedQuiz);
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, error.status || 500, {
+        ok: false,
+        message: error.message || 'Unable to create the AI quiz.'
       });
     }
     return;
