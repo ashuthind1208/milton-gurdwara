@@ -35,6 +35,7 @@ import { getYouTubeEmbedUrl, getYouTubeThumbnail } from '../../services/videoSer
 import Button from '../../components/ui/Button';
 import { useAuth } from '../../context/AuthContext';
 import PhoneInput from '../../components/forms/PhoneInput';
+import GurmatLearningGuide from '../../components/kids/GurmatLearningGuide';
 import { formatTenDigitPhone, isTenDigitPhone, TEN_DIGIT_PHONE_ERROR } from '../../utils/phone';
 
 const PAGE_SIZE = 10;
@@ -610,6 +611,8 @@ const LibraryPage = () => {
                     </div>
                   </div>
                 ) : null}
+
+                <GurmatLearningGuide compact />
               </div>
             ) : null}
           </Card>
