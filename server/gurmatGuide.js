@@ -135,7 +135,10 @@ const requestOllamaGuide = async ({ baseUrl, fetchImpl, model, prompt, signal })
   }
 
   const payload = await response.json();
-  return readJsonObject(payload?.message?.content);
+  return {
+    generated: readJsonObject(payload?.message?.content),
+    model
+  };
 };
 
 const requestGeminiGuide = async ({ apiKey, baseUrl, fetchImpl, model, prompt, signal }) => {
@@ -145,12 +148,13 @@ const requestGeminiGuide = async ({ apiKey, baseUrl, fetchImpl, model, prompt, s
     throw error;
   }
 
-  const response = await fetchImpl(`${baseUrl}/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+  const headers = {
+    'Content-Type': 'application/json',
+    'x-goog-api-key': apiKey
+  };
+  const requestModel = (modelName) => fetchImpl(`${baseUrl}/v1beta/models/${encodeURIComponent(modelName)}:generateContent`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': apiKey
-    },
+    headers,
     body: JSON.stringify({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: {
@@ -161,6 +165,36 @@ const requestGeminiGuide = async ({ apiKey, baseUrl, fetchImpl, model, prompt, s
     signal
   });
 
+  let resolvedModel = model;
+  let response = await requestModel(resolvedModel);
+
+  if (response.status === 404) {
+    const modelsResponse = await fetchImpl(`${baseUrl}/v1beta/models?pageSize=100`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey
+      },
+      signal
+    });
+
+    if (modelsResponse.ok) {
+      const modelsPayload = await modelsResponse.json();
+      const availableModels = (Array.isArray(modelsPayload?.models) ? modelsPayload.models : [])
+        .filter((entry) => Array.isArray(entry.supportedGenerationMethods) && entry.supportedGenerationMethods.includes('generateContent'))
+        .map((entry) => String(entry.name || '').replace(/^models\//, ''))
+        .filter((name) => name.startsWith('gemini-'));
+      resolvedModel = availableModels.find((name) => name.includes('flash-lite'))
+        || availableModels.find((name) => name.includes('flash'))
+        || availableModels[0]
+        || model;
+
+      if (resolvedModel !== model) {
+        response = await requestModel(resolvedModel);
+      }
+    }
+  }
+
   if (!response.ok) {
     const error = new Error(response.status === 429
       ? 'The free AI lesson limit has been reached. Please try again later.'
@@ -170,7 +204,10 @@ const requestGeminiGuide = async ({ apiKey, baseUrl, fetchImpl, model, prompt, s
   }
 
   const payload = await response.json();
-  return readJsonObject(payload?.candidates?.[0]?.content?.parts?.[0]?.text);
+  return {
+    generated: readJsonObject(payload?.candidates?.[0]?.content?.parts?.[0]?.text),
+    model: resolvedModel
+  };
 };
 
 const createGurmatGuide = async (wordValue, options = {}) => {
@@ -195,16 +232,17 @@ const createGurmatGuide = async (wordValue, options = {}) => {
       prompt: createPrompt(word),
       signal: controller.signal
     };
-    const generated = isGemini
+    const modelResponse = isGemini
       ? await requestGeminiGuide(requestOptions)
       : await requestOllamaGuide(requestOptions);
+    const generated = modelResponse.generated;
     validateGeneratedGuide(generated);
     const trustedLine = TRUSTED_GURBANI_LINES.find((line) => line.id === generated.gurbaniId) || TRUSTED_GURBANI_LINES[0];
 
     return {
       requestedWord: word,
       provider,
-      model,
+      model: modelResponse.model,
       wordPunjabi: limitText(generated.wordPunjabi, 80),
       wordTransliteration: limitText(generated.wordTransliteration, 80),
       wordEnglish: limitText(generated.wordEnglish, 80),

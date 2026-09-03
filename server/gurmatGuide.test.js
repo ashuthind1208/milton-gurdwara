@@ -100,3 +100,57 @@ test('uses the Gemini API without placing the key in the URL', async () => {
   assert.equal(capturedHeaders['x-goog-api-key'], 'test-secret');
   assert.equal(guide.gurbani.id, 'aad-sach');
 });
+
+test('discovers and retries an available Gemini Flash model after a 404', async () => {
+  const requestedUrls = [];
+  const fetchImpl = async (url) => {
+    requestedUrls.push(url);
+    if (url.includes('gemini-missing:generateContent')) {
+      return { ok: false, status: 404 };
+    }
+    if (url.includes('/v1beta/models?pageSize=100')) {
+      return {
+        ok: true,
+        json: async () => ({
+          models: [{
+            name: 'models/gemini-available-flash',
+            supportedGenerationMethods: ['generateContent']
+          }]
+        })
+      };
+    }
+    return {
+      ok: true,
+      json: async () => ({
+        candidates: [{
+          content: {
+            parts: [{
+              text: JSON.stringify({
+                gurbaniId: 'mool-mantar',
+                wordPunjabi: 'ਸੇਵਾ',
+                wordTransliteration: 'Seva',
+                wordEnglish: 'Service',
+                meaningEnglish: 'Helping others.',
+                meaningPunjabi: 'ਦੂਜਿਆਂ ਦੀ ਮਦਦ ਕਰਨੀ।',
+                importanceEnglish: 'Service builds kindness.',
+                importancePunjabi: 'ਸੇਵਾ ਦਇਆ ਵਧਾਉਂਦੀ ਹੈ।',
+                reflectionQuestion: 'How can you help today?'
+              })
+            }]
+          }
+        }]
+      })
+    };
+  };
+
+  const guide = await createGurmatGuide('Seva', {
+    provider: 'gemini',
+    apiKey: 'test-secret',
+    model: 'gemini-missing',
+    fetchImpl,
+    timeoutMs: 100
+  });
+
+  assert.equal(guide.model, 'gemini-available-flash');
+  assert.equal(requestedUrls.length, 3);
+});
