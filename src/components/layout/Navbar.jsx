@@ -2527,9 +2527,9 @@ const Navbar = () => {
                         <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Seva Applications</p>
                         <p className="mt-0.5 text-base font-black leading-none text-brand-blue">{familySummary.sevaCount}</p>
                       </div>
-                      <div className="flex h-[62px] min-w-0 flex-col justify-center rounded-xl border border-amber-200 bg-white px-2 py-1.5">
+                      <div className="flex min-h-[62px] min-w-0 flex-col justify-center rounded-xl border border-amber-200 bg-white px-2 py-1.5">
                         <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Upcoming Booking</p>
-                        <p className="mt-0.5 truncate text-xs font-black leading-tight text-brand-blue">{upcomingBooking?.title || upcomingBooking?.categoryName || 'None scheduled'}</p>
+                        <p className="mt-0.5 break-words text-xs font-black leading-normal text-brand-blue">{upcomingBooking?.title || upcomingBooking?.categoryName || 'None scheduled'}</p>
                         <p className="mt-0.5 text-[10px] font-semibold text-amber-700">{upcomingBooking?.date || 'No upcoming date'}</p>
                       </div>
                     </div>
@@ -3036,7 +3036,7 @@ const Navbar = () => {
                 </div>
                 <div className="min-w-0 rounded-xl border border-amber-200 bg-white px-2.5 py-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Upcoming Booking</p>
-                  <p className="mt-1 truncate text-xs font-black leading-tight text-brand-blue">{upcomingBooking?.title || upcomingBooking?.categoryName || 'None scheduled'}</p>
+                  <p className="mt-1 break-words text-xs font-black leading-normal text-brand-blue">{upcomingBooking?.title || upcomingBooking?.categoryName || 'None scheduled'}</p>
                   <p className="mt-0.5 text-[10px] font-semibold text-amber-700">{upcomingBooking?.date || 'No upcoming date'}</p>
                 </div>
               </div>
