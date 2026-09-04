@@ -44,9 +44,13 @@ const AskGranthiQuestionPage = () => {
       <style>{`
         @keyframes granthi-mobile-think { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-7px) rotate(2deg); } }
         @keyframes granthi-mobile-dot { 0%, 70%, 100% { opacity: .25; } 35% { opacity: 1; } }
+        @keyframes granthi-mobile-orbit { from { transform: rotate(0deg) translateX(48px) rotate(0deg); } to { transform: rotate(360deg) translateX(48px) rotate(-360deg); } }
+        @keyframes granthi-mobile-ring { 0%, 100% { transform: scale(.92); opacity: .35; } 50% { transform: scale(1.08); opacity: .85; } }
         .granthi-mobile-thinking { animation: granthi-mobile-think 1.7s ease-in-out infinite; }
         .granthi-mobile-dot { animation: granthi-mobile-dot 1.1s ease-in-out infinite; }
-        @media (prefers-reduced-motion: reduce) { .granthi-mobile-thinking, .granthi-mobile-dot { animation: none; } }
+        .granthi-mobile-orbit { animation: granthi-mobile-orbit 2.8s linear infinite; }
+        .granthi-mobile-ring { animation: granthi-mobile-ring 2s ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) { .granthi-mobile-thinking, .granthi-mobile-dot, .granthi-mobile-orbit, .granthi-mobile-ring { animation: none; } }
       `}</style>
       <img src={khandaMark} alt="" aria-hidden="true" className="pointer-events-none absolute -right-24 top-24 w-96 opacity-[0.045]" />
 
@@ -96,6 +100,7 @@ const AskGranthiQuestionPage = () => {
               <h2 className="mt-2 font-heading text-2xl font-bold leading-tight">{answer.question}</h2>
             </div>
             <div className="space-y-4 p-5">
+              <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold leading-5 text-slate-600">AI-assisted response for educational purposes. Please verify Gurbani references with trusted sources and consult a Granthi Ji for guidance.</p>
               <article>
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Punjabi (ਪੰਜਾਬੀ)</p>
                 <p className="mt-2 font-gurmukhi text-lg font-semibold leading-8 text-[color:var(--granthi-primary)]">{answer.answerPunjabi}</p>
@@ -126,9 +131,14 @@ const AskGranthiQuestionPage = () => {
       {askMutation.isPending ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 px-5 backdrop-blur-md" role="status" aria-live="polite">
           <div className="w-full max-w-sm rounded-md border border-[color:var(--granthi-accent)]/50 bg-[color:var(--granthi-primary)] p-7 text-center shadow-2xl">
-            <img src={logoSrc} alt="" className="granthi-mobile-thinking mx-auto h-24 w-24 rounded-full border-2 border-[color:var(--granthi-accent)] bg-white object-cover" />
+            <div className="relative mx-auto flex h-32 w-32 items-center justify-center">
+              <span className="granthi-mobile-ring absolute inset-1 rounded-full border border-[color:var(--granthi-accent)]/60" />
+              <span className="granthi-mobile-ring absolute inset-4 rounded-full border border-white/30" style={{ animationDelay: '300ms' }} />
+              <span className="granthi-mobile-orbit absolute left-1/2 top-1/2 h-3 w-3 rounded-full bg-[color:var(--granthi-accent)]" />
+              <img src={logoSrc} alt="" className="granthi-mobile-thinking relative h-20 w-20 rounded-full border-2 border-[color:var(--granthi-accent)] bg-white object-cover" />
+            </div>
             <h2 className="mt-5 font-heading text-2xl font-bold text-white">Please wait</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-200">Finding a thoughtful answer and sharing it with the main screen.</p>
+            <p className="mt-2 text-sm leading-6 text-slate-200">Receiving wisdom from the Holy Abode and preparing a thoughtful answer.</p>
             <div className="mt-5 flex justify-center gap-2" aria-hidden="true">
               {[0, 1, 2].map((index) => <span key={index} className="granthi-mobile-dot h-2.5 w-2.5 rounded-full bg-[color:var(--granthi-accent)]" style={{ animationDelay: `${index * 150}ms` }} />)}
             </div>

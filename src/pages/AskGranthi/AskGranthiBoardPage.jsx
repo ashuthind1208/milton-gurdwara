@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { QRCodeSVG } from 'qrcode.react';
-import { ArrowsPointingOutIcon, BookOpenIcon, DevicePhoneMobileIcon, LightBulbIcon } from '@heroicons/react/24/outline';
+import { ArrowsPointingOutIcon, BookOpenIcon, DevicePhoneMobileIcon } from '@heroicons/react/24/outline';
 import Seo from '../../components/common/Seo';
 import askGranthiService from '../../services/askGranthiService';
 import { useBranding } from '../../context/BrandingContext';
@@ -130,10 +130,12 @@ const AskGranthiBoardPage = () => {
       <style>{`
         @keyframes granthi-think { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.2%); } }
         @keyframes granthi-dot { 0%, 60%, 100% { opacity: .25; } 30% { opacity: 1; } }
+        @keyframes granthi-fetch { 0% { transform: translateX(-110%); } 100% { transform: translateX(330%); } }
         @keyframes granthi-answer-in { from { opacity: 0; } to { opacity: 1; } }
         @keyframes granthi-faq-ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
         .granthi-thinking { animation: granthi-think 1.8s ease-in-out infinite; }
         .granthi-dot { animation: granthi-dot 1.2s ease-in-out infinite; }
+        .granthi-fetch { animation: granthi-fetch 1.8s ease-in-out infinite; }
         .granthi-answer { animation: granthi-answer-in .4s ease-out both; }
         .granthi-faq-ticker { animation: granthi-faq-ticker 28s linear infinite; will-change: transform; }
         @media (prefers-reduced-motion: reduce) { .granthi-thinking, .granthi-dot, .granthi-answer, .granthi-faq-ticker { animation: none; } }
@@ -181,7 +183,7 @@ const AskGranthiBoardPage = () => {
               </div>
 
               <div className="justify-self-end bg-[#fffdf8] p-[6%] text-center text-slate-900 shadow-2xl">
-                <QRCodeSVG value={questionUrl} size={260} level="M" marginSize={1} fgColor={branding.primaryColor} bgColor="#fffdf8" className="h-auto w-[16vw] min-w-[150px] max-w-[270px]" />
+                <QRCodeSVG value={questionUrl} size={260} level="M" marginSize={1} fgColor="#111827" bgColor="#fffdf8" className="h-auto w-[16vw] min-w-[150px] max-w-[270px]" />
                 <div className="mt-[6%] flex items-center justify-center gap-[.7vw] bg-[color:var(--granthi-primary)] px-[5%] py-[5%] text-white">
                   <DevicePhoneMobileIcon className="h-[2vw] min-h-6 w-[2vw] min-w-6" />
                   <p className="text-left text-[clamp(10px,.84vw,16px)] font-bold leading-tight">Scan with your<br />phone camera</p>
@@ -223,9 +225,10 @@ const AskGranthiBoardPage = () => {
               </div>
             </div>
             <div className="flex flex-col items-center justify-center p-[7%] text-center">
-              <p className="text-[clamp(12px,1vw,19px)] font-bold uppercase tracking-[.15em] text-blue-800">Please wait</p>
+              <div className="w-full max-w-[78%] overflow-hidden rounded-full bg-slate-300/70" aria-hidden="true"><span className="granthi-fetch block h-1.5 w-1/3 rounded-full bg-[color:var(--granthi-primary)]" /></div>
+              <p className="mt-[3%] text-[clamp(12px,1vw,19px)] font-bold uppercase tracking-[.15em] text-slate-900">Please wait</p>
               <h1 className="mt-[3%] font-heading text-[clamp(30px,3.5vw,62px)] font-bold leading-tight text-[color:var(--granthi-primary)]">{activeQuestion.question}</h1>
-              <p className="mt-[5%] max-w-[80%] text-[clamp(15px,1.45vw,27px)] leading-relaxed text-slate-700">Granthi Ji is preparing a thoughtful bilingual answer for the Sangat.</p>
+              <p className="mt-[5%] max-w-[80%] text-[clamp(15px,1.45vw,27px)] leading-relaxed text-slate-700">Receiving wisdom from the Holy Abode and preparing a thoughtful bilingual answer for the Sangat.</p>
             </div>
           </div>
         ) : (
@@ -235,40 +238,35 @@ const AskGranthiBoardPage = () => {
               <span className="ml-4 shrink-0 text-[clamp(10px,.8vw,15px)] font-bold text-amber-200">Main screen in {secondsRemaining}s</span>
             </header>
 
-            <section className="grid min-h-0 grid-cols-[24%_56%_20%] gap-[1.1%] p-[1.5%]">
+            <section className="grid min-h-0 grid-cols-[24%_76%] gap-[1.1%] p-[2.2%]">
               <aside className="relative min-h-0 overflow-hidden rounded-md border border-[#cdbd9f] bg-[#d7c5a7]">
                 <img src={granthiAnswerPortrait} alt="Granthi Ji sharing the answer" className="absolute inset-x-[2.5%] bottom-[4%] h-[95%] w-[95%] object-contain object-bottom drop-shadow-xl" />
                 <div className="absolute inset-x-[5%] bottom-[4%] flex items-center gap-[5%] bg-[#f4ead7]/95 p-[4%] shadow-xl">
-                  <QRCodeSVG value={questionUrl} size={58} level="M" marginSize={0} fgColor={branding.primaryColor} bgColor="#f4ead7" className="h-auto w-[25%]" />
+                  <QRCodeSVG value={questionUrl} size={58} level="M" marginSize={0} fgColor="#111827" bgColor="#f4ead7" className="h-auto w-[25%]" />
                   <div><p className="text-[clamp(9px,.72vw,14px)] font-bold text-[color:var(--granthi-primary)]">Ask your question</p><p className="text-[clamp(8px,.58vw,11px)]">Scan QR code</p></div>
                 </div>
               </aside>
 
-              <div className="grid min-w-0 grid-rows-[28%_30%_42%] gap-[1.8%]">
-                <article className="overflow-hidden rounded-md border border-[#ded2bc] bg-[#fffdf8] p-[2.5%] shadow-sm">
-                  <span className="inline-block bg-emerald-700 px-[2%] py-[.7%] text-[clamp(10px,.78vw,15px)] font-bold text-white">English Answer</span>
-                  <p className="mt-[1.5%] line-clamp-4 text-[clamp(13px,1.16vw,22px)] font-bold leading-[1.4] text-slate-900">{activeQuestion.answerEnglish}</p>
-                </article>
-                <article className="overflow-hidden rounded-md border border-[#ded2bc] bg-[#fffdf8] p-[2.5%] shadow-sm">
-                  <span className="inline-block bg-blue-800 px-[2%] py-[.7%] text-[clamp(10px,.78vw,15px)] font-bold text-white">Punjabi (ਪੰਜਾਬੀ)</span>
-                  <p className="mt-[1.5%] line-clamp-4 font-gurmukhi text-[clamp(14px,1.28vw,24px)] font-bold leading-[1.45] text-[color:var(--granthi-primary)]">{activeQuestion.answerPunjabi}</p>
-                </article>
-                <article className="overflow-hidden rounded-md border border-[#ded2bc] bg-[#fffdf8] p-[2.5%] shadow-sm">
+              <div className="grid min-w-0 grid-rows-[45%_55%] gap-[1.8%]">
+                <article className="overflow-hidden rounded-md border border-[#ded2bc] bg-[#fffdf8] p-[3.5%] shadow-sm">
                   <span className="inline-block bg-violet-800 px-[2%] py-[.7%] text-[clamp(10px,.78vw,15px)] font-bold text-white">Gurbani Reference</span>
                   {activeQuestion.gurbani ? <><p className="mt-[1.2%] line-clamp-2 font-gurmukhi text-[clamp(14px,1.25vw,23px)] font-bold leading-[1.35] text-[color:var(--granthi-primary)]">{activeQuestion.gurbani.gurmukhi}</p><p className="mt-[.7%] text-[clamp(10px,.75vw,14px)] font-bold text-violet-800">{activeQuestion.gurbani.source}</p><p className="mt-[.8%] font-gurmukhi text-[clamp(10px,.78vw,15px)] font-semibold leading-[1.35] text-slate-800"><span className="font-bold text-violet-800">ਪੰਜਾਬੀ ਅਰਥ: </span>{activeQuestion.gurbani.translationPunjabi}</p><p className="mt-[.6%] text-[clamp(10px,.76vw,14px)] font-semibold leading-[1.35] text-slate-700"><span className="font-bold text-violet-800">English: </span>{activeQuestion.gurbani.translationEnglish}</p></> : <p className="mt-[3%] text-[clamp(12px,.95vw,18px)] font-bold text-red-800">Gurbani reference required. This answer is awaiting review.</p>}
                 </article>
+                <div className="grid min-h-0 grid-cols-2 gap-[1.8%]">
+                  <article className="overflow-hidden rounded-md border border-[#ded2bc] bg-[#fffdf8] p-[3.5%] shadow-sm">
+                    <span className="inline-block bg-emerald-700 px-[2%] py-[.7%] text-[clamp(10px,.78vw,15px)] font-bold text-white">English Answer</span>
+                    <p className="mt-[1.5%] line-clamp-5 text-[clamp(13px,1.16vw,22px)] font-bold leading-[1.4] text-slate-900">{activeQuestion.answerEnglish}</p>
+                  </article>
+                  <article className="overflow-hidden rounded-md border border-[#ded2bc] bg-[#fffdf8] p-[3.5%] shadow-sm">
+                    <span className="inline-block bg-slate-900 px-[2%] py-[.7%] text-[clamp(10px,.78vw,15px)] font-bold text-white">Punjabi (ਪੰਜਾਬੀ)</span>
+                    <p className="mt-[1.5%] line-clamp-5 font-gurmukhi text-[clamp(14px,1.28vw,24px)] font-bold leading-[1.45] text-slate-900">{activeQuestion.answerPunjabi}</p>
+                  </article>
+                </div>
               </div>
-
-              <aside className="flex min-h-0 flex-col items-center justify-center rounded-md border border-[#ded2bc] bg-[#f6ead4] p-[10%] text-center shadow-sm">
-                <LightBulbIcon className="h-[4vw] max-h-16 min-h-10 w-[4vw] max-w-16 min-w-10 text-[color:var(--granthi-accent)]" />
-                <p className="mt-[9%] text-[clamp(10px,.82vw,16px)] font-bold uppercase tracking-[.08em] text-[color:var(--granthi-primary)]">Key Takeaway</p>
-                <p className="mt-[10%] text-[clamp(11px,1vw,19px)] font-semibold leading-[1.55] text-slate-800">{activeQuestion.shortAnswer || activeQuestion.answerEnglish}</p>
-                <BookOpenIcon className="mt-auto h-[4vw] max-h-16 min-h-10 w-[4vw] max-w-16 min-w-10 text-[#9a6a2c]" />
-              </aside>
             </section>
 
             <footer className="flex items-center justify-between bg-[color:var(--granthi-primary)] px-[2.4%] text-[clamp(9px,.72vw,14px)] text-slate-200">
-              <span>Guru's Bani is the Light that illuminates our path.</span><span className="font-heading text-[clamp(12px,1vw,19px)] font-bold text-white">{formatTime(now)}</span>
+              <span>AI-assisted response for educational purposes. Please verify Gurbani references with trusted sources.</span><span className="font-heading text-[clamp(12px,1vw,19px)] font-bold text-white">{formatTime(now)}</span>
             </footer>
           </div>
         )}
