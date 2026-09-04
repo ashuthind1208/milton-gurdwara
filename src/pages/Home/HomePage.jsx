@@ -585,8 +585,13 @@ const HomePage = () => {
         <div className="min-w-0 grid gap-3 lg:grid-cols-[1.5fr_0.85fr]">
           <div className="min-w-0 space-y-3">
             <div className="rounded-xl border border-brand-blue/20 bg-white px-5 py-4">
-              <div>
+              <div className="flex flex-wrap items-start justify-between gap-3">
                 <SectionTitle title="Daily Hukamnama" subtitle="Today's Gurbani with translation." />
+                <div className="flex flex-wrap justify-end gap-1.5 text-[11px] font-semibold text-slate-600">
+                  {activeHukamnama?.ang ? <span className="rounded-full bg-slate-100 px-2 py-1">Ang {activeHukamnama.ang}</span> : null}
+                  {activeHukamnama?.metadata?.raag ? <span className="rounded-full bg-slate-100 px-2 py-1">Raag: {activeHukamnama.metadata.raag}</span> : null}
+                  {activeHukamnama?.metadata?.writer ? <span className="rounded-full bg-slate-100 px-2 py-1">Writer: {activeHukamnama.metadata.writer}</span> : null}
+                </div>
               </div>
               <div className="mt-3 h-px w-full bg-slate-200" />
               <div className="space-y-3 pt-4">
@@ -1169,7 +1174,7 @@ const HomePage = () => {
             </div>
             {selectedSchedulePreview.schedule ? (
               <div className="max-h-[calc(90vh-92px)] overflow-y-auto">
-                <div className="daily-schedule-special-ticker w-full overflow-hidden border-y border-slate-800 bg-slate-900">
+                {(selectedSchedulePreview.schedule.specialReason || selectedSchedulePreview.schedule.highlightNoteEn || selectedSchedulePreview.schedule.specialReasonPa || selectedSchedulePreview.schedule.highlightNotePa) ? <div className="daily-schedule-special-ticker w-full overflow-hidden border-y border-slate-800 bg-slate-900">
                   <div className="ticker-mask px-3 py-2">
                     <div className="ticker-track ticker-force-motion daily-schedule-special-track ticker-speed-fast ticker-no-pause">
                       {[0, 1].map((groupIndex) => (
@@ -1184,7 +1189,7 @@ const HomePage = () => {
                       ))}
                     </div>
                   </div>
-                </div>
+                </div> : null}
                 <div className="space-y-4 p-4 sm:p-5">
                   {[
                     { key: 'morning', label: 'Morning', rows: selectedPreviewMorningRows, border: 'border-sky-200', header: 'border-sky-200 bg-sky-50 text-sky-800', row: 'border-sky-100 bg-sky-50/25' },

@@ -576,7 +576,7 @@ const LibraryPage = () => {
             <span className="whitespace-nowrap rounded-full bg-amber-100 px-3 py-1.5 text-sm font-semibold text-amber-900">{physicalBooks.length} books</span>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="hidden overflow-x-auto sm:block">
             <table className="min-w-full text-left text-[15px]">
               <thead>
                 <tr className="border-b border-amber-200/80 bg-white/70 text-[12px] uppercase tracking-wide text-slate-600">
@@ -624,6 +624,20 @@ const LibraryPage = () => {
               </tbody>
             </table>
           </div>
+          <div className="space-y-2 sm:hidden">
+            {visiblePhysicalBooks.map((book) => {
+              const available = Math.max(0, (book.totalCopies || 0) - (book.issuedCopies || 0));
+              const hasMultiCopyIssueDetails = (book.totalCopies || 0) > 1 && (book.issuedCopies || 0) > 0;
+              return <article key={`mobile-${book.id}`} className="rounded-lg border border-amber-200 bg-white/70 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0"><p className="break-words text-sm font-bold text-slate-800">{book.title || 'Untitled'}</p><p className="break-words text-xs text-slate-600">{book.author || 'Unknown author'}</p></div>
+                  <span className="shrink-0 whitespace-nowrap rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">{available} available</span>
+                </div>
+                <p className="mt-2 text-xs text-slate-600">{book.totalCopies || 0} total · {book.issuedCopies || 0} issued</p>
+                {hasMultiCopyIssueDetails ? <button type="button" className="mt-2 whitespace-nowrap rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700" onClick={() => setIssueModalBookId(book.id)}>View Dates</button> : null}
+              </article>;
+            })}
+          </div>
           <Pagination page={physicalPage} total={physicalTotalPages} onChange={setPhysicalPage} />
           <p className="mt-2 text-xs text-slate-600">
             * Call Gurdwara office to reserve the book.
@@ -644,7 +658,7 @@ const LibraryPage = () => {
             <span className="whitespace-nowrap rounded-full bg-blue-100 px-3 py-1.5 text-sm font-semibold text-blue-900">{digitalResources.length} resources</span>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="hidden overflow-x-auto sm:block">
             <table className="min-w-full text-left text-[15px]">
               <thead>
                 <tr className="border-b border-blue-200/80 bg-white/70 text-[12px] uppercase tracking-wide text-slate-600">
@@ -682,6 +696,13 @@ const LibraryPage = () => {
                 ) : null}
               </tbody>
             </table>
+          </div>
+          <div className="space-y-2 sm:hidden">
+            {visibleDigitalResources.map((resource) => <article key={`mobile-${resource.id}`} className="flex items-center gap-3 rounded-lg border border-blue-200 bg-white/70 p-3">
+              {resource.coverImageUrl ? <img src={resource.coverImageUrl} alt="" className="h-12 w-10 shrink-0 rounded object-cover" /> : <div className="h-12 w-10 shrink-0 rounded bg-slate-200" />}
+              <div className="min-w-0 flex-1"><p className="break-words text-sm font-bold text-slate-800">{resource.title || 'Untitled resource'}</p><p className="break-words text-xs text-slate-600">{resource.description || 'No description'}</p><p className="mt-1 text-[11px] font-semibold text-slate-500">{resource.fileType || 'PDF'}</p></div>
+              <a href={resource.downloadUrl} target="_blank" rel="noreferrer" className="shrink-0 whitespace-nowrap rounded-lg border border-brand-blue/30 px-2.5 py-1.5 text-xs font-bold text-brand-blue">Download</a>
+            </article>)}
           </div>
           <Pagination page={digitalPage} total={digitalTotalPages} onChange={setDigitalPage} />
         </Card>

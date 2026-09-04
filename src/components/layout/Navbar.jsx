@@ -454,7 +454,6 @@ const Navbar = () => {
   const [dateInfoOpen, setDateInfoOpen] = useState(false);
   const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
   const [isWhatsAppPopoverOpen, setIsWhatsAppPopoverOpen] = useState(false);
-  const [isSocialHubOpen, setIsSocialHubOpen] = useState(false);
   const [isProfilePopoverOpen, setIsProfilePopoverOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isProfileSaving, setIsProfileSaving] = useState(false);
@@ -2422,26 +2421,16 @@ const Navbar = () => {
         <div className="mx-auto flex max-w-7xl items-center justify-between md:px-2">
           <div className="flex items-center gap-2">
             <p>{siteConfig.contact.address}</p>
-            {hasWhatsAppGroup ? (
+            {hasWhatsAppGroup || socialLinks.length > 0 ? (
               <>
                 <span className="text-blue-200">|</span>
-                <div
-                  className="relative"
-                  onMouseEnter={openWhatsAppPopover}
-                  onMouseLeave={closeWhatsAppPopoverWithDelay}
-                  onFocus={openWhatsAppPopover}
-                  onBlur={closeWhatsAppPopoverWithDelay}
-                >
-                <button
-                  type="button"
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#25D366] text-white shadow-sm transition hover:bg-[#1fb858] focus:outline-none focus:ring-2 focus:ring-white/70"
-                  aria-label="Join WhatsApp Sangat group"
-                  title="Join WhatsApp Sangat group"
-                  aria-expanded={isWhatsAppPopoverOpen}
-                >
-                  <WhatsAppIcon className="h-4 w-4" />
-                </button>
-                <div className={`pointer-events-auto absolute left-1/2 top-full z-[260] mt-1 w-[286px] -translate-x-1/2 rounded-2xl border border-emerald-200 bg-white p-4 text-center text-slate-900 shadow-[0_24px_60px_rgba(15,23,42,0.24)] transition duration-200 ${isWhatsAppPopoverOpen ? 'visible translate-y-0 opacity-100' : 'invisible translate-y-1 opacity-0'}`}>
+                <div className="flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-2 py-1" aria-label="Social media links">
+                  {hasWhatsAppGroup ? (
+                    <div className="group relative" onMouseEnter={openWhatsAppPopover} onMouseLeave={closeWhatsAppPopoverWithDelay} onFocus={openWhatsAppPopover} onBlur={closeWhatsAppPopoverWithDelay}>
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#25D366] text-white shadow-sm transition group-hover:scale-105" aria-label="WhatsApp Sangat group">
+                      <WhatsAppIcon className="h-5 w-5" />
+                    </span>
+                    <div className={`pointer-events-auto absolute left-1/2 top-full z-[260] mt-1 w-[286px] -translate-x-1/2 rounded-2xl border border-emerald-200 bg-white p-4 text-center text-slate-900 shadow-[0_24px_60px_rgba(15,23,42,0.24)] transition duration-200 ${isWhatsAppPopoverOpen ? 'visible translate-y-0 opacity-100' : 'invisible translate-y-1 opacity-0'}`}>
                   <span className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-45 border-l border-t border-emerald-200 bg-white" />
                   <div className="relative">
                     <div className="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#25D366] text-white">
@@ -2456,25 +2445,25 @@ const Navbar = () => {
                       <WhatsAppIcon className="h-4 w-4" />
                       Open WhatsApp Group
                     </a>
-                  </div>
-                </div>
+                    </div>
+                    </div>
+                    </div>
+                  ) : null}
+                  {socialLinks.map(({ label, url, color, icon: SocialIcon }) => (
+                    <div key={label} className="group relative" tabIndex={0}>
+                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-white shadow-sm transition group-hover:scale-105" style={{ backgroundColor: color }} aria-label={label}>
+                        <SocialIcon className="h-5 w-5" />
+                      </span>
+                      <div className="pointer-events-none invisible absolute left-1/2 top-full z-[260] mt-1 w-[220px] -translate-x-1/2 translate-y-1 rounded-2xl border border-slate-200 bg-white p-3 text-center text-slate-900 opacity-0 shadow-[0_24px_60px_rgba(15,23,42,0.24)] transition duration-200 group-hover:pointer-events-auto group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus:pointer-events-auto group-focus:visible group-focus:translate-y-0 group-focus:opacity-100">
+                        <p className="text-sm font-bold">Follow us on {label}</p>
+                        <div className="mx-auto mt-2 w-fit rounded-lg border border-slate-100 p-1"><QRCodeSVG value={url} size={132} level="M" marginSize={1} fgColor={color} bgColor="#ffffff" /></div>
+                        <a href={url} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-bold text-slate-700 underline">Open {label}</a>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </>
             ) : null}
-            <div className="relative hidden xl:block">
-              <button type="button" onClick={() => setIsSocialHubOpen((openState) => !openState)} className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-2 py-1 text-[10px] font-bold text-white hover:bg-white/20" aria-expanded={isSocialHubOpen}>
-                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#1877F2] text-white"><FacebookIcon className="h-3 w-3" /></span>
-                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#C13584] text-white"><InstagramIcon className="h-3 w-3" /></span>
-                Social hub
-              </button>
-              {isSocialHubOpen ? <div className="absolute left-0 top-full z-[260] mt-1 grid w-[330px] grid-cols-2 gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-slate-900 shadow-2xl">
-                {socialLinks.map(({ label, url, color, icon: SocialIcon }) => <a key={label} href={url} target="_blank" rel="noreferrer" className="rounded-xl border border-slate-200 p-2 text-center hover:bg-slate-50">
-                  <SocialIcon className="mx-auto h-5 w-5" />
-                  <p className="mt-1 text-xs font-bold">{label}</p>
-                  <div className="mx-auto mt-2 w-fit rounded-lg border border-slate-100 p-1"><QRCodeSVG value={url} size={104} level="M" marginSize={1} fgColor={color} bgColor="#ffffff" /></div>
-                </a>)}
-              </div> : null}
-            </div>
             <span className="hidden text-blue-200 xl:inline">|</span>
             <div className="hidden items-center gap-1.5 xl:flex">
               <button
