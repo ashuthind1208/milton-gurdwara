@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createPortal } from 'react-dom';
 import jsPDF from 'jspdf';
 import Hls from 'hls.js';
+import { QRCodeSVG } from 'qrcode.react';
 import {
   Bars3Icon,
   XMarkIcon,
@@ -43,6 +44,7 @@ import uploadService from '../../services/uploadService';
 import userService from '../../services/userService';
 import addressLookupService from '../../services/addressLookupService';
 import cmsService from '../../services/cmsService';
+import phase2Service from '../../services/phase2Service';
 import { useAuth } from '../../context/AuthContext';
 import { formatTenDigitPhone, isTenDigitPhone, TEN_DIGIT_PHONE_ERROR } from '../../utils/phone';
 import { isEventCurrent } from '../../utils/eventAvailability';
@@ -60,6 +62,12 @@ const compactNavClass = ({ isActive }) =>
 
 const mobileDrawerNavClass = ({ isActive }) =>
   `rounded-xl border px-3 py-2.5 text-sm font-semibold transition ${isActive ? 'border-brand-blue/45 bg-brand-blue/10 text-brand-blue' : 'border-slate-200 bg-white text-slate-800 hover:border-brand-blue/35 hover:text-brand-blue'}`;
+
+const WhatsAppIcon = ({ className = 'h-4 w-4' }) => (
+  <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+    <path fill="currentColor" d="M12.04 2a9.83 9.83 0 0 0-8.5 14.76L2.05 22l5.37-1.41A9.95 9.95 0 1 0 12.04 2Zm0 17.96a8.08 8.08 0 0 1-4.12-1.13l-.3-.18-3.19.84.85-3.1-.2-.32a8.1 8.1 0 1 1 6.96 3.89Zm4.44-6.07c-.24-.12-1.44-.71-1.66-.79-.22-.08-.38-.12-.55.12-.16.24-.63.79-.77.95-.14.16-.28.18-.52.06-.24-.12-1.03-.38-1.96-1.21a7.4 7.4 0 0 1-1.36-1.69c-.14-.24-.02-.37.11-.49.11-.11.24-.28.36-.42.12-.14.16-.24.24-.41.08-.16.04-.3-.02-.42-.06-.12-.55-1.31-.75-1.8-.2-.47-.4-.4-.55-.41h-.46c-.16 0-.42.06-.65.3-.22.24-.85.83-.85 2.02s.87 2.34.99 2.5c.12.16 1.71 2.61 4.14 3.66.58.25 1.03.4 1.38.51.58.18 1.11.16 1.53.1.47-.07 1.44-.59 1.64-1.16.2-.57.2-1.07.14-1.16-.06-.11-.22-.17-.46-.29Z" />
+  </svg>
+);
 
 const iconClass = 'h-4.5 w-4.5';
 const streamGlyphClass = 'h-6 w-6';
@@ -438,6 +446,7 @@ const Navbar = () => {
   const [isCompactProfileLanyardOpen, setIsCompactProfileLanyardOpen] = useState(false);
   const [dateInfoOpen, setDateInfoOpen] = useState(false);
   const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
+  const [isWhatsAppPopoverOpen, setIsWhatsAppPopoverOpen] = useState(false);
   const [isProfilePopoverOpen, setIsProfilePopoverOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isProfileSaving, setIsProfileSaving] = useState(false);
@@ -482,6 +491,7 @@ const Navbar = () => {
   const kirtanPausedByUserRef = useRef(false);
   const kirtanReconnectInFlightRef = useRef(false);
   const datePopoverCloseTimeoutRef = useRef(null);
+  const whatsAppPopoverCloseTimeoutRef = useRef(null);
   const profilePopoverCloseTimeoutRef = useRef(null);
   const inlineSearchWrapperRef = useRef(null);
   const inlineSearchCloseTimeoutRef = useRef(null);
@@ -525,6 +535,12 @@ const Navbar = () => {
     staleTime: 60 * 1000,
     refetchInterval: 5 * 60 * 1000,
     placeholderData: (previousData) => previousData
+  });
+  const { data: phase2ChannelsConfig } = useQuery({
+    queryKey: ['phase2-channels-config'],
+    queryFn: () => phase2Service.getChannelsConfig().then((res) => res.data || null),
+    staleTime: 60 * 1000,
+    retry: false
   });
   const combinedNanakshahiObservances = useMemo(() => {
     const todayKey = toDateKey(new Date());
@@ -1706,6 +1722,8 @@ const Navbar = () => {
   const statusDotClass = isKirtanPlaying ? 'bg-emerald-400' : (isKirtanLoading ? 'bg-amber-300' : 'bg-red-400');
   const featuredStream = miltonPrimaryStream || liveStreams[0] || null;
   const isHomeOverlayMode = isHomePage && !isCompact;
+  const whatsAppJoinLink = String(phase2ChannelsConfig?.whatsAppJoinLink || '').trim();
+  const hasWhatsAppGroup = phase2ChannelsConfig?.whatsAppOptInEnabled === true && /^https?:\/\//i.test(whatsAppJoinLink);
 
   const openStreamModal = (id) => {
     setStreamModalState({ open: true, id });
@@ -1720,6 +1738,11 @@ const Navbar = () => {
       window.clearTimeout(profilePopoverCloseTimeoutRef.current);
       profilePopoverCloseTimeoutRef.current = null;
     }
+    if (whatsAppPopoverCloseTimeoutRef.current) {
+      window.clearTimeout(whatsAppPopoverCloseTimeoutRef.current);
+      whatsAppPopoverCloseTimeoutRef.current = null;
+    }
+    setIsWhatsAppPopoverOpen(false);
     setIsProfilePopoverOpen(false);
     setIsDatePopoverOpen(true);
   };
@@ -1739,6 +1762,12 @@ const Navbar = () => {
       window.clearTimeout(profilePopoverCloseTimeoutRef.current);
       profilePopoverCloseTimeoutRef.current = null;
     }
+    if (whatsAppPopoverCloseTimeoutRef.current) {
+      window.clearTimeout(whatsAppPopoverCloseTimeoutRef.current);
+      whatsAppPopoverCloseTimeoutRef.current = null;
+    }
+    setIsWhatsAppPopoverOpen(false);
+    setIsDatePopoverOpen(false);
     setIsProfilePopoverOpen(true);
   };
 
@@ -1749,6 +1778,34 @@ const Navbar = () => {
     profilePopoverCloseTimeoutRef.current = window.setTimeout(() => {
       setIsProfilePopoverOpen(false);
       profilePopoverCloseTimeoutRef.current = null;
+    }, 220);
+  };
+
+  const openWhatsAppPopover = () => {
+    if (whatsAppPopoverCloseTimeoutRef.current) {
+      window.clearTimeout(whatsAppPopoverCloseTimeoutRef.current);
+      whatsAppPopoverCloseTimeoutRef.current = null;
+    }
+    if (datePopoverCloseTimeoutRef.current) {
+      window.clearTimeout(datePopoverCloseTimeoutRef.current);
+      datePopoverCloseTimeoutRef.current = null;
+    }
+    if (profilePopoverCloseTimeoutRef.current) {
+      window.clearTimeout(profilePopoverCloseTimeoutRef.current);
+      profilePopoverCloseTimeoutRef.current = null;
+    }
+    setIsDatePopoverOpen(false);
+    setIsProfilePopoverOpen(false);
+    setIsWhatsAppPopoverOpen(true);
+  };
+
+  const closeWhatsAppPopoverWithDelay = () => {
+    if (whatsAppPopoverCloseTimeoutRef.current) {
+      window.clearTimeout(whatsAppPopoverCloseTimeoutRef.current);
+    }
+    whatsAppPopoverCloseTimeoutRef.current = window.setTimeout(() => {
+      setIsWhatsAppPopoverOpen(false);
+      whatsAppPopoverCloseTimeoutRef.current = null;
     }, 220);
   };
 
@@ -2274,6 +2331,9 @@ const Navbar = () => {
     if (datePopoverCloseTimeoutRef.current) {
       window.clearTimeout(datePopoverCloseTimeoutRef.current);
     }
+    if (whatsAppPopoverCloseTimeoutRef.current) {
+      window.clearTimeout(whatsAppPopoverCloseTimeoutRef.current);
+    }
     if (profilePopoverCloseTimeoutRef.current) {
       window.clearTimeout(profilePopoverCloseTimeoutRef.current);
     }
@@ -2318,6 +2378,42 @@ const Navbar = () => {
         <div className="mx-auto flex max-w-7xl items-center justify-between md:px-2">
           <div className="flex items-center gap-2">
             <p>{siteConfig.contact.address}</p>
+            {hasWhatsAppGroup ? (
+              <div
+                className="relative"
+                onMouseEnter={openWhatsAppPopover}
+                onMouseLeave={closeWhatsAppPopoverWithDelay}
+                onFocus={openWhatsAppPopover}
+                onBlur={closeWhatsAppPopoverWithDelay}
+              >
+                <button
+                  type="button"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#25D366] text-white shadow-sm transition hover:bg-[#1fb858] focus:outline-none focus:ring-2 focus:ring-white/70"
+                  aria-label="Join WhatsApp Sangat group"
+                  title="Join WhatsApp Sangat group"
+                  aria-expanded={isWhatsAppPopoverOpen}
+                >
+                  <WhatsAppIcon className="h-4 w-4" />
+                </button>
+                <div className={`pointer-events-auto absolute left-1/2 top-full z-[260] mt-1 w-[286px] -translate-x-1/2 rounded-2xl border border-emerald-200 bg-white p-4 text-center text-slate-900 shadow-[0_24px_60px_rgba(15,23,42,0.24)] transition duration-200 ${isWhatsAppPopoverOpen ? 'visible translate-y-0 opacity-100' : 'invisible translate-y-1 opacity-0'}`}>
+                  <span className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-45 border-l border-t border-emerald-200 bg-white" />
+                  <div className="relative">
+                    <div className="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#25D366] text-white">
+                      <WhatsAppIcon className="h-6 w-6" />
+                    </div>
+                    <p className="mt-2 font-heading text-lg font-bold text-slate-900">Join the Sangat</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-600">Scan the QR code with your phone to open the Gurdwara WhatsApp group.</p>
+                    <div className="mx-auto mt-3 w-fit rounded-xl border border-emerald-100 bg-white p-2 shadow-inner">
+                      <QRCodeSVG value={whatsAppJoinLink} size={168} level="M" marginSize={1} fgColor="#166534" bgColor="#ffffff" />
+                    </div>
+                    <a href={whatsAppJoinLink} target="_blank" rel="noreferrer" className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#25D366] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#1fb858]">
+                      <WhatsAppIcon className="h-4 w-4" />
+                      Open WhatsApp Group
+                    </a>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             <span className="hidden text-blue-200 xl:inline">|</span>
             <div className="hidden items-center gap-1.5 xl:flex">
               <button

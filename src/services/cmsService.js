@@ -340,13 +340,22 @@ const defaultPageContent = {
   },
   contact: {
     heroTitle: 'Contact Us',
-    heroDescription: 'Reach the Gurdwara team for inquiries, directions, or support.',
+    heroDescription: '',
     intro: 'Use phone, email, or the contact form below for support and program information.',
     mediaUrl: '',
     phone: '',
     email: '',
     address: '',
     mapEmbedUrl: '',
+    contactHours: [
+      { label: 'Darbar Sahib', value: 'Daily: 5:00 AM to 9:00 PM' },
+      { label: 'Langar Hall', value: 'Weekends and Gurpurab Specials' },
+      { label: 'Office Support', value: 'Mon-Sun: 10:00 AM to 6:00 PM' }
+    ],
+    socialLinks: {
+      facebook: 'https://facebook.com/singhsabhamilton',
+      instagram: 'https://www.instagram.com/miltongurdwara/'
+    },
     sections: []
   }
 };

@@ -33,6 +33,12 @@ const emptySection = {
   mediaUrl: ''
 };
 
+const defaultContactHours = [
+  { label: 'Darbar Sahib', value: 'Daily: 5:00 AM to 9:00 PM' },
+  { label: 'Langar Hall', value: 'Weekends and Gurpurab Specials' },
+  { label: 'Office Support', value: 'Mon-Sun: 10:00 AM to 6:00 PM' }
+];
+
 const pageOptions = [
   { value: 'about', label: 'About Us' },
   { value: 'sikhism', label: 'Sikhism' },
@@ -72,7 +78,12 @@ const AdminCmsPage = () => {
       phone: '',
       email: '',
       address: '',
-      mapEmbedUrl: ''
+      mapEmbedUrl: '',
+      contactHours: defaultContactHours,
+      socialLinks: {
+        facebook: '',
+        instagram: ''
+      }
     }
   });
   const sectionForm = useForm({ defaultValues: emptySection });
@@ -111,7 +122,12 @@ const AdminCmsPage = () => {
       phone: pageData.phone || '',
       email: pageData.email || '',
       address: pageData.address || '',
-      mapEmbedUrl: pageData.mapEmbedUrl || ''
+      mapEmbedUrl: pageData.mapEmbedUrl || '',
+      contactHours: Array.isArray(pageData.contactHours) ? pageData.contactHours : defaultContactHours,
+      socialLinks: {
+        facebook: pageData.socialLinks?.facebook || '',
+        instagram: pageData.socialLinks?.instagram || ''
+      }
     });
     setIntroHtml(pageData.intro || '');
   }, [pageData, pageForm]);
@@ -450,6 +466,27 @@ const AdminCmsPage = () => {
                 <label className="text-sm md:col-span-2">Map Embed Link
                   <input {...pageForm.register('mapEmbedUrl')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
                 </label>
+                <fieldset className="space-y-3 rounded-lg border border-slate-200 p-3 md:col-span-2">
+                  <legend className="px-1 text-sm font-semibold text-slate-800">Hours &amp; Channels</legend>
+                  {defaultContactHours.map((_, index) => (
+                    <div key={`contact-hours-${index}`} className="grid gap-2 md:grid-cols-[0.8fr_1.2fr]">
+                      <label className="text-xs font-medium text-slate-600">Channel name
+                        <input {...pageForm.register(`contactHours.${index}.label`)} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                      </label>
+                      <label className="text-xs font-medium text-slate-600">Hours or availability
+                        <input {...pageForm.register(`contactHours.${index}.value`)} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                      </label>
+                    </div>
+                  ))}
+                  <div className="grid gap-2 border-t border-slate-200 pt-3 md:grid-cols-2">
+                    <label className="text-xs font-medium text-slate-600">Facebook URL
+                      <input type="url" {...pageForm.register('socialLinks.facebook')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                    </label>
+                    <label className="text-xs font-medium text-slate-600">Instagram URL
+                      <input type="url" {...pageForm.register('socialLinks.instagram')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                    </label>
+                  </div>
+                </fieldset>
               </>
             ) : null}
           </div>
