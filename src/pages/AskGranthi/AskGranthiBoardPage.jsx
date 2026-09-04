@@ -49,7 +49,8 @@ const AskGranthiBoardPage = () => {
       || Number(right.askCount || 0) - Number(left.askCount || 0))
     .slice(0, 8);
   const latestQuestion = questions[0] || null;
-  const activeQuestion = latestQuestion?.id && !dismissedAnswerIds.has(String(latestQuestion.id)) ? latestQuestion : null;
+  const forceWelcomeScreen = new URLSearchParams(window.location.search).get('screen') === 'welcome';
+  const activeQuestion = !forceWelcomeScreen && latestQuestion?.id && !dismissedAnswerIds.has(String(latestQuestion.id)) ? latestQuestion : null;
   const isThinking = activeQuestion?.status === 'thinking';
   const isAnswered = activeQuestion?.status === 'answered';
   const questionUrl = `${window.location.origin}/ask-a-granthi/question`;

@@ -27,6 +27,8 @@ const AdminAskGranthiPage = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [editingQuestion, setEditingQuestion] = useState(null);
   const [editValues, setEditValues] = useState(null);
+  const [viewingQuestion, setViewingQuestion] = useState(null);
+  const [deletingQuestion, setDeletingQuestion] = useState(null);
 
   const { data: questions = [], isLoading, isError } = useQuery({
     queryKey: ['admin-ask-granthi-questions'],
@@ -63,7 +65,7 @@ const AdminAskGranthiPage = () => {
 
   useEffect(() => {
     setHeaderAction(
-      <AdminHeaderActionButton label="Open LED Board" onClick={() => window.open('/ask-a-granthi', '_blank', 'noopener,noreferrer')} />
+      <AdminHeaderActionButton label="Open LED Board" onClick={() => window.open('/ask-a-granthi?screen=welcome', '_blank', 'noopener,noreferrer')} />
     );
     return () => setHeaderAction(null);
   }, [setHeaderAction]);
@@ -128,11 +130,14 @@ const AdminAskGranthiPage = () => {
       {isError ? <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">Unable to load Ask a Granthi questions.</p> : null}
       {!isLoading && filteredQuestions.length === 0 ? <p className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">No questions match this filter yet.</p> : null}
 
-      <section className="space-y-3">
+      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="hidden grid-cols-[minmax(0,1fr)_120px_240px] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 md:grid">
+          <span>Question</span><span>Status</span><span className="text-right">Actions</span>
+        </div>
         {filteredQuestions.map((entry) => (
-          <article key={entry.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
+          <article key={entry.id} className="border-b border-slate-200 p-4 last:border-b-0">
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_120px_240px] md:items-center">
+              <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`rounded-full border px-2.5 py-1 text-[11px] font-bold capitalize ${statusStyles[entry.status] || statusStyles.error}`}>{entry.status}</span>
                   {entry.featured ? <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-800"><StarIcon className="h-3.5 w-3.5" /> Featured FAQ</span> : null}
@@ -154,7 +159,11 @@ const AdminAskGranthiPage = () => {
                 ) : null}
                 {entry.errorMessage ? <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{entry.errorMessage}</p> : null}
               </div>
-              <div className="flex shrink-0 flex-wrap gap-2">
+              <div className="flex items-center gap-2 md:block">
+                <span className={`rounded-full border px-2.5 py-1 text-[11px] font-bold capitalize ${statusStyles[entry.status] || statusStyles.error}`}>{entry.status}</span>
+              </div>
+              <div className="flex shrink-0 flex-wrap justify-start gap-2 md:justify-end">
+                <button type="button" onClick={() => setViewingQuestion(entry)} className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"><EyeIcon className="h-4 w-4" /> View</button>
                 {entry.status === 'answered' ? (
                   <>
                     <button type="button" onClick={() => quickUpdateMutation.mutate({ id: entry.id, values: { featured: !entry.featured } })} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-amber-200 text-amber-700 hover:bg-amber-50" aria-label={entry.featured ? 'Remove from frequently asked questions' : 'Feature as frequently asked question'} title={entry.featured ? 'Unfeature' : 'Feature'}><StarIcon className="h-5 w-5" /></button>
@@ -169,6 +178,21 @@ const AdminAskGranthiPage = () => {
           </article>
         ))}
       </section>
+
+      {viewingQuestion ? (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/60 px-4 py-6 backdrop-blur-sm" role="presentation" onClick={() => setViewingQuestion(null)}>
+          <section className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-5 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="ask-granthi-view-title" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-4"><div><p className="text-xs font-bold uppercase tracking-wider text-brand-blue">Saved question</p><h2 id="ask-granthi-view-title" className="mt-1 font-heading text-xl font-semibold text-slate-900">{viewingQuestion.question}</h2></div><button type="button" onClick={() => setViewingQuestion(null)} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300" aria-label="Close question preview"><XMarkIcon className="h-5 w-5" /></button></div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2"><div className="rounded-lg bg-slate-50 p-3"><p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Punjabi</p><p className="mt-1 whitespace-pre-wrap font-gurmukhi text-sm leading-6 text-slate-800">{viewingQuestion.answerPunjabi || 'No Punjabi answer yet.'}</p></div><div className="rounded-lg bg-slate-50 p-3"><p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">English</p><p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">{viewingQuestion.answerEnglish || 'No English answer yet.'}</p></div></div>
+          </section>
+        </div>
+      ) : null}
+
+      {deletingQuestion ? (
+        <div className="fixed inset-0 z-[96] flex items-center justify-center bg-slate-950/60 px-4 py-6 backdrop-blur-sm" role="presentation" onClick={() => setDeletingQuestion(null)}>
+          <section className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="ask-granthi-delete-title" onClick={(event) => event.stopPropagation()}><h2 id="ask-granthi-delete-title" className="font-heading text-xl font-semibold text-slate-900">Delete this question?</h2><p className="mt-2 text-sm leading-6 text-slate-600">This will remove the saved question and its answer from the admin list and LED board.</p><div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setDeletingQuestion(null)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold">Cancel</button><button type="button" disabled={deleteMutation.isPending} onClick={() => { deleteMutation.mutate(deletingQuestion.id); setDeletingQuestion(null); }} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{deleteMutation.isPending ? 'Deleting...' : 'Delete question'}</button></div></section>
+        </div>
+      ) : null}
 
       {editingQuestion && editValues ? (
         <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-950/60 px-4 py-6 backdrop-blur-sm">
