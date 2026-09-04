@@ -2423,12 +2423,12 @@ const Navbar = () => {
             <p>{siteConfig.contact.address}</p>
             {hasWhatsAppGroup || socialLinks.length > 0 ? (
               <>
-                <span className="text-blue-200">|</span>
-                <div className="flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-2 py-1" aria-label="Social media links">
+                <div className="flex items-center gap-2" aria-label="Social media links">
+                  <span className="text-blue-200">|</span>
                   {hasWhatsAppGroup ? (
                     <div className="group relative" onMouseEnter={openWhatsAppPopover} onMouseLeave={closeWhatsAppPopoverWithDelay} onFocus={openWhatsAppPopover} onBlur={closeWhatsAppPopoverWithDelay}>
-                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#25D366] text-white shadow-sm transition group-hover:scale-105" aria-label="WhatsApp Sangat group">
-                      <WhatsAppIcon className="h-5 w-5" />
+                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#25D366] text-white shadow-sm transition group-hover:scale-105" aria-label="WhatsApp Sangat group">
+                      <WhatsAppIcon className="h-4 w-4" />
                     </span>
                     <div className={`pointer-events-auto absolute left-1/2 top-full z-[260] mt-1 w-[286px] -translate-x-1/2 rounded-2xl border border-emerald-200 bg-white p-4 text-center text-slate-900 shadow-[0_24px_60px_rgba(15,23,42,0.24)] transition duration-200 ${isWhatsAppPopoverOpen ? 'visible translate-y-0 opacity-100' : 'invisible translate-y-1 opacity-0'}`}>
                   <span className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-45 border-l border-t border-emerald-200 bg-white" />
@@ -2451,16 +2451,19 @@ const Navbar = () => {
                   ) : null}
                   {socialLinks.map(({ label, url, color, icon: SocialIcon }) => (
                     <div key={label} className="group relative" tabIndex={0}>
-                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-white shadow-sm transition group-hover:scale-105" style={{ backgroundColor: color }} aria-label={label}>
-                        <SocialIcon className="h-5 w-5" />
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full text-white shadow-sm transition group-hover:scale-105" style={{ backgroundColor: color }} aria-label={label}>
+                        <SocialIcon className="h-4 w-4" />
                       </span>
-                      <div className="pointer-events-none invisible absolute left-1/2 top-full z-[260] mt-1 w-[220px] -translate-x-1/2 translate-y-1 rounded-2xl border border-slate-200 bg-white p-3 text-center text-slate-900 opacity-0 shadow-[0_24px_60px_rgba(15,23,42,0.24)] transition duration-200 group-hover:pointer-events-auto group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus:pointer-events-auto group-focus:visible group-focus:translate-y-0 group-focus:opacity-100">
-                        <p className="text-sm font-bold">Follow us on {label}</p>
-                        <div className="mx-auto mt-2 w-fit rounded-lg border border-slate-100 p-1"><QRCodeSVG value={url} size={132} level="M" marginSize={1} fgColor={color} bgColor="#ffffff" /></div>
-                        <a href={url} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-bold text-slate-700 underline">Open {label}</a>
+                      <div className="pointer-events-none invisible absolute left-1/2 top-full z-[260] mt-1 w-[286px] -translate-x-1/2 translate-y-1 rounded-2xl border border-slate-200 bg-white p-4 text-center text-slate-900 opacity-0 shadow-[0_24px_60px_rgba(15,23,42,0.24)] transition duration-200 group-hover:pointer-events-auto group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus:pointer-events-auto group-focus:visible group-focus:translate-y-0 group-focus:opacity-100">
+                        <div className="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-full text-white" style={{ backgroundColor: color }}><SocialIcon className="h-6 w-6" /></div>
+                        <p className="mt-2 font-heading text-lg font-bold text-slate-900">Follow us on {label}</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-600">Scan the QR code with your phone to open our {label} page.</p>
+                        <div className="mx-auto mt-3 w-fit rounded-xl border border-slate-100 bg-white p-2 shadow-inner"><QRCodeSVG value={url} size={168} level="M" marginSize={1} fgColor={color} bgColor="#ffffff" /></div>
+                        <a href={url} target="_blank" rel="noreferrer" className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-white" style={{ backgroundColor: color }}><SocialIcon className="h-4 w-4" /> Open {label}</a>
                       </div>
                     </div>
                   ))}
+                  <span className="text-blue-200">|</span>
                 </div>
               </>
             ) : null}

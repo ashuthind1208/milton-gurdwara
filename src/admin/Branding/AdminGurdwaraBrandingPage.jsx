@@ -23,7 +23,6 @@ const AdminGurdwaraBrandingPage = () => {
 
   const saveMutation = useMutation({
     mutationFn: (values) => brandingService.saveBranding({
-      ...values,
       organizationName: String(values.organizationName || '').trim(),
       shortName: String(values.shortName || '').trim(),
       logoUrl: String(values.logoUrl || '').trim(),
