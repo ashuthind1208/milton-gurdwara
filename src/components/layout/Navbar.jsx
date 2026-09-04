@@ -42,6 +42,7 @@ import bookingService from '../../services/bookingService';
 import uploadService from '../../services/uploadService';
 import userService from '../../services/userService';
 import addressLookupService from '../../services/addressLookupService';
+import cmsService from '../../services/cmsService';
 import { useAuth } from '../../context/AuthContext';
 import { formatTenDigitPhone, isTenDigitPhone, TEN_DIGIT_PHONE_ERROR } from '../../utils/phone';
 import { isEventCurrent } from '../../utils/eventAvailability';
@@ -450,7 +451,7 @@ const Navbar = () => {
     avatarUrl: ''
   });
   const [isMembershipModalOpen, setIsMembershipModalOpen] = useState(false);
-  const [membershipPromptEnforced, setMembershipPromptEnforced] = useState(false);
+  const [, setMembershipPromptEnforced] = useState(false);
   const [membershipPromptNotice, setMembershipPromptNotice] = useState('');
   const [membershipFormError, setMembershipFormError] = useState('');
   const [addressSuggestions, setAddressSuggestions] = useState([]);
@@ -644,6 +645,10 @@ const Navbar = () => {
     queryKey: ['bookings', 'navbar'],
     queryFn: () => bookingService.getBookings().then((res) => res.data),
     enabled: isAuthenticated
+  });
+  const { data: membershipContent } = useQuery({
+    queryKey: ['page-content', 'membership'],
+    queryFn: () => cmsService.getPageContent('membership').then((res) => res.data)
   });
   const { data: streamingItems = [] } = useQuery({
     queryKey: ['streaming-config'],
@@ -1216,6 +1221,9 @@ const Navbar = () => {
   });
 
   const handleCancelMembershipRegistration = () => {
+    if (cancelMembershipMutation.isPending) {
+      return;
+    }
     setMembershipFormError('');
     cancelMembershipMutation.mutate();
   };
@@ -1240,12 +1248,7 @@ const Navbar = () => {
   }, [membershipProfile?.canadianStatus, membershipProfile?.dateOfBirth, membershipProfile?.donationMethod, membershipProfile?.donationSchedule, membershipProfile?.membershipPledgeAccepted, membershipProfile?.notes, user?.address, user?.phone]);
 
   const closeMembershipModal = () => {
-    if (membershipPromptEnforced) {
-      setMembershipFormError('Please complete your membership details to continue.');
-      return;
-    }
-
-    setIsMembershipModalOpen(false);
+    handleCancelMembershipRegistration();
   };
 
   const handleMembershipFieldChange = (field) => (event) => {
@@ -3232,16 +3235,16 @@ const Navbar = () => {
                       <h3 className="mt-1 font-heading text-lg font-semibold">Membership Registration Form</h3>
                     </div>
                   </div>
-                  <button type="button" onClick={closeMembershipModal} className="rounded-full border border-white/55 bg-white/10 p-1.5 text-white hover:bg-white/20" aria-label="Close membership details modal">
+                  <button type="button" onClick={closeMembershipModal} disabled={cancelMembershipMutation.isPending} className="rounded-full border border-white/55 bg-white/10 p-1.5 text-white hover:bg-white/20 disabled:opacity-60" aria-label="Cancel membership registration">
                     <XMarkIcon className="h-4 w-4" />
                   </button>
                 </div>
               </div>
 
               <form className="grid gap-4 px-5 py-4 lg:grid-cols-2" onSubmit={handleSaveMembershipDetails}>
-                <p className="lg:col-span-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold leading-5 text-amber-900">
-                  To become a lifetime member of Gurdwara Singh Sabha Milton (GSSM), please complete the form below. An initiation fee of $500 is due upon signup. Going forward, membership will need to be renewed as of January 1st of the following year, at a cost of $50 per month to maintain your membership in good standing. After completing 10 years of $50 monthly donations, your membership will become permanent at no cost.
-                </p>
+                {membershipContent?.intro ? (
+                  <div className="lg:col-span-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold leading-5 text-amber-900" dangerouslySetInnerHTML={{ __html: membershipContent.intro }} />
+                ) : null}
                 <section className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                   <h4 className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-600">Personal Details</h4>
                   <div className="h-px w-full bg-slate-200" />

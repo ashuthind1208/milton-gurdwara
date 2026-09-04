@@ -1,7 +1,6 @@
 import { serviceResponse } from './serviceResponse';
 import contentApiService from './contentApiService';
 import { siteConfig } from '../constants/siteConfig';
-import { createMembershipFeeInformationPdfBlob } from '../utils/csvExport';
 
 const RESOURCE = 'subscribers';
 const NEWSLETTER_RESOURCE = 'newsletter_campaigns';
@@ -522,28 +521,6 @@ const buildApprovalEmailHtml = (user = {}) => {
   </div>`;
 };
 
-const buildMembershipFeeInformationAttachment = async (user = {}) => {
-  const blob = await createMembershipFeeInformationPdfBlob({
-    user,
-    organizationName: siteConfig.name,
-    address: siteConfig.contact?.address,
-    phone: siteConfig.contact?.phone,
-    email: siteConfig.contact?.email
-  });
-  const dataUrl = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(String(reader.result || ''));
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-  return {
-    filename: 'membership-fee-information.pdf',
-    contentType: 'application/pdf',
-    content: dataUrl.split(',')[1] || '',
-    disposition: 'attachment'
-  };
-};
-
 const notificationService = {
   getNewsletterTopics: async () => {
     const stored = await contentApiService.getSingleton(NEWSLETTER_TOPICS_RESOURCE, null);
@@ -877,7 +854,6 @@ const notificationService = {
 
     const approvalBodyHtml = buildApprovalEmailHtml(user);
     const plainMessage = 'Your registration has been approved. Your Member account becomes active when a current membership fee is recorded as paid.';
-    const feeAttachment = await buildMembershipFeeInformationAttachment(user);
 
     const payload = {
       type: 'approval',
@@ -891,7 +867,7 @@ const notificationService = {
       bodyHtml: approvalBodyHtml,
       body: approvalBodyHtml,
       content: approvalBodyHtml,
-      attachments: feeAttachment.content ? [feeAttachment] : [],
+      attachments: [],
       approvedAt: new Date().toISOString()
     };
 

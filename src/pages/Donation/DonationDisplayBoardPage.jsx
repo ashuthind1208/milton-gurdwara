@@ -325,17 +325,17 @@ const DonationDisplayBoardPage = () => {
       label: 'All Campaigns Raised',
       value: formatCurrency(grandRaised)
     },
-    {
+    totalCampaignTarget > 0 ? {
       key: 'overall-target',
       label: 'Combined Target',
       value: formatCurrency(totalCampaignTarget)
-    },
-    {
+    } : null,
+    totalCampaignTarget > 0 ? {
       key: 'overall-progress',
       label: 'Overall Completion',
       value: `${overallCompletionPercent}%`
-    }
-  ], [grandRaised, overallCompletionPercent, totalCampaignTarget]);
+    } : null
+  ].filter(Boolean), [grandRaised, overallCompletionPercent, totalCampaignTarget]);
   const rotatingKpi = rotatingKpis[rotatingKpiIndex] || rotatingKpis[0];
   const quietModeActive = useMemo(() => {
     const hour = new Date(clockTickMs).getHours();
@@ -729,7 +729,7 @@ const DonationDisplayBoardPage = () => {
             <div className="hidden pb-2 pt-4 md:block" aria-hidden="true">
               <span className="block h-px w-full bg-gradient-to-r from-white/55 via-white/30 to-white/10" />
             </div>
-            <div className="mt-1">
+            {totalCampaignTarget > 0 ? <div className="mt-1">
               <div className="flex items-center justify-between text-[10px] text-brand-saffron">
                 <span>{formatCurrency(grandRaised)} / {formatCurrency(totalCampaignTarget)}</span>
                 <span className="text-[9px] text-slate-300">{overallCompletionPercent}%</span>
@@ -737,7 +737,7 @@ const DonationDisplayBoardPage = () => {
               <div className="mt-1 h-1 w-full bg-white/15">
                 <div className="h-1 bg-brand-saffron transition-all duration-700" style={{ width: `${overallCompletionPercent}%` }} />
               </div>
-            </div>
+            </div> : null}
             {campaignRailItems.length > 0 ? (
               <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-slate-900/45">
                 <div className="board-campaign-marquee flex w-max flex-nowrap items-stretch py-1.5" style={{ animationDuration: quietModeActive ? '86s' : '52s' }}>
@@ -754,7 +754,7 @@ const DonationDisplayBoardPage = () => {
                               <p className="truncate text-xs font-extrabold text-white">{campaign.name}</p>
                               <span className="text-[11px] font-extrabold text-cyan-100">{pct}%</span>
                             </div>
-                            <p className="mt-0.5 text-xs font-semibold text-slate-300 sm:text-sm">{formatCurrency(raised)} / {formatCurrency(target)}</p>
+                            <p className="mt-0.5 text-xs font-semibold text-slate-300 sm:text-sm">{target > 0 ? `${formatCurrency(raised)} / ${formatCurrency(target)}` : formatCurrency(raised)}</p>
                           </div>
                         );
                       })}
@@ -821,19 +821,19 @@ const DonationDisplayBoardPage = () => {
                   </p>
                 </div>
 
-                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <div className={`mt-4 grid gap-3 ${Number(spotlightCampaign?.target || 0) > 0 ? 'sm:grid-cols-3' : 'sm:grid-cols-1'}`}>
                   <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-3">
                     <p className="text-[11px] uppercase tracking-wide text-slate-400">Raised</p>
                     <p className="mt-1 text-xl font-semibold text-white">{formatCurrency(totalRaised)}</p>
                   </div>
-                  <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-3">
+                  {Number(spotlightCampaign?.target || 0) > 0 ? <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-3">
                     <p className="text-[11px] uppercase tracking-wide text-slate-400">Target</p>
                     <p className="mt-1 text-xl font-semibold text-white">{formatCurrency(spotlightCampaign?.target || 0)}</p>
-                  </div>
-                  <div className="rounded-2xl border border-brand-saffron/25 bg-brand-saffron/10 p-3">
+                  </div> : null}
+                  {Number(spotlightCampaign?.target || 0) > 0 ? <div className="rounded-2xl border border-brand-saffron/25 bg-brand-saffron/10 p-3">
                     <p className="text-[11px] uppercase tracking-wide text-brand-saffron">Need To Goal</p>
                     <p className="mt-1 text-xl font-extrabold text-white">{amountToGoal == null ? 'Open Goal' : formatCurrency(amountToGoal)}</p>
-                  </div>
+                  </div> : null}
                 </div>
 
                 <div className="mt-4 rounded-2xl border border-white/10 bg-slate-900/45 p-3">
@@ -856,10 +856,10 @@ const DonationDisplayBoardPage = () => {
                               {nearGoal ? <span className="rounded-full bg-amber-300/20 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-amber-200">Urgent</span> : null}
                               {funded ? <span className="rounded-full bg-emerald-300/20 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-emerald-200">Funded</span> : null}
                             </div>
-                            <p className="mt-0.5 text-[11px] text-slate-300">{formatCurrency(raised)} / {formatCurrency(target)}</p>
-                            <div className="mt-1.5 h-1.5 rounded-full bg-white/10">
+                            <p className="mt-0.5 text-[11px] text-slate-300">{target > 0 ? `${formatCurrency(raised)} / ${formatCurrency(target)}` : formatCurrency(raised)}</p>
+                            {target > 0 ? <div className="mt-1.5 h-1.5 rounded-full bg-white/10">
                               <div className="h-1.5 rounded-full bg-gradient-to-r from-cyan-300 to-brand-saffron" style={{ width: `${pct}%` }} />
-                            </div>
+                            </div> : null}
                           </div>
                         );
                       })}

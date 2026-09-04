@@ -331,6 +331,13 @@ const defaultPageContent = {
     mediaUrl: '',
     sections: []
   },
+  membership: {
+    heroTitle: 'Membership Registration',
+    heroDescription: 'Membership registration information and disclaimer.',
+    intro: '<p>To become a lifetime member of Gurdwara Singh Sabha Milton (GSSM), please complete the form below. An initiation fee of $500 is due upon signup. Going forward, membership will need to be renewed as of January 1st of the following year, at a cost of $50 per month to maintain your membership in good standing. After completing 10 years of $50 monthly donations, your membership will become permanent at no cost.</p>',
+    mediaUrl: '',
+    sections: []
+  },
   contact: {
     heroTitle: 'Contact Us',
     heroDescription: 'Reach the Gurdwara team for inquiries, directions, or support.',
@@ -416,6 +423,7 @@ const normalizeAllPageContent = (allContent = {}) => ({
   sikhism: normalizePageEntry(allContent.sikhism, defaultPageContent.sikhism),
   events: normalizePageEntry(allContent.events, defaultPageContent.events),
   gallery: normalizePageEntry(allContent.gallery, defaultPageContent.gallery),
+  membership: normalizePageEntry(allContent.membership, defaultPageContent.membership),
   contact: normalizePageEntry(allContent.contact, defaultPageContent.contact)
 });
 

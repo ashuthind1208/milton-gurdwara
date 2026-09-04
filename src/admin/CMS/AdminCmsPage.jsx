@@ -38,6 +38,7 @@ const pageOptions = [
   { value: 'sikhism', label: 'Sikhism' },
   { value: 'events', label: 'Events' },
   { value: 'gallery', label: 'Gallery' },
+  { value: 'membership', label: 'Membership' },
   { value: 'contact', label: 'Contact' }
 ];
 

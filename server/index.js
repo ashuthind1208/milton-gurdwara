@@ -22,6 +22,7 @@ const {
 } = require('./gurmatGuideStore');
 const { createAiQuiz } = require('./aiQuiz');
 const { findDailyAiQuiz, storeDailyAiQuiz } = require('./aiQuizStore');
+const { resolveMembershipRenewal } = require('./membershipReminder');
 
 const loadEnvFile = (filePath) => {
   if (!fs.existsSync(filePath)) {
@@ -194,6 +195,11 @@ const bookingReminderDays = String(process.env.BOOKING_REMINDER_DAYS || '5,3,2,1
   .split(',')
   .map((value) => Number(String(value || '').trim()))
   .filter((value) => Number.isFinite(value) && value >= 0);
+const membershipReminderWebhookUrl = resolveLocalWebhookUrl(
+  process.env.MEMBERSHIP_REMINDER_WEBHOOK_URL || internalMailRelayUrl,
+  '/api/internal/mail-relay'
+);
+const membershipReminderDays = [30, 15, 10, 5, 2];
 const localMailFromAddress = String(process.env.LOCAL_MAIL_FROM || 'no-reply@singhsabhamilton.local').trim() || 'no-reply@singhsabhamilton.local';
 const localMailTransport = String(process.env.LOCAL_MAIL_TRANSPORT || 'sendmail').trim().toLowerCase();
 const smtpProvider = String(process.env.SMTP_PROVIDER || 'gmail').trim().toLowerCase();
@@ -235,6 +241,8 @@ let eventReminderSweepRunning = false;
 let eventReminderLastRunDateKey = '';
 let bookingReminderSweepRunning = false;
 let bookingReminderLastRunDateKey = '';
+let membershipReminderSweepRunning = false;
+let membershipReminderLastRunDateKey = '';
 const darbarSahibStreamSource = String(process.env.DARBAR_SAHIB_STREAM_PROXY_TARGET || 'http://live.sgpc.net:4835/;').trim();
 const darbarSahibAacSampleRates = [96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350];
 const darbarSahibHlsTargetDuration = 2;
@@ -3802,6 +3810,10 @@ const parseScheduleDateTime = (dateValue, timeValue = '') => {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
+const isAkhandPathBooking = (entry = {}) => (
+  /akhand\s*(paath|path)/i.test(`${entry.categoryName || ''} ${entry.title || ''}`)
+);
+
 const getScheduleIntervals = (entry = {}, kind = 'booking') => {
   if (kind === 'event') {
     const start = parseScheduleDateTime(entry.date);
@@ -3812,8 +3824,9 @@ const getScheduleIntervals = (entry = {}, kind = 'booking') => {
 
   const startDate = String(entry.date || '').trim();
   const endDate = String(entry.toDate || entry.date || '').trim();
-  const startTime = String(entry.startTime || '').trim();
-  const endTime = String(entry.endTime || '').trim();
+  const fullDay = isAkhandPathBooking(entry);
+  const startTime = fullDay ? '00:00' : String(entry.startTime || '').trim();
+  const endTime = fullDay ? '24:00' : String(entry.endTime || '').trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate) || !/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime)) {
     return [];
   }
@@ -3825,7 +3838,9 @@ const getScheduleIntervals = (entry = {}, kind = 'booking') => {
   while (cursor <= lastDay && intervals.length < 3660) {
     const dateKey = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
     const start = parseScheduleDateTime(dateKey, startTime);
-    const end = parseScheduleDateTime(dateKey, endTime);
+    const end = fullDay
+      ? new Date(start.getTime() + (24 * 60 * 60 * 1000))
+      : parseScheduleDateTime(dateKey, endTime);
     if (start && end && end > start) intervals.push({ start, end });
     cursor.setDate(cursor.getDate() + 1);
   }
@@ -4214,6 +4229,129 @@ const runScheduledBookingReminderSweep = async () => {
   const result = await runBookingReminderSweep();
   const nowParts = getDatePartsInTimeZone(new Date(), bookingReminderTimeZone);
   bookingReminderLastRunDateKey = toDateKeyFromParts(nowParts);
+  return result;
+};
+
+const sendNewUserWelcomeEmail = async (user = {}) => {
+  const email = String(user.email || '').trim().toLowerCase();
+  if (!isValidEmailAddress(email)) {
+    return { sent: false, reason: 'invalid_email' };
+  }
+
+  const name = String(user.name || 'Sangat Member').trim();
+  const homeUrl = `${newsletterPublicBaseUrl}/`;
+  const subject = `Welcome to ${volunteerReminderSiteName}`;
+  const text = `Waheguru Ji Ka Khalsa, Waheguru Ji Ki Fateh ${name},\n\nYour account has been created. You can now sign in and use the services available at ${homeUrl}.\n\n${volunteerReminderSiteName}`;
+  const html = `<div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;color:#1e293b;line-height:1.65;"><h2 style="color:#0a4d9f;">Welcome to ${escapeHtml(volunteerReminderSiteName)}</h2><p>Waheguru Ji Ka Khalsa, Waheguru Ji Ki Fateh ${escapeHtml(name)},</p><p>Your account has been created. You can now sign in and use the services available through our website.</p><p><a href="${escapeHtml(homeUrl)}" style="display:inline-block;padding:10px 16px;border-radius:6px;background:#0a4d9f;color:#ffffff;text-decoration:none;font-weight:700;">Visit the website</a></p><p style="margin-top:24px;color:#64748b;">${escapeHtml(volunteerReminderSiteName)}</p></div>`;
+
+  try {
+    const response = await deliverWorkflowEmail(membershipReminderWebhookUrl, {
+      type: 'new-user-welcome', to: email, name, subject, message: text, text, html,
+      bodyHtml: html, bodyText: text, sentAt: new Date().toISOString()
+    });
+    return response.ok ? { sent: true } : { sent: false, reason: 'webhook_error' };
+  } catch {
+    return { sent: false, reason: 'network_error' };
+  }
+};
+
+const sendMembershipRenewalReminderEmail = async (user, renewal) => {
+  const email = String(user.email || '').trim().toLowerCase();
+  if (!isValidEmailAddress(email)) {
+    return { sent: false, reason: 'invalid_email' };
+  }
+
+  const name = String(user.name || 'Member').trim();
+  const dueDateLabel = new Intl.DateTimeFormat('en-CA', {
+    timeZone: bookingReminderTimeZone,
+    year: 'numeric', month: 'long', day: 'numeric'
+  }).format(renewal.dueDate);
+  const dashboardUrl = `${newsletterPublicBaseUrl}/family`;
+  const subject = `Membership renewal due in ${renewal.daysUntilDue} days`;
+  const text = `Waheguru Ji Ka Khalsa, Waheguru Ji Ki Fateh ${name},\n\nYour ${renewal.schedule} membership renewal is due on ${dueDateLabel}. Please visit your Family Dashboard to renew.\n\n${dashboardUrl}`;
+  const html = `<div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;color:#1e293b;line-height:1.65;"><h2 style="color:#0a4d9f;">Membership renewal reminder</h2><p>Waheguru Ji Ka Khalsa, Waheguru Ji Ki Fateh ${escapeHtml(name)},</p><p>Your ${escapeHtml(renewal.schedule)} membership renewal is due in <strong>${renewal.daysUntilDue} days</strong>, on ${escapeHtml(dueDateLabel)}.</p><p><a href="${escapeHtml(dashboardUrl)}" style="display:inline-block;padding:10px 16px;border-radius:6px;background:#0a4d9f;color:#ffffff;text-decoration:none;font-weight:700;">Open Family Dashboard</a></p><p style="margin-top:24px;color:#64748b;">${escapeHtml(volunteerReminderSiteName)}</p></div>`;
+
+  try {
+    const response = await deliverWorkflowEmail(membershipReminderWebhookUrl, {
+      type: 'membership-renewal-reminder', to: email, name, subject, message: text, text, html,
+      bodyHtml: html, bodyText: text,
+      metadata: { userId: user.id, daysUntilDue: renewal.daysUntilDue, dueDate: renewal.dueDate.toISOString(), schedule: renewal.schedule },
+      sentAt: new Date().toISOString()
+    });
+    return response.ok ? { sent: true } : { sent: false, reason: 'webhook_error' };
+  } catch {
+    return { sent: false, reason: 'network_error' };
+  }
+};
+
+const shouldRunMembershipReminderSweep = (date = new Date()) => {
+  const nowParts = getDatePartsInTimeZone(date, bookingReminderTimeZone);
+  const todayDateKey = toDateKeyFromParts(nowParts);
+  const nowMinutes = (nowParts.hour * 60) + nowParts.minute;
+  const scheduledMinutes = (bookingReminderSendTime.hour * 60) + bookingReminderSendTime.minute;
+  return membershipReminderLastRunDateKey !== todayDateKey && nowMinutes >= scheduledMinutes;
+};
+
+const runMembershipReminderSweep = async (options = {}) => {
+  if (membershipReminderSweepRunning) {
+    return { processed: 0, sent: 0, skipped: 0, reason: 'already_running' };
+  }
+
+  membershipReminderSweepRunning = true;
+  const force = options.force === true;
+  try {
+    const [users, reminderLogs] = await Promise.all([
+      eventsDb.listItems('users'),
+      eventsDb.listItems('membership_reminder_log')
+    ]);
+    const sentKeys = new Set((Array.isArray(reminderLogs) ? reminderLogs : []).map((entry) => String(entry.reminderKey || '')));
+    let processed = 0;
+    let sent = 0;
+    let skipped = 0;
+
+    for (const user of Array.isArray(users) ? users : []) {
+      processed += 1;
+      const renewal = resolveMembershipRenewal(user);
+      if (!renewal || !membershipReminderDays.includes(renewal.daysUntilDue)) {
+        skipped += 1;
+        continue;
+      }
+
+      const dueDateKey = renewal.dueDate.toISOString().slice(0, 10);
+      const reminderKey = `${user.id}:${dueDateKey}:${renewal.daysUntilDue}`;
+      if (!force && sentKeys.has(reminderKey)) {
+        skipped += 1;
+        continue;
+      }
+
+      const result = await sendMembershipRenewalReminderEmail(user, renewal);
+      if (!result.sent) {
+        skipped += 1;
+        continue;
+      }
+
+      sent += 1;
+      sentKeys.add(reminderKey);
+      await eventsDb.createItem('membership_reminder_log', {
+        reminderKey, userId: user.id, email: user.email,
+        dueDate: renewal.dueDate.toISOString(), reminderDays: renewal.daysUntilDue,
+        sentAt: new Date().toISOString()
+      });
+    }
+
+    return { processed, sent, skipped, force, reminderDays: membershipReminderDays };
+  } finally {
+    membershipReminderSweepRunning = false;
+  }
+};
+
+const runScheduledMembershipReminderSweep = async () => {
+  if (!shouldRunMembershipReminderSweep()) {
+    return null;
+  }
+  const result = await runMembershipReminderSweep();
+  const nowParts = getDatePartsInTimeZone(new Date(), bookingReminderTimeZone);
+  membershipReminderLastRunDateKey = toDateKeyFromParts(nowParts);
   return result;
 };
 
@@ -6466,6 +6604,12 @@ const server = http.createServer(async (request, response) => {
         validatedBody = await enforceEligibleBookingDutyAssignee(validatedBody);
         await assertNoScheduleOverlap(validatedBody, { kind: 'booking' });
       }
+      const normalizedNewUserEmail = resource === 'users'
+        ? String(validatedBody.email || '').trim().toLowerCase()
+        : '';
+      const userPreviouslyExisted = normalizedNewUserEmail
+        ? (await eventsDb.listItems('users')).some((user) => String(user.email || '').trim().toLowerCase() === normalizedNewUserEmail)
+        : false;
       const data = await eventsDb.createItem(resource, validatedBody);
       if (resource !== 'audit_logs') {
         await appendAuditLog(request, {
@@ -6479,6 +6623,12 @@ const server = http.createServer(async (request, response) => {
       if (resource === 'bookings') {
         if (!shouldDelayBookingEmailUntilPayment(data)) {
           await sendBookingNotificationEmail(data, { changeType: 'created' });
+        }
+      }
+      if (resource === 'users' && !userPreviouslyExisted) {
+        const welcomeResult = await sendNewUserWelcomeEmail(data);
+        if (!welcomeResult.sent) {
+          console.warn(`New-user welcome email was not sent (${welcomeResult.reason || 'unknown'}).`);
         }
       }
       sendJson(response, 200, { ok: true, data });
@@ -8234,6 +8384,7 @@ const bootstrap = async () => {
   console.log(`Event reminder scheduler set for ${eventConfiguredTime} (${eventReminderTimeZone}) daily.`);
   const bookingConfiguredTime = `${String(bookingReminderSendTime.hour).padStart(2, '0')}:${String(bookingReminderSendTime.minute).padStart(2, '0')}`;
   console.log(`Booking reminder scheduler set for ${bookingConfiguredTime} (${bookingReminderTimeZone}) daily at ${bookingReminderDays.join(', ')} day intervals.`);
+  console.log(`Membership renewal scheduler set for ${bookingConfiguredTime} (${bookingReminderTimeZone}) daily at ${membershipReminderDays.join(', ')} day intervals.`);
 
   // Check every minute, but only send once per day after the configured local send time.
   setInterval(() => {
@@ -8266,6 +8417,16 @@ const bootstrap = async () => {
 
   runScheduledBookingReminderSweep().catch((error) => {
     logServerError(error, 'Initial booking reminder scheduler check failed');
+  });
+
+  setInterval(() => {
+    runScheduledMembershipReminderSweep().catch((error) => {
+      logServerError(error, 'Membership renewal reminder sweep failed');
+    });
+  }, 60 * 1000);
+
+  runScheduledMembershipReminderSweep().catch((error) => {
+    logServerError(error, 'Initial membership renewal reminder scheduler check failed');
   });
 
   const zeffyReconciliationTimer = setInterval(() => {

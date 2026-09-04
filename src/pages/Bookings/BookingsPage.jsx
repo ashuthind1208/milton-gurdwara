@@ -11,23 +11,9 @@ import eventService from '../../services/eventService';
 import donationService from '../../services/donationService';
 import ZeffyDonationModal from '../Donation/ZeffyDonationModal';
 import { toZeffyEmbedUrl } from '../../utils/zeffy';
+import { expandDateRange, isAkhandPathBooking, toDateOnlyKey } from '../../utils/dateRange';
 
-const toDateKey = (value) => {
-  const rawValue = String(value || '').trim();
-  const dateOnlyMatch = rawValue.match(/^(\d{4}-\d{2}-\d{2})/);
-  if (dateOnlyMatch) {
-    return dateOnlyMatch[1];
-  }
-
-  const date = value instanceof Date ? value : new Date(value || '');
-  if (Number.isNaN(date.getTime())) {
-    return '';
-  }
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
+const toDateKey = toDateOnlyKey;
 
 const toMinutes = (value) => {
   const [h, m] = String(value || '').split(':').map((token) => Number(token || 0));
@@ -95,6 +81,7 @@ const MOBILE_BOOKING_DATE_OPTIONS = Array.from({ length: 731 }, (_, index) => {
 const initialForm = {
   categoryId: '',
   date: '',
+  toDate: '',
   startTime: '',
   endTime: '',
   bookingLocation: 'Gurdwara Singh Sabha Milton, 7035 Sixth Line, Milton, ON',
@@ -162,32 +149,35 @@ const BookingsPage = () => {
   const calendarEntries = useMemo(() => {
     const bookingEntries = bookings
       .filter((entry) => String(entry.status || '').toLowerCase() !== 'cancelled')
-      .map((entry) => {
+      .flatMap((entry) => {
         const category = categoryById.get(entry.categoryId);
-        return {
-          id: `booking-${entry.id}`,
+        const booking = { ...entry, categoryName: category?.name || entry.categoryName };
+        const fullDay = isAkhandPathBooking(booking);
+        return expandDateRange(entry.date, entry.toDate || entry.date).map((date) => ({
+          id: `booking-${entry.id}-${date}`,
           kind: 'booking',
           title: category?.name || entry.categoryName || 'Booking',
-          date: entry.date,
-          startTime: entry.startTime,
-          endTime: entry.endTime,
+          date,
+          startTime: fullDay ? '00:00' : entry.startTime,
+          endTime: fullDay ? '24:00' : entry.endTime,
           color: category?.color || '#1d4ed8'
-        };
+        }));
       });
 
-    const eventEntries = events.map((entry) => {
-      const date = toDateKey(entry.date);
+    const eventEntries = events.flatMap((entry) => {
+      const startDate = toDateKey(entry.date);
       const start = new Date(entry.date);
       const end = entry.endDate ? new Date(entry.endDate) : new Date(start.getTime() + (60 * 60 * 1000));
-      return {
-        id: `event-${entry.id}`,
+      const endDate = toDateKey(end);
+      return expandDateRange(startDate, endDate).map((date) => ({
+        id: `event-${entry.id}-${date}`,
         kind: 'event',
         title: entry.title || 'Event',
         date,
-        startTime: `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`,
-        endTime: `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`,
+        startTime: date === startDate ? `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}` : '00:00',
+        endTime: date === endDate ? `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}` : '24:00',
         color: '#475569'
-      };
+      }));
     });
 
     return [...bookingEntries, ...eventEntries];
@@ -228,13 +218,20 @@ const BookingsPage = () => {
     [calendarEntriesByDate, mobileCalendarDate]
   );
 
+  const selectedCategory = categoryById.get(form.categoryId) || null;
   const conflictMessage = useMemo(() => {
-    if (!form.date || !form.startTime || !form.endTime) {
+    if (!form.date || !form.toDate || !form.startTime || !form.endTime) {
       return '';
     }
 
-    const start = toMinutes(form.startTime);
-    const end = toMinutes(form.endTime);
+    const selectedDates = expandDateRange(form.date, form.toDate);
+    if (selectedDates.length === 0) {
+      return 'End date must be on or after the start date.';
+    }
+
+    const fullDay = isAkhandPathBooking({ categoryName: selectedCategory?.name });
+    const start = fullDay ? 0 : toMinutes(form.startTime);
+    const end = fullDay ? 24 * 60 : toMinutes(form.endTime);
     if (start == null || end == null || end <= start) {
       return 'Please choose a valid time window.';
     }
@@ -243,7 +240,7 @@ const BookingsPage = () => {
     }
 
     const conflicts = calendarEntries.filter((entry) => {
-      if (entry.date !== form.date) {
+      if (!selectedDates.includes(entry.date)) {
         return false;
       }
       const entryStart = toMinutes(entry.startTime);
@@ -256,9 +253,8 @@ const BookingsPage = () => {
     }
 
     return `Selected slot overlaps with ${conflicts.length} existing booking/event item(s). Choose another time.`;
-  }, [calendarEntries, form.date, form.endTime, form.startTime]);
+  }, [calendarEntries, form.date, form.endTime, form.startTime, form.toDate, selectedCategory?.name]);
 
-  const selectedCategory = categoryById.get(form.categoryId) || null;
   const categoryPaymentRequired = Number(selectedCategory?.feeAmount || 0) > 0;
   const selfPaymentRequired = Boolean(
     categoryPaymentRequired &&
@@ -386,6 +382,7 @@ const BookingsPage = () => {
     setForm((prev) => ({
       ...prev,
       date: prev.date || selectedDateKey,
+      toDate: prev.toDate || prev.date || selectedDateKey,
       requesterName: prev.bookingForDifferentPerson ? prev.requesterName : bookingDefaults.requesterName,
       requesterEmail: prev.bookingForDifferentPerson ? prev.requesterEmail : bookingDefaults.requesterEmail,
       requesterPhone: prev.bookingForDifferentPerson ? prev.requesterPhone : bookingDefaults.requesterPhone,
@@ -418,8 +415,8 @@ const BookingsPage = () => {
     event.preventDefault();
     setNotice({ type: '', message: '' });
 
-    if (!form.categoryId || !form.date || !form.startTime || !form.endTime || !String(form.bookingLocation || '').trim()) {
-      setNotice({ type: 'error', message: 'Booking type, date, time, and location are required.' });
+    if (!form.categoryId || !form.date || !form.toDate || !form.startTime || !form.endTime || !String(form.bookingLocation || '').trim()) {
+      setNotice({ type: 'error', message: 'Booking type, start date, end date, time, and location are required.' });
       return;
     }
 
@@ -695,13 +692,23 @@ const BookingsPage = () => {
           </label>
 
           <label className="text-sm font-semibold text-slate-700">
-            Date
+            Start Date
             <select value={form.date} onChange={handleField('date')} className="booking-mobile-date-select mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 sm:hidden" required>
               <option value="">Select date</option>
               {form.date && !MOBILE_BOOKING_DATE_OPTIONS.some((entry) => entry.value === form.date) ? <option value={form.date}>{form.date}</option> : null}
               {MOBILE_BOOKING_DATE_OPTIONS.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
             </select>
             <input type="date" value={form.date} onChange={handleField('date')} className="booking-date-input mt-1 hidden w-full rounded-lg border border-slate-300 px-3 py-2 sm:block" required />
+          </label>
+
+          <label className="text-sm font-semibold text-slate-700">
+            End Date
+            <select value={form.toDate} onChange={handleField('toDate')} className="booking-mobile-date-select mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 sm:hidden" required>
+              <option value="">Select end date</option>
+              {form.toDate && !MOBILE_BOOKING_DATE_OPTIONS.some((entry) => entry.value === form.toDate) ? <option value={form.toDate}>{form.toDate}</option> : null}
+              {MOBILE_BOOKING_DATE_OPTIONS.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
+            </select>
+            <input type="date" min={form.date || undefined} value={form.toDate} onChange={handleField('toDate')} className="booking-date-input mt-1 hidden w-full rounded-lg border border-slate-300 px-3 py-2 sm:block" required />
           </label>
 
           <label className="text-sm font-semibold text-slate-700">

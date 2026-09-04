@@ -369,10 +369,14 @@ const DonationPage = () => {
                 {campaign.description ? <p className="mt-1 text-sm text-slate-600">{campaign.description}</p> : null}
                 <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Raised so far</p>
                 <p className="mt-1 text-3xl font-extrabold leading-none text-brand-blue">{formatCurrency(raised)}</p>
-                <p className="mt-1 text-sm text-slate-700">Target: {formatCurrency(target)}</p>
-                <div className="mt-2 h-2 rounded-full bg-slate-200">
-                  <div className="h-2 rounded-full bg-brand-saffron" style={{ width: `${progress}%` }} />
-                </div>
+                {target > 0 ? (
+                  <>
+                    <p className="mt-1 text-sm text-slate-700">Target: {formatCurrency(target)}</p>
+                    <div className="mt-4 h-2 rounded-full bg-slate-200">
+                      <div className="h-2 rounded-full bg-brand-blue" style={{ width: `${progress}%` }} />
+                    </div>
+                  </>
+                ) : null}
                 <p className="mt-2 text-xs font-semibold text-slate-500">{progress.toFixed(1)}% complete</p>
                 {activeProgressItems.length > 0 ? (
                   <div className="mt-3 flex flex-wrap gap-1.5">

@@ -11,7 +11,7 @@ import eventService from '../../services/eventService';
 import donationService from '../../services/donationService';
 import volunteerService from '../../services/volunteerService';
 import bookingService from '../../services/bookingService';
-import { downloadCsv, downloadDonationInvoicePdf } from '../../utils/csvExport';
+import { downloadCsv, downloadDonationInvoicePdf, downloadMembershipFeeInformationPdf } from '../../utils/csvExport';
 import { siteConfig } from '../../constants/siteConfig';
 import { isEventCurrent } from '../../utils/eventAvailability';
 import { bookingBelongsToProfile, isBookingPaymentDonation, sortBookingsBySchedule } from '../../utils/profileBookings';
@@ -124,6 +124,7 @@ const FamilyDashboardPage = () => {
   const donationsPerPage = 6;
   const userDisplayName = String(user?.name || 'Member').trim() || 'Member';
   const userAvatarUrl = String(user?.avatarUrl || user?.picture || user?.photoURL || user?.imageUrl || user?.profileImageUrl || '').trim();
+  const isMember = String(user?.role || '').trim().toLowerCase() === 'member';
 
   const email = String(user?.email || '').toLowerCase();
   const userName = String(user?.name || '').trim().toLowerCase();
@@ -296,6 +297,14 @@ const FamilyDashboardPage = () => {
     () => familyDonations.reduce((sum, item) => sum + Number(item.amount || 0), 0),
     [familyDonations]
   );
+  const membershipRenewals = useMemo(() => (
+    isMember && Array.isArray(user?.membershipFeeRecords)
+      ? user.membershipFeeRecords
+        .filter((entry) => String(entry?.membershipEntryType || '').trim().toLowerCase() === 'renew'
+          && String(entry?.status || '').trim().toLowerCase() === 'paid')
+        .sort((left, right) => new Date(right.paymentDate || right.updatedAt || 0).getTime() - new Date(left.paymentDate || left.updatedAt || 0).getTime())
+      : []
+  ), [isMember, user?.membershipFeeRecords]);
 
   useEffect(() => {
     if (!selectedBooking) {
@@ -365,6 +374,16 @@ const FamilyDashboardPage = () => {
       phone: siteConfig.contact.phone,
       donation: entry,
       campaignDescription: ''
+    }).catch(() => null);
+  };
+
+  const handleDownloadMembershipRenewal = (entry) => {
+    void downloadMembershipFeeInformationPdf({
+      user: { ...user, membershipFeeRecords: [entry] },
+      organizationName: siteConfig.name,
+      address: siteConfig.contact.address,
+      phone: siteConfig.contact.phone,
+      email: siteConfig.contact.email
     }).catch(() => null);
   };
 
@@ -687,6 +706,28 @@ const FamilyDashboardPage = () => {
             <p className="mt-2 text-[2rem] font-black leading-none text-emerald-700 md:text-[2.4rem]">${donationTotal.toFixed(2)}</p>
             <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Total contributed</p>
           </article>
+
+          {isMember ? (
+            <article className="rounded-2xl border border-violet-200/80 bg-gradient-to-br from-violet-50 via-white to-blue-50 p-5">
+              <h2 className="text-2xl font-black text-brand-blue">Membership Renewal Receipts</h2>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Paid renewals only</p>
+              <div className="mt-3 space-y-2">
+                {membershipRenewals.map((entry) => (
+                  <div key={entry.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                    <div>
+                      <p className="font-semibold text-slate-800">{entry.receiptNumber || 'Membership renewal'}</p>
+                      <p className="text-xs text-slate-600">{entry.paymentDate ? format(new Date(entry.paymentDate), 'MMM d, yyyy') : 'Date unavailable'} · {entry.currency || 'CAD'} {Number(entry.amount || 0).toFixed(2)}</p>
+                    </div>
+                    <button type="button" onClick={() => handleDownloadMembershipRenewal(entry)} className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-brand-blue/20 px-3 py-1 text-xs font-semibold text-brand-blue transition hover:border-brand-blue hover:bg-brand-blue hover:text-white">
+                      <DocumentArrowDownIcon className="h-4 w-4" />
+                      Receipt
+                    </button>
+                  </div>
+                ))}
+                {membershipRenewals.length === 0 ? <p className="text-sm text-slate-500">No paid membership renewals are available yet.</p> : null}
+              </div>
+            </article>
+          ) : null}
         </div>
 
         <article className="rounded-2xl border border-brand-blue/20 bg-gradient-to-br from-blue-50 via-white to-amber-100 p-5">

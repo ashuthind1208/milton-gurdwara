@@ -25,6 +25,7 @@ import sponsorService from '../../services/sponsorService';
 import { getNanakshahiDate, toGurmukhiNumber } from '../../utils/punjabiCalendar';
 import { siteConfig } from '../../constants/siteConfig';
 import gurdwaraLogo from '../../assets/gurdwara-logo.webp';
+import { expandDateRange } from '../../utils/dateRange';
 
 const WEEKDAY_LABELS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
@@ -126,14 +127,17 @@ const EventCalendarBoardPage = () => {
     .sort((left, right) => new Date(left.date || 0).getTime() - new Date(right.date || 0).getTime()), [events]);
   const confirmedBookings = useMemo(() => bookings
     .filter((booking) => booking?.status === 'confirmed' && booking?.date)
-    .map((booking) => ({
-      ...booking,
-      itemType: 'booking',
-      title: booking.title || booking.categoryName || 'Gurdwara Booking',
-      category: 'Booking',
-      dateTime: new Date(`${booking.date}T${booking.startTime || '00:00'}`),
-      location: booking.bookingLocation || siteConfig.name
-    }))
+    .flatMap((booking) => expandDateRange(booking.date, booking.toDate || booking.date).map((date) => ({
+        ...booking,
+        id: `${booking.id}-${date}`,
+        sourceBookingId: booking.id,
+        itemType: 'booking',
+        title: booking.title || booking.categoryName || 'Gurdwara Booking',
+        category: 'Booking',
+        date,
+        dateTime: new Date(`${date}T${booking.startTime || '00:00'}`),
+        location: booking.bookingLocation || siteConfig.name
+      })))
     .filter((booking) => !Number.isNaN(booking.dateTime.getTime()))
     .sort((left, right) => left.dateTime.getTime() - right.dateTime.getTime()), [bookings]);
   const calendarItems = useMemo(() => [...activeEvents, ...confirmedBookings]

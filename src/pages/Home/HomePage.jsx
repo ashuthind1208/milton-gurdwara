@@ -96,6 +96,21 @@ const resolveScheduleStartMinutes = (timeEn) => {
   return startMinutes == null ? Number.POSITIVE_INFINITY : startMinutes;
 };
 
+const sortScheduleEntries = (entries = []) => [...entries].sort((left, right) => {
+  const leftMinutes = resolveScheduleStartMinutes(left.timeEn);
+  const rightMinutes = resolveScheduleStartMinutes(right.timeEn);
+  return leftMinutes !== rightMinutes
+    ? leftMinutes - rightMinutes
+    : Number(left.sortOrder || 0) - Number(right.sortOrder || 0);
+});
+
+const formatScheduleDate = (dateKey) => {
+  const date = new Date(`${dateKey}T12:00:00`);
+  return Number.isNaN(date.getTime())
+    ? dateKey
+    : date.toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+};
+
 const resolveLangarCategoryIcon = (category = '') => {
   const normalizedCategory = String(category || '').toLowerCase();
 
@@ -141,6 +156,7 @@ const HomePage = () => {
   const [selectedSevaCategory, setSelectedSevaCategory] = useState('All');
   const [selectedSevaPage, setSelectedSevaPage] = useState(1);
   const [tickerMotionSeed, setTickerMotionSeed] = useState(0);
+  const [selectedSchedulePreview, setSelectedSchedulePreview] = useState(null);
   const homeTickerTrackRef = useRef(null);
   const specialTickerTrackRef = useRef(null);
 
@@ -276,7 +292,7 @@ const HomePage = () => {
     };
   }, [publicLangarNeeds]);
   const activeHukamnama = dailyHukamnama?.entry || null;
-  const resolvedScheduleDay = useMemo(() => {
+  const scheduleDaysForResolution = useMemo(() => {
     const scheduleDays = Array.isArray(cmsData?.scheduleDays) ? cmsData.scheduleDays : [];
     const fallbackEntries = [
       ...(cmsData?.schedule?.morning || []).map((item) => ({ ...item, segment: 'morning', titleEn: item.label || '', timeEn: item.time || '' })),
@@ -284,33 +300,53 @@ const HomePage = () => {
     ];
 
     if (scheduleDays.length === 0) {
-      return resolveScheduleForDate([{
+      return [{
         dateKey: 'default',
         title: 'Daily Schedule',
         highlightTitle: '',
         highlightNoteEn: '',
         highlightNotePa: '',
         entries: fallbackEntries
-      }], todayDateKey);
+      }];
     }
 
-    return resolveScheduleForDate(scheduleDays, todayDateKey);
-  }, [cmsData, todayDateKey]);
-  const scheduleRows = useMemo(() => {
-    const entries = Array.isArray(resolvedScheduleDay?.entries) ? [...resolvedScheduleDay.entries] : [];
+    return scheduleDays;
+  }, [cmsData]);
+  const resolvedScheduleDay = useMemo(
+    () => resolveScheduleForDate(scheduleDaysForResolution, todayDateKey),
+    [scheduleDaysForResolution, todayDateKey]
+  );
+  const schedulePreviews = useMemo(() => {
+    const today = new Date(`${todayDateKey}T12:00:00`);
+    const nextSunday = new Date(today);
+    nextSunday.setDate(today.getDate() + (7 - today.getDay() || 7));
+    const sundayDateKey = toDateKey(nextSunday);
+    const specialDay = scheduleDaysForResolution
+      .filter((day) => day.dateKey > todayDateKey && day.dateKey !== 'default' && day.isSpecial !== false)
+      .sort((left, right) => left.dateKey.localeCompare(right.dateKey))[0] || null;
 
-    entries.sort((left, right) => {
-      const leftMinutes = resolveScheduleStartMinutes(left.timeEn);
-      const rightMinutes = resolveScheduleStartMinutes(right.timeEn);
-
-      if (leftMinutes !== rightMinutes) {
-        return leftMinutes - rightMinutes;
+    return {
+      sunday: {
+        type: 'sunday',
+        dateKey: sundayDateKey,
+        title: 'Upcoming Sunday Schedule',
+        schedule: resolveScheduleForDate(scheduleDaysForResolution, sundayDateKey)
+      },
+      special: specialDay ? {
+        type: 'special',
+        dateKey: specialDay.dateKey,
+        title: 'Upcoming Special-Day Schedule',
+        schedule: resolveScheduleForDate(scheduleDaysForResolution, specialDay.dateKey)
+      } : {
+        type: 'special',
+        dateKey: '',
+        title: 'Upcoming Special-Day Schedule',
+        schedule: null
       }
-
-      return Number(left.sortOrder || 0) - Number(right.sortOrder || 0);
-    });
-
-    return entries.map((item) => ({
+    };
+  }, [scheduleDaysForResolution, todayDateKey]);
+  const scheduleRows = useMemo(() => {
+    return sortScheduleEntries(Array.isArray(resolvedScheduleDay?.entries) ? resolvedScheduleDay.entries : []).map((item) => ({
       ...item,
       ...resolveScheduleRowState(item.timeEn, new Date())
     }));
@@ -569,6 +605,10 @@ const HomePage = () => {
 
               <div className={`flex flex-wrap items-start justify-between gap-3 ${isTodaySpecial ? 'pt-8' : ''}`}>
                 <SectionTitle title="Daily Schedule" subtitle="" />
+                <div className="ml-auto flex flex-wrap justify-end gap-x-3 gap-y-1 text-xs font-semibold">
+                  <button type="button" onClick={() => setSelectedSchedulePreview(schedulePreviews.sunday)} className="text-brand-blue hover:underline">Upcoming Sunday</button>
+                  <button type="button" onClick={() => setSelectedSchedulePreview(schedulePreviews.special)} className="text-brand-blue hover:underline">Next Special Day</button>
+                </div>
               </div>
 
               {specialDayTickerTextVisible ? (
@@ -1098,6 +1138,44 @@ const HomePage = () => {
               </div>
             )}
 
+          </div>
+        </div>
+      ) : null}
+      {selectedSchedulePreview ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/50 px-3 py-4" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setSelectedSchedulePreview(null);
+        }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="schedule-preview-title" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-5">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-3">
+              <div>
+                <h3 id="schedule-preview-title" className="font-heading text-xl font-semibold text-slate-900">{selectedSchedulePreview.title}</h3>
+                {selectedSchedulePreview.dateKey ? <p className="mt-1 text-sm text-slate-600">{formatScheduleDate(selectedSchedulePreview.dateKey)}</p> : null}
+              </div>
+              <button type="button" onClick={() => setSelectedSchedulePreview(null)} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-brand-blue bg-brand-blue text-lg leading-none text-white hover:bg-blue-700" aria-label="Close schedule preview">×</button>
+            </div>
+            {selectedSchedulePreview.schedule ? (
+              <div className="mt-4">
+                {(selectedSchedulePreview.schedule.specialReason || selectedSchedulePreview.schedule.highlightNoteEn) ? (
+                  <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">{selectedSchedulePreview.schedule.specialReason || selectedSchedulePreview.schedule.highlightNoteEn}</p>
+                ) : null}
+                <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+                  {sortScheduleEntries(selectedSchedulePreview.schedule.entries || []).map((item) => (
+                    <div key={item.id} className="grid grid-cols-[110px_1fr] gap-3 px-3 py-2.5 sm:grid-cols-[150px_1fr]">
+                      <div className="text-sm font-semibold text-slate-700">
+                        <p>{item.timeEn || 'Time TBD'}</p>
+                        {item.timePa ? <p className="mt-0.5 text-xs font-medium text-slate-500">{item.timePa}</p> : null}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-900">{item.titleEn || 'Schedule item'}</p>
+                        {item.titlePa ? <p className="mt-0.5 text-sm text-brand-saffron">{item.titlePa}</p> : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="py-8 text-center text-sm text-slate-600">No upcoming special-day schedule has been published.</p>
+            )}
           </div>
         </div>
       ) : null}
