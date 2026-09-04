@@ -595,7 +595,7 @@ const HomePage = () => {
                 ) : hukamnamaLines.map((line) => (
                   <div key={line.id}>
                     <p className="font-gurmukhi text-lg font-bold leading-relaxed text-brand-navy">{line.gurmukhi}</p>
-                    {line.translationPunjabi ? <p className="mt-1 text-sm font-normal text-brand-saffron">Punjabi: {line.translationPunjabi}</p> : null}
+                    {line.translationPunjabi ? <p className="mt-1 text-sm font-normal text-slate-900">Punjabi: {line.translationPunjabi}</p> : null}
                     {line.translationEnglish ? <p className="mt-0.5 text-sm font-normal text-brand-blue">English: {line.translationEnglish}</p> : null}
                   </div>
                 ))}
@@ -630,10 +630,9 @@ const HomePage = () => {
                       {[0, 1].map((groupIndex) => (
                         <div key={`special-day-note-${groupIndex}`} className="ticker-group">
                           {[0, 1, 2, 3].map((unitIndex) => (
-                            <div key={`${groupIndex}-unit-${unitIndex}`} className={`daily-schedule-special-item inline-flex shrink-0 items-center gap-1 text-sm font-extrabold ${specialDayTickerTextClass}`}>
-                              <span className="ml-4 whitespace-nowrap">{specialDayTickerParts[1]?.label || ''}</span>
+                            <div key={`${groupIndex}-unit-${unitIndex}`} className={`daily-schedule-special-item inline-flex shrink-0 items-center gap-3 text-sm font-extrabold ${specialDayTickerTextClass}`}>
+                              {specialDayTickerParts.map((part) => <span key={part.key} className="whitespace-nowrap">{part.label}</span>)}
                               <span aria-hidden="true" className="inline-flex h-3 w-3 items-center justify-center text-base font-black leading-none text-black">•</span>
-                              <span className="mr-3 whitespace-nowrap">{specialDayTickerParts[0]?.label || ''}</span>
                               <img
                                 src={gurdwaraLogo}
                                 alt=""
@@ -1170,14 +1169,14 @@ const HomePage = () => {
             </div>
             {selectedSchedulePreview.schedule ? (
               <div className="max-h-[calc(90vh-92px)] overflow-y-auto">
-                <div className="daily-schedule-special-ticker w-full overflow-hidden border-y border-brand-saffron/40 bg-brand-saffron">
+                <div className="daily-schedule-special-ticker w-full overflow-hidden border-y border-slate-800 bg-slate-900">
                   <div className="ticker-mask px-3 py-2">
                     <div className="ticker-track ticker-force-motion daily-schedule-special-track ticker-speed-fast ticker-no-pause">
                       {[0, 1].map((groupIndex) => (
                         <div key={`preview-ticker-${groupIndex}`} className="ticker-group" aria-hidden={groupIndex === 1}>
                           {[0, 1, 2].map((unitIndex) => (
                             <div key={`preview-ticker-${groupIndex}-${unitIndex}`} className="daily-schedule-special-item inline-flex shrink-0 items-center gap-3 text-sm font-extrabold text-amber-50">
-                              <span className="ml-5 whitespace-nowrap">{selectedSchedulePreview.schedule.specialReason || selectedSchedulePreview.schedule.highlightNoteEn || selectedSchedulePreview.schedule.title || selectedSchedulePreview.title}</span>
+                              {[selectedSchedulePreview.schedule.specialReason, selectedSchedulePreview.schedule.highlightNoteEn, selectedSchedulePreview.schedule.specialReasonPa, selectedSchedulePreview.schedule.highlightNotePa].filter(Boolean).map((message) => <span key={message} className="ml-5 whitespace-nowrap">{message}</span>)}
                               <img src={gurdwaraLogo} alt="" aria-hidden="true" className="mr-3 h-5 w-5 shrink-0 rounded-full object-cover" />
                             </div>
                           ))}

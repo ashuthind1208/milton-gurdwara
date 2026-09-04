@@ -421,6 +421,21 @@ const userService = {
       ...existing,
       phone: String(payload?.phone || existing.phone || '').trim(),
       address: String(payload?.address || existing.address || '').trim(),
+      membershipFeeRecords: payload?.membershipPaymentConfirmed === true
+        ? [
+          ...(Array.isArray(existing.membershipFeeRecords) ? existing.membershipFeeRecords : []),
+          {
+            id: `zeffy-membership-${Date.now()}`,
+            amount: 0,
+            currency: 'CAD',
+            paymentDate: new Date().toISOString(),
+            paymentMethod: 'Zeffy',
+            membershipEntryType: existing.membershipFeeRecords?.some((entry) => String(entry?.status || '').toLowerCase() === 'paid') ? 'renew' : 'new',
+            status: 'paid',
+            notes: 'Membership payment completed through Zeffy.'
+          }
+        ]
+        : existing.membershipFeeRecords,
       membershipProfile: profile,
       isActive: existing.isActive !== false,
       registrationComplete: true,

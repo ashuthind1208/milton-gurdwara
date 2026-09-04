@@ -1296,17 +1296,14 @@ const AdminDonationsPage = () => {
                           </span>
                         </td>
                         <td className="px-3 py-2">
-                          <div className="flex items-center gap-2">
-                            <button type="button" onClick={() => openProgressItemModal({ mode: 'view', item, index })} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-sky-200 bg-sky-50 text-sky-700" title="View progress item">
-                              <EyeIcon className="h-4 w-4" />
-                            </button>
-                            <button type="button" onClick={() => openProgressItemModal({ mode: 'edit', item, index })} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-amber-700" title="Edit progress item">
-                              <PencilSquareIcon className="h-4 w-4" />
-                            </button>
-                            <button type="button" onClick={() => handleDeleteProgressItem(index)} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-700" title="Delete progress item">
-                              <TrashIcon className="h-4 w-4" />
-                            </button>
-                          </div>
+                          <details className="relative text-left">
+                            <summary className="cursor-pointer list-none rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700">Actions</summary>
+                            <div className="absolute right-0 z-10 mt-1 w-32 rounded-lg border border-slate-200 bg-white p-1 text-left shadow-lg">
+                              <button type="button" onClick={() => openProgressItemModal({ mode: 'view', item, index })} className="block w-full rounded px-2 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100">View</button>
+                              <button type="button" onClick={() => openProgressItemModal({ mode: 'edit', item, index })} className="block w-full rounded px-2 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100">Edit</button>
+                              <button type="button" onClick={() => handleDeleteProgressItem(index)} className="block w-full rounded px-2 py-1.5 text-left text-xs text-rose-700 hover:bg-rose-50">Delete</button>
+                            </div>
+                          </details>
                         </td>
                       </tr>
                     ))}
@@ -1367,10 +1364,10 @@ const AdminDonationsPage = () => {
                       {progressItemModalState.mode === 'view' ? (
                         <div className="mt-4 space-y-4 px-4 pb-4 sm:px-6 sm:pb-6">
                           <div className="grid gap-4 lg:grid-cols-2">
-                            <div className={`rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5 ${Array.isArray(selectedProgressItem?.photos) && selectedProgressItem.photos.length > 0 ? '' : 'lg:col-span-2'}`}>
+                            <div className={`min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left sm:p-5 ${Array.isArray(selectedProgressItem?.photos) && selectedProgressItem.photos.length > 0 ? '' : 'lg:col-span-2'}`}>
                               <div className="mt-1 space-y-3">
                                 <div>
-                                  <div className="flex justify-end gap-2">
+                                  <div className="flex justify-start gap-2">
                                     <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getCampaignProgressStatusClassName(selectedProgressItem?.status, selectedProgressItem?.isActive)}`}>
                                       {getCampaignProgressStatusLabel(selectedProgressItem?.status, selectedProgressItem?.isActive)}
                                     </span>
@@ -1382,7 +1379,7 @@ const AdminDonationsPage = () => {
                                 {selectedProgressItem?.description ? (
                                   <div>
                                     <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Summary</p>
-                                    <p className="mt-1 text-[11px] leading-5 text-slate-700">{selectedProgressItem.description}</p>
+                                    <p className="mt-1 text-sm leading-6 text-slate-700">{selectedProgressItem.description}</p>
                                   </div>
                                 ) : null}
                               </div>

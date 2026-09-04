@@ -53,6 +53,9 @@ import PhoneInput from '../forms/PhoneInput';
 import StreamingModal from '../common/StreamingModal';
 import AudioPillPlayer from '../common/AudioPillPlayer';
 import GlobalSearchBar from '../common/GlobalSearchBar';
+import ZeffyDonationModal from '../../pages/Donation/ZeffyDonationModal';
+
+const MEMBERSHIP_ZEFFY_URL = 'https://www.zeffy.com/en-CA/ticketing/gurdwara-singh-sabha-milton-membership';
 
 const navClass = ({ isActive }) =>
   `border-b-[3px] px-3 py-2.5 text-base font-semibold tracking-tight transition ${isActive ? 'border-brand-saffron text-white' : 'border-transparent text-blue-100 hover:border-blue-200/70 hover:text-white'}`;
@@ -461,6 +464,9 @@ const Navbar = () => {
     avatarUrl: ''
   });
   const [isMembershipModalOpen, setIsMembershipModalOpen] = useState(false);
+  const [isMembershipZeffyOpen, setIsMembershipZeffyOpen] = useState(false);
+  const [membershipPaymentConfirmed, setMembershipPaymentConfirmed] = useState(false);
+  const [membershipSuccessNotice, setMembershipSuccessNotice] = useState('');
   const [isMembershipCancelConfirmOpen, setIsMembershipCancelConfirmOpen] = useState(false);
   const [, setMembershipPromptEnforced] = useState(false);
   const [membershipPromptNotice, setMembershipPromptNotice] = useState('');
@@ -1196,6 +1202,11 @@ const Navbar = () => {
         persistUser(response.data);
       }
       setIsMembershipModalOpen(false);
+      if (membershipPaymentConfirmed || response?.data?.membershipFeeRecords?.some((entry) => String(entry?.paymentMethod || '').toLowerCase() === 'zeffy' && String(entry?.status || '').toLowerCase() === 'paid')) {
+        const schedule = String(response?.data?.membershipProfile?.donationSchedule || membershipForm.donationSchedule || 'monthly').toLowerCase();
+        const validUntil = new Date(Date.now() + (schedule === 'yearly' ? 365 : 30) * 24 * 60 * 60 * 1000).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' });
+        setMembershipSuccessNotice(`Your ${schedule} membership payment was recorded through Zeffy. Your membership is active until ${validUntil}.`);
+      }
       setMembershipPromptEnforced(false);
       setMembershipFormError('');
       try {
@@ -1276,6 +1287,8 @@ const Navbar = () => {
       membershipPledgeAccepted: membershipProfile?.membershipPledgeAccepted === true,
       notes: String(membershipProfile?.notes || '').trim()
     });
+    setMembershipPaymentConfirmed(false);
+    setMembershipSuccessNotice('');
     setIsMembershipModalOpen(true);
   }, [membershipProfile?.canadianStatus, membershipProfile?.dateOfBirth, membershipProfile?.donationMethod, membershipProfile?.donationSchedule, membershipProfile?.membershipPledgeAccepted, membershipProfile?.notes, user?.address, user?.phone]);
 
@@ -1393,7 +1406,29 @@ const Navbar = () => {
       return;
     }
 
-    membershipDetailsMutation.mutate(payload);
+    if (payload.donationMethod === 'Zeffy' && !membershipPaymentConfirmed) {
+      setIsMembershipZeffyOpen(true);
+      return;
+    }
+
+    membershipDetailsMutation.mutate({ ...payload, membershipPaymentConfirmed });
+  };
+
+  const handleMembershipPaymentCompleted = () => {
+    setIsMembershipZeffyOpen(false);
+    setMembershipPaymentConfirmed(true);
+    setMembershipFormError('');
+    membershipDetailsMutation.mutate({
+      phone: String(membershipForm.phone || '').trim(),
+      address: String(membershipForm.address || '').trim(),
+      dateOfBirth: String(membershipForm.dateOfBirth || '').trim(),
+      canadianStatus: String(membershipForm.canadianStatus || '').trim(),
+      donationMethod: 'Zeffy',
+      donationSchedule: String(membershipForm.donationSchedule || 'monthly').trim().toLowerCase(),
+      membershipPledgeAccepted: membershipForm.membershipPledgeAccepted === true,
+      notes: String(membershipForm.notes || '').trim(),
+      membershipPaymentConfirmed: true
+    });
   };
 
   useEffect(() => {
@@ -3432,6 +3467,7 @@ const Navbar = () => {
                         <option value="">Select Method</option>
                         <option value="Interac E-Transfer">Interac E-Transfer</option>
                         <option value="Cash at Gurdwara">Cash at Gurdwara</option>
+                        <option value="Zeffy">Zeffy online payment</option>
                       </select>
                     </label>
                     <fieldset className="min-w-0">
@@ -3487,7 +3523,7 @@ const Navbar = () => {
                     disabled={membershipDetailsMutation.isPending || cancelMembershipMutation.isPending}
                     className="rounded-lg bg-brand-blue px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
                   >
-                    {membershipDetailsMutation.isPending ? 'Submitting...' : 'Submit Details'}
+                    {membershipDetailsMutation.isPending ? 'Submitting...' : membershipForm.donationMethod === 'Zeffy' && !membershipPaymentConfirmed ? 'Continue to Zeffy' : 'Submit Details'}
                   </button>
                 </div>
               </form>
@@ -3495,6 +3531,26 @@ const Navbar = () => {
           </div>
         </div>
       , document.body) : null}
+
+      <ZeffyDonationModal
+        isOpen={isMembershipZeffyOpen}
+        formUrl={MEMBERSHIP_ZEFFY_URL}
+        title="Pay membership fee with Zeffy"
+        requireCompletion
+        onPaymentCompleted={handleMembershipPaymentCompleted}
+        onClose={() => setIsMembershipZeffyOpen(false)}
+      />
+
+      {membershipSuccessNotice ? createPortal(
+        <div className="fixed inset-0 z-[290] flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-md">
+          <section className="w-full max-w-md rounded-2xl bg-white p-6 text-center shadow-2xl" role="alertdialog" aria-modal="true">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-2xl text-emerald-700">✓</div>
+            <h3 className="mt-4 font-heading text-2xl font-bold text-slate-900">Membership is active</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-600">{membershipSuccessNotice}</p>
+            <button type="button" onClick={() => setMembershipSuccessNotice('')} className="mt-5 rounded-lg bg-brand-blue px-5 py-2.5 text-sm font-semibold text-white">OK</button>
+          </section>
+        </div>, document.body
+      ) : null}
 
       {isMembershipCancelConfirmOpen ? createPortal(
         <div className="fixed inset-0 z-[400] flex items-center justify-center bg-slate-950/75 px-4 py-6 backdrop-blur-sm">

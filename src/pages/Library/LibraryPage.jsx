@@ -605,7 +605,7 @@ const LibraryPage = () => {
                           {hasMultiCopyIssueDetails ? (
                             <button
                               type="button"
-                              className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                              className="whitespace-nowrap rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                               onClick={() => setIssueModalBookId(book.id)}
                             >
                               View Dates

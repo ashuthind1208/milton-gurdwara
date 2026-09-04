@@ -12,7 +12,7 @@ const AdminGurdwaraBrandingPage = () => {
   const queryClient = useQueryClient();
   const [uploadState, setUploadState] = useState({ pending: false, progress: 0, error: '' });
   const form = useForm({ defaultValues: DEFAULT_GURDWARA_BRANDING });
-  const { data } = useQuery({
+  const { data, error: brandingLoadError } = useQuery({
     queryKey: ['gurdwara-branding'],
     queryFn: () => brandingService.getBranding().then((response) => response.data)
   });
@@ -22,7 +22,15 @@ const AdminGurdwaraBrandingPage = () => {
   }, [data, form]);
 
   const saveMutation = useMutation({
-    mutationFn: (values) => brandingService.saveBranding(values),
+    mutationFn: (values) => brandingService.saveBranding({
+      ...values,
+      organizationName: String(values.organizationName || '').trim(),
+      shortName: String(values.shortName || '').trim(),
+      logoUrl: String(values.logoUrl || '').trim(),
+      primaryColor: String(values.primaryColor || '').trim().toUpperCase(),
+      accentColor: String(values.accentColor || '').trim().toUpperCase(),
+      surfaceColor: String(values.surfaceColor || '').trim().toUpperCase()
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['gurdwara-branding'] });
       queryClient.invalidateQueries({ queryKey: ['ask-granthi-board'] });
@@ -84,14 +92,15 @@ const AdminGurdwaraBrandingPage = () => {
               ].map(([field, label]) => (
                 <label key={field} className="text-xs font-semibold text-slate-600">{label}
                   <div className="mt-1 flex items-center gap-2">
-                    <input type="color" {...form.register(field, { required: true, pattern: /^#[0-9a-f]{6}$/i })} className="h-10 w-12 rounded border border-slate-300 bg-white p-1" />
+                    <input type="color" value={values[field] || '#000000'} onChange={(event) => form.setValue(field, event.target.value.toUpperCase(), { shouldDirty: true, shouldValidate: true })} className="h-10 w-12 rounded border border-slate-300 bg-white p-1" />
                     <input {...form.register(field, { required: true, pattern: /^#[0-9a-f]{6}$/i })} maxLength={7} className="min-w-0 flex-1 rounded-lg border border-slate-300 p-2 font-mono text-xs" />
                   </div>
                 </label>
               ))}
             </fieldset>
 
-            {saveMutation.isError ? <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{saveMutation.error?.message}</p> : null}
+            {brandingLoadError ? <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">Unable to load saved branding. The defaults are shown until the API is available.</p> : null}
+            {saveMutation.isError ? <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{saveMutation.error?.message || 'Unable to save branding. Check the name, logo URL, and six-digit colors.'}</p> : null}
             {saveMutation.isSuccess ? <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">Branding saved and published across the application.</p> : null}
             <Button type="submit" disabled={saveMutation.isPending || uploadState.pending}>{saveMutation.isPending ? 'Saving...' : 'Save branding'}</Button>
           </form>

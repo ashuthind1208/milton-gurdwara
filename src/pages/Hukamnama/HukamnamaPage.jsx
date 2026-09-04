@@ -299,7 +299,7 @@ const HukamnamaPage = () => {
                 {(selectedArchiveEntry?.lines || []).map((line) => (
                   <article key={line.id || `${line.lineNo}-${line.gurmukhi}`}>
                     <p className="font-gurmukhi text-lg font-bold leading-relaxed text-brand-navy">{line.gurmukhi}</p>
-                    {line.translationPunjabi ? <p className="mt-1 text-sm font-normal text-brand-saffron">Punjabi: {line.translationPunjabi}</p> : null}
+                    {line.translationPunjabi ? <p className="mt-1 text-sm font-normal text-slate-900">Punjabi: {line.translationPunjabi}</p> : null}
                     {line.translationEnglish ? <p className="mt-0.5 text-sm font-normal text-brand-blue">English: {line.translationEnglish}</p> : null}
                   </article>
                 ))}
