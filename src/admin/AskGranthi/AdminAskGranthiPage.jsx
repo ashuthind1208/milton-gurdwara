@@ -29,6 +29,8 @@ const AdminAskGranthiPage = () => {
   const [editValues, setEditValues] = useState(null);
   const [viewingQuestion, setViewingQuestion] = useState(null);
   const [deletingQuestion, setDeletingQuestion] = useState(null);
+  const [questionsPage, setQuestionsPage] = useState(1);
+  const QUESTIONS_PER_PAGE = 10;
 
   const { data: questions = [], isLoading, isError } = useQuery({
     queryKey: ['admin-ask-granthi-questions'],
@@ -71,6 +73,12 @@ const AdminAskGranthiPage = () => {
   }, [setHeaderAction]);
 
   const filteredQuestions = useMemo(() => questions.filter((entry) => statusFilter === 'all' || entry.status === statusFilter), [questions, statusFilter]);
+  const totalQuestionPages = Math.max(1, Math.ceil(filteredQuestions.length / QUESTIONS_PER_PAGE));
+  const pagedQuestions = useMemo(() => filteredQuestions.slice((questionsPage - 1) * QUESTIONS_PER_PAGE, questionsPage * QUESTIONS_PER_PAGE), [filteredQuestions, questionsPage]);
+
+  useEffect(() => {
+    setQuestionsPage((page) => Math.min(page, totalQuestionPages));
+  }, [totalQuestionPages]);
   const metrics = useMemo(() => ({
     total: questions.length,
     answered: questions.filter((entry) => entry.status === 'answered').length,
@@ -122,7 +130,7 @@ const AdminAskGranthiPage = () => {
 
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter questions by status">
         {['all', 'answered', 'thinking', 'error'].map((status) => (
-          <button key={status} type="button" onClick={() => setStatusFilter(status)} className={`rounded-full border px-3 py-1.5 text-xs font-bold capitalize ${statusFilter === status ? 'border-brand-blue bg-brand-blue text-white' : 'border-slate-300 bg-white text-slate-700'}`}>{status}</button>
+          <button key={status} type="button" onClick={() => { setStatusFilter(status); setQuestionsPage(1); }} className={`rounded-full border px-3 py-1.5 text-xs font-bold capitalize ${statusFilter === status ? 'border-brand-blue bg-brand-blue text-white' : 'border-slate-300 bg-white text-slate-700'}`}>{status}</button>
         ))}
       </div>
 
@@ -134,34 +142,17 @@ const AdminAskGranthiPage = () => {
         <div className="hidden grid-cols-[minmax(0,1fr)_120px_330px] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 md:grid">
           <span>Question</span><span>Status</span><span className="text-right">Actions</span>
         </div>
-        {filteredQuestions.map((entry) => (
+        {pagedQuestions.map((entry) => (
           <article key={entry.id} className="border-b border-slate-200 px-4 py-3 last:border-b-0">
             <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_120px_330px] md:items-center">
               <div className="min-w-0">
                 <div className="flex min-w-0 items-center gap-2">
                   <span className={`rounded-full border px-2.5 py-1 text-[11px] font-bold capitalize ${statusStyles[entry.status] || statusStyles.error}`}>{entry.status}</span>
-                  {entry.featured ? <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-800"><StarIcon className="h-3.5 w-3.5" /> Featured FAQ</span> : null}
-                  {entry.visible === false ? <span className="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">Hidden</span> : null}
-                  <span className="text-xs text-slate-400">Asked {Math.max(1, Number(entry.askCount) || 1)} time(s)</span>
+                  <span className="truncate text-xs text-slate-500">{entry.status === 'answered' ? `Punjabi: ${entry.answerPunjabi || '-'} · English: ${entry.answerEnglish || '-'}` : entry.errorMessage || 'Answer pending'}</span>
                 </div>
                 <h2 className="min-w-0 truncate font-semibold text-slate-900" title={entry.question}>{entry.question}</h2>
-                {entry.status === 'answered' ? (
-                  <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                    <div className="rounded-lg bg-slate-50 p-3">
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Punjabi</p>
-                      <p className="mt-1 line-clamp-3 font-gurmukhi text-sm leading-6 text-slate-800">{entry.answerPunjabi}</p>
-                    </div>
-                    <div className="rounded-lg bg-slate-50 p-3">
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">English</p>
-                      <p className="mt-1 line-clamp-3 text-sm leading-6 text-slate-700">{entry.answerEnglish}</p>
-                    </div>
-                  </div>
-                ) : null}
-                {entry.errorMessage ? <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{entry.errorMessage}</p> : null}
               </div>
-              <div className="flex items-center gap-2 md:block">
-                <span className={`rounded-full border px-2.5 py-1 text-[11px] font-bold capitalize ${statusStyles[entry.status] || statusStyles.error}`}>{entry.status}</span>
-              </div>
+              <div className="hidden md:block"><span className={`rounded-full border px-2.5 py-1 text-[11px] font-bold capitalize ${statusStyles[entry.status] || statusStyles.error}`}>{entry.status}</span></div>
               <div className="flex shrink-0 flex-nowrap items-center justify-start gap-1.5 md:justify-end">
                 <button type="button" onClick={() => setViewingQuestion(entry)} className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"><EyeIcon className="h-4 w-4" /> View</button>
                 {entry.status === 'answered' ? (
@@ -178,6 +169,15 @@ const AdminAskGranthiPage = () => {
           </article>
         ))}
       </section>
+
+      {filteredQuestions.length > 0 ? <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
+        <span>Showing {(questionsPage - 1) * QUESTIONS_PER_PAGE + 1}-{Math.min(questionsPage * QUESTIONS_PER_PAGE, filteredQuestions.length)} of {filteredQuestions.length}</span>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => setQuestionsPage((page) => Math.max(1, page - 1))} disabled={questionsPage === 1} className="rounded-lg border border-slate-300 px-3 py-1.5 font-semibold disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+          <span className="font-semibold">Page {questionsPage} of {totalQuestionPages}</span>
+          <button type="button" onClick={() => setQuestionsPage((page) => Math.min(totalQuestionPages, page + 1))} disabled={questionsPage === totalQuestionPages} className="rounded-lg border border-slate-300 px-3 py-1.5 font-semibold disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+        </div>
+      </div> : null}
 
       {viewingQuestion ? (
         <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/60 px-4 py-6 backdrop-blur-sm" role="presentation" onClick={() => setViewingQuestion(null)}>
