@@ -1765,7 +1765,7 @@ const Navbar = () => {
   const hasWhatsAppGroup = phase2ChannelsConfig?.whatsAppOptInEnabled === true && /^https?:\/\//i.test(whatsAppJoinLink);
   const socialLinks = [
     { label: 'Facebook', url: siteConfig.social.facebook, color: '#1877F2', icon: FacebookIcon },
-    { label: 'Instagram', url: siteConfig.social.instagram, color: '#C13584', icon: InstagramIcon }
+    { label: 'Instagram', url: siteConfig.social.instagram, color: '#E4405F', icon: InstagramIcon }
   ];
 
   const openStreamModal = (id) => {
@@ -2463,7 +2463,6 @@ const Navbar = () => {
                       </div>
                     </div>
                   ))}
-                  <span className="text-blue-200">|</span>
                 </div>
               </>
             ) : null}
