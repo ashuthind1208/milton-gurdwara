@@ -445,7 +445,7 @@ export const createBookingReceiptPdfBlob = async ({
   return doc.output('blob');
 };
 
-export const createMembershipFeeInformationPdfBlob = async ({ user = {}, organizationName, address, phone, email }) => {
+export const createMembershipFeeInformationPdfBlob = async ({ user = {}, membershipFeeRecord = null, organizationName, address, phone, email }) => {
   const records = Array.isArray(user?.membershipFeeRecords) ? user.membershipFeeRecords : [];
   const latestPaidRecord = records
     .filter((entry) => String(entry?.status || '').trim().toLowerCase() === 'paid')
@@ -453,16 +453,20 @@ export const createMembershipFeeInformationPdfBlob = async ({ user = {}, organiz
       new Date(right?.paymentDate || right?.updatedAt || 0).getTime()
       - new Date(left?.paymentDate || left?.updatedAt || 0).getTime()
     ))[0];
+  const selectedFeeRecord = membershipFeeRecord && typeof membershipFeeRecord === 'object' ? membershipFeeRecord : null;
+  const feeRecord = selectedFeeRecord || latestPaidRecord;
+  const feeStatus = String(feeRecord?.status || '').trim().toLowerCase();
+  const isPaidFee = feeStatus === 'paid';
   const schedule = String(user?.membershipProfile?.donationSchedule || 'monthly').trim().toLowerCase() === 'yearly'
     ? 'Yearly'
     : 'Monthly';
   const validityDays = schedule === 'Yearly' ? 365 : 30;
-  const paymentDate = latestPaidRecord ? new Date(latestPaidRecord.paymentDate || latestPaidRecord.updatedAt || '') : null;
+  const paymentDate = feeRecord ? new Date(feeRecord.paymentDate || feeRecord.updatedAt || '') : null;
   const hasValidPaymentDate = paymentDate && !Number.isNaN(paymentDate.getTime());
   const validUntil = hasValidPaymentDate
     ? new Date(paymentDate.getTime() + (validityDays * 24 * 60 * 60 * 1000))
     : null;
-  const isCurrent = validUntil ? validUntil.getTime() >= Date.now() : false;
+  const isCurrent = isPaidFee && validUntil ? validUntil.getTime() >= Date.now() : false;
   const formatDate = (value) => value
     ? value.toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })
     : 'Not recorded';
@@ -500,8 +504,8 @@ export const createMembershipFeeInformationPdfBlob = async ({ user = {}, organiz
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10.5);
   doc.setTextColor(51, 65, 85);
-  const welcomeText = latestPaidRecord
-    ? 'Thank you for supporting the programs, services, and community work of Singh Sabha Milton. This document summarizes your membership profile and the latest fee payment recorded on your account.'
+  const welcomeText = feeRecord
+    ? `This document summarizes your membership profile and ${selectedFeeRecord ? 'the selected' : 'the latest'} fee transaction recorded on your account.`
     : 'Your registration has been approved. A current paid membership fee activates Member access and helps support programs, services, and community work at Singh Sabha Milton.';
   doc.text(welcomeText, 40, 171, { maxWidth: pageWidth - 80, lineHeightFactor: 1.45 });
 
@@ -512,11 +516,14 @@ export const createMembershipFeeInformationPdfBlob = async ({ user = {}, organiz
   doc.setTextColor(isCurrent ? 22 : 154, isCurrent ? 101 : 52, isCurrent ? 52 : 18);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
-  doc.text(isCurrent ? 'Membership fee status: CURRENT' : 'Membership fee status: PAYMENT REQUIRED', 55, statusY + 20);
+  const displayedStatus = selectedFeeRecord
+    ? (feeStatus || 'pending').replace(/_/g, ' ').toUpperCase()
+    : (isCurrent ? 'CURRENT' : 'PAYMENT REQUIRED');
+  doc.text(`Membership fee status: ${displayedStatus}`, 55, statusY + 20);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9.5);
   doc.text(
-    isCurrent ? `Current through ${formatDate(validUntil)}.` : 'No current paid membership fee is recorded on this account.',
+    isCurrent ? `Current through ${formatDate(validUntil)}.` : (selectedFeeRecord ? 'This document reflects the selected transaction status.' : 'No current paid membership fee is recorded on this account.'),
     55,
     statusY + 36
   );
@@ -544,13 +551,14 @@ export const createMembershipFeeInformationPdfBlob = async ({ user = {}, organiz
   const paymentTableY = (doc.lastAutoTable?.finalY || 430) + 24;
   autoTable(doc, {
     startY: paymentTableY,
-    head: [['Latest Fee Record', 'Details']],
+    head: [[selectedFeeRecord ? 'Selected Fee Record' : 'Latest Fee Record', 'Details']],
     body: [
-      ['Payment Status', latestPaidRecord ? 'Paid' : 'Payment required'],
+      ...(selectedFeeRecord ? [['Transaction Type', String(feeRecord?.membershipEntryType || 'new').trim().toLowerCase() === 'renew' ? 'Renewal' : 'New Membership']] : []),
+      ['Payment Status', feeRecord ? (feeStatus || 'pending').replace(/^./, (value) => value.toUpperCase()) : 'Payment required'],
       ['Payment Date', formatDate(hasValidPaymentDate ? paymentDate : null)],
-      ['Amount', latestPaidRecord ? `${String(latestPaidRecord.currency || 'CAD')} ${Number(latestPaidRecord.amount || 0).toFixed(2)}` : '-'],
-      ['Receipt Number', String(latestPaidRecord?.receiptNumber || '').trim() || '-'],
-      ['Payment Method', String(latestPaidRecord?.paymentMethod || '').trim() || '-'],
+      ['Amount', feeRecord ? `${String(feeRecord.currency || 'CAD')} ${Number(feeRecord.amount || 0).toFixed(2)}` : '-'],
+      ['Receipt Number', String(feeRecord?.receiptNumber || '').trim() || '-'],
+      ['Payment Method', String(feeRecord?.paymentMethod || '').trim() || '-'],
       ['Valid Until', formatDate(validUntil)]
     ],
     styles: { fontSize: 10, cellPadding: 7, valign: 'top' },
@@ -578,7 +586,12 @@ export const createMembershipFeeInformationPdfBlob = async ({ user = {}, organiz
 export const downloadMembershipFeeInformationPdf = async (payload) => {
   const blob = await createMembershipFeeInformationPdfBlob(payload);
   const memberName = String(payload?.user?.name || 'member').trim().replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase();
-  triggerFileDownload(blob, `membership-fee-${memberName || 'member'}.pdf`);
+  const transactionReference = String(payload?.membershipFeeRecord?.receiptNumber || payload?.membershipFeeRecord?.id || '')
+    .trim()
+    .replace(/[^A-Za-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase();
+  triggerFileDownload(blob, `membership-fee-${memberName || 'member'}${transactionReference ? `-${transactionReference}` : ''}.pdf`);
 };
 
 export const downloadDonationInvoicePdf = async (payload) => {

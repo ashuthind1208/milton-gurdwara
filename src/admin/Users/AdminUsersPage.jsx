@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  ArrowDownTrayIcon,
   CheckCircleIcon,
   ClockIcon,
   CurrencyDollarIcon,
@@ -622,6 +623,17 @@ const AdminUsersPage = () => {
       return haystack.includes(query);
     });
   }, [membershipFeeRecords, membershipSearchTerm]);
+
+  const downloadMembershipTransactionInvoice = (entry) => {
+    void downloadMembershipFeeInformationPdf({
+      user: { ...membershipUserRecord, membershipFeeRecords: [entry] },
+      membershipFeeRecord: entry,
+      organizationName: siteConfig.name,
+      address: siteConfig.contact?.address,
+      phone: siteConfig.contact?.phone,
+      email: siteConfig.contact?.email
+    }).catch(() => null);
+  };
 
   const membershipFeeMutation = useMutation({
     mutationFn: async ({ id, values, editingId }) => {
@@ -1523,6 +1535,15 @@ const AdminUsersPage = () => {
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
+                                onClick={() => downloadMembershipTransactionInvoice(entry)}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                                aria-label={`Download ${entry.membershipEntryType || 'membership'} transaction invoice`}
+                                title="Download invoice"
+                              >
+                                <ArrowDownTrayIcon className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => openMembershipFeeEntry(entry)}
                                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50"
                                 aria-label="Edit membership fee entry"
@@ -1572,6 +1593,15 @@ const AdminUsersPage = () => {
                             </td>
                             <td className="px-3 py-2">
                               <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => downloadMembershipTransactionInvoice(entry)}
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                                  aria-label={`Download ${entry.membershipEntryType || 'membership'} transaction invoice`}
+                                  title="Download invoice"
+                                >
+                                  <ArrowDownTrayIcon className="h-4 w-4" />
+                                </button>
                                 <button
                                   type="button"
                                   onClick={() => openMembershipFeeEntry(entry)}

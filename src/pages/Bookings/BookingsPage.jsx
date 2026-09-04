@@ -837,6 +837,23 @@ const BookingsPage = () => {
           </div>
         </div>
       ) : null}
+      {createMutation.isPending ? (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/70 px-4 backdrop-blur-sm" role="status" aria-live="assertive" aria-label="Saving booking request">
+          <div className="w-full max-w-sm overflow-hidden rounded-xl border border-blue-200 bg-white shadow-2xl">
+            <div className="h-1.5 w-full overflow-hidden bg-blue-100">
+              <div className="h-full w-1/2 animate-pulse bg-brand-saffron" />
+            </div>
+            <div className="flex flex-col items-center px-6 py-8 text-center">
+              <div className="relative flex h-16 w-16 items-center justify-center">
+                <span className="absolute inset-0 animate-spin rounded-full border-4 border-blue-100 border-t-brand-blue" />
+                <span className="h-7 w-7 rounded-full bg-brand-saffron/20 ring-4 ring-brand-saffron/10" />
+              </div>
+              <h3 className="mt-5 font-heading text-xl font-bold text-slate-900">Saving your booking</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Please wait while we securely submit your request. Keep this window open.</p>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <ZeffyDonationModal isOpen={isZeffyModalOpen} formUrl={zeffyFormUrl} onClose={() => setIsZeffyModalOpen(false)} />
     </div>
   );

@@ -6934,9 +6934,6 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  if (requestUrl.pathname === '/api/events/calendar.ics' && request.method === 'GET') {
-    try {
-
   if (requestUrl.pathname === '/api/auth/logout' && request.method === 'POST') {
     try {
       await appendAuditLog(request, {
@@ -6951,6 +6948,9 @@ const server = http.createServer(async (request, response) => {
     }
     return;
   }
+
+  if (requestUrl.pathname === '/api/events/calendar.ics' && request.method === 'GET') {
+    try {
       const events = await eventsDb.getEvents();
       const includeInactive = requestUrl.searchParams.get('includeInactive') === 'true';
       const visibleEvents = includeInactive

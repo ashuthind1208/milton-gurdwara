@@ -451,6 +451,7 @@ const Navbar = () => {
     avatarUrl: ''
   });
   const [isMembershipModalOpen, setIsMembershipModalOpen] = useState(false);
+  const [isMembershipCancelConfirmOpen, setIsMembershipCancelConfirmOpen] = useState(false);
   const [, setMembershipPromptEnforced] = useState(false);
   const [membershipPromptNotice, setMembershipPromptNotice] = useState('');
   const [membershipFormError, setMembershipFormError] = useState('');
@@ -1225,7 +1226,21 @@ const Navbar = () => {
       return;
     }
     setMembershipFormError('');
+    setIsMembershipModalOpen(false);
+    setIsMembershipCancelConfirmOpen(true);
+  };
+
+  const confirmCancelMembershipRegistration = () => {
+    if (cancelMembershipMutation.isPending) {
+      return;
+    }
+    setIsMembershipCancelConfirmOpen(false);
     cancelMembershipMutation.mutate();
+  };
+
+  const keepMembershipRegistration = () => {
+    setIsMembershipCancelConfirmOpen(false);
+    setIsMembershipModalOpen(true);
   };
 
   const openMembershipModal = useCallback(() => {
@@ -1450,14 +1465,14 @@ const Navbar = () => {
       return undefined;
     }
 
-    if (isMembershipModalOpen) {
+    if (isMembershipModalOpen || isMembershipCancelConfirmOpen) {
       return undefined;
     }
 
     setMembershipPromptNotice('');
     openMembershipModal();
     return undefined;
-  }, [isAuthenticated, isMembershipModalOpen, isMembershipProfileCompleted, openMembershipModal, userRole, approvalStatus, user?.isActive]);
+  }, [isAuthenticated, isMembershipCancelConfirmOpen, isMembershipModalOpen, isMembershipProfileCompleted, openMembershipModal, userRole, approvalStatus, user?.isActive]);
 
   useEffect(() => {
     if (!membershipPromptNotice) {
@@ -3376,6 +3391,19 @@ const Navbar = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      , document.body) : null}
+
+      {isMembershipCancelConfirmOpen ? createPortal(
+        <div className="fixed inset-0 z-[281] flex items-center justify-center bg-slate-900/60 px-4 py-6 backdrop-blur-sm">
+          <div role="alertdialog" aria-modal="true" aria-labelledby="membership-cancel-title" aria-describedby="membership-cancel-description" className="w-full max-w-md rounded-2xl border border-red-200 bg-white p-5 shadow-2xl">
+            <h3 id="membership-cancel-title" className="font-heading text-xl font-semibold text-slate-900">Cancel membership registration?</h3>
+            <p id="membership-cancel-description" className="mt-3 text-sm leading-6 text-slate-600">Are you sure you want to delete the pending member profile from Family Dashboard? This action cannot be undone.</p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={keepMembershipRegistration} disabled={cancelMembershipMutation.isPending} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60">No</button>
+              <button type="button" onClick={confirmCancelMembershipRegistration} disabled={cancelMembershipMutation.isPending} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60">{cancelMembershipMutation.isPending ? 'Deleting...' : 'Yes, Delete'}</button>
             </div>
           </div>
         </div>

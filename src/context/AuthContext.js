@@ -3,6 +3,28 @@ import authService from '../services/authService';
 import userService from '../services/userService';
 
 const AuthContext = createContext(null);
+const LOGOUT_STORAGE_KEYS = [
+  'ssm_google_oauth_callback_hash',
+  'ssm_auth_intent',
+  'ssm_login_mode',
+  'ssm_post_login_next',
+  'ssm_signup_role',
+  'ssm_prompt_member_details',
+  'ssm_forced_logout_reason'
+];
+
+const clearTransientLogoutStorage = () => {
+  [window.sessionStorage, window.localStorage].forEach((storage) => {
+    LOGOUT_STORAGE_KEYS.forEach((key) => storage.removeItem(key));
+    for (let index = storage.length - 1; index >= 0; index -= 1) {
+      const key = storage.key(index);
+      if (key?.startsWith('ssm_member_details_notice_')) {
+        storage.removeItem(key);
+      }
+    }
+  });
+  window.sessionStorage.setItem('ssm_skip_login_auto_once', '1');
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
@@ -111,12 +133,17 @@ export const AuthProvider = ({ children }) => {
   }, [persistUser, user]);
 
   const logout = useCallback(async () => {
+    clearAuthState();
+    try {
+      clearTransientLogoutStorage();
+    } catch {
+      // Auth state is already cleared when browser storage is unavailable.
+    }
+
     try {
       await authService.logout();
     } catch {
-      // Clear local auth state even if server-side logout fails.
-    } finally {
-      clearAuthState();
+      // Local logout remains complete if server-side logging fails.
     }
   }, [clearAuthState]);
 

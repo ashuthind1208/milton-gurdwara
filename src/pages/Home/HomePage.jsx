@@ -345,6 +345,18 @@ const HomePage = () => {
       }
     };
   }, [scheduleDaysForResolution, todayDateKey]);
+  const selectedPreviewRows = useMemo(
+    () => sortScheduleEntries(selectedSchedulePreview?.schedule?.entries || []),
+    [selectedSchedulePreview]
+  );
+  const selectedPreviewMorningRows = useMemo(
+    () => selectedPreviewRows.filter((item) => (item.segment || 'morning') === 'morning'),
+    [selectedPreviewRows]
+  );
+  const selectedPreviewEveningRows = useMemo(
+    () => selectedPreviewRows.filter((item) => (item.segment || 'morning') !== 'morning'),
+    [selectedPreviewRows]
+  );
   const scheduleRows = useMemo(() => {
     return sortScheduleEntries(Array.isArray(resolvedScheduleDay?.entries) ? resolvedScheduleDay.entries : []).map((item) => ({
       ...item,
@@ -1145,36 +1157,62 @@ const HomePage = () => {
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/50 px-3 py-4" onMouseDown={(event) => {
           if (event.target === event.currentTarget) setSelectedSchedulePreview(null);
         }}>
-          <div role="dialog" aria-modal="true" aria-labelledby="schedule-preview-title" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-5">
-            <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-3">
+          <div role="dialog" aria-modal="true" aria-labelledby="schedule-preview-title" className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-3 bg-gradient-to-r from-brand-blue to-blue-700 px-4 py-4 text-white sm:px-5">
               <div>
-                <h3 id="schedule-preview-title" className="font-heading text-xl font-semibold text-slate-900">{selectedSchedulePreview.title}</h3>
-                {selectedSchedulePreview.dateKey ? <p className="mt-1 text-sm text-slate-600">{formatScheduleDate(selectedSchedulePreview.dateKey)}</p> : null}
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-100">Gurdwara Program</p>
+                <h3 id="schedule-preview-title" className="mt-1 font-heading text-xl font-semibold text-white sm:text-2xl">{selectedSchedulePreview.title}</h3>
               </div>
-              <button type="button" onClick={() => setSelectedSchedulePreview(null)} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-brand-blue bg-brand-blue text-lg leading-none text-white hover:bg-blue-700" aria-label="Close schedule preview">×</button>
+              <button type="button" onClick={() => setSelectedSchedulePreview(null)} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/40 bg-white/10 text-lg leading-none text-white hover:bg-white/20" aria-label="Close schedule preview">×</button>
             </div>
             {selectedSchedulePreview.schedule ? (
-              <div className="mt-4">
-                {(selectedSchedulePreview.schedule.specialReason || selectedSchedulePreview.schedule.highlightNoteEn) ? (
-                  <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">{selectedSchedulePreview.schedule.specialReason || selectedSchedulePreview.schedule.highlightNoteEn}</p>
-                ) : null}
-                <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">
-                  {sortScheduleEntries(selectedSchedulePreview.schedule.entries || []).map((item) => (
-                    <div key={item.id} className="grid grid-cols-[110px_1fr] gap-3 px-3 py-2.5 sm:grid-cols-[150px_1fr]">
-                      <div className="text-sm font-semibold text-slate-700">
-                        <p>{item.timeEn || 'Time TBD'}</p>
-                        {item.timePa ? <p className="mt-0.5 text-xs font-medium text-slate-500">{item.timePa}</p> : null}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-900">{item.titleEn || 'Schedule item'}</p>
-                        {item.titlePa ? <p className="mt-0.5 text-sm text-brand-saffron">{item.titlePa}</p> : null}
-                      </div>
+              <div className="max-h-[calc(90vh-92px)] overflow-y-auto">
+                <div className="daily-schedule-special-ticker w-full overflow-hidden border-y border-brand-saffron/40 bg-brand-saffron">
+                  <div className="ticker-mask px-3 py-2">
+                    <div className="ticker-track ticker-force-motion daily-schedule-special-track ticker-speed-fast ticker-no-pause">
+                      {[0, 1].map((groupIndex) => (
+                        <div key={`preview-ticker-${groupIndex}`} className="ticker-group" aria-hidden={groupIndex === 1}>
+                          {[0, 1, 2].map((unitIndex) => (
+                            <div key={`preview-ticker-${groupIndex}-${unitIndex}`} className="daily-schedule-special-item inline-flex shrink-0 items-center gap-3 text-sm font-extrabold text-amber-50">
+                              <span className="ml-5 whitespace-nowrap">{formatScheduleDate(selectedSchedulePreview.dateKey)}</span>
+                              <span aria-hidden="true" className="text-slate-900">•</span>
+                              <span className="whitespace-nowrap">{selectedSchedulePreview.schedule.specialReason || selectedSchedulePreview.schedule.highlightNoteEn || selectedSchedulePreview.schedule.title || selectedSchedulePreview.title}</span>
+                              <img src={gurdwaraLogo} alt="" aria-hidden="true" className="mr-3 h-5 w-5 shrink-0 rounded-full object-cover" />
+                            </div>
+                          ))}
+                        </div>
+                      ))}
                     </div>
+                  </div>
+                </div>
+                <div className="space-y-4 p-4 sm:p-5">
+                  {[
+                    { key: 'morning', label: 'Morning', rows: selectedPreviewMorningRows, border: 'border-sky-200', header: 'border-sky-200 bg-sky-50 text-sky-800', row: 'border-sky-100 bg-sky-50/25' },
+                    { key: 'evening', label: 'Evening', rows: selectedPreviewEveningRows, border: 'border-amber-200', header: 'border-amber-200 bg-amber-50 text-amber-800', row: 'border-amber-100 bg-amber-50/35' }
+                  ].filter((section) => section.rows.length > 0).map((section) => (
+                    <section key={section.key} className={`overflow-hidden rounded-lg border ${section.border}`}>
+                      <div className={`border-b px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide ${section.header}`}>{section.label}</div>
+                      <div className="divide-y divide-slate-100">
+                        {section.rows.map((item) => (
+                          <div key={item.id} className={`grid grid-cols-[110px_1fr] gap-3 px-3 py-3 sm:grid-cols-[160px_1fr] ${section.row}`}>
+                            <div className="text-sm font-bold text-slate-800">
+                              <p>{item.timeEn || 'Time TBD'}</p>
+                              {item.timePa ? <p className="mt-1 text-xs font-medium text-slate-500">{item.timePa}</p> : null}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-slate-900">{item.titleEn || 'Schedule item'}</p>
+                              {item.titlePa ? <p className="mt-1 text-sm text-brand-saffron">{item.titlePa}</p> : null}
+                              {item.noteEn ? <p className="mt-1 text-xs text-slate-600">{item.noteEn}</p> : null}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
                   ))}
                 </div>
               </div>
             ) : (
-              <p className="py-8 text-center text-sm text-slate-600">No upcoming special-day schedule has been published.</p>
+              <p className="px-5 py-10 text-center text-sm text-slate-600">No upcoming special-day schedule has been published.</p>
             )}
           </div>
         </div>

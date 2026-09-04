@@ -90,6 +90,7 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [autoOAuthTriggered, setAutoOAuthTriggered] = useState(false);
+  const [requiresManualGoogleSignIn, setRequiresManualGoogleSignIn] = useState(false);
 
   const { loginWithGoogle, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
@@ -314,6 +315,7 @@ const LoginPage = () => {
   const handleGoogleSignIn = useCallback(async (intent = 'signin') => {
     setError('');
     setNotice('');
+    setRequiresManualGoogleSignIn(false);
 
     try {
       window.sessionStorage.removeItem('ssm_admin_logout_in_progress');
@@ -403,6 +405,7 @@ const LoginPage = () => {
       const skipOnce = window.sessionStorage.getItem('ssm_skip_login_auto_once') === '1';
       if (skipOnce) {
         window.sessionStorage.removeItem('ssm_skip_login_auto_once');
+        setRequiresManualGoogleSignIn(true);
         return;
       }
     } catch {
@@ -424,16 +427,30 @@ const LoginPage = () => {
       <Seo {...meta} />
       <PageHero
         title="Secure Sign In"
-        description={'Redirecting to Google OAuth. Please wait...'}
+        description={requiresManualGoogleSignIn ? 'Choose a Google account to continue securely.' : 'Redirecting to Google OAuth. Please wait...'}
       />
 
       <Card className="mx-auto max-w-md">
         <div className="flex flex-col items-center gap-3 py-2 text-center">
-          <div className="h-9 w-9 animate-spin rounded-full border-2 border-slate-300 border-t-brand-blue" />
-          <p className="text-sm font-semibold text-slate-800">
-            Redirecting to Google sign-in...
-          </p>
-          <p className="text-xs text-slate-500">Please wait while we securely continue the authentication flow.</p>
+          {requiresManualGoogleSignIn ? (
+            <>
+              <p className="text-sm font-semibold text-slate-800">Your previous session has been signed out.</p>
+              <p className="text-xs text-slate-500">Continue to Google and choose the account you want to use.</p>
+              <button
+                type="button"
+                onClick={() => handleGoogleSignIn(modeParam === 'join' ? 'signup' : 'signin')}
+                className="mt-2 rounded-lg bg-brand-blue px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+              >
+                Continue with Google
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="h-9 w-9 animate-spin rounded-full border-2 border-slate-300 border-t-brand-blue" />
+              <p className="text-sm font-semibold text-slate-800">Redirecting to Google sign-in...</p>
+              <p className="text-xs text-slate-500">Please wait while we securely continue the authentication flow.</p>
+            </>
+          )}
           {!authService.getGoogleOAuthUrl() ? (
             <p className="text-xs text-slate-500">Google OAuth URL not detected. Restart the app after updating .env.local. Mock Google login fallback is enabled.</p>
           ) : null}
