@@ -594,9 +594,9 @@ const HomePage = () => {
                   <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">Today's hukamnama is not available yet.</p>
                 ) : hukamnamaLines.map((line) => (
                   <div key={line.id}>
-                    <p className="font-gurmukhi text-lg font-bold leading-relaxed text-brand-navy">{line.gurmukhi}</p>
-                    {line.translationPunjabi ? <p className="mt-1 text-sm font-normal text-slate-900">Punjabi: {line.translationPunjabi}</p> : null}
-                    {line.translationEnglish ? <p className="mt-0.5 text-sm font-normal text-brand-blue">English: {line.translationEnglish}</p> : null}
+                    <p className="font-gurmukhi text-lg font-bold leading-relaxed text-slate-950">{line.gurmukhi}</p>
+                    {line.translationPunjabi ? <p className="mt-1 text-sm font-semibold text-brand-saffron">Punjabi: {line.translationPunjabi}</p> : null}
+                    {line.translationEnglish ? <p className="mt-0.5 text-sm font-semibold text-brand-navy">English: {line.translationEnglish}</p> : null}
                   </div>
                 ))}
               </div>

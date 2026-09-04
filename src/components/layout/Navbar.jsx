@@ -57,6 +57,9 @@ import ZeffyDonationModal from '../../pages/Donation/ZeffyDonationModal';
 
 const MEMBERSHIP_ZEFFY_URL = 'https://www.zeffy.com/en-CA/ticketing/gurdwara-singh-sabha-milton-membership';
 
+const FacebookIcon = ({ className = 'h-4 w-4' }) => <svg viewBox="0 0 24 24" className={className} aria-hidden="true"><path fill="currentColor" d="M13.5 22v-8h2.7l.4-3h-3.1V9.1c0-.9.3-1.5 1.6-1.5h1.7V4.9c-.3 0-1.3-.1-2.5-.1-2.5 0-4.2 1.5-4.2 4.2V11H7.3v3h2.8v8h3.4Z" /></svg>;
+const InstagramIcon = ({ className = 'h-4 w-4' }) => <svg viewBox="0 0 24 24" className={className} aria-hidden="true"><path fill="none" stroke="currentColor" strokeWidth="2" d="M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4Z" /><circle cx="12" cy="12" r="3.5" fill="none" stroke="currentColor" strokeWidth="2" /><circle cx="17.5" cy="6.5" r="1" fill="currentColor" /></svg>;
+
 const navClass = ({ isActive }) =>
   `border-b-[3px] px-3 py-2.5 text-base font-semibold tracking-tight transition ${isActive ? 'border-brand-saffron text-white' : 'border-transparent text-blue-100 hover:border-blue-200/70 hover:text-white'}`;
 
@@ -451,6 +454,7 @@ const Navbar = () => {
   const [dateInfoOpen, setDateInfoOpen] = useState(false);
   const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
   const [isWhatsAppPopoverOpen, setIsWhatsAppPopoverOpen] = useState(false);
+  const [isSocialHubOpen, setIsSocialHubOpen] = useState(false);
   const [isProfilePopoverOpen, setIsProfilePopoverOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isProfileSaving, setIsProfileSaving] = useState(false);
@@ -1760,6 +1764,10 @@ const Navbar = () => {
   const isHomeOverlayMode = isHomePage && !isCompact;
   const whatsAppJoinLink = String(phase2ChannelsConfig?.whatsAppJoinLink || '').trim();
   const hasWhatsAppGroup = phase2ChannelsConfig?.whatsAppOptInEnabled === true && /^https?:\/\//i.test(whatsAppJoinLink);
+  const socialLinks = [
+    { label: 'Facebook', url: siteConfig.social.facebook, color: '#1877F2', icon: FacebookIcon },
+    { label: 'Instagram', url: siteConfig.social.instagram, color: '#C13584', icon: InstagramIcon }
+  ];
 
   const openStreamModal = (id) => {
     setStreamModalState({ open: true, id });
@@ -2453,6 +2461,20 @@ const Navbar = () => {
                 </div>
               </>
             ) : null}
+            <div className="relative hidden xl:block">
+              <button type="button" onClick={() => setIsSocialHubOpen((openState) => !openState)} className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-2 py-1 text-[10px] font-bold text-white hover:bg-white/20" aria-expanded={isSocialHubOpen}>
+                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#1877F2] text-white"><FacebookIcon className="h-3 w-3" /></span>
+                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#C13584] text-white"><InstagramIcon className="h-3 w-3" /></span>
+                Social hub
+              </button>
+              {isSocialHubOpen ? <div className="absolute left-0 top-full z-[260] mt-1 grid w-[330px] grid-cols-2 gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-slate-900 shadow-2xl">
+                {socialLinks.map(({ label, url, color, icon: SocialIcon }) => <a key={label} href={url} target="_blank" rel="noreferrer" className="rounded-xl border border-slate-200 p-2 text-center hover:bg-slate-50">
+                  <SocialIcon className="mx-auto h-5 w-5" />
+                  <p className="mt-1 text-xs font-bold">{label}</p>
+                  <div className="mx-auto mt-2 w-fit rounded-lg border border-slate-100 p-1"><QRCodeSVG value={url} size={104} level="M" marginSize={1} fgColor={color} bgColor="#ffffff" /></div>
+                </a>)}
+              </div> : null}
+            </div>
             <span className="hidden text-blue-200 xl:inline">|</span>
             <div className="hidden items-center gap-1.5 xl:flex">
               <button

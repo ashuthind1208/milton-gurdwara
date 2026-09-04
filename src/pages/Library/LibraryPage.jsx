@@ -573,7 +573,7 @@ const LibraryPage = () => {
               </h3>
               <p className="mt-1 text-sm text-slate-700">Physical books inventory with issued and available counts.</p>
             </div>
-            <span className="rounded-full bg-amber-100 px-3 py-1.5 text-sm font-semibold text-amber-900">{physicalBooks.length} books</span>
+            <span className="whitespace-nowrap rounded-full bg-amber-100 px-3 py-1.5 text-sm font-semibold text-amber-900">{physicalBooks.length} books</span>
           </div>
 
           <div className="overflow-x-auto">
@@ -593,7 +593,7 @@ const LibraryPage = () => {
 
                   return (
                     <tr key={book.id} className="border-b border-amber-100/80 last:border-b-0">
-                      <td className="px-2.5 py-2">
+                      <td className="whitespace-nowrap px-2.5 py-2">
                         <p className="text-base font-semibold text-slate-800">{book.title || 'Untitled'}</p>
                         <p className="text-sm text-slate-600">{book.author || 'Unknown author'}</p>
                       </td>
@@ -601,7 +601,7 @@ const LibraryPage = () => {
                       <td className="px-2.5 py-2 text-sm text-slate-700">{book.issuedCopies || 0}</td>
                       <td className="px-2.5 py-2">
                         <div className="flex items-center gap-2">
-                          <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">{available}</span>
+                          <span className="whitespace-nowrap rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">{available}</span>
                           {hasMultiCopyIssueDetails ? (
                             <button
                               type="button"
@@ -641,7 +641,7 @@ const LibraryPage = () => {
               </h3>
               <p className="mt-1 text-sm text-slate-700">PDFs and documents with cover image and download links.</p>
             </div>
-            <span className="rounded-full bg-blue-100 px-3 py-1.5 text-sm font-semibold text-blue-900">{digitalResources.length} resources</span>
+            <span className="whitespace-nowrap rounded-full bg-blue-100 px-3 py-1.5 text-sm font-semibold text-blue-900">{digitalResources.length} resources</span>
           </div>
 
           <div className="overflow-x-auto">
@@ -656,7 +656,7 @@ const LibraryPage = () => {
               <tbody>
                 {visibleDigitalResources.map((resource) => (
                   <tr key={resource.id} className="border-b border-blue-100/80 last:border-b-0">
-                    <td className="px-2.5 py-2">
+                    <td className="whitespace-nowrap px-2.5 py-2">
                       <div className="flex items-center gap-2">
                         {resource.coverImageUrl ? (
                           <img src={resource.coverImageUrl} alt={resource.title || 'Cover'} className="h-10 w-8 rounded object-cover" />

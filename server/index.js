@@ -2294,7 +2294,10 @@ const canManageGranthiQuestions = (request) => {
   return role === 'admin' || role === 'super admin';
 };
 
-const isSuperAdmin = (request) => String(getRequestActor(request).role || '').trim().toLowerCase() === 'super admin';
+const isSuperAdmin = (request) => String(getRequestActor(request).role || '')
+  .trim()
+  .toLowerCase()
+  .replace(/[\s_-]+/g, '') === 'superadmin';
 
 const appendAuditLog = async (request, details = {}) => {
   try {
