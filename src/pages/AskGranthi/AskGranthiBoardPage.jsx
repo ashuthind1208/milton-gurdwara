@@ -275,16 +275,16 @@ const AskGranthiBoardPage = () => {
               <div className="grid min-w-0 grid-rows-[35%_65%] gap-[1.8%]">
                 <article className="min-h-0 overflow-y-auto rounded-md border border-[#ded2bc] bg-[#fffdf8] p-[3%] shadow-sm">
                   <span className="inline-block bg-violet-800 px-[2%] py-[.7%] text-[clamp(10px,.78vw,15px)] font-bold text-white">Gurbani Reference</span>
-                  {activeQuestion.gurbani ? <><p className="mt-[1.2%] font-gurmukhi text-[clamp(13px,1.1vw,21px)] font-bold leading-[1.3] text-[color:var(--granthi-primary)]">{activeQuestion.gurbani.gurmukhi}</p><p className="mt-[.7%] text-[clamp(10px,.7vw,13px)] font-bold text-violet-800">{activeQuestion.gurbani.source}</p><p className="mt-[.8%] font-gurmukhi text-[clamp(10px,.7vw,14px)] font-semibold leading-[1.3] text-slate-800"><span className="font-bold text-violet-800">ਪੰਜਾਬੀ ਅਰਥ: </span>{activeQuestion.gurbani.translationPunjabi}</p><p className="mt-[.6%] text-[clamp(10px,.68vw,13px)] font-semibold leading-[1.3] text-slate-700"><span className="font-bold text-violet-800">English: </span>{activeQuestion.gurbani.translationEnglish}</p></> : <p className="mt-[3%] text-[clamp(12px,.95vw,18px)] font-bold text-red-800">Gurbani reference required. This answer is awaiting review.</p>}
+                  {activeQuestion.gurbani ? <><p className="mt-[1.2%] font-gurmukhi text-[clamp(16px,1.45vw,28px)] font-bold leading-[1.3] text-[color:var(--granthi-primary)]">{activeQuestion.gurbani.gurmukhi}</p><p className="mt-[.7%] text-[clamp(11px,.8vw,15px)] font-bold text-violet-800">{activeQuestion.gurbani.source}</p><p className="mt-[.8%] font-gurmukhi text-[clamp(12px,.9vw,18px)] font-semibold leading-[1.35] text-slate-800"><span className="font-bold text-violet-800">ਪੰਜਾਬੀ ਅਰਥ: </span>{activeQuestion.gurbani.translationPunjabi}</p><p className="mt-[.6%] text-[clamp(12px,.88vw,17px)] font-semibold leading-[1.35] text-slate-700"><span className="font-bold text-violet-800">English: </span>{activeQuestion.gurbani.translationEnglish}</p></> : <p className="mt-[3%] text-[clamp(12px,.95vw,18px)] font-bold text-red-800">Gurbani reference required. This answer is awaiting review.</p>}
                 </article>
                 <div className="grid min-h-0 grid-cols-2 gap-[1.8%]">
                   <article className="min-h-0 overflow-y-auto rounded-md border border-[#ded2bc] bg-[#fffdf8] p-[3.5%] shadow-sm">
                     <span className="inline-block bg-emerald-700 px-[2%] py-[.7%] text-[clamp(10px,.78vw,15px)] font-bold text-white">English Answer</span>
-                    <p className="mt-[1.5%] text-[clamp(12px,1.05vw,20px)] font-bold leading-[1.35] text-slate-900">{activeQuestion.answerEnglish}</p>
+                    <p className="mt-[1.5%] text-[clamp(18px,1.7vw,32px)] font-bold leading-[1.35] text-slate-900">{activeQuestion.answerEnglish}</p>
                   </article>
                   <article className="min-h-0 overflow-y-auto rounded-md border border-[#ded2bc] bg-[#fffdf8] p-[3.5%] shadow-sm">
                     <span className="inline-block bg-slate-900 px-[2%] py-[.7%] text-[clamp(10px,.78vw,15px)] font-bold text-white">Punjabi (ਪੰਜਾਬੀ)</span>
-                    <p className="mt-[1.5%] font-gurmukhi text-[clamp(13px,1.15vw,22px)] font-bold leading-[1.35] text-slate-900">{activeQuestion.answerPunjabi}</p>
+                    <p className="mt-[1.5%] font-gurmukhi text-[clamp(18px,1.8vw,34px)] font-bold leading-[1.4] text-slate-900">{activeQuestion.answerPunjabi}</p>
                   </article>
                 </div>
               </div>
