@@ -89,8 +89,19 @@ const readJsonObject = (value) => {
 const hasGurmukhi = (value) => /[\u0A00-\u0A7F]/.test(String(value || ''));
 const limitText = (value, maxLength) => String(value || '').trim().slice(0, maxLength);
 
-const validateGranthiAnswer = (generated) => {
-  const reference = TRUSTED_GRANTHI_REFERENCES.find((entry) => entry.id === generated?.referenceId);
+const referenceRelevanceScore = (reference, question, generated = {}) => {
+  const source = `${question} ${generated.shortAnswer || ''} ${generated.answerEnglish || ''}`.toLocaleLowerCase('en');
+  return reference.themes.reduce((score, theme) => score + (source.includes(theme.toLocaleLowerCase('en')) ? 1 : 0), 0);
+};
+
+const validateGranthiAnswer = (generated, question = '') => {
+  const selectedReference = TRUSTED_GRANTHI_REFERENCES.find((entry) => entry.id === generated?.referenceId);
+  const bestReference = [...TRUSTED_GRANTHI_REFERENCES]
+    .map((reference) => ({ reference, score: referenceRelevanceScore(reference, question, generated) }))
+    .sort((left, right) => right.score - left.score)[0];
+  const reference = selectedReference && referenceRelevanceScore(selectedReference, question, generated) > 0
+    ? selectedReference
+    : (bestReference?.score > 0 ? bestReference.reference : selectedReference);
   if (!reference
     || !String(generated?.answerEnglish || '').trim()
     || !hasGurmukhi(generated?.answerPunjabi)
@@ -185,7 +196,7 @@ const createGranthiAnswer = async (questionValue, options = {}) => {
 
     const payload = await response.json();
     const generated = readJsonObject(payload?.candidates?.[0]?.content?.parts?.[0]?.text);
-    const reference = validateGranthiAnswer(generated);
+    const reference = validateGranthiAnswer(generated, question);
     return {
       shortAnswer: limitText(generated.shortAnswer, 120),
       answerPunjabi: limitText(generated.answerPunjabi, 700),

@@ -139,19 +139,14 @@ const AdminAskGranthiPage = () => {
       {!isLoading && filteredQuestions.length === 0 ? <p className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">No questions match this filter yet.</p> : null}
 
       <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="hidden grid-cols-[minmax(0,1fr)_120px_330px] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 md:grid">
-          <span>Question</span><span>Status</span><span className="text-right">Actions</span>
+        <div className="hidden grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_120px_330px] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 md:grid">
+          <span>Question</span><span>Answer summary</span><span>Status</span><span className="text-right">Actions</span>
         </div>
         {pagedQuestions.map((entry) => (
           <article key={entry.id} className="border-b border-slate-200 px-4 py-3 last:border-b-0">
-            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_120px_330px] md:items-center">
-              <div className="min-w-0">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className={`rounded-full border px-2.5 py-1 text-[11px] font-bold capitalize ${statusStyles[entry.status] || statusStyles.error}`}>{entry.status}</span>
-                  <span className="truncate text-xs text-slate-500">{entry.status === 'answered' ? `Punjabi: ${entry.answerPunjabi || '-'} · English: ${entry.answerEnglish || '-'}` : entry.errorMessage || 'Answer pending'}</span>
-                </div>
-                <h2 className="min-w-0 truncate font-semibold text-slate-900" title={entry.question}>{entry.question}</h2>
-              </div>
+            <div className="grid gap-2 md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_120px_330px] md:items-center">
+              <h2 className="min-w-0 truncate font-semibold text-slate-900" title={entry.question}>{entry.question}</h2>
+              <span className="min-w-0 truncate text-xs text-slate-500" title={entry.status === 'answered' ? `${entry.answerPunjabi || '-'} | ${entry.answerEnglish || '-'}` : entry.errorMessage || 'Answer pending'}>{entry.status === 'answered' ? `ਪੰ: ${entry.answerPunjabi || '-'} · En: ${entry.answerEnglish || '-'}` : entry.errorMessage || 'Answer pending'}</span>
               <div className="hidden md:block"><span className={`rounded-full border px-2.5 py-1 text-[11px] font-bold capitalize ${statusStyles[entry.status] || statusStyles.error}`}>{entry.status}</span></div>
               <div className="flex shrink-0 flex-nowrap items-center justify-start gap-1.5 md:justify-end">
                 <button type="button" onClick={() => setViewingQuestion(entry)} className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"><EyeIcon className="h-4 w-4" /> View</button>
