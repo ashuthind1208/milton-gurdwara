@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { QRCodeSVG } from 'qrcode.react';
@@ -35,6 +35,8 @@ const AskGranthiBoardPage = () => {
   const [secondsRemaining, setSecondsRemaining] = useState(30);
   const [dismissedAnswerIds, setDismissedAnswerIds] = useState(readDismissedAnswerIds);
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
+  const welcomeBaselineQuestionIdRef = useRef(null);
+  const welcomeBaselineInitializedRef = useRef(false);
   const { data, isError } = useQuery({
     queryKey: ['ask-granthi-board'],
     queryFn: () => askGranthiService.getBoard().then((response) => response.data),
@@ -52,7 +54,18 @@ const AskGranthiBoardPage = () => {
     .slice(0, 8);
   const latestQuestion = questions[0] || null;
   const forceWelcomeScreen = new URLSearchParams(window.location.search).get('screen') === 'welcome';
-  const activeQuestion = !forceWelcomeScreen && latestQuestion?.id && !dismissedAnswerIds.has(String(latestQuestion.id)) ? latestQuestion : null;
+  if (forceWelcomeScreen && !welcomeBaselineInitializedRef.current && data) {
+    welcomeBaselineQuestionIdRef.current = latestQuestion?.id ? String(latestQuestion.id) : '';
+    welcomeBaselineInitializedRef.current = true;
+  }
+  const isNewQuestionAfterWelcome = forceWelcomeScreen
+    && latestQuestion?.id
+    && String(latestQuestion.id) !== welcomeBaselineQuestionIdRef.current;
+  const activeQuestion = (!forceWelcomeScreen || isNewQuestionAfterWelcome)
+    && latestQuestion?.id
+    && !dismissedAnswerIds.has(String(latestQuestion.id))
+    ? latestQuestion
+    : null;
   const isThinking = activeQuestion?.status === 'thinking';
   const isAnswered = activeQuestion?.status === 'answered';
   const questionUrl = `${window.location.origin}/ask-a-granthi/question`;
