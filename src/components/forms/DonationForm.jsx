@@ -126,7 +126,7 @@ const DonationForm = ({
                   step="0.01"
                   required
                   placeholder="e.g. 25"
-                  required className="mt-1 h-10 w-full rounded-xl border border-slate-300 bg-white/95 px-3 py-2 text-sm font-bold"
+                  className="mt-1 h-10 w-full rounded-xl border border-slate-300 bg-white/95 px-3 py-2 text-sm font-bold"
                 />
               </label>
 
