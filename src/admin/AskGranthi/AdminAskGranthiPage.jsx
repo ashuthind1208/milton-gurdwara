@@ -131,20 +131,20 @@ const AdminAskGranthiPage = () => {
       {!isLoading && filteredQuestions.length === 0 ? <p className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">No questions match this filter yet.</p> : null}
 
       <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="hidden grid-cols-[minmax(0,1fr)_120px_240px] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 md:grid">
+        <div className="hidden grid-cols-[minmax(0,1fr)_120px_330px] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 md:grid">
           <span>Question</span><span>Status</span><span className="text-right">Actions</span>
         </div>
         {filteredQuestions.map((entry) => (
-          <article key={entry.id} className="border-b border-slate-200 p-4 last:border-b-0">
-            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_120px_240px] md:items-center">
+          <article key={entry.id} className="border-b border-slate-200 px-4 py-3 last:border-b-0">
+            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_120px_330px] md:items-center">
               <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2">
                   <span className={`rounded-full border px-2.5 py-1 text-[11px] font-bold capitalize ${statusStyles[entry.status] || statusStyles.error}`}>{entry.status}</span>
                   {entry.featured ? <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-800"><StarIcon className="h-3.5 w-3.5" /> Featured FAQ</span> : null}
                   {entry.visible === false ? <span className="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">Hidden</span> : null}
                   <span className="text-xs text-slate-400">Asked {Math.max(1, Number(entry.askCount) || 1)} time(s)</span>
                 </div>
-                <h2 className="mt-3 font-heading text-lg font-semibold text-slate-900">{entry.question}</h2>
+                <h2 className="min-w-0 truncate font-semibold text-slate-900" title={entry.question}>{entry.question}</h2>
                 {entry.status === 'answered' ? (
                   <div className="mt-3 grid gap-3 lg:grid-cols-2">
                     <div className="rounded-lg bg-slate-50 p-3">
@@ -162,7 +162,7 @@ const AdminAskGranthiPage = () => {
               <div className="flex items-center gap-2 md:block">
                 <span className={`rounded-full border px-2.5 py-1 text-[11px] font-bold capitalize ${statusStyles[entry.status] || statusStyles.error}`}>{entry.status}</span>
               </div>
-              <div className="flex shrink-0 flex-wrap justify-start gap-2 md:justify-end">
+              <div className="flex shrink-0 flex-nowrap items-center justify-start gap-1.5 md:justify-end">
                 <button type="button" onClick={() => setViewingQuestion(entry)} className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"><EyeIcon className="h-4 w-4" /> View</button>
                 {entry.status === 'answered' ? (
                   <>

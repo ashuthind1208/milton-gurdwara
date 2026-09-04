@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { QRCodeSVG } from 'qrcode.react';
 import { ArrowsPointingOutIcon, BookOpenIcon, DevicePhoneMobileIcon } from '@heroicons/react/24/outline';
@@ -33,6 +34,7 @@ const AskGranthiBoardPage = () => {
   const [now, setNow] = useState(new Date());
   const [secondsRemaining, setSecondsRemaining] = useState(30);
   const [dismissedAnswerIds, setDismissedAnswerIds] = useState(readDismissedAnswerIds);
+  const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
   const { data, isError } = useQuery({
     queryKey: ['ask-granthi-board'],
     queryFn: () => askGranthiService.getBoard().then((response) => response.data),
@@ -58,6 +60,12 @@ const AskGranthiBoardPage = () => {
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
   useEffect(() => {
@@ -158,9 +166,12 @@ const AskGranthiBoardPage = () => {
                   <p className="font-gurmukhi text-[clamp(10px,.8vw,15px)] text-amber-100">ਸਿੱਖੋ · ਪੁੱਛੋ · ਸਾਂਝ ਪਾਓ</p>
                 </div>
               </div>
-              <button type="button" onClick={enterFullscreen} className="flex h-[3vw] min-h-9 w-[3vw] min-w-9 items-center justify-center border border-white/30 bg-white/10" aria-label="Toggle fullscreen">
-                <ArrowsPointingOutIcon className="h-1/2 w-1/2" />
-              </button>
+              <div className="flex items-center gap-2">
+                {!isFullscreen ? <Link to="/admin/ask-granthi" className="flex h-[3vw] min-h-9 items-center justify-center border border-white/30 bg-white/10 px-3 text-[clamp(10px,.7vw,14px)] font-bold text-white hover:bg-white/20">Back to Admin</Link> : null}
+                <button type="button" onClick={enterFullscreen} className="flex h-[3vw] min-h-9 w-[3vw] min-w-9 items-center justify-center border border-white/30 bg-white/10" aria-label="Toggle fullscreen">
+                  <ArrowsPointingOutIcon className="h-1/2 w-1/2" />
+                </button>
+              </div>
               <div className="absolute inset-x-[3.2%] bottom-[6%] space-y-[3px]" aria-hidden="true">
                 <span className="block h-[2px] w-full bg-brand-saffron" />
                 <span className="block h-px w-full bg-brand-saffron/55" />
