@@ -42,12 +42,12 @@ const ZeffyDonationModal = ({ isOpen, formUrl, onClose, onPaymentCompleted, titl
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[180] flex items-stretch justify-center bg-slate-950/65 backdrop-blur-sm md:items-center md:p-6" role="presentation">
+    <div className="fixed inset-0 z-[320] flex items-stretch justify-center bg-slate-950/65 backdrop-blur-sm md:items-center md:p-6" role="presentation">
       <button type="button" className="absolute inset-0 cursor-default" onClick={() => { if (!requireCompletion) onClose(); }} aria-label="Dismiss Zeffy donation form" />
       <section className="relative z-10 flex h-full w-full flex-col overflow-hidden bg-white shadow-2xl md:h-[90vh] md:max-w-6xl md:rounded-lg" role="dialog" aria-modal="true" aria-labelledby="zeffy-modal-title">
         <header className="flex min-h-14 items-center justify-between gap-3 border-b border-slate-200 bg-brand-blue px-4 py-3 text-white">
           <h2 id="zeffy-modal-title" className="font-heading text-lg font-bold tracking-normal">{title}</h2>
-          <button type="button" onClick={onClose} disabled={requireCompletion} className="inline-flex h-10 w-10 items-center justify-center rounded-md text-white hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white disabled:cursor-not-allowed disabled:opacity-40" aria-label="Close Zeffy donation form">
+          <button type="button" onClick={onClose} className="inline-flex h-10 w-10 items-center justify-center rounded-md text-white hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white" aria-label="Close Zeffy donation form">
             <XMarkIcon className="h-6 w-6" aria-hidden="true" />
           </button>
         </header>
