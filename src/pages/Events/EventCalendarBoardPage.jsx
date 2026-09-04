@@ -23,8 +23,7 @@ import bookingService from '../../services/bookingService';
 import advertisementService from '../../services/advertisementService';
 import sponsorService from '../../services/sponsorService';
 import { getNanakshahiDate, toGurmukhiNumber } from '../../utils/punjabiCalendar';
-import { siteConfig } from '../../constants/siteConfig';
-import gurdwaraLogo from '../../assets/gurdwara-logo.webp';
+import { useBranding } from '../../context/BrandingContext';
 import { expandDateRange } from '../../utils/dateRange';
 
 const WEEKDAY_LABELS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -36,6 +35,7 @@ const toLocalDateKey = (value) => {
 };
 
 const EventCalendarBoardPage = () => {
+  const { branding, logoSrc } = useBranding();
   const meta = useSeoMeta('Event Calendar Board', 'Live monthly event calendar with registration totals and Nanakshahi dates.');
   const [now, setNow] = useState(new Date());
   const [isBrowserFullscreen, setIsBrowserFullscreen] = useState(Boolean(document.fullscreenElement));
@@ -136,10 +136,10 @@ const EventCalendarBoardPage = () => {
         category: 'Booking',
         date,
         dateTime: new Date(`${date}T${booking.startTime || '00:00'}`),
-        location: booking.bookingLocation || siteConfig.name
+        location: booking.bookingLocation || branding.organizationName
       })))
     .filter((booking) => !Number.isNaN(booking.dateTime.getTime()))
-    .sort((left, right) => left.dateTime.getTime() - right.dateTime.getTime()), [bookings]);
+    .sort((left, right) => left.dateTime.getTime() - right.dateTime.getTime()), [bookings, branding.organizationName]);
   const calendarItems = useMemo(() => [...activeEvents, ...confirmedBookings]
     .sort((left, right) => new Date(left.dateTime || left.date || 0).getTime() - new Date(right.dateTime || right.date || 0).getTime()), [activeEvents, confirmedBookings]);
   const visibleCalendarItems = useMemo(() => {
@@ -304,9 +304,9 @@ const EventCalendarBoardPage = () => {
         <main className="relative z-10 flex h-full flex-col px-3 py-2 sm:px-5 sm:py-3 lg:px-7">
           <header className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4">
             <div className="flex min-w-0 items-center gap-3">
-              <img src={gurdwaraLogo} alt={`${siteConfig.name} logo`} className="h-12 w-12 shrink-0 rounded-full border border-white/20 object-cover sm:h-16 sm:w-16 xl:h-20 xl:w-20" />
+              <img src={logoSrc} alt={`${branding.organizationName} logo`} className="h-12 w-12 shrink-0 rounded-full border border-white/20 object-cover sm:h-16 sm:w-16 xl:h-20 xl:w-20" />
               <div className="min-w-0">
-                <p className="truncate text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-200 sm:text-sm xl:text-base">{siteConfig.name}</p>
+                <p className="truncate text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-200 sm:text-sm xl:text-base">{branding.organizationName}</p>
                 <h1 className="truncate text-2xl font-semibold text-white sm:text-3xl">Event Calendar</h1>
               </div>
             </div>
@@ -437,7 +437,7 @@ const EventCalendarBoardPage = () => {
                                   <span className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${item.itemType === 'booking' ? 'bg-rose-300/20 text-rose-100' : 'bg-cyan-300/20 text-cyan-100'}`}>{item.itemType}</span>
                                 </div>
                                 <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-slate-200"><CalendarDaysIcon className="h-4 w-4 shrink-0" /> {format(itemDate, 'EEEE, MMM d')} · {format(itemDate, 'h:mm a')}</p>
-                                <p className="mt-1 flex items-center gap-1.5 truncate text-xs text-slate-400"><MapPinIcon className="h-4 w-4 shrink-0" /> {item.location || siteConfig.name}</p>
+                                <p className="mt-1 flex items-center gap-1.5 truncate text-xs text-slate-400"><MapPinIcon className="h-4 w-4 shrink-0" /> {item.location || branding.organizationName}</p>
                               </div>
                             );
                           })}

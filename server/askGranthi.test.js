@@ -40,6 +40,8 @@ test('sends the Gemini key in a header and returns a trusted reference', async (
   assert.equal(requestUrl.includes('secret-test-key'), false);
   assert.equal(requestOptions.headers['x-goog-api-key'], 'secret-test-key');
   assert.equal(answer.gurbani.source, 'Sri Guru Granth Sahib Ji, Ang 1');
+  assert.match(answer.gurbani.translationPunjabi, /[\u0A00-\u0A7F]/);
+  assert.ok(answer.gurbani.translationEnglish.length > 40);
   assert.equal(answer.model, 'gemini-test-flash');
 });
 

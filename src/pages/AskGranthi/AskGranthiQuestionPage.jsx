@@ -1,29 +1,15 @@
 import { useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { ArrowPathIcon, BookOpenIcon, PaperAirplaneIcon } from '@heroicons/react/24/outline';
 import Seo from '../../components/common/Seo';
 import askGranthiService from '../../services/askGranthiService';
-import gurdwaraLogo from '../../assets/gurdwara-logo.webp';
+import { useBranding } from '../../context/BrandingContext';
 import khandaMark from '../../assets/khanda-mark.webp';
-
-const DEFAULT_BRANDING = {
-  organizationName: 'Gurdwara Singh Sabha Milton',
-  productName: 'Ask a Granthi Ji',
-  logoUrl: '',
-  primaryColor: '#0B1F3A',
-  accentColor: '#F4A300',
-  surfaceColor: '#FFF9EE'
-};
 
 const AskGranthiQuestionPage = () => {
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState(null);
-  const { data } = useQuery({
-    queryKey: ['ask-granthi-branding'],
-    queryFn: () => askGranthiService.getBranding().then((response) => response.data)
-  });
-  const branding = { ...DEFAULT_BRANDING, ...(data || {}) };
-  const logoSrc = branding.logoUrl || gurdwaraLogo;
+  const { branding, logoSrc } = useBranding();
   const askMutation = useMutation({
     mutationFn: (value) => askGranthiService.askQuestion(value),
     onSuccess: (response) => setAnswer(response.data)
@@ -54,7 +40,7 @@ const AskGranthiQuestionPage = () => {
         '--granthi-surface': branding.surfaceColor
       }}
     >
-      <Seo title={branding.productName} description="Ask a Sikh learning question and receive a bilingual AI-assisted answer." />
+      <Seo title="Ask a Granthi Ji" description="Ask a Sikh learning question and receive a bilingual AI-assisted answer." />
       <style>{`
         @keyframes granthi-mobile-think { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-7px) rotate(2deg); } }
         @keyframes granthi-mobile-dot { 0%, 70%, 100% { opacity: .25; } 35% { opacity: 1; } }
@@ -68,7 +54,7 @@ const AskGranthiQuestionPage = () => {
         <header className="text-center">
           <img src={logoSrc} alt={`${branding.organizationName} logo`} className="mx-auto h-20 w-20 rounded-full border-2 border-[color:var(--granthi-accent)] bg-white object-cover shadow-xl" />
           <p className="mt-4 text-xs font-bold uppercase tracking-[0.18em] text-[color:var(--granthi-accent)]">{branding.organizationName}</p>
-          <h1 className="mt-2 font-heading text-4xl font-bold text-white sm:text-5xl">{branding.productName}</h1>
+          <h1 className="mt-2 font-heading text-4xl font-bold text-white sm:text-5xl">Ask a Granthi Ji</h1>
           <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-slate-300">Ask about Sikhi, Gurbani, Sikh history, or daily practice. Your question and answer will appear on the Gurdwara display.</p>
         </header>
 
@@ -123,6 +109,10 @@ const AskGranthiQuestionPage = () => {
                   <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-violet-700"><BookOpenIcon className="h-4 w-4" /> Gurbani reference</p>
                   <p className="mt-2 font-gurmukhi text-base font-bold leading-7 text-violet-950">{answer.gurbani.gurmukhi}</p>
                   <p className="mt-2 text-xs font-bold text-violet-700">{answer.gurbani.source}</p>
+                  <p className="mt-3 text-xs font-bold uppercase tracking-wider text-violet-700">ਪੰਜਾਬੀ ਅਰਥ</p>
+                  <p className="mt-1 font-gurmukhi text-sm font-semibold leading-6 text-violet-950">{answer.gurbani.translationPunjabi}</p>
+                  <p className="mt-3 text-xs font-bold uppercase tracking-wider text-violet-700">English translation</p>
+                  <p className="mt-1 text-sm font-semibold leading-6 text-violet-950">{answer.gurbani.translationEnglish}</p>
                 </article>
               ) : null}
               <button type="button" onClick={askAnother} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-[color:var(--granthi-primary)] hover:bg-slate-50">

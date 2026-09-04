@@ -33,7 +33,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import GlobalSearchBar from '../components/common/GlobalSearchBar';
 import { adminNav } from '../constants/navigation';
 import { useAuth } from '../context/AuthContext';
-import gurdwaraLogo from '../assets/gurdwara-logo.webp';
+import { useBranding } from '../context/BrandingContext';
 import auditService from '../services/auditService';
 import contentApiService from '../services/contentApiService';
 import phase2Service from '../services/phase2Service';
@@ -421,7 +421,7 @@ const iconByPath = {
   '/admin/schedule': CalendarDaysIcon,
   '/admin/hukamnama': SparklesIcon,
   '/admin/ask-granthi': ChatBubbleLeftRightIcon,
-  '/admin/ask-granthi-branding': SwatchIcon,
+  '/admin/gurdwara-branding': SwatchIcon,
   '/admin/langar': HeartIcon,
   '/admin/seva-opportunities': UserGroupIcon,
   '/admin/gallery': PhotoIcon,
@@ -443,6 +443,7 @@ const iconByPath = {
 
 const AdminLayout = () => {
   const { user, logout } = useAuth();
+  const { branding, logoSrc } = useBranding();
   const location = useLocation();
   const navigate = useNavigate();
   const [accessDeniedModalOpen, setAccessDeniedModalOpen] = useState(false);
@@ -514,10 +515,12 @@ const AdminLayout = () => {
     }
     return ['/admin', ...normalized];
   }, [assignedAdminPages]);
-  const roleVisibleAdminNav = adminNav.filter((item) => item.path !== '/admin/ask-granthi-branding' || isSuperAdminRole);
+  const roleVisibleAdminNav = adminNav.filter((item) => item.path !== '/admin/gurdwara-branding' || isSuperAdminRole);
   const visibleNav = hasFullAccess
     ? roleVisibleAdminNav
     : roleVisibleAdminNav.filter((item) => limitedAccessPaths.includes(item.path));
+  const primaryVisibleNav = visibleNav.filter((item) => item.path !== '/admin/gurdwara-branding');
+  const brandingNavItem = visibleNav.find((item) => item.path === '/admin/gurdwara-branding');
   const adminSearchItems = useMemo(() => {
     const allowedPaths = new Set(visibleNav.map((item) => String(item.path || '').trim()).filter(Boolean));
     const pageItems = visibleNav
@@ -932,7 +935,7 @@ const AdminLayout = () => {
       <aside className="hidden border-r border-slate-800 bg-slate-950 p-4 text-slate-100 lg:block lg:min-h-full lg:self-stretch">
         <div className="flex items-center justify-between gap-2">
           <p className="flex items-center gap-2 font-heading text-xl font-bold text-white">
-            <img src={gurdwaraLogo} alt="Singh Sabha logo" className="h-8 w-8 rounded-full border border-brand-saffron/70 object-cover" />
+            <img src={logoSrc} alt={`${branding.shortName} logo`} className="h-8 w-8 rounded-full border border-brand-saffron/70 object-cover" />
             Admin Portal
           </p>
           <button
@@ -946,7 +949,7 @@ const AdminLayout = () => {
           </button>
         </div>
         <nav className="mt-6 grid gap-2" aria-label="Admin navigation">
-          {visibleNav.map((item) => (
+          {primaryVisibleNav.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
@@ -966,6 +969,16 @@ const AdminLayout = () => {
               })()}
             </NavLink>
           ))}
+          {brandingNavItem ? (
+            <div className="mt-4 border-t border-slate-700 pt-4">
+              <NavLink
+                to={brandingNavItem.path}
+                className={({ isActive }) => `block rounded-lg px-3 py-2 text-sm ${isActive ? 'bg-brand-blue text-white' : 'text-slate-300 hover:bg-slate-800'}`}
+              >
+                <span className="inline-flex items-center gap-2"><SwatchIcon className="h-4 w-4" /><span>{brandingNavItem.label}</span></span>
+              </NavLink>
+            </div>
+          ) : null}
         </nav>
       </aside>
       <main className="admin-main-content min-w-0 overflow-x-hidden p-4 md:p-8">
@@ -1115,7 +1128,7 @@ const AdminLayout = () => {
           <aside className="relative h-full w-[86%] max-w-[320px] overflow-y-auto border-r border-slate-800 bg-slate-950 p-4 text-slate-100 shadow-2xl">
             <div className="flex items-center justify-between gap-2">
               <p className="flex items-center gap-2 font-heading text-xl font-bold text-white">
-                <img src={gurdwaraLogo} alt="Singh Sabha logo" className="h-8 w-8 rounded-full border border-brand-saffron/70 object-cover" />
+                <img src={logoSrc} alt={`${branding.shortName} logo`} className="h-8 w-8 rounded-full border border-brand-saffron/70 object-cover" />
                 Admin Portal
               </p>
               <div className="flex items-center gap-2">
@@ -1143,7 +1156,7 @@ const AdminLayout = () => {
             </div>
 
             <nav className="mt-6 grid gap-2" aria-label="Admin navigation mobile">
-              {visibleNav.map((item) => (
+              {primaryVisibleNav.map((item) => (
                 <NavLink
                   key={item.path}
                   to={item.path}
@@ -1163,6 +1176,17 @@ const AdminLayout = () => {
                   })()}
                 </NavLink>
               ))}
+              {brandingNavItem ? (
+                <div className="mt-4 border-t border-slate-700 pt-4">
+                  <NavLink
+                    to={brandingNavItem.path}
+                    onClick={() => setMobileNavOpen(false)}
+                    className={({ isActive }) => `block rounded-lg px-3 py-2 text-sm ${isActive ? 'bg-brand-blue text-white' : 'text-slate-300 hover:bg-slate-800'}`}
+                  >
+                    <span className="inline-flex items-center gap-2"><SwatchIcon className="h-4 w-4" /><span>{brandingNavItem.label}</span></span>
+                  </NavLink>
+                </div>
+              ) : null}
             </nav>
           </aside>
         </div>
@@ -1172,8 +1196,8 @@ const AdminLayout = () => {
         <div className="fixed inset-0 z-[160] flex items-center justify-center bg-slate-950/65 px-4" role="status" aria-live="assertive" aria-label="Logging out">
           <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-2xl">
             <img
-              src={gurdwaraLogo}
-              alt="Singh Sabha logo"
+              src={logoSrc}
+              alt={`${branding.shortName} logo`}
               className="mx-auto h-16 w-16 rounded-full border border-brand-saffron/70 object-cover"
             />
             <div className="mx-auto mt-4 h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-brand-blue" />

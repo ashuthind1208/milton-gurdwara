@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ArrowDownTrayIcon, ShareIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { useBranding } from '../../context/BrandingContext';
 
 const DISMISSED_AT_KEY = 'ssm_app_install_dismissed_at';
 const DISMISSAL_DURATION_MS = 14 * 24 * 60 * 60 * 1000;
@@ -15,6 +16,7 @@ const isInstalled = () => (typeof window.matchMedia === 'function'
   || window.navigator.standalone === true;
 
 const AppInstallPrompt = () => {
+  const { branding, logoSrc } = useBranding();
   const [installEvent, setInstallEvent] = useState(null);
   const [showIosHelp, setShowIosHelp] = useState(false);
   const [dismissed, setDismissed] = useState(() => {
@@ -63,10 +65,10 @@ const AppInstallPrompt = () => {
 
   return (
     <>
-      <aside className="fixed inset-x-3 bottom-3 z-40 mx-auto flex max-w-md items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-2xl lg:hidden" aria-label="Install Singh Sabha app">
-        <img src="/logo192.png" alt="" className="h-11 w-11 shrink-0 rounded-lg" />
+      <aside className="fixed inset-x-3 bottom-3 z-40 mx-auto flex max-w-md items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-2xl lg:hidden" aria-label={`Install ${branding.shortName} app`}>
+        <img src={logoSrc} alt="" className="h-11 w-11 shrink-0 rounded-lg object-cover" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-slate-900">Singh Sabha Milton</p>
+          <p className="text-sm font-bold text-slate-900">{branding.shortName}</p>
           <button type="button" onClick={install} className="mt-0.5 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-blue">
             <ArrowDownTrayIcon className="h-4 w-4" />
             Install app

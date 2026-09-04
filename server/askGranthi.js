@@ -5,49 +5,56 @@ const TRUSTED_GRANTHI_REFERENCES = Object.freeze([
   {
     id: 'mool-mantar',
     gurmukhi: 'ੴ ਸਤਿ ਨਾਮੁ ਕਰਤਾ ਪੁਰਖੁ ਨਿਰਭਉ ਨਿਰਵੈਰੁ ਅਕਾਲ ਮੂਰਤਿ ਅਜੂਨੀ ਸੈਭੰ ਗੁਰ ਪ੍ਰਸਾਦਿ ॥',
-    translation: 'One Universal Creator God. The Name Is Truth. Creative Being Personified. Without Fear. Without Hatred. Timeless, Beyond Birth, Self-Existent. By Guru\'s Grace.',
+    translationPunjabi: 'ਇੱਕ ਸਰਬ-ਵਿਆਪਕ ਸਿਰਜਣਹਾਰ ਹੈ। ਉਸ ਦਾ ਨਾਮ ਸੱਚ ਹੈ; ਉਹ ਕਰਤਾ ਪੁਰਖ, ਨਿਰਭਉ, ਨਿਰਵੈਰ, ਕਾਲ ਤੋਂ ਪਰੇ, ਜਨਮ ਤੋਂ ਰਹਿਤ ਅਤੇ ਆਪਣੇ ਆਪ ਤੋਂ ਪ੍ਰਕਾਸ਼ਮਾਨ ਹੈ। ਗੁਰੂ ਦੀ ਕਿਰਪਾ ਨਾਲ ਉਸ ਦੀ ਪਛਾਣ ਹੁੰਦੀ ਹੈ।',
+    translationEnglish: 'There is One Universal Creator. The Name is Truth; the Creator is without fear, without hatred, beyond time and birth, self-existent, and realized through the Guru\'s grace.',
     source: 'Sri Guru Granth Sahib Ji, Ang 1',
     themes: ['ik onkar', 'oneness', 'creator', 'truth', 'fearlessness', 'equality']
   },
   {
     id: 'hukam',
     gurmukhi: 'ਹੁਕਮਿ ਰਜਾਈ ਚਲਣਾ ਨਾਨਕ ਲਿਖਿਆ ਨਾਲਿ ॥੧॥',
-    translation: 'O Nanak, it is written that we walk in harmony with Hukam, the Divine Will.',
+    translationPunjabi: 'ਗੁਰੂ ਨਾਨਕ ਸਾਹਿਬ ਸਮਝਾਉਂਦੇ ਹਨ ਕਿ ਜੀਵਨ ਦਾ ਸੱਚਾ ਮਾਰਗ ਰਜ਼ਾ ਦੇ ਮਾਲਕ ਦੇ ਹੁਕਮ ਅਨੁਸਾਰ ਚੱਲਣਾ ਹੈ; ਇਹ ਹੁਕਮ ਜੀਵ ਦੇ ਨਾਲ ਹੀ ਲਿਖਿਆ ਹੋਇਆ ਹੈ।',
+    translationEnglish: 'Guru Nanak teaches that the true way of life is to walk in harmony with the Divine Will; this Hukam is written as an inseparable part of our existence.',
     source: 'Sri Guru Granth Sahib Ji, Ang 1',
     themes: ['hukam', 'acceptance', 'patience', 'contentment', 'rehat']
   },
   {
     id: 'one-giver',
     gurmukhi: 'ਸਭਨਾ ਜੀਆ ਕਾ ਇਕੁ ਦਾਤਾ ਸੋ ਮੈ ਵਿਸਰਿ ਨ ਜਾਈ ॥',
-    translation: 'There is one Giver for all beings; may I never forget the One.',
+    translationPunjabi: 'ਸਾਰੇ ਜੀਵਾਂ ਨੂੰ ਦਾਤਾਂ ਦੇਣ ਵਾਲਾ ਇੱਕੋ ਪਰਮਾਤਮਾ ਹੈ; ਅਰਦਾਸ ਹੈ ਕਿ ਉਹ ਦਾਤਾਰ ਮੈਨੂੰ ਕਦੇ ਨਾ ਵਿਸਰੇ।',
+    translationEnglish: 'The One Divine Giver sustains every living being; may I never forget that One.',
     source: 'Sri Guru Granth Sahib Ji, Ang 2',
     themes: ['oneness', 'remembrance', 'gratitude', 'equality']
   },
   {
     id: 'air-water-earth',
     gurmukhi: 'ਪਵਣੁ ਗੁਰੂ ਪਾਣੀ ਪਿਤਾ ਮਾਤਾ ਧਰਤਿ ਮਹਤੁ ॥',
-    translation: 'Air is the Guru, water the father, and the great earth the mother.',
+    translationPunjabi: 'ਹਵਾ ਜੀਵਨ-ਦਾਤੀ ਗੁਰੂ ਸਮਾਨ ਹੈ, ਪਾਣੀ ਪਿਤਾ ਸਮਾਨ ਹੈ ਅਤੇ ਮਹਾਨ ਧਰਤੀ ਸਭ ਦੀ ਮਾਤਾ ਸਮਾਨ ਹੈ।',
+    translationEnglish: 'Air is like the Guru, water is like the father, and the great earth is like the mother who sustains all life.',
     source: 'Sri Guru Granth Sahib Ji, Ang 8',
     themes: ['creation', 'environment', 'respect', 'nature']
   },
   {
     id: 'inner-light',
     gurmukhi: 'ਮਨ ਤੂੰ ਜੋਤਿ ਸਰੂਪੁ ਹੈ ਆਪਣਾ ਮੂਲੁ ਪਛਾਣੁ ॥',
-    translation: 'O mind, you are the embodiment of the Divine Light; recognize your own origin.',
+    translationPunjabi: 'ਹੇ ਮਨ, ਤੂੰ ਪਰਮਾਤਮਾ ਦੀ ਜੋਤ ਦਾ ਸਰੂਪ ਹੈਂ; ਆਪਣੇ ਅਸਲ ਦਿਵਯ ਮੂਲ ਨੂੰ ਪਛਾਣ।',
+    translationEnglish: 'O mind, you embody the Divine Light; recognize the Divine source from which you come.',
     source: 'Sri Guru Granth Sahib Ji, Ang 441',
     themes: ['identity', 'mind', 'meditation', 'spiritual growth']
   },
   {
     id: 'honest-work-sharing',
     gurmukhi: 'ਘਾਲਿ ਖਾਇ ਕਿਛੁ ਹਥਹੁ ਦੇਇ ॥ ਨਾਨਕ ਰਾਹੁ ਪਛਾਣਹਿ ਸੇਇ ॥੧॥',
-    translation: 'Those who earn honestly and share with others recognize the true path.',
+    translationPunjabi: 'ਜੋ ਮਨੁੱਖ ਇਮਾਨਦਾਰੀ ਨਾਲ ਮਿਹਨਤ ਕਰਕੇ ਖਾਂਦਾ ਹੈ ਅਤੇ ਆਪਣੀ ਕਮਾਈ ਵਿਚੋਂ ਲੋੜਵੰਦਾਂ ਨਾਲ ਸਾਂਝ ਪਾਂਦਾ ਹੈ, ਗੁਰੂ ਨਾਨਕ ਸਾਹਿਬ ਅਨੁਸਾਰ ਉਹੀ ਸੱਚੇ ਜੀਵਨ-ਮਾਰਗ ਨੂੰ ਪਛਾਣਦਾ ਹੈ।',
+    translationEnglish: 'One who earns through honest work and shares from those earnings with others is recognized by Guru Nanak as one who understands the true path.',
     source: 'Sri Guru Granth Sahib Ji, Ang 1245',
     themes: ['kirat karni', 'vand chhakna', 'seva', 'honest work', 'sharing']
   },
   {
     id: 'divine-light-all',
     gurmukhi: 'ਅਵਲਿ ਅਲਹ ਨੂਰੁ ਉਪਾਇਆ ਕੁਦਰਤਿ ਕੇ ਸਭ ਬੰਦੇ ॥',
-    translation: 'First, the Divine created the Light; from that creative power came all beings.',
+    translationPunjabi: 'ਸਭ ਤੋਂ ਪਹਿਲਾਂ ਪਰਮਾਤਮਾ ਨੇ ਇੱਕ ਨੂਰ ਪ੍ਰਗਟ ਕੀਤਾ; ਉਸੇ ਕੁਦਰਤੀ ਰਚਨਾ ਤੋਂ ਸਾਰੇ ਮਨੁੱਖ ਪੈਦਾ ਹੋਏ ਹਨ। ਇਸ ਲਈ ਸਭ ਵਿੱਚ ਇੱਕੋ ਦਿਵਯ ਜੋਤ ਹੈ।',
+    translationEnglish: 'First, the Divine brought forth the One Light; from that creative power all human beings came into existence. The same Divine Light therefore shines within all.',
     source: 'Sri Guru Granth Sahib Ji, Ang 1349',
     themes: ['equality', 'humanity', 'divine light', 'inclusion']
   }
@@ -187,7 +194,8 @@ const createGranthiAnswer = async (questionValue, options = {}) => {
       gurbani: {
         id: reference.id,
         gurmukhi: reference.gurmukhi,
-        translationEnglish: reference.translation,
+        translationPunjabi: reference.translationPunjabi,
+        translationEnglish: reference.translationEnglish,
         source: reference.source
       },
       provider: 'gemini',

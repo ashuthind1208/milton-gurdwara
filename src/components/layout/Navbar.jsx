@@ -28,7 +28,6 @@ import {
 } from '@heroicons/react/24/outline';
 import { publicNav } from '../../constants/navigation';
 import { siteConfig } from '../../constants/siteConfig';
-import gurdwaraLogo from '../../assets/gurdwara-logo.webp';
 import notoSansGurmukhiRegular from '../../assets/fonts/NotoSansGurmukhi-Regular.ttf';
 import notoSansGurmukhiBold from '../../assets/fonts/NotoSansGurmukhi-Bold.ttf';
 import { getNanakshahiDate, getNanakshahiMonthCalendar, getUpcomingPunjabiObservances } from '../../utils/punjabiCalendar';
@@ -46,6 +45,7 @@ import addressLookupService from '../../services/addressLookupService';
 import cmsService from '../../services/cmsService';
 import phase2Service from '../../services/phase2Service';
 import { useAuth } from '../../context/AuthContext';
+import { useBranding } from '../../context/BrandingContext';
 import { formatTenDigitPhone, isTenDigitPhone, TEN_DIGIT_PHONE_ERROR } from '../../utils/phone';
 import { isEventCurrent } from '../../utils/eventAvailability';
 import { bookingBelongsToProfile, isBookingPaymentDonation, sortBookingsBySchedule } from '../../utils/profileBookings';
@@ -438,6 +438,7 @@ const Navbar = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { user, isAuthenticated, logout, updateProfile, persistUser } = useAuth();
+  const { branding, logoSrc } = useBranding();
   const [open, setOpen] = useState(false);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [isInlineSearchExpanded, setIsInlineSearchExpanded] = useState(false);
@@ -1926,7 +1927,7 @@ const Navbar = () => {
     image.src = src;
   });
 
-  const getLogoDataUrl = async () => getImageDataUrl(gurdwaraLogo);
+  const getLogoDataUrl = async () => getImageDataUrl(logoSrc);
 
   const getPdfBannerDataUrls = async (urls = []) => {
     const selected = (Array.isArray(urls) ? urls : []).slice(0, 8);
@@ -1976,7 +1977,7 @@ const Navbar = () => {
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(14);
-    doc.text(siteConfig.name, 34, 14);
+    doc.text(branding.organizationName, 34, 14);
 
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(219, 234, 254);
@@ -2699,8 +2700,8 @@ const Navbar = () => {
             tabIndex={(isCompact || !isHomePage) ? -1 : 0}
           >
             <img
-              src={gurdwaraLogo}
-              alt="Gurdwara Singh Sabha Milton logo"
+              src={logoSrc}
+              alt={`${branding.organizationName} logo`}
               className="h-[7.7rem] w-[7.7rem] rounded-full border-2 border-brand-saffron object-cover shadow-[0_4px_16px_rgba(245,166,35,0.25)]"
             />
           </Link>
@@ -2714,8 +2715,8 @@ const Navbar = () => {
             tabIndex={(isCompact || !isHomePage) ? 0 : -1}
           >
             <img
-              src={gurdwaraLogo}
-              alt="Gurdwara Singh Sabha Milton logo"
+              src={logoSrc}
+              alt={`${branding.organizationName} logo`}
               className="h-[4.5rem] w-[4.5rem] rounded-full border-2 border-brand-saffron object-cover shadow-[0_4px_16px_rgba(245,166,35,0.25)]"
             />
           </Link>
@@ -2819,8 +2820,8 @@ const Navbar = () => {
           <div className="flex items-center justify-start">
             <Link to="/" className="inline-flex items-center" aria-label="Go to homepage">
               <img
-                src={gurdwaraLogo}
-                alt="Gurdwara Singh Sabha Milton logo"
+                src={logoSrc}
+                alt={`${branding.organizationName} logo`}
                 className="mt-1.5 h-[3.55rem] w-[3.55rem] rounded-full border border-brand-saffron object-cover"
               />
             </Link>
@@ -3343,9 +3344,9 @@ const Navbar = () => {
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.26),transparent_44%)]" aria-hidden="true" />
                 <div className="relative flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <img src={gurdwaraLogo} alt="Gurdwara Singh Sabha Milton" className="h-14 w-14 rounded-full border-2 border-white/70 bg-white object-cover" />
+                    <img src={logoSrc} alt={branding.organizationName} className="h-14 w-14 rounded-full border-2 border-white/70 bg-white object-cover" />
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/85">Gurdwara Singh Sabha Milton</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/85">{branding.organizationName}</p>
                       <h3 className="mt-1 font-heading text-lg font-semibold">Membership Registration Form</h3>
                     </div>
                   </div>

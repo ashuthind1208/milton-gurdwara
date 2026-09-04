@@ -12,8 +12,7 @@ import donationService from '../../services/donationService';
 import advertisementService from '../../services/advertisementService';
 import sponsorService from '../../services/sponsorService';
 import { formatCurrency } from '../../utils/formatters';
-import { siteConfig } from '../../constants/siteConfig';
-import gurdwaraLogo from '../../assets/gurdwara-logo.webp';
+import { useBranding } from '../../context/BrandingContext';
 
 const CAMPAIGN_SPOTLIGHT_INTERVAL_MS = 15000;
 const BIG_KPI_ROTATION_MS = 18000;
@@ -70,6 +69,7 @@ const hashCampaignPalette = (seed = '') => {
 };
 
 const DonationDisplayBoardPage = () => {
+  const { branding, logoSrc } = useBranding();
   const location = useLocation();
   const params = useMemo(() => new URLSearchParams(location.search || ''), [location.search]);
   const fullscreen = useMemo(() => params.get('fullscreen') === '1', [params]);
@@ -651,7 +651,7 @@ const DonationDisplayBoardPage = () => {
           <div className="absolute left-1/2 top-1/2 h-[72vmax] w-[72vmax] -translate-x-1/2 -translate-y-1/2 rounded-full border border-brand-saffron/10" />
           <div className="absolute left-1/2 top-1/2 h-[58vmax] w-[58vmax] -translate-x-1/2 -translate-y-1/2 rounded-full border border-brand-blue/15" />
           <div className="absolute right-8 top-8 opacity-10 md:right-14 md:top-10">
-            <img src={gurdwaraLogo} alt="" aria-hidden="true" className="h-44 w-44 rounded-full border border-brand-saffron/30 object-cover md:h-56 md:w-56" />
+            <img src={logoSrc} alt="" aria-hidden="true" className="h-44 w-44 rounded-full border border-brand-saffron/30 object-cover md:h-56 md:w-56" />
           </div>
         </div>
 
@@ -686,9 +686,9 @@ const DonationDisplayBoardPage = () => {
             ) : null}
             <div className={`grid items-center gap-2 ${isPresentationFullscreen ? 'md:grid-cols-[1fr_auto]' : 'md:grid-cols-[1fr_auto_1fr]'}`}>
               <div className="flex items-center gap-2.5 md:justify-self-stretch">
-                <img src={gurdwaraLogo} alt="Singh Sabha Milton Gurdwara logo" className="h-14 w-14 rounded-full border border-brand-saffron/70 object-cover sm:h-16 sm:w-16" />
+                <img src={logoSrc} alt={`${branding.organizationName} logo`} className="h-14 w-14 rounded-full border border-brand-saffron/70 object-cover sm:h-16 sm:w-16" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-saffron">{siteConfig.shortName}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-saffron">{branding.shortName}</p>
                   <h1 className={`font-semibold text-white ${projectorMode ? 'text-3xl sm:text-4xl' : 'text-2xl sm:text-3xl'}`}>Live Donation Display Board</h1>
                 </div>
               </div>
@@ -901,7 +901,7 @@ const DonationDisplayBoardPage = () => {
 
           <footer className="mt-3 board-fade-up flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-2 text-[11px] text-slate-300" style={{ animationDelay: '320ms' }}>
             <p className="inline-flex items-center gap-1.5"><HeartIcon className="h-4 w-4 text-brand-saffron" /> Powered by sangat generosity</p>
-            <p className="inline-flex items-center gap-1.5"><PresentationChartLineIcon className="h-4 w-4 text-cyan-300" /> {siteConfig.name}</p>
+            <p className="inline-flex items-center gap-1.5"><PresentationChartLineIcon className="h-4 w-4 text-cyan-300" /> {branding.organizationName}</p>
           </footer>
         </main>
       </div>

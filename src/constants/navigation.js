@@ -23,7 +23,6 @@ export const adminNav = [
   { label: 'Daily Schedule', path: '/admin/schedule' },
   { label: 'Hukamnama', path: '/admin/hukamnama' },
   { label: 'Ask a Granthi', path: '/admin/ask-granthi' },
-  { label: 'Granthi Branding', path: '/admin/ask-granthi-branding' },
   { label: 'Seva Items', path: '/admin/langar' },
   { label: 'Seva Opportunities', path: '/admin/seva-opportunities' },
   { label: 'Gallery Folders', path: '/admin/gallery' },
@@ -39,5 +38,6 @@ export const adminNav = [
   { label: 'Newsletter', path: '/admin/newsletter' },
   { label: 'Audit Trail', path: '/admin/audit-trail' },
   { label: 'Roles and Access', path: '/admin/roles-access' },
-  { label: 'Users', path: '/admin/users' }
+  { label: 'Users', path: '/admin/users' },
+  { label: 'Gurdwara Branding', path: '/admin/gurdwara-branding' }
 ];

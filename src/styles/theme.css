@@ -1,10 +1,15 @@
 :root {
   --brand-saffron: #f5a623;
+  --brand-saffron-rgb: 245 166 35;
   --brand-blue: #0a4d9f;
+  --brand-blue-rgb: 10 77 159;
   --brand-cream: #fff8e8;
+  --brand-cream-rgb: 255 248 232;
   --brand-white: #ffffff;
   --brand-navy: #0d2f61;
+  --brand-navy-rgb: 13 47 97;
   --brand-gold: #c89b3c;
+  --brand-gold-rgb: 200 155 60;
   --brand-light-gray: #f7f7f7;
   --brand-success: #2e8b57;
   --brand-error: #d32f2f;

@@ -5,11 +5,11 @@ module.exports = {
     extend: {
       colors: {
         brand: {
-          saffron: '#F4A300',
-          blue: '#0B4EA2',
-          cream: '#FFF8E8',
-          navy: '#1D3557',
-          gold: '#C89B3C',
+          saffron: 'rgb(var(--brand-saffron-rgb, 244 163 0) / <alpha-value>)',
+          blue: 'rgb(var(--brand-blue-rgb, 11 78 162) / <alpha-value>)',
+          cream: 'rgb(var(--brand-cream-rgb, 255 248 232) / <alpha-value>)',
+          navy: 'rgb(var(--brand-navy-rgb, 29 53 87) / <alpha-value>)',
+          gold: 'rgb(var(--brand-gold-rgb, 200 155 60) / <alpha-value>)',
           green: '#2E8B57',
           error: '#D32F2F'
         }

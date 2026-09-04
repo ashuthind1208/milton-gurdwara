@@ -3,38 +3,28 @@ import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
-import askGranthiService from '../../services/askGranthiService';
+import { DEFAULT_GURDWARA_BRANDING } from '../../context/BrandingContext';
+import brandingService from '../../services/brandingService';
 import uploadService from '../../services/uploadService';
 import gurdwaraLogo from '../../assets/gurdwara-logo.webp';
 
-const DEFAULT_BRANDING = {
-  organizationName: 'Gurdwara Singh Sabha Milton',
-  productName: 'Ask a Granthi Ji',
-  logoUrl: '',
-  primaryColor: '#0B1F3A',
-  accentColor: '#F4A300',
-  surfaceColor: '#FFF9EE'
-};
-
-const AdminGranthiBrandingPage = () => {
+const AdminGurdwaraBrandingPage = () => {
   const queryClient = useQueryClient();
   const [uploadState, setUploadState] = useState({ pending: false, progress: 0, error: '' });
-  const form = useForm({ defaultValues: DEFAULT_BRANDING });
+  const form = useForm({ defaultValues: DEFAULT_GURDWARA_BRANDING });
   const { data } = useQuery({
-    queryKey: ['ask-granthi-branding'],
-    queryFn: () => askGranthiService.getBranding().then((response) => response.data)
+    queryKey: ['gurdwara-branding'],
+    queryFn: () => brandingService.getBranding().then((response) => response.data)
   });
 
   useEffect(() => {
-    if (data) {
-      form.reset({ ...DEFAULT_BRANDING, ...data });
-    }
+    if (data) form.reset({ ...DEFAULT_GURDWARA_BRANDING, ...data });
   }, [data, form]);
 
   const saveMutation = useMutation({
-    mutationFn: (values) => askGranthiService.saveBranding(values),
+    mutationFn: (values) => brandingService.saveBranding(values),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ask-granthi-branding'] });
+      queryClient.invalidateQueries({ queryKey: ['gurdwara-branding'] });
       queryClient.invalidateQueries({ queryKey: ['ask-granthi-board'] });
     }
   });
@@ -64,8 +54,8 @@ const AdminGranthiBrandingPage = () => {
     <div className="space-y-5">
       <div>
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-700">Super Admin only</p>
-        <h1 className="mt-1 font-heading text-2xl font-semibold text-slate-900">Ask a Granthi Branding</h1>
-        <p className="mt-1 text-sm text-slate-600">Configure the product identity used by the LED board and QR question screen.</p>
+        <h1 className="mt-1 font-heading text-2xl font-semibold text-slate-900">Gurdwara Branding</h1>
+        <p className="mt-1 text-sm text-slate-600">Configure the name, logo, and theme used across the public website, admin portal, displays, and mobile pages.</p>
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1fr_0.9fr]">
@@ -74,8 +64,8 @@ const AdminGranthiBrandingPage = () => {
             <label className="block text-sm font-semibold text-slate-700">Gurdwara name
               <input {...form.register('organizationName', { required: true, minLength: 2, maxLength: 120 })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 font-normal" />
             </label>
-            <label className="block text-sm font-semibold text-slate-700">Product name
-              <input {...form.register('productName', { required: true, minLength: 2, maxLength: 80 })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 font-normal" />
+            <label className="block text-sm font-semibold text-slate-700">Short name
+              <input {...form.register('shortName', { required: true, minLength: 2, maxLength: 80 })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 font-normal" />
             </label>
             <label className="block text-sm font-semibold text-slate-700">Logo URL
               <input {...form.register('logoUrl')} placeholder="https://... or /uploads/..." className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 font-normal" />
@@ -86,11 +76,11 @@ const AdminGranthiBrandingPage = () => {
             </label>
 
             <fieldset className="grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-3">
-              <legend className="px-1 text-sm font-semibold text-slate-700">Color scheme</legend>
+              <legend className="px-1 text-sm font-semibold text-slate-700">Application theme</legend>
               {[
                 ['primaryColor', 'Primary'],
                 ['accentColor', 'Accent'],
-                ['surfaceColor', 'Answer surface']
+                ['surfaceColor', 'Surface']
               ].map(([field, label]) => (
                 <label key={field} className="text-xs font-semibold text-slate-600">{label}
                   <div className="mt-1 flex items-center gap-2">
@@ -102,26 +92,26 @@ const AdminGranthiBrandingPage = () => {
             </fieldset>
 
             {saveMutation.isError ? <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{saveMutation.error?.message}</p> : null}
-            {saveMutation.isSuccess ? <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">Branding saved and published to both screens.</p> : null}
+            {saveMutation.isSuccess ? <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">Branding saved and published across the application.</p> : null}
             <Button type="submit" disabled={saveMutation.isPending || uploadState.pending}>{saveMutation.isPending ? 'Saving...' : 'Save branding'}</Button>
           </form>
         </Card>
 
-        <section className="overflow-hidden rounded-lg border border-slate-200 bg-[#05080e] shadow-lg">
+        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
           <div className="p-5" style={{ backgroundColor: values.primaryColor }}>
             <div className="flex items-center gap-3">
               <img src={logoSrc} alt="Brand preview" className="h-16 w-16 rounded-full border-2 bg-white object-cover" style={{ borderColor: values.accentColor }} />
               <div className="min-w-0">
-                <p className="truncate text-xs font-bold uppercase tracking-wider" style={{ color: values.accentColor }}>{values.organizationName || 'Gurdwara name'}</p>
-                <h2 className="mt-1 truncate font-heading text-2xl font-bold text-white">{values.productName || 'Product name'}</h2>
+                <p className="truncate text-xs font-bold uppercase tracking-wider" style={{ color: values.accentColor }}>{values.shortName || 'Short name'}</p>
+                <h2 className="mt-1 truncate font-heading text-2xl font-bold text-white">{values.organizationName || 'Gurdwara name'}</h2>
               </div>
             </div>
           </div>
           <div className="m-5 rounded-lg p-5" style={{ backgroundColor: values.surfaceColor }}>
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Answer preview</p>
-            <p className="mt-3 font-heading text-xl font-bold" style={{ color: values.primaryColor }}>What is the meaning of Ik Onkar?</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Application preview</p>
+            <p className="mt-3 font-heading text-xl font-bold" style={{ color: values.primaryColor }}>Welcome to {values.shortName || 'your Gurdwara'}</p>
             <div className="mt-4 h-1 w-20" style={{ backgroundColor: values.accentColor }} />
-            <p className="mt-4 text-sm leading-6 text-slate-700">The configured colors and logo update the public board and mobile question experience.</p>
+            <p className="mt-4 text-sm leading-6 text-slate-700">These settings apply to shared navigation, footers, admin screens, display boards, and brand-colored controls throughout the application.</p>
           </div>
         </section>
       </div>
@@ -129,4 +119,4 @@ const AdminGranthiBrandingPage = () => {
   );
 };
 
-export default AdminGranthiBrandingPage;
+export default AdminGurdwaraBrandingPage;

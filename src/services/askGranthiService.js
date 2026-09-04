@@ -24,14 +24,6 @@ const askGranthiService = {
   removeQuestion: async (id) => {
     const response = await apiClient.delete(`/ask-granthi/questions/${encodeURIComponent(id)}`);
     return response.data;
-  },
-  getBranding: async () => {
-    const response = await apiClient.get('/ask-granthi/branding');
-    return response.data;
-  },
-  saveBranding: async (payload) => {
-    const response = await apiClient.put('/ask-granthi/branding', payload);
-    return response.data;
   }
 };
 

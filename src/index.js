@@ -7,6 +7,7 @@ import './index.css';
 import App from './App';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { BrandingProvider } from './context/BrandingContext';
 
 const GOOGLE_OAUTH_CALLBACK_STORAGE_KEY = 'ssm_google_oauth_callback_hash';
 
@@ -54,11 +55,13 @@ root.render(
     <HelmetProvider>
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
-          <AuthProvider>
-            <BrowserRouter>
-              <App />
-            </BrowserRouter>
-          </AuthProvider>
+          <BrandingProvider>
+            <AuthProvider>
+              <BrowserRouter>
+                <App />
+              </BrowserRouter>
+            </AuthProvider>
+          </BrandingProvider>
         </ThemeProvider>
       </QueryClientProvider>
     </HelmetProvider>

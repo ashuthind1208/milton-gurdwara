@@ -2,16 +2,6 @@ const crypto = require('crypto');
 const { normalizeGranthiQuestion } = require('./askGranthi');
 
 const QUESTION_RESOURCE = 'ask_granthi_questions';
-const BRANDING_RESOURCE = 'ask_granthi_branding';
-
-const DEFAULT_BRANDING = Object.freeze({
-  organizationName: 'Gurdwara Singh Sabha Milton',
-  productName: 'Ask a Granthi Ji',
-  logoUrl: '',
-  primaryColor: '#0B1F3A',
-  accentColor: '#F4A300',
-  surfaceColor: '#FFF9EE'
-});
 
 const normalizeQuestionKey = (question) => normalizeGranthiQuestion(question)
   .normalize('NFC')
@@ -23,6 +13,7 @@ const createQuestionId = () => `granthi-${Date.now()}-${crypto.randomBytes(4).to
 const hasCompleteGurbaniReference = (record) => Boolean(
   String(record?.gurbani?.gurmukhi || '').trim()
   && String(record?.gurbani?.source || '').trim()
+  && String(record?.gurbani?.translationPunjabi || '').trim()
   && String(record?.gurbani?.translationEnglish || '').trim()
 );
 
@@ -101,29 +92,14 @@ const failGranthiAnswer = async (db, record, error) => db.updateItem(QUESTION_RE
   updatedAt: new Date().toISOString()
 });
 
-const getGranthiBranding = async (db) => ({
-  ...DEFAULT_BRANDING,
-  ...(await db.getSingleton(BRANDING_RESOURCE, DEFAULT_BRANDING) || {})
-});
-
-const saveGranthiBranding = async (db, branding) => db.setSingleton(BRANDING_RESOURCE, {
-  ...DEFAULT_BRANDING,
-  ...branding,
-  updatedAt: new Date().toISOString()
-});
-
 module.exports = {
-  BRANDING_RESOURCE,
-  DEFAULT_BRANDING,
   QUESTION_RESOURCE,
   completeGranthiAnswer,
   createThinkingQuestion,
   failGranthiAnswer,
   findReusableAnswer,
-  getGranthiBranding,
   listGranthiQuestions,
   listPublicGranthiQuestions,
   normalizeQuestionKey,
-  reuseGranthiAnswer,
-  saveGranthiBranding
+  reuseGranthiAnswer
 };

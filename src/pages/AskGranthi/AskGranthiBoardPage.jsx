@@ -1,20 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { QRCodeSVG } from 'qrcode.react';
 import { ArrowsPointingOutIcon, BookOpenIcon, DevicePhoneMobileIcon, LightBulbIcon } from '@heroicons/react/24/outline';
 import Seo from '../../components/common/Seo';
 import askGranthiService from '../../services/askGranthiService';
-import gurdwaraLogo from '../../assets/gurdwara-logo.webp';
+import { useBranding } from '../../context/BrandingContext';
 import granthiWelcomePortrait from '../../assets/granthi-welcome-cutout.png';
 import granthiAnswerPortrait from '../../assets/granthi-answer-cutout.png';
 
 const DEFAULT_BRANDING = {
-  organizationName: 'Gurdwara Singh Sabha Milton',
   productName: 'Ask a Granthi Ji',
-  logoUrl: '',
-  primaryColor: '#071a32',
-  accentColor: '#d7a548',
-  surfaceColor: '#f5eddd'
+};
+
+const DISMISSED_ANSWERS_KEY = 'ask_granthi_dismissed_answer_ids';
+
+const readDismissedAnswerIds = () => {
+  try {
+    const stored = JSON.parse(window.sessionStorage.getItem(DISMISSED_ANSWERS_KEY) || '[]');
+    return new Set(Array.isArray(stored) ? stored.map(String) : []);
+  } catch {
+    return new Set();
+  }
 };
 
 const formatTime = (value) => new Intl.DateTimeFormat('en-CA', {
@@ -23,9 +29,10 @@ const formatTime = (value) => new Intl.DateTimeFormat('en-CA', {
 }).format(value);
 
 const AskGranthiBoardPage = () => {
+  const { branding: globalBranding, logoSrc } = useBranding();
   const [now, setNow] = useState(new Date());
   const [secondsRemaining, setSecondsRemaining] = useState(30);
-  const [dismissedAnswerKey, setDismissedAnswerKey] = useState('');
+  const [dismissedAnswerIds, setDismissedAnswerIds] = useState(readDismissedAnswerIds);
   const { data, isError } = useQuery({
     queryKey: ['ask-granthi-board'],
     queryFn: () => askGranthiService.getBoard().then((response) => response.data),
@@ -34,25 +41,44 @@ const AskGranthiBoardPage = () => {
     refetchOnWindowFocus: true
   });
 
-  const branding = { ...DEFAULT_BRANDING, ...(data?.branding || {}) };
-  const questions = Array.isArray(data?.questions) ? data.questions : [];
+  const branding = { ...DEFAULT_BRANDING, ...globalBranding, ...(data?.branding || {}) };
+  const questions = useMemo(() => (Array.isArray(data?.questions) ? data.questions : []), [data?.questions]);
   const frequentlyAskedQuestions = questions
     .filter((question) => question.status === 'answered')
     .sort((left, right) => Number(Boolean(right.featured)) - Number(Boolean(left.featured))
       || Number(right.askCount || 0) - Number(left.askCount || 0))
     .slice(0, 8);
   const latestQuestion = questions[0] || null;
-  const latestQuestionKey = latestQuestion ? `${latestQuestion.id}:${latestQuestion.updatedAt || ''}` : '';
-  const activeQuestion = latestQuestionKey && latestQuestionKey !== dismissedAnswerKey ? latestQuestion : null;
+  const activeQuestion = latestQuestion?.id && !dismissedAnswerIds.has(String(latestQuestion.id)) ? latestQuestion : null;
   const isThinking = activeQuestion?.status === 'thinking';
   const isAnswered = activeQuestion?.status === 'answered';
   const questionUrl = `${window.location.origin}/ask-a-granthi/question`;
-  const logoSrc = branding.logoUrl || gurdwaraLogo;
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    const olderAnsweredIds = questions
+      .slice(1)
+      .filter((question) => question.status === 'answered')
+      .map((question) => String(question.id));
+    if (olderAnsweredIds.length === 0) return;
+
+    setDismissedAnswerIds((previous) => {
+      const next = new Set(previous);
+      const previousSize = next.size;
+      olderAnsweredIds.forEach((id) => next.add(id));
+      if (next.size === previousSize) return previous;
+      try {
+        window.sessionStorage.setItem(DISMISSED_ANSWERS_KEY, JSON.stringify([...next]));
+      } catch {
+        // Keep the in-memory dismissal when browser storage is unavailable.
+      }
+      return next;
+    });
+  }, [questions]);
 
   useEffect(() => {
     if (!isAnswered) {
@@ -66,13 +92,22 @@ const AskGranthiBoardPage = () => {
       setSecondsRemaining(remaining);
       if (remaining === 0) {
         window.clearInterval(timer);
-        setDismissedAnswerKey(`${activeQuestion.id}:${activeQuestion.updatedAt || ''}`);
+        setDismissedAnswerIds((previous) => {
+          const next = new Set(previous);
+          next.add(String(activeQuestion.id));
+          try {
+            window.sessionStorage.setItem(DISMISSED_ANSWERS_KEY, JSON.stringify([...next]));
+          } catch {
+            // Keep the in-memory dismissal when browser storage is unavailable.
+          }
+          return next;
+        });
         window.history.replaceState(null, '', '/ask-a-granthi');
       }
     }, 250);
 
     return () => window.clearInterval(timer);
-  }, [activeQuestion?.id, activeQuestion?.updatedAt, isAnswered]);
+  }, [activeQuestion?.id, isAnswered]);
 
   const enterFullscreen = async () => {
     if (!document.fullscreenElement) {
@@ -220,7 +255,7 @@ const AskGranthiBoardPage = () => {
                 </article>
                 <article className="overflow-hidden rounded-md border border-[#ded2bc] bg-[#fffdf8] p-[2.5%] shadow-sm">
                   <span className="inline-block bg-violet-800 px-[2%] py-[.7%] text-[clamp(10px,.78vw,15px)] font-bold text-white">Gurbani Reference</span>
-                  {activeQuestion.gurbani ? <><p className="mt-[1.5%] line-clamp-2 font-gurmukhi text-[clamp(15px,1.4vw,26px)] font-bold leading-[1.4] text-[color:var(--granthi-primary)]">{activeQuestion.gurbani.gurmukhi}</p><p className="mt-[1%] text-[clamp(11px,.86vw,16px)] font-bold text-violet-800">({activeQuestion.gurbani.source})</p><p className="mt-[1%] line-clamp-2 text-[clamp(11px,.9vw,17px)] font-semibold leading-relaxed text-slate-700">{activeQuestion.gurbani.translationEnglish}</p></> : <p className="mt-[3%] text-[clamp(12px,.95vw,18px)] font-bold text-red-800">Gurbani reference required. This answer is awaiting review.</p>}
+                  {activeQuestion.gurbani ? <><p className="mt-[1.2%] line-clamp-2 font-gurmukhi text-[clamp(14px,1.25vw,23px)] font-bold leading-[1.35] text-[color:var(--granthi-primary)]">{activeQuestion.gurbani.gurmukhi}</p><p className="mt-[.7%] text-[clamp(10px,.75vw,14px)] font-bold text-violet-800">{activeQuestion.gurbani.source}</p><p className="mt-[.8%] font-gurmukhi text-[clamp(10px,.78vw,15px)] font-semibold leading-[1.35] text-slate-800"><span className="font-bold text-violet-800">ਪੰਜਾਬੀ ਅਰਥ: </span>{activeQuestion.gurbani.translationPunjabi}</p><p className="mt-[.6%] text-[clamp(10px,.76vw,14px)] font-semibold leading-[1.35] text-slate-700"><span className="font-bold text-violet-800">English: </span>{activeQuestion.gurbani.translationEnglish}</p></> : <p className="mt-[3%] text-[clamp(12px,.95vw,18px)] font-bold text-red-800">Gurbani reference required. This answer is awaiting review.</p>}
                 </article>
               </div>
 

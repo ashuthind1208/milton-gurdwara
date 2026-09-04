@@ -28,13 +28,12 @@ const {
   createThinkingQuestion,
   failGranthiAnswer,
   findReusableAnswer,
-  getGranthiBranding,
   listGranthiQuestions,
   listPublicGranthiQuestions,
   normalizeQuestionKey,
   reuseGranthiAnswer,
-  saveGranthiBranding
 } = require('./askGranthiStore');
+const { getGurdwaraBranding, saveGurdwaraBranding } = require('./gurdwaraBrandingStore');
 const { resolveMembershipRenewal } = require('./membershipReminder');
 
 const loadEnvFile = (filePath) => {
@@ -5880,7 +5879,7 @@ const server = http.createServer(async (request, response) => {
       assertInput(eventsDb.hasDatabaseConnection, 'Ask a Granthi is temporarily unavailable.', 503);
       const [questions, branding] = await Promise.all([
         listPublicGranthiQuestions(eventsDb, 12),
-        getGranthiBranding(eventsDb)
+        getGurdwaraBranding(eventsDb)
       ]);
       sendJson(response, 200, { ok: true, data: { questions, branding } });
     } catch (error) {
@@ -5889,39 +5888,39 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  if (requestUrl.pathname === '/api/ask-granthi/branding' && request.method === 'GET') {
+  if ((requestUrl.pathname === '/api/gurdwara-branding' || requestUrl.pathname === '/api/ask-granthi/branding') && request.method === 'GET') {
     try {
-      assertInput(eventsDb.hasDatabaseConnection, 'Ask a Granthi branding is temporarily unavailable.', 503);
-      sendJson(response, 200, { ok: true, data: await getGranthiBranding(eventsDb) });
+      assertInput(eventsDb.hasDatabaseConnection, 'Gurdwara branding is temporarily unavailable.', 503);
+      sendJson(response, 200, { ok: true, data: await getGurdwaraBranding(eventsDb) });
     } catch (error) {
       sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to load branding.' });
     }
     return;
   }
 
-  if (requestUrl.pathname === '/api/ask-granthi/branding' && request.method === 'PUT') {
+  if ((requestUrl.pathname === '/api/gurdwara-branding' || requestUrl.pathname === '/api/ask-granthi/branding') && request.method === 'PUT') {
     try {
-      assertInput(isSuperAdmin(request), 'Only Super Admins can change Ask a Granthi branding.', 403);
-      assertInput(eventsDb.hasDatabaseConnection, 'Ask a Granthi branding is temporarily unavailable.', 503);
+      assertInput(isSuperAdmin(request), 'Only Super Admins can change Gurdwara branding.', 403);
+      assertInput(eventsDb.hasDatabaseConnection, 'Gurdwara branding is temporarily unavailable.', 503);
       const payload = await parseJsonObjectBody(request, { maxBytes: 32 * 1024, allowEmpty: false });
-      ensureNoUnknownKeys(payload, ['organizationName', 'productName', 'logoUrl', 'primaryColor', 'accentColor', 'surfaceColor']);
+      ensureNoUnknownKeys(payload, ['organizationName', 'shortName', 'logoUrl', 'primaryColor', 'accentColor', 'surfaceColor']);
       const colorPattern = /^#[0-9a-f]{6}$/i;
       const logoUrl = readStringField(payload, 'logoUrl', { max: 1000 });
       assertInput(!logoUrl || /^(https?:\/\/|\/)/i.test(logoUrl), 'logoUrl must be an HTTPS URL or site-relative path.');
       const branding = {
         organizationName: readStringField(payload, 'organizationName', { required: true, min: 2, max: 120 }),
-        productName: readStringField(payload, 'productName', { required: true, min: 2, max: 80 }),
+        shortName: readStringField(payload, 'shortName', { required: true, min: 2, max: 80 }),
         logoUrl,
         primaryColor: readStringField(payload, 'primaryColor', { required: true, pattern: colorPattern, max: 7 }),
         accentColor: readStringField(payload, 'accentColor', { required: true, pattern: colorPattern, max: 7 }),
         surfaceColor: readStringField(payload, 'surfaceColor', { required: true, pattern: colorPattern, max: 7 })
       };
-      const data = await saveGranthiBranding(eventsDb, branding);
+      const data = await saveGurdwaraBranding(eventsDb, branding);
       await appendAuditLog(request, {
-        action: 'ask_granthi.branding.update',
-        targetType: 'ask_granthi_branding',
+        action: 'gurdwara.branding.update',
+        targetType: 'gurdwara_branding',
         targetId: 'default',
-        description: 'Updated Ask a Granthi product branding.',
+        description: 'Updated application-wide Gurdwara branding.',
         payload: branding
       });
       sendJson(response, 200, { ok: true, data });

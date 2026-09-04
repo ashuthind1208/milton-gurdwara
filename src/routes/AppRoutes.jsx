@@ -36,7 +36,7 @@ const AdminNewsPage = lazy(() => import('../admin/News/AdminNewsPage'));
 const AdminSchedulePage = lazy(() => import('../admin/Schedule/AdminSchedulePage'));
 const AdminHukamnamaPage = lazy(() => import('../admin/Hukamnama/AdminHukamnamaPage'));
 const AdminAskGranthiPage = lazy(() => import('../admin/AskGranthi/AdminAskGranthiPage'));
-const AdminGranthiBrandingPage = lazy(() => import('../admin/AskGranthi/AdminGranthiBrandingPage'));
+const AdminGurdwaraBrandingPage = lazy(() => import('../admin/Branding/AdminGurdwaraBrandingPage'));
 const AdminLangarPage = lazy(() => import('../admin/Langar/AdminLangarPage'));
 const AdminSevaOpportunitiesPage = lazy(() => import('../admin/SevaOpportunities/AdminSevaOpportunitiesPage'));
 const AdminGalleryPage = lazy(() => import('../admin/Gallery/AdminGalleryPage'));
@@ -103,7 +103,8 @@ const AppRoutes = () => {
             <Route path="/admin/hukamnama" element={<AdminHukamnamaPage />} />
             <Route path="/admin/ask-granthi" element={<AdminAskGranthiPage />} />
             <Route element={<ProtectedRoute allowedRoles={SUPER_ADMIN_ONLY_ROLES} allowAssignedAdminAccess={false} />}>
-              <Route path="/admin/ask-granthi-branding" element={<AdminGranthiBrandingPage />} />
+              <Route path="/admin/gurdwara-branding" element={<AdminGurdwaraBrandingPage />} />
+              <Route path="/admin/ask-granthi-branding" element={<Navigate to="/admin/gurdwara-branding" replace />} />
             </Route>
             <Route path="/admin/langar" element={<AdminLangarPage />} />
             <Route path="/admin/gallery" element={<AdminGalleryPage />} />

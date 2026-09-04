@@ -3,10 +3,10 @@ import { useForm } from 'react-hook-form';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ChevronDownIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { siteConfig } from '../../constants/siteConfig';
-import khandaMark from '../../assets/khanda-mark.webp';
 import phase2Service from '../../services/phase2Service';
 import notificationService from '../../services/notificationService';
 import { useAuth } from '../../context/AuthContext';
+import { useBranding } from '../../context/BrandingContext';
 
 const socialIconClass = 'h-4 w-4';
 
@@ -38,6 +38,7 @@ const YouTubeIcon = () => (
 
 const Footer = () => {
   const { user, isAuthenticated } = useAuth();
+  const { branding, logoSrc } = useBranding();
   const [isNewsletterModalOpen, setIsNewsletterModalOpen] = useState(false);
   const [isTopicDropdownOpen, setIsTopicDropdownOpen] = useState(false);
   const [selectedTopics, setSelectedTopics] = useState([]);
@@ -135,8 +136,8 @@ const Footer = () => {
       <div className="mx-auto max-w-4xl px-4 py-10 md:px-6">
         <div className="text-center">
           <div className="flex items-center justify-center gap-2">
-            <img src={khandaMark} alt="Khanda symbol" className="h-7 w-7" />
-            <p className="font-heading text-lg font-semibold text-brand-blue">{siteConfig.name}</p>
+            <img src={logoSrc} alt={`${branding.shortName} logo`} className="h-8 w-8 rounded-full object-cover" />
+            <p className="font-heading text-lg font-semibold text-brand-blue">{branding.organizationName}</p>
           </div>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">A spiritually rooted and community focused digital platform for sangat services.</p>
           <p className="mt-2 text-sm font-gurmukhi text-brand-navy dark:text-brand-cream">ਵਾਹਿਗੁਰੂ ਜੀ ਕਾ ਖਾਲਸਾ, ਵਾਹਿਗੁਰੂ ਜੀ ਕੀ ਫਤਿਹ</p>

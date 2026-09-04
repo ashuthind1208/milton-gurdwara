@@ -53,6 +53,7 @@ test('reuses a normalized stored answer and records another ask', async () => {
     gurbani: {
       gurmukhi: 'ਵਿਚਿ ਦੁਨੀਆ ਸੇਵ ਕਮਾਈਐ ॥',
       source: 'Sri Guru Granth Sahib Ji, Ang 26',
+      translationPunjabi: 'ਇਸ ਸੰਸਾਰ ਵਿੱਚ ਨਿਸ਼ਕਾਮ ਸੇਵਾ ਕਰਨੀ ਚਾਹੀਦੀ ਹੈ।',
       translationEnglish: 'In the midst of this world, perform selfless service.'
     }
   });
