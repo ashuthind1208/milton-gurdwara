@@ -78,7 +78,6 @@ const AdminCmsPage = () => {
       phone: '',
       email: '',
       address: '',
-      mapEmbedUrl: '',
       contactHours: defaultContactHours,
       socialLinks: {
         facebook: '',
@@ -122,7 +121,6 @@ const AdminCmsPage = () => {
       phone: pageData.phone || '',
       email: pageData.email || '',
       address: pageData.address || '',
-      mapEmbedUrl: pageData.mapEmbedUrl || '',
       contactHours: Array.isArray(pageData.contactHours) ? pageData.contactHours : defaultContactHours,
       socialLinks: {
         facebook: pageData.socialLinks?.facebook || '',
@@ -462,9 +460,6 @@ const AdminCmsPage = () => {
                 </label>
                 <label className="text-sm md:col-span-2">Address
                   <input {...pageForm.register('address')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-                </label>
-                <label className="text-sm md:col-span-2">Map Embed Link
-                  <input {...pageForm.register('mapEmbedUrl')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
                 </label>
                 <fieldset className="space-y-3 rounded-lg border border-slate-200 p-3 md:col-span-2">
                   <legend className="px-1 text-sm font-semibold text-slate-800">Hours &amp; Channels</legend>

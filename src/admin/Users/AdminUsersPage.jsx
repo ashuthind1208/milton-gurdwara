@@ -1433,19 +1433,6 @@ const AdminUsersPage = () => {
               <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
                 <Button
                   type="button"
-                  className="min-w-0 rounded-full border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20"
-                  onClick={() => downloadMembershipFeeInformationPdf({
-                    user: membershipUserRecord,
-                    organizationName: siteConfig.name,
-                    address: siteConfig.contact?.address,
-                    phone: siteConfig.contact?.phone,
-                    email: siteConfig.contact?.email
-                  })}
-                >
-                  Download Fee PDF
-                </Button>
-                <Button
-                  type="button"
                   className="min-w-0 rounded-full border border-white/25 bg-emerald-950 px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-emerald-950/25 hover:bg-emerald-900"
                   onClick={openMembershipFeeEntry}
                 >

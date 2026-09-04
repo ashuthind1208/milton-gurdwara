@@ -2379,13 +2379,15 @@ const Navbar = () => {
           <div className="flex items-center gap-2">
             <p>{siteConfig.contact.address}</p>
             {hasWhatsAppGroup ? (
-              <div
-                className="relative"
-                onMouseEnter={openWhatsAppPopover}
-                onMouseLeave={closeWhatsAppPopoverWithDelay}
-                onFocus={openWhatsAppPopover}
-                onBlur={closeWhatsAppPopoverWithDelay}
-              >
+              <>
+                <span className="text-blue-200">|</span>
+                <div
+                  className="relative"
+                  onMouseEnter={openWhatsAppPopover}
+                  onMouseLeave={closeWhatsAppPopoverWithDelay}
+                  onFocus={openWhatsAppPopover}
+                  onBlur={closeWhatsAppPopoverWithDelay}
+                >
                 <button
                   type="button"
                   className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#25D366] text-white shadow-sm transition hover:bg-[#1fb858] focus:outline-none focus:ring-2 focus:ring-white/70"
@@ -2412,7 +2414,8 @@ const Navbar = () => {
                     </a>
                   </div>
                 </div>
-              </div>
+                </div>
+              </>
             ) : null}
             <span className="hidden text-blue-200 xl:inline">|</span>
             <div className="hidden items-center gap-1.5 xl:flex">
@@ -3332,10 +3335,10 @@ const Navbar = () => {
         </div>
       ) : null}
 
-      {isMembershipModalOpen ? createPortal(
+      {isMembershipModalOpen && !isMembershipCancelConfirmOpen ? createPortal(
         <div className="fixed inset-0 z-[279] overflow-y-auto bg-slate-900/70 px-4 py-6 backdrop-blur-md" onClick={closeMembershipModal}>
           <div className="mx-auto flex min-h-full items-start justify-center py-2 lg:items-center lg:py-6">
-            <div className="w-full max-w-5xl max-h-[92vh] overflow-y-auto rounded-2xl bg-white shadow-2xl lg:max-h-none lg:overflow-visible" onClick={(event) => event.stopPropagation()}>
+            <div data-delete-guard-ignore="true" className="w-full max-w-5xl max-h-[92vh] overflow-y-auto rounded-2xl bg-white shadow-2xl lg:max-h-none lg:overflow-visible" onClick={(event) => event.stopPropagation()}>
               <div className="relative overflow-hidden rounded-t-2xl bg-gradient-to-r from-brand-blue via-blue-700 to-brand-saffron px-5 py-4 text-white">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.26),transparent_44%)]" aria-hidden="true" />
                 <div className="relative flex items-start justify-between gap-3">
@@ -3493,7 +3496,7 @@ const Navbar = () => {
       , document.body) : null}
 
       {isMembershipCancelConfirmOpen ? createPortal(
-        <div className="fixed inset-0 z-[281] flex items-center justify-center bg-slate-900/60 px-4 py-6 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-slate-950/75 px-4 py-6 backdrop-blur-sm">
           <div role="alertdialog" aria-modal="true" aria-labelledby="membership-cancel-title" aria-describedby="membership-cancel-description" className="w-full max-w-md rounded-2xl border border-red-200 bg-white p-5 shadow-2xl">
             <h3 id="membership-cancel-title" className="font-heading text-xl font-semibold text-slate-900">Cancel membership registration?</h3>
             <p id="membership-cancel-description" className="mt-3 text-sm leading-6 text-slate-600">Are you sure you want to delete the pending member profile from Family Dashboard? This action cannot be undone.</p>

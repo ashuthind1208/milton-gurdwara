@@ -95,7 +95,6 @@ const ContactPage = () => {
     process.env.REACT_APP_CONTACT_US_WEBHOOK_URL ||
     '/api/internal/mail-relay'
   ).trim() || '/api/internal/mail-relay';
-  const contactRecipientOverride = String(process.env.REACT_APP_CONTACT_US_RECIPIENT_EMAIL || '').trim();
   const meta = useSeoMeta('Contact', 'Contact details, map placeholder, directions, and inquiry form.');
   const { data: content } = useQuery({
     queryKey: ['page-content', 'contact'],
@@ -111,7 +110,7 @@ const ContactPage = () => {
     try {
       const siteName = String(siteConfig?.orgName || 'Singh Sabha Milton Gurdwara').trim();
       const logoUrl = String(process.env.REACT_APP_NEWSLETTER_LOGO_URL || '').trim();
-      const recipientEmail = String(contactRecipientOverride || email || '').trim();
+      const recipientEmail = String(email || '').trim();
       const subject = `Contact Us Inquiry from ${String(values?.name || 'Visitor').trim()}`;
       const htmlBody = buildContactInquiryHtml({
         siteName,
@@ -196,8 +195,8 @@ const ContactPage = () => {
   const phoneHref = normalizedPhone ? `tel:${normalizedPhone}` : '#';
   const emailHref = `mailto:${email}`;
   const fallbackEmbed = `https://maps.google.com/maps?q=${encodeURIComponent(address)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
-  const mapEmbedSrc = content?.mapEmbedUrl || fallbackEmbed;
-  const mapOpenLink = content?.mapEmbedUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+  const mapEmbedSrc = fallbackEmbed;
+  const mapOpenLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
   const social = siteConfig.social || {};
   const contactHours = Array.isArray(content?.contactHours) ? content.contactHours : DEFAULT_CONTACT_HOURS;
   const facebookUrl = String(content?.socialLinks?.facebook || social.facebook || '').trim();

@@ -346,7 +346,6 @@ const defaultPageContent = {
     phone: '',
     email: '',
     address: '',
-    mapEmbedUrl: '',
     contactHours: [
       { label: 'Darbar Sahib', value: 'Daily: 5:00 AM to 9:00 PM' },
       { label: 'Langar Hall', value: 'Weekends and Gurpurab Specials' },

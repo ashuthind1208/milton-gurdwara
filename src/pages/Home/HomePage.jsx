@@ -1163,7 +1163,10 @@ const HomePage = () => {
                 <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-100">Gurdwara Program</p>
                 <h3 id="schedule-preview-title" className="mt-1 font-heading text-xl font-semibold text-white sm:text-2xl">{selectedSchedulePreview.title}</h3>
               </div>
-              <button type="button" onClick={() => setSelectedSchedulePreview(null)} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/40 bg-white/10 text-lg leading-none text-white hover:bg-white/20" aria-label="Close schedule preview">×</button>
+              <div className="flex shrink-0 items-start gap-3">
+                {selectedSchedulePreview.dateKey ? <p className="pt-1 text-right text-sm font-bold text-white sm:text-base">{formatScheduleDate(selectedSchedulePreview.dateKey)}</p> : null}
+                <button type="button" onClick={() => setSelectedSchedulePreview(null)} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/40 bg-white/10 text-lg leading-none text-white hover:bg-white/20" aria-label="Close schedule preview">×</button>
+              </div>
             </div>
             {selectedSchedulePreview.schedule ? (
               <div className="max-h-[calc(90vh-92px)] overflow-y-auto">
@@ -1174,9 +1177,7 @@ const HomePage = () => {
                         <div key={`preview-ticker-${groupIndex}`} className="ticker-group" aria-hidden={groupIndex === 1}>
                           {[0, 1, 2].map((unitIndex) => (
                             <div key={`preview-ticker-${groupIndex}-${unitIndex}`} className="daily-schedule-special-item inline-flex shrink-0 items-center gap-3 text-sm font-extrabold text-amber-50">
-                              <span className="ml-5 whitespace-nowrap">{formatScheduleDate(selectedSchedulePreview.dateKey)}</span>
-                              <span aria-hidden="true" className="text-slate-900">•</span>
-                              <span className="whitespace-nowrap">{selectedSchedulePreview.schedule.specialReason || selectedSchedulePreview.schedule.highlightNoteEn || selectedSchedulePreview.schedule.title || selectedSchedulePreview.title}</span>
+                              <span className="ml-5 whitespace-nowrap">{selectedSchedulePreview.schedule.specialReason || selectedSchedulePreview.schedule.highlightNoteEn || selectedSchedulePreview.schedule.title || selectedSchedulePreview.title}</span>
                               <img src={gurdwaraLogo} alt="" aria-hidden="true" className="mr-3 h-5 w-5 shrink-0 rounded-full object-cover" />
                             </div>
                           ))}
