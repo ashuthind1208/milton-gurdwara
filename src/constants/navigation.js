@@ -22,6 +22,8 @@ export const adminNav = [
   { label: 'News and Updates', path: '/admin/news' },
   { label: 'Daily Schedule', path: '/admin/schedule' },
   { label: 'Hukamnama', path: '/admin/hukamnama' },
+  { label: 'Ask a Granthi', path: '/admin/ask-granthi' },
+  { label: 'Granthi Branding', path: '/admin/ask-granthi-branding' },
   { label: 'Seva Items', path: '/admin/langar' },
   { label: 'Seva Opportunities', path: '/admin/seva-opportunities' },
   { label: 'Gallery Folders', path: '/admin/gallery' },

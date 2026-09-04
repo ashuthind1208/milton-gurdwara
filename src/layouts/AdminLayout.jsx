@@ -25,7 +25,9 @@ import {
   VideoCameraIcon,
   BookOpenIcon,
   HeartIcon,
-  SparklesIcon
+  SparklesIcon,
+  ChatBubbleLeftRightIcon,
+  SwatchIcon
 } from '@heroicons/react/24/outline';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import GlobalSearchBar from '../components/common/GlobalSearchBar';
@@ -418,6 +420,8 @@ const iconByPath = {
   '/admin/news': NewspaperIcon,
   '/admin/schedule': CalendarDaysIcon,
   '/admin/hukamnama': SparklesIcon,
+  '/admin/ask-granthi': ChatBubbleLeftRightIcon,
+  '/admin/ask-granthi-branding': SwatchIcon,
   '/admin/langar': HeartIcon,
   '/admin/seva-opportunities': UserGroupIcon,
   '/admin/gallery': PhotoIcon,
@@ -499,6 +503,7 @@ const AdminLayout = () => {
     [effectiveUser?.adminPageAccess]
   );
   const hasRoleBasedAdminAccess = hasFullAccess || assignedAdminPages.length > 0;
+  const isSuperAdminRole = String(effectiveUser?.role || '') === 'Super Admin';
   const limitedAccessPaths = useMemo(() => {
     const normalized = [...new Set(assignedAdminPages)];
     if (normalized.includes('/admin')) {
@@ -509,9 +514,10 @@ const AdminLayout = () => {
     }
     return ['/admin', ...normalized];
   }, [assignedAdminPages]);
+  const roleVisibleAdminNav = adminNav.filter((item) => item.path !== '/admin/ask-granthi-branding' || isSuperAdminRole);
   const visibleNav = hasFullAccess
-    ? adminNav
-    : adminNav.filter((item) => limitedAccessPaths.includes(item.path));
+    ? roleVisibleAdminNav
+    : roleVisibleAdminNav.filter((item) => limitedAccessPaths.includes(item.path));
   const adminSearchItems = useMemo(() => {
     const allowedPaths = new Set(visibleNav.map((item) => String(item.path || '').trim()).filter(Boolean));
     const pageItems = visibleNav

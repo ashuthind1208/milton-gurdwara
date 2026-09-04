@@ -22,6 +22,19 @@ const {
 } = require('./gurmatGuideStore');
 const { createAiQuiz } = require('./aiQuiz');
 const { findDailyAiQuiz, storeDailyAiQuiz } = require('./aiQuizStore');
+const { createGranthiAnswer, normalizeGranthiQuestion } = require('./askGranthi');
+const {
+  completeGranthiAnswer,
+  createThinkingQuestion,
+  failGranthiAnswer,
+  findReusableAnswer,
+  getGranthiBranding,
+  listGranthiQuestions,
+  listPublicGranthiQuestions,
+  normalizeQuestionKey,
+  reuseGranthiAnswer,
+  saveGranthiBranding
+} = require('./askGranthiStore');
 const { resolveMembershipRenewal } = require('./membershipReminder');
 
 const loadEnvFile = (filePath) => {
@@ -2276,6 +2289,13 @@ const canManageBookingDuties = (request) => {
   const role = String(getRequestActor(request).role || '').trim().toLowerCase();
   return role === 'admin' || role === 'super admin';
 };
+
+const canManageGranthiQuestions = (request) => {
+  const role = String(getRequestActor(request).role || '').trim().toLowerCase();
+  return role === 'admin' || role === 'super admin';
+};
+
+const isSuperAdmin = (request) => String(getRequestActor(request).role || '').trim().toLowerCase() === 'super admin';
 
 const appendAuditLog = async (request, details = {}) => {
   try {
@@ -5852,6 +5872,211 @@ const server = http.createServer(async (request, response) => {
       startupId: API_STARTUP_ID,
       serverPort: port
     });
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/ask-granthi/board' && request.method === 'GET') {
+    try {
+      assertInput(eventsDb.hasDatabaseConnection, 'Ask a Granthi is temporarily unavailable.', 503);
+      const [questions, branding] = await Promise.all([
+        listPublicGranthiQuestions(eventsDb, 12),
+        getGranthiBranding(eventsDb)
+      ]);
+      sendJson(response, 200, { ok: true, data: { questions, branding } });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to load Ask a Granthi.' });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/ask-granthi/branding' && request.method === 'GET') {
+    try {
+      assertInput(eventsDb.hasDatabaseConnection, 'Ask a Granthi branding is temporarily unavailable.', 503);
+      sendJson(response, 200, { ok: true, data: await getGranthiBranding(eventsDb) });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to load branding.' });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/ask-granthi/branding' && request.method === 'PUT') {
+    try {
+      assertInput(isSuperAdmin(request), 'Only Super Admins can change Ask a Granthi branding.', 403);
+      assertInput(eventsDb.hasDatabaseConnection, 'Ask a Granthi branding is temporarily unavailable.', 503);
+      const payload = await parseJsonObjectBody(request, { maxBytes: 32 * 1024, allowEmpty: false });
+      ensureNoUnknownKeys(payload, ['organizationName', 'productName', 'logoUrl', 'primaryColor', 'accentColor', 'surfaceColor']);
+      const colorPattern = /^#[0-9a-f]{6}$/i;
+      const logoUrl = readStringField(payload, 'logoUrl', { max: 1000 });
+      assertInput(!logoUrl || /^(https?:\/\/|\/)/i.test(logoUrl), 'logoUrl must be an HTTPS URL or site-relative path.');
+      const branding = {
+        organizationName: readStringField(payload, 'organizationName', { required: true, min: 2, max: 120 }),
+        productName: readStringField(payload, 'productName', { required: true, min: 2, max: 80 }),
+        logoUrl,
+        primaryColor: readStringField(payload, 'primaryColor', { required: true, pattern: colorPattern, max: 7 }),
+        accentColor: readStringField(payload, 'accentColor', { required: true, pattern: colorPattern, max: 7 }),
+        surfaceColor: readStringField(payload, 'surfaceColor', { required: true, pattern: colorPattern, max: 7 })
+      };
+      const data = await saveGranthiBranding(eventsDb, branding);
+      await appendAuditLog(request, {
+        action: 'ask_granthi.branding.update',
+        targetType: 'ask_granthi_branding',
+        targetId: 'default',
+        description: 'Updated Ask a Granthi product branding.',
+        payload: branding
+      });
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to save branding.' });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/ask-granthi/questions' && request.method === 'GET') {
+    try {
+      assertInput(canManageGranthiQuestions(request), 'Admin access is required.', 403);
+      assertInput(eventsDb.hasDatabaseConnection, 'Ask a Granthi is temporarily unavailable.', 503);
+      sendJson(response, 200, { ok: true, data: await listGranthiQuestions(eventsDb) });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to load questions.' });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/ask-granthi/questions' && request.method === 'POST') {
+    let pendingRecord = null;
+    try {
+      assertInput(eventsDb.hasDatabaseConnection, 'Ask a Granthi is temporarily unavailable.', 503);
+      const payload = await parseJsonObjectBody(request, { maxBytes: 8 * 1024, allowEmpty: false });
+      ensureNoUnknownKeys(payload, ['question']);
+      const question = normalizeGranthiQuestion(readStringField(payload, 'question', { required: true, min: 8, max: 500 }));
+      const reusable = await findReusableAnswer(eventsDb, question);
+      if (reusable) {
+        const data = await reuseGranthiAnswer(eventsDb, reusable);
+        sendJson(response, 200, { ok: true, reused: true, data });
+        return;
+      }
+
+      const aiRateLimit = evaluateFixedWindowLimit(
+        fixedWindowRateState,
+        `ask-granthi:${resolveClientIp(request) || 'unknown-ip'}`,
+        rateLimitConfig.gurmatAiMaxRequests,
+        rateLimitConfig.gurmatAiWindowMs,
+        Date.now()
+      );
+      if (aiRateLimit.limited) {
+        sendRateLimitExceeded(response, aiRateLimit.retryAfterMs, 'The Ask a Granthi request limit has been reached. Please try again later.', 'ask-granthi');
+        return;
+      }
+
+      pendingRecord = await createThinkingQuestion(eventsDb, question, { submittedFrom: 'qr' });
+      const generatedAnswer = await createGranthiAnswer(question);
+      const data = await completeGranthiAnswer(eventsDb, pendingRecord, generatedAnswer);
+      sendJson(response, 201, { ok: true, reused: false, data });
+    } catch (error) {
+      if (pendingRecord) {
+        await failGranthiAnswer(eventsDb, pendingRecord, error).catch(() => {});
+      }
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to answer the question.' });
+    }
+    return;
+  }
+
+  const granthiQuestionMatch = requestUrl.pathname.match(/^\/api\/ask-granthi\/questions\/([^/]+)$/);
+  if (granthiQuestionMatch && request.method === 'PATCH') {
+    try {
+      assertInput(canManageGranthiQuestions(request), 'Admin access is required.', 403);
+      assertInput(eventsDb.hasDatabaseConnection, 'Ask a Granthi is temporarily unavailable.', 503);
+      const questionId = decodeURIComponent(granthiQuestionMatch[1]);
+      const records = await listGranthiQuestions(eventsDb);
+      const existing = records.find((record) => record.id === questionId);
+      assertInput(existing, 'Question not found.', 404);
+      const payload = await parseJsonObjectBody(request, { maxBytes: 32 * 1024, allowEmpty: false });
+      ensureNoUnknownKeys(payload, ['question', 'shortAnswer', 'answerPunjabi', 'answerEnglish', 'category', 'featured', 'visible']);
+      const nextQuestion = Object.prototype.hasOwnProperty.call(payload, 'question')
+        ? normalizeGranthiQuestion(readStringField(payload, 'question', { required: true, min: 8, max: 500 }))
+        : existing.question;
+      const nextRecord = {
+        ...existing,
+        question: nextQuestion,
+        questionKey: normalizeQuestionKey(nextQuestion),
+        shortAnswer: Object.prototype.hasOwnProperty.call(payload, 'shortAnswer') ? readStringField(payload, 'shortAnswer', { required: true, min: 2, max: 120 }) : existing.shortAnswer,
+        answerPunjabi: Object.prototype.hasOwnProperty.call(payload, 'answerPunjabi') ? readStringField(payload, 'answerPunjabi', { required: true, min: 2, max: 700 }) : existing.answerPunjabi,
+        answerEnglish: Object.prototype.hasOwnProperty.call(payload, 'answerEnglish') ? readStringField(payload, 'answerEnglish', { required: true, min: 2, max: 700 }) : existing.answerEnglish,
+        category: Object.prototype.hasOwnProperty.call(payload, 'category') ? readStringField(payload, 'category', { required: true, min: 2, max: 80 }) : existing.category,
+        featured: Object.prototype.hasOwnProperty.call(payload, 'featured') ? readBooleanField(payload, 'featured', { required: true }) : Boolean(existing.featured),
+        visible: Object.prototype.hasOwnProperty.call(payload, 'visible') ? readBooleanField(payload, 'visible', { required: true }) : existing.visible !== false,
+        status: 'answered',
+        errorMessage: '',
+        updatedAt: new Date().toISOString()
+      };
+      const data = await eventsDb.updateItem('ask_granthi_questions', questionId, nextRecord);
+      await appendAuditLog(request, {
+        action: 'ask_granthi.question.update',
+        targetType: 'ask_granthi_question',
+        targetId: questionId,
+        description: 'Updated an Ask a Granthi question and answer.',
+        payload: { featured: nextRecord.featured, visible: nextRecord.visible }
+      });
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to update the question.' });
+    }
+    return;
+  }
+
+  if (granthiQuestionMatch && request.method === 'DELETE') {
+    try {
+      assertInput(canManageGranthiQuestions(request), 'Admin access is required.', 403);
+      assertInput(eventsDb.hasDatabaseConnection, 'Ask a Granthi is temporarily unavailable.', 503);
+      const questionId = decodeURIComponent(granthiQuestionMatch[1]);
+      await eventsDb.removeItem('ask_granthi_questions', questionId);
+      await appendAuditLog(request, {
+        action: 'ask_granthi.question.delete',
+        targetType: 'ask_granthi_question',
+        targetId: questionId,
+        description: 'Deleted an Ask a Granthi question.'
+      });
+      sendJson(response, 200, { ok: true, data: { id: questionId } });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to delete the question.' });
+    }
+    return;
+  }
+
+  const granthiRetryMatch = requestUrl.pathname.match(/^\/api\/ask-granthi\/questions\/([^/]+)\/retry$/);
+  if (granthiRetryMatch && request.method === 'POST') {
+    let pendingRecord = null;
+    try {
+      assertInput(canManageGranthiQuestions(request), 'Admin access is required.', 403);
+      assertInput(eventsDb.hasDatabaseConnection, 'Ask a Granthi is temporarily unavailable.', 503);
+      const questionId = decodeURIComponent(granthiRetryMatch[1]);
+      const records = await listGranthiQuestions(eventsDb);
+      const existing = records.find((record) => record.id === questionId);
+      assertInput(existing, 'Question not found.', 404);
+      const now = new Date().toISOString();
+      pendingRecord = await eventsDb.updateItem('ask_granthi_questions', questionId, {
+        ...existing,
+        status: 'thinking',
+        visible: true,
+        errorMessage: '',
+        updatedAt: now,
+        lastAskedAt: now
+      });
+      const generatedAnswer = await createGranthiAnswer(existing.question);
+      const data = await completeGranthiAnswer(eventsDb, pendingRecord, generatedAnswer);
+      await appendAuditLog(request, {
+        action: 'ask_granthi.question.retry',
+        targetType: 'ask_granthi_question',
+        targetId: questionId,
+        description: 'Regenerated an Ask a Granthi answer.'
+      });
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      if (pendingRecord) {
+        await failGranthiAnswer(eventsDb, pendingRecord, error).catch(() => {});
+      }
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to regenerate the answer.' });
+    }
     return;
   }
 

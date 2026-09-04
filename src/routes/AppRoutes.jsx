@@ -18,6 +18,8 @@ const DonationPage = lazy(() => import('../pages/Donation/DonationPage'));
 const KidsLearningPage = lazy(() => import('../pages/KidsLearning/KidsLearningPage'));
 const DonationDisplayBoardPage = lazy(() => import('../pages/Donation/DonationDisplayBoardPage'));
 const EventCalendarBoardPage = lazy(() => import('../pages/Events/EventCalendarBoardPage'));
+const AskGranthiBoardPage = lazy(() => import('../pages/AskGranthi/AskGranthiBoardPage'));
+const AskGranthiQuestionPage = lazy(() => import('../pages/AskGranthi/AskGranthiQuestionPage'));
 const DonationSuccessPage = lazy(() => import('../pages/Donation/DonationSuccessPage'));
 const GalleryPage = lazy(() => import('../pages/Gallery/GalleryPage'));
 const MediaPage = lazy(() => import('../pages/Media/MediaPage'));
@@ -33,6 +35,8 @@ const AdminCmsPage = lazy(() => import('../admin/CMS/AdminCmsPage'));
 const AdminNewsPage = lazy(() => import('../admin/News/AdminNewsPage'));
 const AdminSchedulePage = lazy(() => import('../admin/Schedule/AdminSchedulePage'));
 const AdminHukamnamaPage = lazy(() => import('../admin/Hukamnama/AdminHukamnamaPage'));
+const AdminAskGranthiPage = lazy(() => import('../admin/AskGranthi/AdminAskGranthiPage'));
+const AdminGranthiBrandingPage = lazy(() => import('../admin/AskGranthi/AdminGranthiBrandingPage'));
 const AdminLangarPage = lazy(() => import('../admin/Langar/AdminLangarPage'));
 const AdminSevaOpportunitiesPage = lazy(() => import('../admin/SevaOpportunities/AdminSevaOpportunitiesPage'));
 const AdminGalleryPage = lazy(() => import('../admin/Gallery/AdminGalleryPage'));
@@ -54,6 +58,7 @@ const LoadingFallback = () => <div className="py-20 text-center text-slate-600">
 
 const LIMITED_ADMIN_ROLES = [userRoles.SUPER_ADMIN, userRoles.ADMIN, userRoles.MEMBER, userRoles.VOLUNTEER, userRoles.FAMILY];
 const ROLES_ACCESS_ALLOWED_ROLES = [userRoles.SUPER_ADMIN, userRoles.ADMIN];
+const SUPER_ADMIN_ONLY_ROLES = [userRoles.SUPER_ADMIN];
 
 const AppRoutes = () => {
   return (
@@ -86,6 +91,8 @@ const AppRoutes = () => {
 
         <Route path="/donation-board" element={<DonationDisplayBoardPage />} />
         <Route path="/event-calendar-board" element={<EventCalendarBoardPage />} />
+        <Route path="/ask-a-granthi" element={<AskGranthiBoardPage />} />
+        <Route path="/ask-a-granthi/question" element={<AskGranthiQuestionPage />} />
 
         <Route element={<ProtectedRoute allowedRoles={LIMITED_ADMIN_ROLES} />}>
           <Route element={<AdminLayout />}>
@@ -94,6 +101,10 @@ const AppRoutes = () => {
             <Route path="/admin/news" element={<AdminNewsPage />} />
             <Route path="/admin/schedule" element={<AdminSchedulePage />} />
             <Route path="/admin/hukamnama" element={<AdminHukamnamaPage />} />
+            <Route path="/admin/ask-granthi" element={<AdminAskGranthiPage />} />
+            <Route element={<ProtectedRoute allowedRoles={SUPER_ADMIN_ONLY_ROLES} allowAssignedAdminAccess={false} />}>
+              <Route path="/admin/ask-granthi-branding" element={<AdminGranthiBrandingPage />} />
+            </Route>
             <Route path="/admin/langar" element={<AdminLangarPage />} />
             <Route path="/admin/gallery" element={<AdminGalleryPage />} />
             <Route path="/admin/library" element={<AdminLibraryPage />} />
