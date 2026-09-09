@@ -1,5 +1,6 @@
 import { serviceResponse } from './serviceResponse';
 import contentApiService from './contentApiService';
+import apiClient from './apiClient';
 
 const HOME_CONTENT_RESOURCE = 'cms_home_content';
 const PAGE_CONTENT_RESOURCE = 'cms_page_content';
@@ -23,6 +24,25 @@ const resolveLangarStatusLabel = (item = {}) => {
   }
 
   return 'Required Soon';
+};
+
+const notifyLangarItemChange = async (action, item = {}) => {
+  const resolvedAction = String(action || 'updated').trim().toLowerCase();
+  const itemName = String(item?.name || '').trim() || 'Grocery item';
+  const category = String(item?.category || 'Grocery').trim() || 'Grocery';
+  const status = item?.needed === true ? 'Needed' : (item?.stockStatus === 'stock_available' ? 'Available' : 'Updated');
+
+  try {
+    await apiClient.post('/social/langar-item-update', {
+      action: resolvedAction,
+      itemName,
+      category,
+      status,
+      link: `${window.location.origin || ''}/seva`
+    });
+  } catch (error) {
+    console.warn('[cmsService] Langar WhatsApp notification failed.', error);
+  }
 };
 
 const defaultSchedule = {
@@ -334,7 +354,7 @@ const defaultPageContent = {
   membership: {
     heroTitle: 'Membership Registration',
     heroDescription: 'Membership registration information and disclaimer.',
-    intro: '<p>To become a lifetime member of Gurdwara Singh Sabha Milton (GSSM), please complete the form below. An initiation fee of $500 is due upon signup. Going forward, membership will need to be renewed as of January 1st of the following year, at a cost of $50 per month to maintain your membership in good standing. After completing 10 years of $50 monthly donations, your membership will become permanent at no cost.</p>',
+    intro: '<p>To become a lifetime member of Gurdwara Singh Sabha Milton (GSSM), please complete the form below. An initiation fee of $500 is due upon signup. Going forward, membership will need to be renewed as of January 1st of the following year, at a cost of $50 per month to maintain your membership in good standing. After completing 10 years of $50 monthly donations, your membership will become permanent at no cost.</p><p class="mt-2">Membership is open to residents of the Town of Milton, as per the Gurdwara’s constitution. Proof of residence may be required for approval.</p>',
     mediaUrl: '',
     sections: []
   },
@@ -636,44 +656,50 @@ const cmsService = {
   },
   addLangarItem: async (payload) => {
     const current = await readHomeContent();
+    const nextItem = {
+      id: `langar-${Date.now()}`,
+      name: payload.name,
+      category: payload.category || 'Grocery',
+      addedOn: payload.addedOn || new Date().toISOString().slice(0, 10),
+      expiryDate: payload.expiryDate || '',
+      needed: payload.needed,
+      stockStatus: payload.stockStatus || (payload.needed ? 'required_soon' : 'stock_available'),
+      customStatusLabel: payload.customStatusLabel || ''
+    };
     const nextValue = {
       ...current,
-      langarItems: [
-        {
-          id: `langar-${Date.now()}`,
-          name: payload.name,
-          category: payload.category || 'Grocery',
-          addedOn: payload.addedOn || new Date().toISOString().slice(0, 10),
-          expiryDate: payload.expiryDate || '',
-          needed: payload.needed,
-          stockStatus: payload.stockStatus || (payload.needed ? 'required_soon' : 'stock_available'),
-          customStatusLabel: payload.customStatusLabel || ''
-        },
-        ...current.langarItems
-      ]
+      langarItems: [nextItem, ...current.langarItems]
     };
 
-    return serviceResponse(normalizeContent(await persistContent(nextValue)).langarItems);
+    const saved = serviceResponse(normalizeContent(await persistContent(nextValue)).langarItems);
+    await notifyLangarItemChange('created', nextItem);
+    return saved;
   },
   removeLangarItem: async (id) => {
     const current = await readHomeContent();
+    const removedItem = current.langarItems.find((item) => item.id === id) || {};
     const nextValue = {
       ...current,
       langarItems: current.langarItems.filter((item) => item.id !== id)
     };
 
-    return serviceResponse(normalizeContent(await persistContent(nextValue)).langarItems);
+    const saved = serviceResponse(normalizeContent(await persistContent(nextValue)).langarItems);
+    await notifyLangarItemChange('removed', removedItem);
+    return saved;
   },
   updateLangarItem: async (id, payload) => {
     const current = await readHomeContent();
+    const updatedItem = { ...(current.langarItems.find((item) => item.id === id) || {}), ...payload };
     const nextValue = {
       ...current,
       langarItems: current.langarItems.map((item) => (
-        item.id === id ? { ...item, ...payload } : item
+        item.id === id ? updatedItem : item
       ))
     };
 
-    return serviceResponse(normalizeContent(await persistContent(nextValue)).langarItems);
+    const saved = serviceResponse(normalizeContent(await persistContent(nextValue)).langarItems);
+    await notifyLangarItemChange('updated', updatedItem);
+    return saved;
   },
   updateSchedule: async (schedule) => {
     const current = await readHomeContent();

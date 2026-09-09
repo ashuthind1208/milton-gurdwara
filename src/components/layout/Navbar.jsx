@@ -418,6 +418,15 @@ const rightMenu = [
 const FULL_ACCESS_ROLES = new Set(['Super Admin', 'Admin']);
 const PENDING_APPROVAL_MESSAGE = 'Access is pending till your status is approved by an admin.';
 
+export const getBecomeMemberLoginTarget = (nextPath = '/family-dashboard') => {
+  const safeNextPath = String(nextPath || '/family-dashboard').trim();
+  if (!safeNextPath || safeNextPath === '/') {
+    return '/login?mode=join&next=/family-dashboard';
+  }
+
+  return `/login?mode=join&next=${encodeURIComponent(safeNextPath)}`;
+};
+
 const resolveLandingPathByRole = () => '/';
 
 const getAvatarFallbackUrl = (name = 'Member') => `https://ui-avatars.com/api/?name=${encodeURIComponent(String(name || 'Member'))}`;
@@ -1339,6 +1348,14 @@ const Navbar = () => {
       try {
         window.sessionStorage.setItem('ssm_prompt_member_details', '1');
         window.localStorage.setItem('ssm_prompt_member_details', '1');
+        window.sessionStorage.setItem('ssm_auth_intent', 'signup');
+        window.localStorage.setItem('ssm_auth_intent', 'signup');
+        window.sessionStorage.setItem('ssm_login_mode', 'join');
+        window.localStorage.setItem('ssm_login_mode', 'join');
+        window.sessionStorage.setItem('ssm_post_login_next', '/family-dashboard');
+        window.localStorage.setItem('ssm_post_login_next', '/family-dashboard');
+        window.sessionStorage.setItem('ssm_signup_role', 'Member');
+        window.localStorage.setItem('ssm_signup_role', 'Member');
       } catch {
         // Ignore storage errors.
       }
@@ -2622,7 +2639,7 @@ const Navbar = () => {
             </div>
             <div className="ml-auto flex items-center gap-3">
               {!isAuthenticated ? (
-                <Link to="/login?mode=join&next=/family-dashboard" onClick={handleBecomeMemberClick} className="my-1 rounded-full border border-brand-saffron bg-brand-saffron px-3 py-1 text-[11px] font-extrabold text-brand-navy shadow-[0_8px_18px_rgba(245,166,35,0.4)] transition hover:bg-amber-300 hover:shadow-[0_0_18px_rgba(245,166,35,0.55)]">Become Member</Link>
+                <Link to={getBecomeMemberLoginTarget('/family-dashboard')} onClick={handleBecomeMemberClick} className="my-1 rounded-full border border-brand-saffron bg-brand-saffron px-3 py-1 text-[11px] font-extrabold text-brand-navy shadow-[0_8px_18px_rgba(245,166,35,0.4)] transition hover:bg-amber-300 hover:shadow-[0_0_18px_rgba(245,166,35,0.55)]">Become Member</Link>
               ) : null}
               {isAuthenticated ? (
                 <div className="relative flex items-center gap-2">
@@ -3408,6 +3425,9 @@ const Navbar = () => {
                 {membershipContent?.intro ? (
                   <div className="lg:col-span-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold leading-5 text-amber-900" dangerouslySetInnerHTML={{ __html: membershipContent.intro }} />
                 ) : null}
+                <div className="lg:col-span-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-semibold leading-6 text-amber-900">
+                  Membership is open to residents of the Town of Milton, as per the Gurdwara’s constitution. Proof of residence may be required for approval.
+                </div>
                 <section className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                   <h4 className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-600">Personal Details</h4>
                   <div className="h-px w-full bg-slate-200" />
@@ -3682,7 +3702,7 @@ const Navbar = () => {
           <div className="mb-3 grid gap-2">
             {!isAuthenticated ? (
               <Link
-                to="/login?next=/family-dashboard"
+                to={getBecomeMemberLoginTarget('/family-dashboard')}
                 onClick={(event) => {
                   handleBecomeMemberClick(event);
                   setOpen(false);

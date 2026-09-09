@@ -35,6 +35,12 @@ const {
 } = require('./askGranthiStore');
 const { getGurdwaraBranding, saveGurdwaraBranding } = require('./gurdwaraBrandingStore');
 const { resolveMembershipRenewal } = require('./membershipReminder');
+const {
+  InstagramService,
+  WhatsAppService,
+  buildInstagramCaption,
+  buildWhatsAppTemplatePayload
+} = require('./socialAutomation');
 
 const loadEnvFile = (filePath) => {
   if (!fs.existsSync(filePath)) {
@@ -246,6 +252,99 @@ const newsletterPublicBaseUrl = String(process.env.PUBLIC_SITE_URL || process.en
 const newsletterUnsubscribeSecret = String(process.env.NEWSLETTER_UNSUBSCRIBE_SECRET || smtpPass || stripeWebhookSecret || '').trim();
 const newsletterSendConcurrency = Math.max(1, Math.min(10, Number(process.env.NEWSLETTER_SEND_CONCURRENCY || 3)));
 const contactUsInboxAddress = String(process.env.CONTACT_US_EMAIL || smtpFromAddress || smtpUser || localMailFromAddress).trim();
+const socialAutomationEnabled = String(process.env.ENABLE_SOCIAL_AUTOMATION || 'true').trim().toLowerCase() !== 'false';
+const socialInstagramService = socialAutomationEnabled && String(process.env.META_PAGE_ACCESS_TOKEN || '').trim() && String(process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID || '').trim()
+  ? new InstagramService({
+      pageAccessToken: process.env.META_PAGE_ACCESS_TOKEN,
+      instagramBusinessAccountId: process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID,
+      logger: console
+    })
+  : null;
+const socialWhatsAppService = socialAutomationEnabled && String(process.env.META_WA_ACCESS_TOKEN || '').trim() && String(process.env.META_WA_PHONE_NUMBER_ID || '').trim()
+  ? new WhatsAppService({
+      accessToken: process.env.META_WA_ACCESS_TOKEN,
+      phoneNumberId: process.env.META_WA_PHONE_NUMBER_ID,
+      templateName: process.env.WHATSAPP_TEMPLATE_NAME || 'event_announcement',
+      templateLanguage: process.env.WHATSAPP_TEMPLATE_LANGUAGE || 'en_US',
+      logger: console
+    })
+  : null;
+const normalizeSocialNumber = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return '';
+  }
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) {
+    return '';
+  }
+  return digits.startsWith('00') ? digits.slice(2) : digits;
+};
+const triggerSocialAutomation = async ({ type, payload = {} }) => {
+  if (!socialAutomationEnabled) {
+    return { ok: true, skipped: true, reason: 'disabled' };
+  }
+
+  const normalizedType = String(type || '').trim();
+  if (!normalizedType) {
+    return { ok: true, skipped: true, reason: 'missing_type' };
+  }
+
+  const results = [];
+  const normalizedPayload = payload || {};
+  const actionTitle = String(normalizedPayload.title || normalizedPayload.name || 'Community Update').trim();
+  const actionSummary = String(normalizedPayload.summary || normalizedPayload.description || normalizedPayload.message || '').trim();
+  const actionLink = String(normalizedPayload.link || process.env.APP_URL || '').trim();
+  const whatsappNumber = normalizeSocialNumber(normalizedPayload.whatsappNumber || process.env.WHATSAPP_GROUP_NUMBER || '');
+  const instagramCaption = buildInstagramCaption({
+    title: actionTitle,
+    summary: actionSummary,
+    type: normalizedType.replace(/\./g, ' ').replace(/\b\w/g, (match) => match.toUpperCase()),
+    link: actionLink,
+    hashtags: normalizedPayload.hashtags || ['SinghSabha', 'Community', 'Seva', 'Gurdwara']
+  });
+
+  if (socialInstagramService) {
+    try {
+      const instagramResponse = await socialInstagramService.publishPost({
+        mediaType: normalizedPayload.mediaType || 'IMAGE',
+        imageUrl: normalizedPayload.imageUrl || normalizedPayload.coverImageUrl || normalizedPayload.featuredImageUrl || null,
+        videoUrl: normalizedPayload.videoUrl || null,
+        caption: instagramCaption
+      });
+      results.push({ platform: 'instagram', ok: true, data: instagramResponse });
+    } catch (error) {
+      results.push({ platform: 'instagram', ok: false, error: error?.response?.data || error?.message || String(error) });
+    }
+  }
+
+  if (socialWhatsAppService && whatsappNumber) {
+    try {
+      const whatsappParameters = normalizedPayload.whatsappParameters || [
+        actionTitle || 'Community Update',
+        normalizedPayload.date || normalizedPayload.eventDate || new Date().toLocaleDateString(),
+        normalizedPayload.location || normalizedPayload.summary || 'Community',
+        actionLink || process.env.APP_URL || 'https://example.com'
+      ];
+      const templateName = normalizedPayload.templateName || process.env.WHATSAPP_TEMPLATE_NAME || 'event_announcement';
+      const whatsappResponse = await socialWhatsAppService.sendTemplateMessage({
+        to: whatsappNumber,
+        templateName,
+        parameters: whatsappParameters
+      });
+      results.push({ platform: 'whatsapp', ok: true, data: whatsappResponse });
+    } catch (error) {
+      results.push({ platform: 'whatsapp', ok: false, error: error?.response?.data || error?.message || String(error) });
+    }
+  }
+
+  return {
+    ok: true,
+    skipped: !results.length,
+    type: normalizedType,
+    results
+  };
+};
 let smtpTransport = null;
 let volunteerReminderSweepRunning = false;
 let volunteerReminderLastRunDateKey = '';
@@ -6838,6 +6937,19 @@ const server = http.createServer(async (request, response) => {
         ? (await eventsDb.listItems('users')).some((user) => String(user.email || '').trim().toLowerCase() === normalizedNewUserEmail)
         : false;
       const data = await eventsDb.createItem(resource, validatedBody);
+      if (resource === 'seva_opportunities') {
+        await triggerSocialAutomation({
+          type: 'seva.created',
+          payload: {
+            title: data?.title || data?.sevaType || 'Seva opportunity',
+            summary: data?.description || data?.summary || 'A new seva opportunity is now available.',
+            featuredImageUrl: data?.imageUrl || data?.coverImageUrl || '',
+            link: `${newsletterPublicBaseUrl || volunteerReminderBaseUrl || process.env.APP_URL || 'https://example.com'}/seva`,
+            whatsappNumber: process.env.WHATSAPP_GROUP_NUMBER || '',
+            hashtags: ['Seva', 'Sangat', 'Community']
+          }
+        });
+      }
       if (resource !== 'audit_logs') {
         await appendAuditLog(request, {
           action: 'content.create',
@@ -7009,6 +7121,21 @@ const server = http.createServer(async (request, response) => {
       }
       const body = await parseAndValidateGenericStructuredBody(request, { maxBytes: maxJsonBodyBytes });
       const data = await eventsDb.setSingleton(resource, body);
+      if (String(resource || '').toLowerCase().includes('hukamnama')) {
+        const title = body?.title || 'Daily Hukamnama';
+        const summary = body?.summary || body?.metadata?.source || 'Daily hukamnama updated.';
+        await triggerSocialAutomation({
+          type: 'hukamnama.updated',
+          payload: {
+            title,
+            summary,
+            imageUrl: body?.imageUrl || body?.coverImageUrl || '',
+            link: `${newsletterPublicBaseUrl || volunteerReminderBaseUrl || process.env.APP_URL || 'https://example.com'}/hukamnama`,
+            whatsappNumber: process.env.WHATSAPP_GROUP_NUMBER || '',
+            hashtags: ['Hukamnama', 'Gurbani', 'SikhCommunity']
+          }
+        });
+      }
       await appendAuditLog(request, {
         action: 'content.singleton.update',
         targetType: resource,
@@ -7161,6 +7288,43 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (requestUrl.pathname === '/api/social/langar-item-update' && request.method === 'POST') {
+    try {
+      const body = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
+      ensureNoUnknownKeys(body, ['action', 'itemName', 'category', 'status', 'link', 'whatsappNumber']);
+      const action = String(body.action || 'updated').trim().toLowerCase();
+      const itemName = readStringField(body, 'itemName', { required: true, max: 200 });
+      const category = readStringField(body, 'category', { max: 120 }) || 'Grocery';
+      const status = readStringField(body, 'status', { max: 80 }) || 'Updated';
+      const link = readStringField(body, 'link', { max: 500 }) || `${newsletterPublicBaseUrl || volunteerReminderBaseUrl || process.env.APP_URL || 'https://example.com'}/seva`;
+      const whatsappNumber = normalizeSocialNumber(body.whatsappNumber || process.env.WHATSAPP_GROUP_NUMBER || '');
+
+      if (!socialWhatsAppService || !whatsappNumber) {
+        sendJson(response, 200, { ok: true, data: { skipped: true, reason: 'WhatsApp not configured' } });
+        return;
+      }
+
+      const message = {
+        created: `${itemName} (${category}) has been added to the langar needs list. Status: ${status}. View: ${link}`,
+        updated: `${itemName} (${category}) was updated in the langar needs list. Status: ${status}. View: ${link}`,
+        removed: `${itemName} (${category}) was removed from the langar needs list. Status: ${status}. View: ${link}`
+      }[action] || `${itemName} (${category}) was updated. Status: ${status}. View: ${link}`;
+
+      const result = await socialWhatsAppService.sendTextMessage({
+        to: whatsappNumber,
+        message
+      });
+
+      sendJson(response, 200, { ok: true, data: { success: true, result } });
+    } catch (error) {
+      sendJson(response, error.status || 500, {
+        ok: false,
+        message: error.message || 'Unable to send notification.'
+      });
+    }
+    return;
+  }
+
   if (requestUrl.pathname === '/api/auth/logout' && request.method === 'POST') {
     try {
       await appendAuditLog(request, {
@@ -7256,6 +7420,19 @@ const server = http.createServer(async (request, response) => {
       body.date = date;
       await assertNoScheduleOverlap(body, { kind: 'event' });
       const data = await eventsDb.createEvent(body);
+      await triggerSocialAutomation({
+        type: 'event.created',
+        payload: {
+          title: data?.title || body?.title,
+          summary: data?.description || body?.description || 'New community event has been added.',
+          date: data?.date || body?.date,
+          location: data?.location || body?.location || '',
+          coverImageUrl: data?.coverImageUrl || body?.coverImageUrl || body?.imageUrl || '',
+          link: `${newsletterPublicBaseUrl || volunteerReminderBaseUrl || process.env.APP_URL || 'https://example.com'}/events`,
+          whatsappNumber: process.env.WHATSAPP_GROUP_NUMBER || '',
+          hashtags: ['SinghSabha', 'Community', 'Event']
+        }
+      });
       await appendAuditLog(request, {
         action: 'event.create',
         targetType: 'event',
