@@ -3425,9 +3425,6 @@ const Navbar = () => {
                 {membershipContent?.intro ? (
                   <div className="lg:col-span-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold leading-5 text-amber-900" dangerouslySetInnerHTML={{ __html: membershipContent.intro }} />
                 ) : null}
-                <div className="lg:col-span-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-semibold leading-6 text-amber-900">
-                  Membership is open to residents of the Town of Milton, as per the Gurdwara’s constitution. Proof of residence may be required for approval.
-                </div>
                 <section className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                   <h4 className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-600">Personal Details</h4>
                   <div className="h-px w-full bg-slate-200" />

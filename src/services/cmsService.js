@@ -354,7 +354,7 @@ const defaultPageContent = {
   membership: {
     heroTitle: 'Membership Registration',
     heroDescription: 'Membership registration information and disclaimer.',
-    intro: '<p>To become a lifetime member of Gurdwara Singh Sabha Milton (GSSM), please complete the form below. An initiation fee of $500 is due upon signup. Going forward, membership will need to be renewed as of January 1st of the following year, at a cost of $50 per month to maintain your membership in good standing. After completing 10 years of $50 monthly donations, your membership will become permanent at no cost.</p><p class="mt-2">Membership is open to residents of the Town of Milton, as per the Gurdwara’s constitution. Proof of residence may be required for approval.</p>',
+    intro: '<p>To become a lifetime member of Gurdwara Singh Sabha Milton (GSSM), please complete the form below. An initiation fee of $500 is due upon signup. Going forward, membership will need to be renewed as of January 1st of the following year, at a cost of $50 per month to maintain your membership in good standing. After completing 10 years of $50 monthly donations, your membership will become permanent at no cost.</p>',
     mediaUrl: '',
     sections: []
   },
