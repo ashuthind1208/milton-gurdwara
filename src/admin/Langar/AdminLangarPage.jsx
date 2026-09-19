@@ -159,7 +159,10 @@ const AdminLangarPage = () => {
   });
   const contributionStatusMutation = useMutation({
     mutationFn: ({ id, status }) => contentApiService.update(LANGAR_CONTRIBUTIONS_RESOURCE, id, { status }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [LANGAR_CONTRIBUTIONS_RESOURCE, 'admin'] })
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [LANGAR_CONTRIBUTIONS_RESOURCE, 'admin'] });
+      queryClient.invalidateQueries({ queryKey: ['cms-home'] });
+    }
   });
 
   const openEdit = (item) => {

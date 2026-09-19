@@ -24,7 +24,7 @@ import NewsArticleDialog from '../../components/news/NewsArticleDialog';
 import gurdwaraLogo from '../../assets/gurdwara-logo.webp';
 import { isEventCurrent } from '../../utils/eventAvailability';
 import { truncateHeading, truncateHtmlByCharacters } from '../../utils/newsContent';
-import LangarNeedsBoard from '../../components/langar/LangarNeedsBoard';
+import LangarNeedsBoard from '../../components/langar/LangarNeedsBoardReference';
 
 const toDateKey = (value = new Date()) => {
   const date = value instanceof Date ? value : new Date(value);

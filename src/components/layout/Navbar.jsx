@@ -54,7 +54,8 @@ import StreamingModal from '../common/StreamingModal';
 import AudioPillPlayer from '../common/AudioPillPlayer';
 import GlobalSearchBar from '../common/GlobalSearchBar';
 import ZeffyDonationModal from '../../pages/Donation/ZeffyDonationModal';
-import LangarNeedsBoard from '../langar/LangarNeedsBoard';
+import LangarNeedsBoard from '../langar/LangarNeedsBoardReference';
+import langarService, { LANGAR_CONTRIBUTIONS_RESOURCE } from '../../services/langarService';
 
 const MEMBERSHIP_ZEFFY_URL = 'https://www.zeffy.com/en-CA/ticketing/gurdwara-singh-sabha-milton-membership';
 
@@ -459,6 +460,16 @@ const Navbar = () => {
     queryKey: ['cms-home', 'navbar-langar'],
     queryFn: () => cmsService.getHomeContent().then((response) => response.data)
   });
+  const { data: langarContributions = [] } = useQuery({
+    queryKey: [LANGAR_CONTRIBUTIONS_RESOURCE, 'navbar'],
+    queryFn: () => langarService.getContributions().then((response) => response.data),
+    enabled: isAuthenticated,
+    refetchInterval: 15000
+  });
+  const familyLangarSummary = useMemo(() => ({
+    commitments: langarContributions.filter((entry) => String(entry.donorEmail || '').toLowerCase() === String(user?.email || '').toLowerCase()).length,
+    units: langarContributions.filter((entry) => String(entry.donorEmail || '').toLowerCase() === String(user?.email || '').toLowerCase()).reduce((sum, entry) => sum + Number(entry.quantity || 0), 0)
+  }), [langarContributions, user?.email]);
   const [open, setOpen] = useState(false);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [isInlineSearchExpanded, setIsInlineSearchExpanded] = useState(false);
@@ -2715,6 +2726,11 @@ const Navbar = () => {
                         <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Seva Applications</p>
                         <p className="mt-0.5 text-base font-black leading-none text-brand-blue">{familySummary.sevaCount}</p>
                       </div>
+                      <div className="flex h-[62px] flex-col justify-center rounded-xl border border-amber-200 bg-white px-2 py-1.5">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Langar Contributions</p>
+                        <p className="mt-0.5 text-base font-black leading-none text-amber-700">{familyLangarSummary.commitments}</p>
+                        <p className="mt-0.5 text-[10px] text-slate-500">{familyLangarSummary.units} units committed</p>
+                      </div>
                       <div className="flex min-h-[62px] min-w-0 flex-col justify-center rounded-xl border border-amber-200 bg-white px-2 py-1.5">
                         <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Upcoming Booking</p>
                         <p className="mt-0.5 break-words text-xs font-black leading-normal text-brand-blue">{upcomingBooking?.title || upcomingBooking?.categoryName || 'None scheduled'}</p>
@@ -2740,6 +2756,8 @@ const Navbar = () => {
                         Donation
                       </Link>
                     </div>
+
+                    <div className="mt-3"><LangarNeedsBoard items={homeContent?.langarItems || []} triggerOnly /></div>
 
                     <Link to="/family-dashboard" onClick={handleProfileQuickLink('/family-dashboard')} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-brand-saffron bg-brand-saffron px-3 py-1.5 text-xs font-extrabold uppercase tracking-wide text-brand-navy transition hover:bg-amber-300">
                       <SparklesIcon className="h-4 w-4" />
@@ -3221,6 +3239,11 @@ const Navbar = () => {
                 <div className="rounded-xl border border-brand-blue/20 bg-white px-2.5 py-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Seva Applications</p>
                   <p className="mt-1 text-lg font-black leading-none text-brand-blue">{familySummary.sevaCount}</p>
+                </div>
+                <div className="rounded-xl border border-amber-200 bg-white px-2.5 py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Langar Contributions</p>
+                  <p className="mt-1 text-lg font-black leading-none text-amber-700">{familyLangarSummary.commitments}</p>
+                  <p className="mt-0.5 text-[10px] text-slate-500">{familyLangarSummary.units} units committed</p>
                 </div>
                 <div className="min-w-0 rounded-xl border border-amber-200 bg-white px-2.5 py-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Upcoming Booking</p>

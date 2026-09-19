@@ -1,3 +1,71 @@
+[role='dialog'][aria-label='Help us stock the kitchen'] button {
+  white-space: nowrap;
+}
+
+[role='dialog'][aria-label='Help us stock the kitchen'] h3 {
+  font-size: 1.45rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+[role='dialog'][aria-label='Help us stock the kitchen'] aside h3 {
+  margin: -1rem -1rem 1rem;
+  border-bottom: 0;
+  border-radius: 0.75rem 0.75rem 0 0;
+  background: linear-gradient(100deg, rgb(3 35 82), rgb(37 99 235));
+  padding: 0.9rem 1rem;
+  color: white;
+}
+
+[role='dialog'][aria-label='Help us stock the kitchen'] aside {
+  background: #ffffff;
+  margin-top: 0;
+}
+
+[role='dialog'][aria-label='Help us stock the kitchen'] section {
+  border: 1px solid rgb(186 230 253);
+  border-radius: 0.75rem;
+  padding: 1rem;
+}
+
+[role='dialog'][aria-label='Help us stock the kitchen'] section > h3 {
+  margin: -1rem -1rem 1rem;
+  border-bottom: 0;
+  border-radius: 0.75rem 0.75rem 0 0;
+  background: linear-gradient(100deg, rgb(3 35 82), rgb(37 99 235));
+  padding: 0.9rem 1rem;
+  color: white;
+}
+
+@media (min-width: 1024px) {
+  [role='dialog'][aria-label='Help us stock the kitchen'] > div:last-child {
+    align-items: stretch;
+  }
+
+  [role='dialog'][aria-label='Help us stock the kitchen'] aside {
+    height: 100%;
+  }
+
+  [role='dialog'][aria-label='Help us stock the kitchen'] {
+    max-width: 90rem;
+    width: calc(100vw - 2rem);
+  }
+
+  [role='dialog'][aria-label='Help us stock the kitchen'] > div:last-child {
+    grid-template-columns: minmax(0, 1.5fr) minmax(14rem, 0.7fr);
+  }
+}
+
+[role='dialog'][aria-label='Help us stock the kitchen'] aside p.text-base {
+  font-weight: 800;
+}
+
+@media (max-width: 640px) {
+  [role='dialog'][aria-label='Help us stock the kitchen'] article button {
+    font-size: 10px;
+    padding: 5px 7px;
+  }
+}
 .App {
   text-align: center;
 }

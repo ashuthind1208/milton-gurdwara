@@ -7013,6 +7013,26 @@ const server = http.createServer(async (request, response) => {
         validatedBody = await enforceEligibleBookingDutyAssignee(validatedBody);
         await assertNoScheduleOverlap(validatedBody, { kind: 'booking', excludeId: id });
       }
+      if (resource === 'langar_contributions') {
+        const existingContribution = await eventsDb.listItems(resource).then((rows) => rows.find((entry) => String(entry?.id || '') === String(id)));
+        const previousStatus = String(existingContribution?.status || 'pending').trim().toLowerCase();
+        const nextStatus = String(validatedBody?.status || previousStatus).trim().toLowerCase();
+        if (existingContribution && previousStatus !== nextStatus && ['received', 'pending', 'cancelled'].includes(nextStatus)) {
+          const homeContent = await eventsDb.getSingleton('cms_home_content', null);
+          if (homeContent && Array.isArray(homeContent.langarItems)) {
+            const quantity = Number(existingContribution.quantity || 0);
+            const direction = nextStatus === 'received' ? 1 : previousStatus === 'received' ? -1 : 0;
+            if (direction !== 0) {
+              const nextLangarItems = homeContent.langarItems.map((item) => (
+                String(item?.id || '') === String(existingContribution.itemId || '')
+                  ? { ...item, quantityReceived: Math.max(0, Number(item.quantityReceived || 0) + (direction * quantity)) }
+                  : item
+              ));
+              await eventsDb.setSingleton('cms_home_content', { ...homeContent, langarItems: nextLangarItems });
+            }
+          }
+        }
+      }
       const data = await eventsDb.updateItem(resource, id, validatedBody);
 
       if (resource === 'users' && eventsDb.hasDatabaseConnection) {
