@@ -15,6 +15,7 @@ import { downloadCsv, downloadDonationInvoicePdf, downloadMembershipFeeInformati
 import { siteConfig } from '../../constants/siteConfig';
 import { isEventCurrent } from '../../utils/eventAvailability';
 import { bookingBelongsToProfile, isBookingPaymentDonation, sortBookingsBySchedule } from '../../utils/profileBookings';
+import langarService, { LANGAR_CONTRIBUTIONS_RESOURCE } from '../../services/langarService';
 
 const toDateKey = (value) => {
   const parsed = new Date(value);
@@ -159,6 +160,12 @@ const FamilyDashboardPage = () => {
     queryFn: () => bookingService.getBookings().then((res) => res.data),
     enabled: isAuthenticated
   });
+  const { data: langarContributions = [] } = useQuery({
+    queryKey: ['family-dashboard-langar-contributions', LANGAR_CONTRIBUTIONS_RESOURCE],
+    queryFn: () => langarService.getContributions().then((res) => res.data),
+    enabled: isAuthenticated,
+    refetchInterval: 15000
+  });
 
   const familyEventRegistrations = useMemo(() => {
     if (!isAuthenticated) {
@@ -296,6 +303,13 @@ const FamilyDashboardPage = () => {
   const donationTotal = useMemo(
     () => familyDonations.reduce((sum, item) => sum + Number(item.amount || 0), 0),
     [familyDonations]
+  );
+  const familyLangarContributions = useMemo(() => langarContributions
+    .filter((entry) => String(entry.donorEmail || '').trim().toLowerCase() === email)
+    .sort((left, right) => new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime()), [email, langarContributions]);
+  const langarContributionTotal = useMemo(
+    () => familyLangarContributions.reduce((sum, entry) => sum + Number(entry.quantity || 0), 0),
+    [familyLangarContributions]
   );
   const membershipRenewals = useMemo(() => (
     isMember && Array.isArray(user?.membershipFeeRecords)
@@ -705,6 +719,22 @@ const FamilyDashboardPage = () => {
             <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Records: {familyDonations.length}</p>
             <p className="mt-2 text-[2rem] font-black leading-none text-emerald-700 md:text-[2.4rem]">${donationTotal.toFixed(2)}</p>
             <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Total contributed</p>
+          </article>
+
+          <article className="rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50 via-white to-orange-100 p-5">
+            <h2 className="text-2xl font-black text-brand-blue">Langar Contributions</h2>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Commitments made: {familyLangarContributions.length}</p>
+            <p className="mt-2 text-[2rem] font-black leading-none text-amber-700 md:text-[2.4rem]">{langarContributionTotal}</p>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Total units committed</p>
+            <div className="mt-3 space-y-2">
+              {familyLangarContributions.slice(0, 3).map((entry) => (
+                <div key={entry.id} className="flex items-center justify-between gap-2 rounded-lg border border-amber-100 bg-white/90 px-3 py-2 text-xs">
+                  <span className="font-semibold text-slate-800">{entry.itemName} · {entry.quantity} {entry.unit}</span>
+                  <span className="text-slate-500">{entry.createdAt ? format(new Date(entry.createdAt), 'MMM d, yyyy') : '-'}</span>
+                </div>
+              ))}
+              {familyLangarContributions.length === 0 ? <p className="text-sm text-slate-500">No Langar contributions found for your profile yet.</p> : null}
+            </div>
           </article>
 
           {isMember ? (

@@ -261,9 +261,17 @@ const ensureEventsSchema = async () => {
       added_on DATE,
       expiry_date DATE,
       needed BOOLEAN NOT NULL DEFAULT TRUE,
+      quantity_required NUMERIC(12,2) NOT NULL DEFAULT 0,
+      quantity_received NUMERIC(12,2) NOT NULL DEFAULT 0,
+      unit TEXT NOT NULL DEFAULT 'items',
+      image_url TEXT NOT NULL DEFAULT '',
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
+  await pool.query("ALTER TABLE langar_items ADD COLUMN IF NOT EXISTS quantity_required NUMERIC(12,2) NOT NULL DEFAULT 0;");
+  await pool.query("ALTER TABLE langar_items ADD COLUMN IF NOT EXISTS quantity_received NUMERIC(12,2) NOT NULL DEFAULT 0;");
+  await pool.query("ALTER TABLE langar_items ADD COLUMN IF NOT EXISTS unit TEXT NOT NULL DEFAULT 'items';");
+  await pool.query("ALTER TABLE langar_items ADD COLUMN IF NOT EXISTS image_url TEXT NOT NULL DEFAULT '';");
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS advertisements (
@@ -526,6 +534,25 @@ const ensureEventsSchema = async () => {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS langar_contributions (
+      id TEXT PRIMARY KEY,
+      item_id TEXT NOT NULL,
+      item_name TEXT NOT NULL DEFAULT '',
+      quantity NUMERIC(12,2) NOT NULL DEFAULT 0,
+      unit TEXT NOT NULL DEFAULT 'items',
+      donor_name TEXT NOT NULL DEFAULT '',
+      donor_email TEXT NOT NULL DEFAULT '',
+      anonymous BOOLEAN NOT NULL DEFAULT FALSE,
+      expected_delivery_date DATE,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_langar_contributions_item ON langar_contributions(item_id);');
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_langar_contributions_email ON langar_contributions(donor_email);');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS analytics_daily_metrics (

@@ -24,6 +24,7 @@ import NewsArticleDialog from '../../components/news/NewsArticleDialog';
 import gurdwaraLogo from '../../assets/gurdwara-logo.webp';
 import { isEventCurrent } from '../../utils/eventAvailability';
 import { truncateHeading, truncateHtmlByCharacters } from '../../utils/newsContent';
+import LangarNeedsBoard from '../../components/langar/LangarNeedsBoard';
 
 const toDateKey = (value = new Date()) => {
   const date = value instanceof Date ? value : new Date(value);
@@ -720,7 +721,7 @@ const HomePage = () => {
           </div>
 
           <div className="min-w-0 space-y-3 self-start">
-            <aside className="overflow-hidden rounded-xl border border-brand-blue/20 bg-white shadow-[0_18px_45px_-34px_rgba(11,78,162,0.65)]">
+            {false ? (<aside className="overflow-hidden rounded-xl border border-brand-blue/20 bg-white shadow-[0_18px_45px_-34px_rgba(11,78,162,0.65)]">
               <div className="bg-gradient-to-r from-brand-blue to-blue-700 px-4 py-4 text-white">
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -834,7 +835,7 @@ const HomePage = () => {
                   </Link>
                 </div>
               </div>
-            </aside>
+            </aside>) : <LangarNeedsBoard items={cmsData?.langarItems || []} compact />}
 
             <section className="rounded-xl border border-slate-200 bg-white px-4 py-4">
               <SectionTitle title="Latest Update" subtitle={latestArticle ? '' : 'No active update'} />

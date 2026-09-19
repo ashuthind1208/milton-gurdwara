@@ -134,6 +134,23 @@ const mirrorItemResource = async (db, resource, payload = {}) => {
     });
     return true;
   }
+  if (resource === 'langar_contributions') {
+    await upsertRow(db, 'langar_contributions', {
+      id: item.id,
+      item_id: item.itemId || '',
+      item_name: item.itemName || '',
+      quantity: Number(item.quantity || 0),
+      unit: item.unit || 'items',
+      donor_name: item.donorName || '',
+      donor_email: String(item.donorEmail || '').toLowerCase(),
+      anonymous: Boolean(item.anonymous),
+      expected_delivery_date: toDateValue(item.expectedDeliveryDate),
+      status: item.status || 'pending',
+      created_at: item.createdAt ? new Date(item.createdAt) : new Date(),
+      updated_at: item.updatedAt ? new Date(item.updatedAt) : new Date()
+    });
+    return true;
+  }
   if (resource === 'donation_records' || resource === 'donations') {
     const userId = await existingIdOrNull(db, 'admin_users', item.userId);
     await upsertRow(db, 'donation_records', {
@@ -167,6 +184,7 @@ const deleteItemMirror = async (db, resource, id) => {
     gallery_albums: 'gallery_albums', videos: 'videos', streaming_configs: 'streaming_configs',
     subscribers: 'subscribers', seva_opportunities: 'seva_opportunities',
     volunteer_registrations: 'volunteer_registrations', donations: 'donation_records', donation_records: 'donation_records'
+    , langar_contributions: 'langar_contributions'
   };
   const table = tableMap[resource];
   if (!table) return false;
@@ -209,7 +227,9 @@ const mirrorSingletonResource = async (db, resource, payload = {}) => {
     for (const item of Array.isArray(value.langarItems) ? value.langarItems : []) {
       await upsertRow(db, 'langar_items', {
         id: item.id, name: item.name || '', category: item.category || 'Grocery', added_on: toDateValue(item.addedOn),
-        expiry_date: toDateValue(item.expiryDate), needed: item.needed !== false, updated_at: new Date()
+        expiry_date: toDateValue(item.expiryDate), needed: item.needed !== false,
+        quantity_required: Number(item.quantityRequired || 0), quantity_received: Number(item.quantityReceived || 0),
+        unit: item.unit || 'items', image_url: item.imageUrl || '', updated_at: new Date()
       });
     }
     return true;

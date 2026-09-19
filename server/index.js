@@ -6921,6 +6921,15 @@ const server = http.createServer(async (request, response) => {
     try {
       const resource = String(contentResourceMatch[1]).toLowerCase();
       const body = await parseAndValidateGenericObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
+      if (resource === 'langar_contributions') {
+        const actor = getRequestActor(request);
+        const actorEmail = String(actor.email || '').trim().toLowerCase();
+        const donorEmail = String(body.donorEmail || '').trim().toLowerCase();
+        assertInput(Boolean(actorEmail && donorEmail && actorEmail === donorEmail), 'Please sign in before making a Langar contribution.', 401);
+        body.donorEmail = actorEmail;
+        body.anonymous = Boolean(body.anonymous);
+        body.status = 'pending';
+      }
       let validatedBody = resource === 'users'
         ? enforceUserMembershipActivity(body, body)
         : resource === 'bookings'

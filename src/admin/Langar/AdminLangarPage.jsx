@@ -12,6 +12,8 @@ import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton';
 import cmsService from '../../services/cmsService';
+import langarService, { LANGAR_CONTRIBUTIONS_RESOURCE } from '../../services/langarService';
+import contentApiService from '../../services/contentApiService';
 
 const actionIconClass = 'h-4 w-4';
 const LANGAR_PAGE_SIZE = 10;
@@ -23,7 +25,11 @@ const defaultForm = {
   expiryDate: '',
   statusType: 'required_soon',
   customStatusLabel: '',
-  customNeeded: 'true'
+  customNeeded: 'true',
+  quantityRequired: 0,
+  quantityReceived: 0,
+  unit: 'items',
+  imageUrl: ''
 };
 
 const resolveStatusPreview = (item = {}) => {
@@ -46,7 +52,11 @@ const buildLangarPayload = (values) => {
     expiryDate: values.expiryDate,
     needed,
     stockStatus: values.statusType,
-    customStatusLabel: isCustom ? (values.customStatusLabel || '').trim() : ''
+    customStatusLabel: isCustom ? (values.customStatusLabel || '').trim() : '',
+    quantityRequired: Number(values.quantityRequired || 0),
+    quantityReceived: Number(values.quantityReceived || 0),
+    unit: String(values.unit || 'items').trim() || 'items',
+    imageUrl: String(values.imageUrl || '').trim()
   };
 };
 
@@ -69,6 +79,11 @@ const AdminLangarPage = () => {
   const { data: cmsData } = useQuery({
     queryKey: ['cms-home'],
     queryFn: () => cmsService.getHomeContent().then((res) => res.data)
+  });
+  const { data: contributions = [] } = useQuery({
+    queryKey: [LANGAR_CONTRIBUTIONS_RESOURCE, 'admin'],
+    queryFn: () => langarService.getContributions().then((res) => res.data),
+    refetchInterval: 15000
   });
 
   const langarItems = useMemo(() => cmsData?.langarItems || [], [cmsData?.langarItems]);
@@ -142,6 +157,10 @@ const AdminLangarPage = () => {
       setEditingItem((prev) => (prev?.id === id ? null : prev));
     }
   });
+  const contributionStatusMutation = useMutation({
+    mutationFn: ({ id, status }) => contentApiService.update(LANGAR_CONTRIBUTIONS_RESOURCE, id, { status }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [LANGAR_CONTRIBUTIONS_RESOURCE, 'admin'] })
+  });
 
   const openEdit = (item) => {
     setEditingItem(item);
@@ -152,7 +171,11 @@ const AdminLangarPage = () => {
       expiryDate: item.expiryDate || '',
       statusType: item.stockStatus || (item.needed ? 'required_soon' : 'stock_available'),
       customStatusLabel: item.customStatusLabel || '',
-      customNeeded: item.needed ? 'true' : 'false'
+      customNeeded: item.needed ? 'true' : 'false',
+      quantityRequired: item.quantityRequired || 0,
+      quantityReceived: item.quantityReceived || 0,
+      unit: item.unit || 'items',
+      imageUrl: item.imageUrl || ''
     });
   };
 
@@ -181,6 +204,29 @@ const AdminLangarPage = () => {
   return (
     <div className="space-y-6">
       <h1 className="sr-only">Seva Items</h1>
+
+      <Card>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="font-heading text-xl font-semibold text-brand-blue">Langar Commitments</h2>
+            <p className="mt-1 text-xs text-slate-500">Review contributor commitments and mark supplies received.</p>
+          </div>
+          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">{contributions.length} total</span>
+        </div>
+        <div className="mt-3 space-y-2">
+          {contributions.slice(0, 12).map((entry) => (
+            <div key={entry.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+              <div><p className="font-semibold text-slate-800">{entry.anonymous ? 'Anonymous' : entry.donorName} · {entry.itemName}</p><p className="text-xs text-slate-500">{entry.quantity} {entry.unit}{entry.expectedDeliveryDate ? ` · expected ${entry.expectedDeliveryDate}` : ''}</p></div>
+              <select value={entry.status || 'pending'} onChange={(event) => contributionStatusMutation.mutate({ id: entry.id, status: event.target.value })} className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700" disabled={contributionStatusMutation.isPending}>
+                <option value="pending">Pending</option>
+                <option value="received">Received</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+          ))}
+          {contributions.length === 0 ? <p className="text-sm text-slate-500">No Langar commitments yet.</p> : null}
+        </div>
+      </Card>
 
       <Card>
         <div className="mb-4 grid gap-2 md:grid-cols-4">
@@ -228,6 +274,7 @@ const AdminLangarPage = () => {
                 <th className="py-2 pr-3">Category</th>
                 <th className="py-2 pr-3">Added</th>
                 <th className="py-2 pr-3">Expiry</th>
+                <th className="py-2 pr-3">Received</th>
                 <th className="py-2 pr-3">Status</th>
                 <th className="py-2 pr-3">Actions</th>
               </tr>
@@ -252,6 +299,9 @@ const AdminLangarPage = () => {
                   <td className="admin-langar-mobile-hidden py-2 pr-3">{item.category || 'Grocery'}</td>
                   <td className="admin-langar-mobile-hidden py-2 pr-3">{item.addedOn || '-'}</td>
                   <td className="admin-langar-mobile-hidden py-2 pr-3">{item.expiryDate || '-'}</td>
+                  <td className="admin-langar-mobile-hidden py-2 pr-3">
+                    {Number(item.quantityReceived || 0)} / {Number(item.quantityRequired || 0)} {item.unit || 'items'}
+                  </td>
                   <td className="admin-langar-mobile-hidden py-2 pr-3">
                     <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${item.needed ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-700'}`}>
                       {resolveStatusPreview(item)}
@@ -301,7 +351,7 @@ const AdminLangarPage = () => {
               ))}
               {filteredItems.length === 0 ? (
                 <tr>
-                  <td className="py-4 text-center text-slate-500" colSpan={6}>No seva items found.</td>
+                  <td className="py-4 text-center text-slate-500" colSpan={7}>No seva items found.</td>
                 </tr>
               ) : null}
             </tbody>
@@ -353,6 +403,18 @@ const AdminLangarPage = () => {
               </label>
               <label className="text-sm">Expiry Date
                 <input type="date" {...form.register('expiryDate')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="text-sm">Quantity Needed
+                <input type="number" min="0" step="0.01" {...form.register('quantityRequired', { valueAsNumber: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="text-sm">Quantity Received
+                <input type="number" min="0" step="0.01" {...form.register('quantityReceived', { valueAsNumber: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="text-sm">Unit
+                <input {...form.register('unit')} placeholder="kg, bags, cases" className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="text-sm md:col-span-2">Grocery Image URL (optional)
+                <input type="url" {...form.register('imageUrl')} placeholder="https://..." className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
               <label className="text-sm md:col-span-2">Seva Status Category
                 <select {...form.register('statusType')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
@@ -428,6 +490,18 @@ const AdminLangarPage = () => {
               </label>
               <label className="text-sm">Expiry Date
                 <input type="date" {...editForm.register('expiryDate')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="text-sm">Quantity Needed
+                <input type="number" min="0" step="0.01" {...editForm.register('quantityRequired', { valueAsNumber: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="text-sm">Quantity Received
+                <input type="number" min="0" step="0.01" {...editForm.register('quantityReceived', { valueAsNumber: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="text-sm">Unit
+                <input {...editForm.register('unit')} placeholder="kg, bags, cases" className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+              </label>
+              <label className="text-sm md:col-span-2">Grocery Image URL (optional)
+                <input type="url" {...editForm.register('imageUrl')} placeholder="https://..." className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
               <label className="text-sm md:col-span-2">Seva Status Category
                 <select {...editForm.register('statusType')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">

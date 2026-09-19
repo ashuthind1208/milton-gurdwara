@@ -7,11 +7,12 @@ const PAGE_CONTENT_RESOURCE = 'cms_page_content';
 const DEFAULT_HERO_SLIDE_INTERVAL_SECONDS = 5;
 
 const defaultLangarItems = [
-  { id: 'langar-1', name: 'Ginger', category: 'Grocery', addedOn: '2026-07-07', expiryDate: '', needed: true, stockStatus: 'required_soon', customStatusLabel: '' },
-  { id: 'langar-2', name: 'Tomato', category: 'Grocery', addedOn: '2026-07-07', expiryDate: '', needed: true, stockStatus: 'required_soon', customStatusLabel: '' },
-  { id: 'langar-3', name: 'Onions', category: 'Grocery', addedOn: '2026-07-06', expiryDate: '', needed: false, stockStatus: 'stock_available', customStatusLabel: '' },
-  { id: 'langar-4', name: 'Flour (Atta)', category: 'Grocery', addedOn: '2026-07-07', expiryDate: '', needed: true, stockStatus: 'required_soon', customStatusLabel: '' },
-  { id: 'langar-5', name: 'Lentils (Daal)', category: 'Grocery', addedOn: '2026-07-05', expiryDate: '', needed: false, stockStatus: 'stock_available', customStatusLabel: '' }
+  { id: 'langar-1', name: 'Ginger', category: 'Grocery', addedOn: '2026-07-07', expiryDate: '', needed: true, stockStatus: 'required_soon', customStatusLabel: '', quantityRequired: 10, quantityReceived: 2, unit: 'kg' },
+  { id: 'langar-2', name: 'Tomatoes', category: 'Grocery', addedOn: '2026-07-07', expiryDate: '', needed: true, stockStatus: 'required_soon', customStatusLabel: '', quantityRequired: 10, quantityReceived: 5, unit: 'kg' },
+  { id: 'langar-3', name: 'Onions', category: 'Grocery', addedOn: '2026-07-06', expiryDate: '', needed: true, stockStatus: 'required_soon', customStatusLabel: '', quantityRequired: 10, quantityReceived: 5, unit: 'kg' },
+  { id: 'langar-4', name: 'Milk', category: 'Dairy', addedOn: '2026-07-07', expiryDate: '', needed: true, stockStatus: 'required_soon', customStatusLabel: '', quantityRequired: 10, quantityReceived: 4, unit: 'bags' },
+  { id: 'langar-5', name: 'Potatoes', category: 'Grocery', addedOn: '2026-07-05', expiryDate: '', needed: true, stockStatus: 'required_soon', customStatusLabel: '', quantityRequired: 10, quantityReceived: 6, unit: 'kg' },
+  { id: 'langar-6', name: 'Paneer', category: 'Dairy', addedOn: '2026-07-05', expiryDate: '', needed: true, stockStatus: 'required_soon', customStatusLabel: '', quantityRequired: 10, quantityReceived: 1, unit: 'kg' }
 ];
 
 const resolveLangarStatusLabel = (item = {}) => {
@@ -482,6 +483,10 @@ const normalizeContent = (content) => {
     needed: typeof item.needed === 'boolean' ? item.needed : true,
     stockStatus: item.stockStatus || ((typeof item.needed === 'boolean' ? item.needed : true) ? 'required_soon' : 'stock_available'),
     customStatusLabel: item.customStatusLabel || '',
+    quantityRequired: Math.max(0, Number(item.quantityRequired ?? 0)),
+    quantityReceived: Math.max(0, Number(item.quantityReceived ?? 0)),
+    unit: item.unit || 'items',
+    imageUrl: item.imageUrl || '',
     displayStatusLabel: resolveLangarStatusLabel(item)
   }))
   };
@@ -664,7 +669,11 @@ const cmsService = {
       expiryDate: payload.expiryDate || '',
       needed: payload.needed,
       stockStatus: payload.stockStatus || (payload.needed ? 'required_soon' : 'stock_available'),
-      customStatusLabel: payload.customStatusLabel || ''
+      customStatusLabel: payload.customStatusLabel || '',
+      quantityRequired: Math.max(0, Number(payload.quantityRequired || 0)),
+      quantityReceived: Math.max(0, Number(payload.quantityReceived || 0)),
+      unit: payload.unit || 'items',
+      imageUrl: payload.imageUrl || ''
     };
     const nextValue = {
       ...current,

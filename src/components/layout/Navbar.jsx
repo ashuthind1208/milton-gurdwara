@@ -54,6 +54,7 @@ import StreamingModal from '../common/StreamingModal';
 import AudioPillPlayer from '../common/AudioPillPlayer';
 import GlobalSearchBar from '../common/GlobalSearchBar';
 import ZeffyDonationModal from '../../pages/Donation/ZeffyDonationModal';
+import LangarNeedsBoard from '../langar/LangarNeedsBoard';
 
 const MEMBERSHIP_ZEFFY_URL = 'https://www.zeffy.com/en-CA/ticketing/gurdwara-singh-sabha-milton-membership';
 
@@ -454,6 +455,10 @@ const Navbar = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated, logout, updateProfile, persistUser } = useAuth();
   const { branding, logoSrc } = useBranding();
+  const { data: homeContent } = useQuery({
+    queryKey: ['cms-home', 'navbar-langar'],
+    queryFn: () => cmsService.getHomeContent().then((response) => response.data)
+  });
   const [open, setOpen] = useState(false);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [isInlineSearchExpanded, setIsInlineSearchExpanded] = useState(false);
@@ -3243,6 +3248,7 @@ const Navbar = () => {
                 </Link>
               </div>
 
+              <div className="mt-3"><LangarNeedsBoard items={homeContent?.langarItems || []} triggerOnly /></div>
               <Link to="/family-dashboard" onTouchEnd={handleCompactProfileLinkTouch('/family-dashboard')} onClick={handleProfileQuickLink('/family-dashboard')} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-brand-saffron bg-brand-saffron px-3 py-1.5 text-xs font-extrabold uppercase tracking-wide text-brand-navy transition hover:bg-amber-300 touch-manipulation select-none">
                 <SparklesIcon className="h-4 w-4" />
                 Open Family Dashboard
