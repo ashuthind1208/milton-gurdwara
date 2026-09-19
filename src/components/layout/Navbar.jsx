@@ -2738,26 +2738,25 @@ const Navbar = () => {
                       </div>
                     </div>
 
-                    <div className="mt-3 grid grid-cols-4 gap-2">
-                      <button type="button" onClick={openProfileModal} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-2 py-1.5 text-[10px] font-bold text-brand-blue hover:bg-blue-50">
-                        <UserCircleIcon className="h-4.5 w-4.5" />
+                    <div className="mt-3 grid grid-cols-5 gap-1.5">
+                      <button type="button" onClick={openProfileModal} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-1.5 py-1.5 text-[9px] font-bold text-brand-blue hover:bg-blue-50">
+                        <UserCircleIcon className="h-4 w-4" />
                         Profile
                       </button>
-                      <Link to="/events" onClick={handleProfileQuickLink('/events')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-2 py-1.5 text-[10px] font-bold text-brand-blue hover:bg-blue-50">
-                        <CalendarDaysIcon className="h-4.5 w-4.5" />
+                      <Link to="/events" onClick={handleProfileQuickLink('/events')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-1.5 py-1.5 text-[9px] font-bold text-brand-blue hover:bg-blue-50">
+                        <CalendarDaysIcon className="h-4 w-4" />
                         Events
                       </Link>
-                      <Link to="/seva" onClick={handleProfileQuickLink('/seva')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-2 py-1.5 text-[10px] font-bold text-brand-blue hover:bg-blue-50">
-                        <HandRaisedIcon className="h-4.5 w-4.5" />
+                      <Link to="/seva" onClick={handleProfileQuickLink('/seva')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-1.5 py-1.5 text-[9px] font-bold text-brand-blue hover:bg-blue-50">
+                        <HandRaisedIcon className="h-4 w-4" />
                         Seva
                       </Link>
-                      <Link to="/donation" onClick={handleProfileQuickLink('/donation')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-2 py-1.5 text-[10px] font-bold text-brand-blue hover:bg-blue-50">
-                        <HeartIcon className="h-4.5 w-4.5" />
+                      <Link to="/donation" onClick={handleProfileQuickLink('/donation')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-1.5 py-1.5 text-[9px] font-bold text-brand-blue hover:bg-blue-50">
+                        <HeartIcon className="h-4 w-4" />
                         Donation
                       </Link>
+                      <LangarNeedsBoard items={homeContent?.langarItems || []} triggerOnly navItem />
                     </div>
-
-                    <div className="mt-3"><LangarNeedsBoard items={homeContent?.langarItems || []} triggerOnly /></div>
 
                     <Link to="/family-dashboard" onClick={handleProfileQuickLink('/family-dashboard')} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-brand-saffron bg-brand-saffron px-3 py-1.5 text-xs font-extrabold uppercase tracking-wide text-brand-navy transition hover:bg-amber-300">
                       <SparklesIcon className="h-4 w-4" />
@@ -3252,26 +3251,26 @@ const Navbar = () => {
                 </div>
               </div>
 
-              <div className="mt-3 grid grid-cols-4 gap-2">
-                <button type="button" onClick={openProfileModal} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-2 py-1.5 text-[10px] font-bold text-brand-blue">
-                  <UserCircleIcon className="h-4.5 w-4.5" />
+              <div className="mt-3 grid grid-cols-5 gap-1.5">
+                <button type="button" onClick={openProfileModal} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-1.5 py-1.5 text-[9px] font-bold text-brand-blue">
+                  <UserCircleIcon className="h-4 w-4" />
                   Profile
                 </button>
-                <Link to="/events" onClick={handleProfileQuickLink('/events')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-2 py-1.5 text-[10px] font-bold text-brand-blue">
-                  <CalendarDaysIcon className="h-4.5 w-4.5" />
+                <Link to="/events" onClick={handleProfileQuickLink('/events')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-1.5 py-1.5 text-[9px] font-bold text-brand-blue">
+                  <CalendarDaysIcon className="h-4 w-4" />
                   Events
                 </Link>
-                <Link to="/seva" onClick={handleProfileQuickLink('/seva')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-2 py-1.5 text-[10px] font-bold text-brand-blue">
-                  <HandRaisedIcon className="h-4.5 w-4.5" />
+                <Link to="/seva" onClick={handleProfileQuickLink('/seva')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-1.5 py-1.5 text-[9px] font-bold text-brand-blue">
+                  <HandRaisedIcon className="h-4 w-4" />
                   Seva
                 </Link>
-                <Link to="/donation" onClick={handleProfileQuickLink('/donation')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-2 py-1.5 text-[10px] font-bold text-brand-blue">
-                  <HeartIcon className="h-4.5 w-4.5" />
+                <Link to="/donation" onClick={handleProfileQuickLink('/donation')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-1.5 py-1.5 text-[9px] font-bold text-brand-blue">
+                  <HeartIcon className="h-4 w-4" />
                   Donate
                 </Link>
+                <LangarNeedsBoard items={homeContent?.langarItems || []} triggerOnly navItem />
               </div>
 
-              <div className="mt-3"><LangarNeedsBoard items={homeContent?.langarItems || []} triggerOnly /></div>
               <Link to="/family-dashboard" onTouchEnd={handleCompactProfileLinkTouch('/family-dashboard')} onClick={handleProfileQuickLink('/family-dashboard')} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-brand-saffron bg-brand-saffron px-3 py-1.5 text-xs font-extrabold uppercase tracking-wide text-brand-navy transition hover:bg-amber-300 touch-manipulation select-none">
                 <SparklesIcon className="h-4 w-4" />
                 Open Family Dashboard

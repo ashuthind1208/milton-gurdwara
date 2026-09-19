@@ -12,51 +12,41 @@ import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton';
 import cmsService from '../../services/cmsService';
-import langarService, { LANGAR_CONTRIBUTIONS_RESOURCE } from '../../services/langarService';
+import langarService, { LANGAR_CONTRIBUTIONS_RESOURCE, resolveGroceryImage } from '../../services/langarService';
 import contentApiService from '../../services/contentApiService';
 
 const actionIconClass = 'h-4 w-4';
 const LANGAR_PAGE_SIZE = 10;
+const LANGAR_UNIT_OPTIONS = ['items', 'kg', 'gm', 'lb', 'unit'];
 
 const defaultForm = {
   name: '',
   category: 'Grocery',
   addedOn: new Date().toISOString().slice(0, 10),
   expiryDate: '',
-  statusType: 'required_soon',
-  customStatusLabel: '',
-  customNeeded: 'true',
   quantityRequired: 0,
   quantityReceived: 0,
-  unit: 'items',
-  imageUrl: ''
+  unit: 'items'
 };
 
-const resolveStatusPreview = (item = {}) => {
-  if (item.stockStatus === 'custom' && item.customStatusLabel) {
-    return item.customStatusLabel;
-  }
-  if (item.stockStatus === 'stock_available') {
-    return 'Stock Available';
-  }
-  return 'Required Soon';
-};
+const resolveStatusPreview = (item = {}) => (item.needed === false ? 'Stock Available' : 'Required Soon');
 
 const buildLangarPayload = (values) => {
-  const isCustom = values.statusType === 'custom';
-  const needed = isCustom ? values.customNeeded === 'true' : values.statusType === 'required_soon';
+  const quantityRequired = Number(values.quantityRequired || 0);
+  const quantityReceived = Number(values.quantityReceived || 0);
+  const needed = quantityReceived < quantityRequired;
   return {
     name: values.name,
     category: values.category,
     addedOn: values.addedOn,
     expiryDate: values.expiryDate,
     needed,
-    stockStatus: values.statusType,
-    customStatusLabel: isCustom ? (values.customStatusLabel || '').trim() : '',
-    quantityRequired: Number(values.quantityRequired || 0),
-    quantityReceived: Number(values.quantityReceived || 0),
+    stockStatus: needed ? 'required_soon' : 'stock_available',
+    customStatusLabel: '',
+    quantityRequired,
+    quantityReceived,
     unit: String(values.unit || 'items').trim() || 'items',
-    imageUrl: String(values.imageUrl || '').trim()
+    imageUrl: resolveGroceryImage(values.name)
   };
 };
 
@@ -73,8 +63,8 @@ const AdminLangarPage = () => {
 
   const form = useForm({ defaultValues: defaultForm });
   const editForm = useForm({ defaultValues: defaultForm });
-  const createStatusType = form.watch('statusType');
-  const editStatusType = editForm.watch('statusType');
+  const createName = form.watch('name');
+  const editName = editForm.watch('name');
 
   const { data: cmsData } = useQuery({
     queryKey: ['cms-home'],
@@ -164,6 +154,13 @@ const AdminLangarPage = () => {
       queryClient.invalidateQueries({ queryKey: ['cms-home'] });
     }
   });
+  const contributionDeleteMutation = useMutation({
+    mutationFn: (id) => langarService.deleteContribution(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [LANGAR_CONTRIBUTIONS_RESOURCE, 'admin'] });
+      queryClient.invalidateQueries({ queryKey: ['cms-home'] });
+    }
+  });
 
   const openEdit = (item) => {
     setEditingItem(item);
@@ -172,13 +169,9 @@ const AdminLangarPage = () => {
       category: item.category || 'Grocery',
       addedOn: item.addedOn || '',
       expiryDate: item.expiryDate || '',
-      statusType: item.stockStatus || (item.needed ? 'required_soon' : 'stock_available'),
-      customStatusLabel: item.customStatusLabel || '',
-      customNeeded: item.needed ? 'true' : 'false',
       quantityRequired: item.quantityRequired || 0,
       quantityReceived: item.quantityReceived || 0,
-      unit: item.unit || 'items',
-      imageUrl: item.imageUrl || ''
+      unit: item.unit || 'items'
     });
   };
 
@@ -220,11 +213,23 @@ const AdminLangarPage = () => {
           {contributions.slice(0, 12).map((entry) => (
             <div key={entry.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
               <div><p className="font-semibold text-slate-800">{entry.anonymous ? 'Anonymous' : entry.donorName} · {entry.itemName}</p><p className="text-xs text-slate-500">{entry.quantity} {entry.unit}{entry.expectedDeliveryDate ? ` · expected ${entry.expectedDeliveryDate}` : ''}</p></div>
-              <select value={entry.status || 'pending'} onChange={(event) => contributionStatusMutation.mutate({ id: entry.id, status: event.target.value })} className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700" disabled={contributionStatusMutation.isPending}>
-                <option value="pending">Pending</option>
-                <option value="received">Received</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
+              <div className="flex items-center gap-2">
+                <select value={entry.status || 'pending'} onChange={(event) => contributionStatusMutation.mutate({ id: entry.id, status: event.target.value })} className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700" disabled={contributionStatusMutation.isPending}>
+                  <option value="pending">Pending</option>
+                  <option value="received">Received</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={() => { if (window.confirm('Delete this Langar commitment?')) contributionDeleteMutation.mutate(entry.id); }}
+                  disabled={contributionDeleteMutation.isPending}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-50"
+                  title="Delete commitment"
+                  aria-label="Delete commitment"
+                >
+                  <TrashIcon className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
           ))}
           {contributions.length === 0 ? <p className="text-sm text-slate-500">No Langar commitments yet.</p> : null}
@@ -407,38 +412,23 @@ const AdminLangarPage = () => {
               <label className="text-sm">Expiry Date
                 <input type="date" {...form.register('expiryDate')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
-              <label className="text-sm">Quantity Needed
-                <input type="number" min="0" step="0.01" {...form.register('quantityRequired', { valueAsNumber: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-              </label>
+              <div className="flex gap-2">
+                <label className="text-sm w-24">Quantity Needed
+                  <input type="number" min="0" step="0.01" {...form.register('quantityRequired', { valueAsNumber: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                </label>
+                <label className="text-sm flex-1">Unit
+                  <select {...form.register('unit')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
+                    {LANGAR_UNIT_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                </label>
+              </div>
               <label className="text-sm">Quantity Received
                 <input type="number" min="0" step="0.01" {...form.register('quantityReceived', { valueAsNumber: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
-              <label className="text-sm">Unit
-                <input {...form.register('unit')} placeholder="kg, bags, cases" className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-              </label>
-              <label className="text-sm md:col-span-2">Grocery Image URL (optional)
-                <input type="url" {...form.register('imageUrl')} placeholder="https://..." className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-              </label>
-              <label className="text-sm md:col-span-2">Seva Status Category
-                <select {...form.register('statusType')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
-                  <option value="required_soon">Required Soon</option>
-                  <option value="stock_available">Stock Available</option>
-                  <option value="custom">Custom Label</option>
-                </select>
-              </label>
-              {createStatusType === 'custom' ? (
-                <>
-                  <label className="text-sm md:col-span-2">Custom Status Label
-                    <input {...form.register('customStatusLabel', { required: createStatusType === 'custom' })} required={createStatusType === 'custom'} placeholder="Ex: Seasonal shortage" className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-                  </label>
-                  <label className="text-sm md:col-span-2">Base Status Tone
-                    <select {...form.register('customNeeded')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
-                      <option value="true">Required Soon (orange)</option>
-                      <option value="false">Stock Available (green)</option>
-                    </select>
-                  </label>
-                </>
-              ) : null}
+              <div className="text-sm md:col-span-2 flex items-center gap-3 rounded-lg border border-dashed border-slate-300 bg-white/60 p-2.5">
+                <img src={resolveGroceryImage(createName) || undefined} alt="" className="h-12 w-12 rounded-lg border border-slate-200 object-cover" onError={(event) => { event.currentTarget.style.visibility = 'hidden'; }} onLoad={(event) => { event.currentTarget.style.visibility = 'visible'; }} />
+                <p className="text-xs text-slate-500">Image is fetched automatically from the item name.</p>
+              </div>
               <div className="md:col-span-2 flex gap-2">
                 <Button type="submit" disabled={addMutation.isPending}>{addMutation.isPending ? 'Saving...' : 'Create Item'}</Button>
                 <Button type="button" variant="ghost" onClick={closeModals}>Cancel</Button>
@@ -494,38 +484,23 @@ const AdminLangarPage = () => {
               <label className="text-sm">Expiry Date
                 <input type="date" {...editForm.register('expiryDate')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
-              <label className="text-sm">Quantity Needed
-                <input type="number" min="0" step="0.01" {...editForm.register('quantityRequired', { valueAsNumber: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-              </label>
+              <div className="flex gap-2">
+                <label className="text-sm w-24">Quantity Needed
+                  <input type="number" min="0" step="0.01" {...editForm.register('quantityRequired', { valueAsNumber: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
+                </label>
+                <label className="text-sm flex-1">Unit
+                  <select {...editForm.register('unit')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
+                    {LANGAR_UNIT_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                </label>
+              </div>
               <label className="text-sm">Quantity Received
                 <input type="number" min="0" step="0.01" {...editForm.register('quantityReceived', { valueAsNumber: true })} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
               </label>
-              <label className="text-sm">Unit
-                <input {...editForm.register('unit')} placeholder="kg, bags, cases" className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-              </label>
-              <label className="text-sm md:col-span-2">Grocery Image URL (optional)
-                <input type="url" {...editForm.register('imageUrl')} placeholder="https://..." className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-              </label>
-              <label className="text-sm md:col-span-2">Seva Status Category
-                <select {...editForm.register('statusType')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
-                  <option value="required_soon">Required Soon</option>
-                  <option value="stock_available">Stock Available</option>
-                  <option value="custom">Custom Label</option>
-                </select>
-              </label>
-              {editStatusType === 'custom' ? (
-                <>
-                  <label className="text-sm md:col-span-2">Custom Status Label
-                    <input {...editForm.register('customStatusLabel', { required: editStatusType === 'custom' })} required={editStatusType === 'custom'} placeholder="Ex: Limited stock until Friday" className="mt-1 w-full rounded-lg border border-slate-300 p-2.5" />
-                  </label>
-                  <label className="text-sm md:col-span-2">Base Status Tone
-                    <select {...editForm.register('customNeeded')} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
-                      <option value="true">Required Soon (orange)</option>
-                      <option value="false">Stock Available (green)</option>
-                    </select>
-                  </label>
-                </>
-              ) : null}
+              <div className="text-sm md:col-span-2 flex items-center gap-3 rounded-lg border border-dashed border-slate-300 bg-white/60 p-2.5">
+                <img src={resolveGroceryImage(editName) || undefined} alt="" className="h-12 w-12 rounded-lg border border-slate-200 object-cover" onError={(event) => { event.currentTarget.style.visibility = 'hidden'; }} onLoad={(event) => { event.currentTarget.style.visibility = 'visible'; }} />
+                <p className="text-xs text-slate-500">Image is fetched automatically from the item name.</p>
+              </div>
               <div className="md:col-span-2 flex gap-2">
                 <Button type="submit" disabled={updateMutation.isPending}>{updateMutation.isPending ? 'Saving...' : 'Save Changes'}</Button>
                 <Button type="button" variant="ghost" onClick={closeModals}>Cancel</Button>

@@ -7084,6 +7084,22 @@ const server = http.createServer(async (request, response) => {
         assertInput(canManageBookingDuties(request), 'Only Admin and Super Admin can delete bookings.', 403);
       }
 
+      if (resource === 'langar_contributions') {
+        const existingContribution = await eventsDb.listItems(resource).then((rows) => rows.find((entry) => String(entry?.id || '') === String(id)));
+        if (existingContribution && String(existingContribution.status || '').trim().toLowerCase() === 'received') {
+          const homeContent = await eventsDb.getSingleton('cms_home_content', null);
+          if (homeContent && Array.isArray(homeContent.langarItems)) {
+            const quantity = Number(existingContribution.quantity || 0);
+            const nextLangarItems = homeContent.langarItems.map((item) => (
+              String(item?.id || '') === String(existingContribution.itemId || '')
+                ? { ...item, quantityReceived: Math.max(0, Number(item.quantityReceived || 0) - quantity) }
+                : item
+            ));
+            await eventsDb.setSingleton('cms_home_content', { ...homeContent, langarItems: nextLangarItems });
+          }
+        }
+      }
+
       if (resource === 'users' && eventsDb.hasDatabaseConnection) {
         const users = await eventsDb.listItems('users');
         const targetUser = Array.isArray(users) ? users.find((entry) => String(entry?.id || '') === String(id)) : null;
