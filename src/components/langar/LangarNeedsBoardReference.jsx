@@ -56,7 +56,6 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
   const [boardOpen, setBoardOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [quantity, setQuantity] = useState(1);
-  const [donorName, setDonorName] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('');
   const [anonymous, setAnonymous] = useState(false);
   const [notice, setNotice] = useState('');
@@ -95,7 +94,6 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
       queryClient.invalidateQueries({ queryKey: [LANGAR_CONTRIBUTIONS_RESOURCE] });
       setSelectedItem(null);
       setQuantity(1);
-      setDonorName('');
       setDeliveryDate('');
       setAnonymous(false);
     },
@@ -117,7 +115,7 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
       itemName: selectedItem.name,
       quantity: Math.min(Number(quantity), remainingForSelected),
       unit: selectedItem.unit,
-      donorName: donorName || user?.name || 'Member',
+      donorName: user?.name || 'Member',
       donorEmail: user?.email || '',
       donorAvatarUrl: user?.avatarUrl || user?.picture || user?.photoURL || '',
       anonymous,
@@ -349,13 +347,13 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
               <div>
                 <p className="text-sm font-bold uppercase tracking-wide text-slate-500">Your Details</p>
                 <div className="mt-2 space-y-2.5">
-                  <label className="flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2.5">
+                  <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2.5">
                     <UserIcon className="h-4 w-4 shrink-0 text-slate-400" />
-                    <input value={donorName} onChange={(event) => setDonorName(event.target.value)} placeholder={user?.name || 'Your Name e.g. Harpreet Singh'} className="w-full text-sm outline-none" />
+                    <input value={anonymous ? 'Anonymous' : (user?.name || 'Member')} readOnly disabled className="w-full cursor-not-allowed bg-transparent text-sm text-slate-600 outline-none" />
                   </label>
                   <label className="flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2.5">
                     <CalendarDaysIcon className="h-4 w-4 shrink-0 text-slate-400" />
-                    <input type="date" value={deliveryDate} onChange={(event) => setDeliveryDate(event.target.value)} className="w-full text-sm outline-none" />
+                    <input type="date" value={deliveryDate} max={selectedItem.expiryDate || undefined} onChange={(event) => setDeliveryDate(event.target.value)} className="w-full text-sm outline-none" />
                   </label>
                   <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
                     <input type="checkbox" checked={anonymous} onChange={(event) => setAnonymous(event.target.checked)} className="h-4 w-4" /> Keep my name anonymous

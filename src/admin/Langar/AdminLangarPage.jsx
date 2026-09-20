@@ -9,6 +9,7 @@ import {
   EyeIcon,
   FunnelIcon,
   PencilSquareIcon,
+  PowerIcon,
   TrashIcon,
   XMarkIcon
 } from '@heroicons/react/24/outline';
@@ -74,18 +75,15 @@ const inputClass = 'mt-1 w-full rounded-lg border border-slate-300 bg-white px-2
 const labelClass = 'text-xs font-bold uppercase tracking-wide text-slate-500';
 const formatShortDate = (value) => (value ? new Date(value).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' }) : '-');
 
-const StatusSwitch = ({ isReceived, onToggle, disabled }) => (
+const StatusPill = ({ isReceived, onToggle, disabled }) => (
   <button
     type="button"
-    role="switch"
-    aria-checked={isReceived}
     onClick={onToggle}
     disabled={disabled}
-    className={`inline-flex items-center gap-2 rounded-full px-1 py-1 text-[11px] font-bold transition disabled:opacity-50 ${isReceived ? 'bg-emerald-500' : 'bg-slate-300'}`}
-    title={isReceived ? 'Received — click to mark pending' : 'Pending — click to mark received'}
+    className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-semibold transition ${isReceived ? 'border-emerald-300 bg-emerald-100 text-emerald-800 hover:border-emerald-400' : 'border-slate-300 bg-slate-100 text-slate-700 hover:border-slate-400'} disabled:cursor-not-allowed disabled:opacity-60`}
   >
-    <span className={`flex h-5 w-5 items-center justify-center rounded-full bg-white shadow transition-transform ${isReceived ? 'translate-x-6' : 'translate-x-0'}`} />
-    <span className={`pr-2 ${isReceived ? 'text-white' : 'text-slate-700'}`}>{isReceived ? 'Received' : 'Pending'}</span>
+    <PowerIcon className="h-3.5 w-3.5" />
+    {isReceived ? 'Received' : 'Pending'}
   </button>
 );
 
@@ -384,7 +382,7 @@ const AdminLangarPage = () => {
                     <td className="py-2 pr-3 text-slate-700">{entry.createdAt ? formatShortDate(entry.createdAt) : '-'}</td>
                     <td className="py-2 pr-3 text-slate-700">{entry.expectedDeliveryDate || '-'}</td>
                     <td className="py-2 pr-3">
-                      <StatusSwitch
+                      <StatusPill
                         isReceived={isReceived}
                         disabled={contributionStatusMutation.isPending}
                         onToggle={() => contributionStatusMutation.mutate({ id: entry.id, status: isReceived ? 'pending' : 'received' })}
@@ -599,7 +597,7 @@ const AdminLangarPage = () => {
                   <label className={labelClass}>Added Date
                     <input type="date" {...form.register('addedOn', { required: true })} required className={inputClass} />
                   </label>
-                  <label className={labelClass}>Expiry Date
+                  <label className={labelClass}>Expiry Date <span className="font-normal normal-case text-slate-400">(optional)</span>
                     <input type="date" {...form.register('expiryDate')} className={inputClass} />
                   </label>
                 </div>
@@ -723,7 +721,7 @@ const AdminLangarPage = () => {
                   <label className={labelClass}>Added Date
                     <input type="date" {...editForm.register('addedOn', { required: true })} required className={inputClass} />
                   </label>
-                  <label className={labelClass}>Expiry Date
+                  <label className={labelClass}>Expiry Date <span className="font-normal normal-case text-slate-400">(optional)</span>
                     <input type="date" {...editForm.register('expiryDate')} className={inputClass} />
                   </label>
                 </div>
