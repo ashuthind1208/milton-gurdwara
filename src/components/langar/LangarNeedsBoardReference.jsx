@@ -86,7 +86,16 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
     return { received, progress: required ? Math.min(100, Math.round(received / required * 100)) : 0, contributors, receivedThisWeek };
   }, [activeItems, contributions]);
 
-  const remainingForSelected = selectedItem ? Math.max(1, Number(selectedItem.quantityRequired || 0) - Number(selectedItem.quantityReceived || 0)) : 1;
+  const pendingByItem = useMemo(() => contributions.reduce((result, entry) => {
+    if (String(entry.status || 'pending').toLowerCase() !== 'pending') return result;
+    const itemId = String(entry.itemId || '');
+    result[itemId] = (result[itemId] || 0) + Number(entry.quantity || 0);
+    return result;
+  }, {}), [contributions]);
+
+  const remainingForItem = (item) => Math.max(0, Number(item?.quantityRequired || 0) - Number(item?.quantityReceived || 0) - Number(pendingByItem[String(item?.id || '')] || 0));
+
+  const remainingForSelected = selectedItem ? remainingForItem(selectedItem) : 0;
 
   const contributionMutation = useMutation({
     mutationFn: (payload) => langarService.createContribution(payload),
@@ -235,7 +244,7 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
                     const received = Number(item.quantityReceived || 0);
                     const receivedProgress = required ? Math.min(100, Math.round((received / required) * 100)) : 0;
                     const status = getStatus(receivedProgress);
-                    const isFullyDone = required > 0 && received >= required;
+                    const isFullyDone = required > 0 && remainingForItem(item) <= 0;
                     return (
                       <article key={item.id} className="flex flex-wrap items-start gap-x-3 gap-y-2 border-b border-slate-200 py-4 sm:flex-nowrap sm:items-center">
                         <img src={imageForItem(item)} alt="" className="mt-1 h-12 w-12 shrink-0 rounded-lg object-cover sm:mt-0" />

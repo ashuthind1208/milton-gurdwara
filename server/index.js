@@ -6934,7 +6934,11 @@ const server = http.createServer(async (request, response) => {
           ? homeContentForQuantity.langarItems.find((item) => String(item?.id || '') === String(body.itemId || ''))
           : null;
         if (matchedItem) {
-          const remaining = Math.max(0, Number(matchedItem.quantityRequired || 0) - Number(matchedItem.quantityReceived || 0));
+          const existingContributions = await eventsDb.listItems(resource);
+          const pendingQuantity = existingContributions
+            .filter((entry) => String(entry?.itemId || '') === String(matchedItem.id || '') && String(entry?.status || 'pending').trim().toLowerCase() === 'pending')
+            .reduce((sum, entry) => sum + Number(entry?.quantity || 0), 0);
+          const remaining = Math.max(0, Number(matchedItem.quantityRequired || 0) - Number(matchedItem.quantityReceived || 0) - pendingQuantity);
           assertInput(Number(body.quantity || 0) <= remaining, `Only ${remaining} ${matchedItem.unit || 'items'} remain needed for this item.`, 400);
         }
       }
