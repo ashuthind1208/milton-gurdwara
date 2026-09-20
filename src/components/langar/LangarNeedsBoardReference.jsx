@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArchiveBoxIcon, CalendarDaysIcon, ChevronRightIcon, ClockIcon, GiftIcon, MinusIcon, PlusIcon, UserIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../../context/AuthContext';
@@ -183,7 +184,7 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
         )
       ) : homeCard}
 
-      {boardOpen ? (
+      {boardOpen ? createPortal(
         <div className="fixed inset-0 z-[300] overflow-y-auto bg-slate-950/70 px-3 py-5 backdrop-blur-sm sm:px-5" onClick={() => setBoardOpen(false)}>
           <div className="mx-auto max-w-6xl overflow-hidden rounded-2xl bg-white shadow-2xl" role="dialog" aria-modal="true" aria-label="Help us stock the kitchen" onClick={(event) => event.stopPropagation()}>
             <header
@@ -305,10 +306,11 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
               </aside>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       ) : null}
 
-      {selectedItem ? (
+      {selectedItem ? createPortal(
         <div className="fixed inset-0 z-[310] overflow-y-auto bg-slate-950/75 px-3 py-5" onClick={() => setSelectedItem(null)}>
           <div className="mx-auto w-full max-w-lg max-h-[calc(100vh-2.5rem)] overflow-hidden overflow-y-auto rounded-2xl bg-white shadow-2xl" role="dialog" aria-modal="true" aria-label="Make a Langar contribution" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-3 bg-gradient-to-r from-brand-blue via-blue-700 to-brand-saffron px-4 py-4 sm:px-6 sm:py-5">
@@ -386,7 +388,8 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
               </button>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       ) : null}
     </>
   );

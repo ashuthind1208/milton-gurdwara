@@ -4,8 +4,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
   ArrowDownTrayIcon,
-  CheckIcon,
+  CalendarDaysIcon,
+  ClockIcon,
   EyeIcon,
+  FunnelIcon,
   PencilSquareIcon,
   TrashIcon,
   XMarkIcon
@@ -16,7 +18,7 @@ import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton
 import cmsService from '../../services/cmsService';
 import langarService, { LANGAR_CONTRIBUTIONS_RESOURCE, resolveGroceryImage } from '../../services/langarService';
 import contentApiService from '../../services/contentApiService';
-import { downloadRegistrationCsv, downloadRegistrationPdf } from '../../utils/csvExport';
+import { downloadLangarReceivedReportCsv, downloadLangarReceivedReportPdf } from '../../utils/csvExport';
 import { siteConfig } from '../../constants/siteConfig';
 
 const actionIconClass = 'h-4 w-4';
@@ -24,11 +26,18 @@ const LANGAR_PAGE_SIZE = 10;
 const COMMITMENTS_PAGE_SIZE = 10;
 const VIEW_CONTRIBUTORS_PAGE_SIZE = 10;
 const LANGAR_UNIT_OPTIONS = ['items', 'kg', 'gm', 'lb', 'unit'];
-const REPORT_PERIODS = [
-  { value: 'week', label: 'Past 7 Days', days: 7 },
-  { value: 'month', label: 'Past 30 Days', days: 30 },
-  { value: 'year', label: 'Past 365 Days', days: 365 }
+const REPORT_PRESETS = [
+  { value: 'week', label: '7 Days', days: 7 },
+  { value: 'month', label: '30 Days', days: 30 },
+  { value: 'year', label: '365 Days', days: 365 }
 ];
+
+const toDateInputValue = (date) => date.toISOString().slice(0, 10);
+const defaultReportDates = () => {
+  const today = new Date();
+  const weekAgo = new Date(today.getTime() - (7 * 24 * 60 * 60 * 1000));
+  return { start: toDateInputValue(weekAgo), end: toDateInputValue(today) };
+};
 
 const defaultForm = {
   name: '',
@@ -63,6 +72,22 @@ const buildLangarPayload = (values) => {
 
 const inputClass = 'mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-800 outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20';
 const labelClass = 'text-xs font-bold uppercase tracking-wide text-slate-500';
+const formatShortDate = (value) => (value ? new Date(value).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' }) : '-');
+
+const StatusSwitch = ({ isReceived, onToggle, disabled }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={isReceived}
+    onClick={onToggle}
+    disabled={disabled}
+    className={`inline-flex items-center gap-2 rounded-full px-1 py-1 text-[11px] font-bold transition disabled:opacity-50 ${isReceived ? 'bg-emerald-500' : 'bg-slate-300'}`}
+    title={isReceived ? 'Received — click to mark pending' : 'Pending — click to mark received'}
+  >
+    <span className={`flex h-5 w-5 items-center justify-center rounded-full bg-white shadow transition-transform ${isReceived ? 'translate-x-6' : 'translate-x-0'}`} />
+    <span className={`pr-2 ${isReceived ? 'text-white' : 'text-slate-700'}`}>{isReceived ? 'Received' : 'Pending'}</span>
+  </button>
+);
 
 const AdminLangarPage = () => {
   const { setHeaderAction } = useOutletContext();
@@ -81,7 +106,7 @@ const AdminLangarPage = () => {
   const [commitmentPage, setCommitmentPage] = useState(1);
 
   const [reportOpen, setReportOpen] = useState(false);
-  const [reportPeriod, setReportPeriod] = useState('week');
+  const [reportDates, setReportDates] = useState(defaultReportDates);
 
   const form = useForm({ defaultValues: defaultForm });
   const editForm = useForm({ defaultValues: defaultForm });
@@ -172,12 +197,16 @@ const AdminLangarPage = () => {
   }, [viewItemContributions, viewContributorsPage]);
 
   const reportRows = useMemo(() => {
-    const period = REPORT_PERIODS.find((entry) => entry.value === reportPeriod) || REPORT_PERIODS[0];
-    const cutoff = Date.now() - (period.days * 24 * 60 * 60 * 1000);
-    return sortedContributions.filter((entry) => (
-      String(entry.status || '').toLowerCase() === 'received' && new Date(entry.createdAt || 0).getTime() >= cutoff
-    ));
-  }, [sortedContributions, reportPeriod]);
+    const startTime = reportDates.start ? new Date(`${reportDates.start}T00:00:00`).getTime() : -Infinity;
+    const endTime = reportDates.end ? new Date(`${reportDates.end}T23:59:59`).getTime() : Infinity;
+    return sortedContributions.filter((entry) => {
+      if (String(entry.status || '').toLowerCase() !== 'received') return false;
+      const createdTime = new Date(entry.createdAt || 0).getTime();
+      return createdTime >= startTime && createdTime <= endTime;
+    });
+  }, [sortedContributions, reportDates]);
+
+  const reportGrandTotal = useMemo(() => reportRows.reduce((sum, row) => sum + Number(row.quantity || 0), 0), [reportRows]);
 
   const addMutation = useMutation({
     mutationFn: (values) => cmsService.addLangarItem(buildLangarPayload(values)),
@@ -194,11 +223,6 @@ const AdminLangarPage = () => {
       queryClient.invalidateQueries({ queryKey: ['cms-home'] });
       setEditingItem(null);
     }
-  });
-
-  const toggleMutation = useMutation({
-    mutationFn: ({ id, needed }) => cmsService.updateLangarItem(id, { needed }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['cms-home'] })
   });
 
   const removeMutation = useMutation({
@@ -250,42 +274,33 @@ const AdminLangarPage = () => {
     setEditingItem(null);
   };
 
-  const buildReportPayload = () => {
-    const period = REPORT_PERIODS.find((entry) => entry.value === reportPeriod) || REPORT_PERIODS[0];
-    return {
-      organizationName: siteConfig.name,
-      serviceName: 'Langar Items Received',
-      serviceDate: period.label,
-      serviceTime: `Generated ${new Date().toLocaleString()}`,
-      headers: ['Item', 'Contributor', 'Quantity', 'Expected Date', 'Received'],
-      rows: reportRows.map((entry) => [
-        entry.itemName || '-',
-        entry.anonymous ? 'Anonymous' : (entry.donorName || 'Member'),
-        `${entry.quantity} ${entry.unit}`,
-        entry.expectedDeliveryDate || '-',
-        entry.createdAt ? new Date(entry.createdAt).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'
-      ])
-    };
+  const applyReportPreset = (days) => {
+    const today = new Date();
+    const from = new Date(today.getTime() - (days * 24 * 60 * 60 * 1000));
+    setReportDates({ start: toDateInputValue(from), end: toDateInputValue(today) });
   };
 
+  const buildReportRowsForExport = () => reportRows.map((entry) => ({
+    itemName: entry.itemName || '-',
+    donorName: entry.anonymous ? 'Anonymous' : (entry.donorName || 'Member'),
+    quantity: entry.quantity,
+    unit: entry.unit,
+    createdDate: entry.createdAt ? formatShortDate(entry.createdAt) : '-',
+    expectedDate: entry.expectedDeliveryDate ? formatShortDate(entry.expectedDeliveryDate) : '-'
+  }));
+
   const downloadReport = async (format) => {
-    const payload = buildReportPayload();
+    const periodLabel = `${formatShortDate(reportDates.start)} – ${formatShortDate(reportDates.end)}`;
+    const rows = buildReportRowsForExport();
     if (format === 'pdf') {
-      await downloadRegistrationPdf({ ...payload, fileName: `langar-items-received-${reportPeriod}.pdf` });
+      await downloadLangarReceivedReportPdf({ organizationName: siteConfig.name, periodLabel, rows, fileName: `langar-items-received-${reportDates.start}-to-${reportDates.end}.pdf` });
       return;
     }
-    downloadRegistrationCsv({ ...payload, fileName: `langar-items-received-${reportPeriod}.csv` });
+    downloadLangarReceivedReportCsv({ organizationName: siteConfig.name, periodLabel, rows, fileName: `langar-items-received-${reportDates.start}-to-${reportDates.end}.csv` });
   };
 
   useEffect(() => {
-    setHeaderAction(
-      <div className="flex items-center gap-2">
-        <Button type="button" variant="ghost" onClick={() => setReportOpen(true)}>
-          <ArrowDownTrayIcon className="mr-1 h-4 w-4" /> Download Report
-        </Button>
-        <AdminHeaderActionButton label="Add New Seva Item" onClick={() => setCreateOpen(true)} />
-      </div>
-    );
+    setHeaderAction(<AdminHeaderActionButton label="Add New Seva Item" onClick={() => setCreateOpen(true)} />);
 
     return () => setHeaderAction(null);
   }, [setHeaderAction]);
@@ -320,7 +335,12 @@ const AdminLangarPage = () => {
             <h2 className="font-heading text-xl font-semibold text-brand-blue">Langar Commitments</h2>
             <p className="mt-1 text-xs text-slate-500">Review contributor commitments and mark supplies received.</p>
           </div>
-          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">{filteredCommitments.length} of {contributions.length} total</span>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">{filteredCommitments.length} of {contributions.length} total</span>
+            <Button type="button" onClick={() => setReportOpen(true)} className="bg-brand-blue text-white hover:bg-blue-800">
+              <ArrowDownTrayIcon className="mr-1.5 h-4 w-4" /> Download Report
+            </Button>
+          </div>
         </div>
 
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -347,42 +367,47 @@ const AdminLangarPage = () => {
                 <th className="py-2 pr-3">Name</th>
                 <th className="py-2 pr-3">Contributed For</th>
                 <th className="py-2 pr-3">Quantity</th>
+                <th className="py-2 pr-3">Created</th>
                 <th className="py-2 pr-3">Expected Date</th>
                 <th className="py-2 pr-3">Status</th>
                 <th className="py-2 pr-3">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {visibleCommitments.map((entry) => (
-                <tr key={entry.id} className="border-b border-slate-100">
-                  <td className="py-2 pr-3 font-semibold text-slate-800">{entry.anonymous ? 'Anonymous' : entry.donorName}</td>
-                  <td className="py-2 pr-3 text-slate-700">{entry.itemName}</td>
-                  <td className="py-2 pr-3 text-slate-700">{entry.quantity} {entry.unit}</td>
-                  <td className="py-2 pr-3 text-slate-700">{entry.expectedDeliveryDate || '-'}</td>
-                  <td className="py-2 pr-3">
-                    <select value={entry.status || 'pending'} onChange={(event) => contributionStatusMutation.mutate({ id: entry.id, status: event.target.value })} className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700" disabled={contributionStatusMutation.isPending}>
-                      <option value="pending">Pending</option>
-                      <option value="received">Received</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
-                  </td>
-                  <td className="py-2 pr-3">
-                    <button
-                      type="button"
-                      onClick={() => { if (window.confirm('Delete this Langar commitment?')) contributionDeleteMutation.mutate(entry.id); }}
-                      disabled={contributionDeleteMutation.isPending}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-50"
-                      title="Delete commitment"
-                      aria-label="Delete commitment"
-                    >
-                      <TrashIcon className={actionIconClass} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {visibleCommitments.map((entry) => {
+                const isReceived = String(entry.status || 'pending') === 'received';
+                return (
+                  <tr key={entry.id} className="border-b border-slate-100">
+                    <td className="py-2 pr-3 font-semibold text-slate-800">{entry.anonymous ? 'Anonymous' : entry.donorName}</td>
+                    <td className="py-2 pr-3 text-slate-700">{entry.itemName}</td>
+                    <td className="py-2 pr-3 text-slate-700">{entry.quantity} {entry.unit}</td>
+                    <td className="py-2 pr-3 text-slate-700">{entry.createdAt ? formatShortDate(entry.createdAt) : '-'}</td>
+                    <td className="py-2 pr-3 text-slate-700">{entry.expectedDeliveryDate || '-'}</td>
+                    <td className="py-2 pr-3">
+                      <StatusSwitch
+                        isReceived={isReceived}
+                        disabled={contributionStatusMutation.isPending}
+                        onToggle={() => contributionStatusMutation.mutate({ id: entry.id, status: isReceived ? 'pending' : 'received' })}
+                      />
+                    </td>
+                    <td className="py-2 pr-3">
+                      <button
+                        type="button"
+                        onClick={() => { if (window.confirm('Delete this Langar commitment?')) contributionDeleteMutation.mutate(entry.id); }}
+                        disabled={contributionDeleteMutation.isPending}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-50"
+                        title="Delete commitment"
+                        aria-label="Delete commitment"
+                      >
+                        <TrashIcon className={actionIconClass} />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
               {filteredCommitments.length === 0 ? (
                 <tr>
-                  <td className="py-4 text-center text-slate-500" colSpan={6}>No Langar commitments found.</td>
+                  <td className="py-4 text-center text-slate-500" colSpan={7}>No Langar commitments found.</td>
                 </tr>
               ) : null}
             </tbody>
@@ -484,15 +509,6 @@ const AdminLangarPage = () => {
                   </td>
                   <td className="py-2 pr-3">
                     <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => toggleMutation.mutate({ id: item.id, needed: !item.needed })}
-                        className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border ${item.needed ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-50' : 'border-slate-300 text-slate-700 hover:bg-slate-100'}`}
-                        title={item.needed ? 'Mark inactive' : 'Mark active'}
-                        aria-label={item.needed ? 'Mark inactive' : 'Mark active'}
-                      >
-                        <CheckIcon className={actionIconClass} />
-                      </button>
                       <button
                         type="button"
                         onClick={() => openView(item)}
@@ -641,17 +657,32 @@ const AdminLangarPage = () => {
                 <div>
                   <p className="font-heading text-lg font-bold text-slate-900">Contributors</p>
                   <p className="text-xs text-slate-500">People who committed to this item.</p>
-                  <div className="mt-3 space-y-2">
-                    {visibleViewContributions.map((entry) => (
-                      <div key={entry.id} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-                        <div>
-                          <p className="font-semibold text-slate-800">{entry.anonymous ? 'Anonymous' : entry.donorName}</p>
-                          <p className="text-xs text-slate-500">{entry.quantity} {entry.unit}{entry.expectedDeliveryDate ? ` · expected ${entry.expectedDeliveryDate}` : ''}</p>
-                        </div>
-                        <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${entry.status === 'received' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>{entry.status === 'received' ? 'Received' : entry.status === 'cancelled' ? 'Cancelled' : 'Pending'}</span>
-                      </div>
-                    ))}
-                    {viewItemContributions.length === 0 ? <p className="text-sm text-slate-500">No contributions yet for this item.</p> : null}
+                  <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
+                    <table className="min-w-full text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+                          <th className="px-3 py-2">Name</th>
+                          <th className="px-3 py-2">Contributed</th>
+                          <th className="px-3 py-2">When</th>
+                          <th className="px-3 py-2">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {visibleViewContributions.map((entry) => (
+                          <tr key={entry.id} className="border-b border-slate-100">
+                            <td className="px-3 py-2 font-semibold text-slate-800">{entry.anonymous ? 'Anonymous' : entry.donorName}</td>
+                            <td className="px-3 py-2 text-slate-700">{entry.quantity} {entry.unit}</td>
+                            <td className="px-3 py-2 text-slate-700">{entry.createdAt ? formatShortDate(entry.createdAt) : '-'}</td>
+                            <td className="px-3 py-2">
+                              <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${entry.status === 'received' ? 'bg-emerald-100 text-emerald-700' : entry.status === 'cancelled' ? 'bg-slate-200 text-slate-600' : 'bg-amber-100 text-amber-800'}`}>{entry.status === 'received' ? 'Received' : entry.status === 'cancelled' ? 'Cancelled' : 'Pending'}</span>
+                            </td>
+                          </tr>
+                        ))}
+                        {viewItemContributions.length === 0 ? (
+                          <tr><td className="px-3 py-4 text-center text-slate-500" colSpan={4}>No contributions yet for this item.</td></tr>
+                        ) : null}
+                      </tbody>
+                    </table>
                   </div>
                   {viewItemContributions.length > 0 ? (
                     <div className="mt-3 flex items-center justify-between gap-2">
@@ -722,47 +753,78 @@ const AdminLangarPage = () => {
       {reportOpen ? (
         <div className="fixed inset-0 z-[96] overflow-y-auto bg-slate-900/45 px-4 py-6" onClick={() => setReportOpen(false)}>
           <div className="mx-auto flex min-h-full items-center justify-center">
-            <div className="w-full max-w-2xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-2xl border border-brand-blue/20 bg-white shadow-xl" onClick={(event) => event.stopPropagation()}>
+            <div className="w-full max-w-3xl max-h-[calc(100vh-3rem)] overflow-y-auto rounded-2xl border border-brand-blue/20 bg-white shadow-xl" onClick={(event) => event.stopPropagation()}>
               <div className="flex items-center justify-between gap-3 rounded-t-2xl bg-gradient-to-r from-brand-blue to-blue-700 px-5 py-4">
-                <h3 className="font-heading text-xl font-semibold text-white">Langar Items Received Report</h3>
+                <div className="flex items-center gap-2 text-white">
+                  <ArrowDownTrayIcon className="h-5 w-5" />
+                  <h3 className="font-heading text-xl font-semibold">Langar Items Received Report</h3>
+                </div>
                 <button type="button" className="rounded-full border border-white/40 p-1.5 text-white hover:bg-white/10" onClick={() => setReportOpen(false)} aria-label="Close">
                   <XMarkIcon className="h-4 w-4" />
                 </button>
               </div>
               <div className="space-y-4 p-5">
-                <label className={labelClass}>Period
-                  <select value={reportPeriod} onChange={(event) => setReportPeriod(event.target.value)} className={inputClass}>
-                    {REPORT_PERIODS.map((period) => <option key={period.value} value={period.value}>{period.label}</option>)}
-                  </select>
-                </label>
-                <div className="max-h-64 overflow-y-auto rounded-xl border border-slate-200">
+                <div className="flex flex-wrap items-center gap-2">
+                  <FunnelIcon className="h-4 w-4 text-slate-400" />
+                  <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Quick range:</span>
+                  {REPORT_PRESETS.map((preset) => (
+                    <button key={preset.value} type="button" onClick={() => applyReportPreset(preset.days)} className="rounded-full border border-brand-blue/30 bg-blue-50 px-3 py-1 text-xs font-bold text-brand-blue hover:bg-blue-100">
+                      Past {preset.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className={labelClass}><CalendarDaysIcon className="mr-1 inline h-3.5 w-3.5" />Start Date
+                    <input type="date" value={reportDates.start} onChange={(event) => setReportDates((prev) => ({ ...prev, start: event.target.value }))} className={inputClass} />
+                  </label>
+                  <label className={labelClass}><CalendarDaysIcon className="mr-1 inline h-3.5 w-3.5" />End Date
+                    <input type="date" value={reportDates.end} onChange={(event) => setReportDates((prev) => ({ ...prev, end: event.target.value }))} className={inputClass} />
+                  </label>
+                </div>
+                <div className="flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-slate-600">
+                  <ClockIcon className="h-4 w-4 shrink-0 text-brand-blue" />
+                  Showing {reportRows.length} received commitment{reportRows.length === 1 ? '' : 's'} totaling <strong className="text-brand-blue">{reportGrandTotal}</strong> units between {formatShortDate(reportDates.start)} and {formatShortDate(reportDates.end)}.
+                </div>
+                <div className="max-h-72 overflow-y-auto rounded-xl border border-slate-200">
                   <table className="min-w-full text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                    <thead className="sticky top-0">
+                      <tr className="border-b border-slate-200 bg-slate-100 text-xs uppercase tracking-wide text-slate-500">
                         <th className="px-3 py-2">Item</th>
                         <th className="px-3 py-2">Contributor</th>
                         <th className="px-3 py-2">Quantity</th>
-                        <th className="px-3 py-2">Received</th>
+                        <th className="px-3 py-2">Created</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {reportRows.map((entry) => (
-                        <tr key={entry.id} className="border-b border-slate-100">
+                      {reportRows.map((entry, index) => (
+                        <tr key={entry.id} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                           <td className="px-3 py-2 font-semibold text-slate-800">{entry.itemName}</td>
                           <td className="px-3 py-2 text-slate-700">{entry.anonymous ? 'Anonymous' : entry.donorName}</td>
                           <td className="px-3 py-2 text-slate-700">{entry.quantity} {entry.unit}</td>
-                          <td className="px-3 py-2 text-slate-700">{entry.createdAt ? new Date(entry.createdAt).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }) : '-'}</td>
+                          <td className="px-3 py-2 text-slate-700">{entry.createdAt ? formatShortDate(entry.createdAt) : '-'}</td>
                         </tr>
                       ))}
                       {reportRows.length === 0 ? (
                         <tr><td className="px-3 py-4 text-center text-slate-500" colSpan={4}>No items received in this period.</td></tr>
                       ) : null}
                     </tbody>
+                    {reportRows.length > 0 ? (
+                      <tfoot>
+                        <tr className="border-t-2 border-slate-300 bg-slate-100">
+                          <td className="px-3 py-2 font-bold text-brand-blue" colSpan={2}>Grand Total</td>
+                          <td className="px-3 py-2 font-bold text-brand-blue" colSpan={2}>{reportGrandTotal} units</td>
+                        </tr>
+                      </tfoot>
+                    ) : null}
                   </table>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button type="button" onClick={() => downloadReport('pdf')} disabled={reportRows.length === 0}><ArrowDownTrayIcon className="mr-1 h-4 w-4" /> Download PDF</Button>
-                  <Button type="button" variant="ghost" onClick={() => downloadReport('csv')} disabled={reportRows.length === 0}><ArrowDownTrayIcon className="mr-1 h-4 w-4" /> Download CSV</Button>
+                  <Button type="button" onClick={() => downloadReport('pdf')} disabled={reportRows.length === 0} className="bg-brand-blue text-white hover:bg-blue-800">
+                    <ArrowDownTrayIcon className="mr-1.5 h-4 w-4" /> Download PDF
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={() => downloadReport('csv')} disabled={reportRows.length === 0}>
+                    <ArrowDownTrayIcon className="mr-1.5 h-4 w-4" /> Download CSV
+                  </Button>
                 </div>
               </div>
             </div>

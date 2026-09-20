@@ -715,3 +715,130 @@ export const downloadCampaignDonationsPdf = async ({
 
   doc.save(fileName || 'campaign-donations.pdf');
 };
+
+const groupLangarReportRows = (rows = []) => {
+  const groups = new Map();
+  rows.forEach((row) => {
+    const key = row.itemName || 'Unknown item';
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+    groups.get(key).push(row);
+  });
+  return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+};
+
+export const downloadLangarReceivedReportPdf = async ({
+  organizationName,
+  periodLabel,
+  rows = [],
+  fileName
+}) => {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const logoDataUrl = await loadLogoDataUrl();
+  const generatedOn = new Date().toLocaleString();
+  const groupedRows = groupLangarReportRows(rows);
+  const grandTotal = rows.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
+
+  doc.setFillColor(...LOGO_BLUE_RGB);
+  doc.rect(0, 0, pageWidth, 98, 'F');
+
+  if (logoDataUrl) {
+    doc.addImage(logoDataUrl, 'PNG', 34, 22, 54, 54);
+  }
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.text(organizationName || 'Gurdwara', 102, 42);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text('Langar Items Received Report', 102, 58);
+  doc.text(`Period: ${periodLabel || '-'}`, 102, 72);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.text('Items Received', pageWidth - 40, 42, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text(`Total Commitments: ${rows.length}`, pageWidth - 40, 60, { align: 'right' });
+  doc.text(`Generated: ${generatedOn}`, pageWidth - 40, 74, { align: 'right' });
+
+  const body = [];
+  groupedRows.forEach(([itemName, entries]) => {
+    entries.forEach((row) => body.push([
+      itemName,
+      row.donorName || '-',
+      `${row.quantity} ${row.unit}`,
+      row.createdDate || '-',
+      row.expectedDate || '-'
+    ]));
+    const subtotal = entries.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
+    body.push([
+      { content: `${itemName} — Subtotal`, colSpan: 3, styles: { fontStyle: 'bold', fillColor: [241, 245, 249], textColor: [15, 23, 42] } },
+      { content: `${subtotal} ${entries[0]?.unit || ''}`, colSpan: 2, styles: { fontStyle: 'bold', fillColor: [241, 245, 249], textColor: [15, 23, 42] } }
+    ]);
+  });
+  body.push([
+    { content: 'Grand Total', colSpan: 3, styles: { fontStyle: 'bold', fillColor: LOGO_BLUE_RGB, textColor: 255 } },
+    { content: `${grandTotal}`, colSpan: 2, styles: { fontStyle: 'bold', fillColor: LOGO_BLUE_RGB, textColor: 255 } }
+  ]);
+
+  autoTable(doc, {
+    startY: 126,
+    head: [['Item', 'Contributor', 'Quantity', 'Created Date', 'Expected Date']],
+    body,
+    styles: { fontSize: 9, cellPadding: 6 },
+    headStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold' },
+    theme: 'grid',
+    margin: { left: 40, right: 40 }
+  });
+
+  const finalY = doc.lastAutoTable?.finalY || 260;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text('This report compiles Langar item commitments marked received for the selected period.', 40, Math.min(finalY + 20, pageHeight - 34));
+
+  doc.save(fileName || 'langar-items-received.pdf');
+};
+
+export const downloadLangarReceivedReportCsv = ({
+  organizationName,
+  periodLabel,
+  rows = [],
+  fileName
+}) => {
+  const groupedRows = groupLangarReportRows(rows);
+  const grandTotal = rows.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
+  const dataRows = [];
+  groupedRows.forEach(([itemName, entries]) => {
+    entries.forEach((row) => dataRows.push([
+      itemName,
+      row.donorName || '-',
+      `${row.quantity} ${row.unit}`,
+      row.createdDate || '-',
+      row.expectedDate || '-'
+    ]));
+    const subtotal = entries.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
+    dataRows.push([`${itemName} — Subtotal`, '', `${subtotal} ${entries[0]?.unit || ''}`, '', '']);
+  });
+  dataRows.push(['Grand Total', '', `${grandTotal}`, '', '']);
+
+  const metadataRows = [
+    ['Organization', organizationName || ''],
+    ['Report', 'Langar Items Received Report'],
+    ['Period', periodLabel || '-'],
+    ['Generated On', new Date().toLocaleString()],
+    []
+  ];
+
+  const csvData = [
+    ...metadataRows.map((row) => row.map((cell) => escapeCsvCell(cell)).join(',')),
+    buildCsv(['Item', 'Contributor', 'Quantity', 'Created Date', 'Expected Date'], dataRows)
+  ].join('\n');
+
+  const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+  triggerFileDownload(blob, fileName || 'langar-items-received.csv');
+};
