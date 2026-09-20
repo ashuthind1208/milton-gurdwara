@@ -2739,20 +2739,20 @@ const Navbar = () => {
                     </div>
 
                     <div className="mt-3 grid grid-cols-5 gap-1.5">
-                      <button type="button" onClick={openProfileModal} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-1.5 py-1.5 text-[9px] font-bold text-brand-blue hover:bg-blue-50">
-                        <UserCircleIcon className="h-4 w-4" />
+                      <button type="button" onClick={openProfileModal} className="inline-flex flex-col items-center gap-0.5 rounded-xl border border-brand-blue/25 bg-white px-1.5 py-1.5 text-[9px] font-bold text-brand-blue hover:bg-blue-50">
+                        <UserCircleIcon className="h-5 w-5" />
                         Profile
                       </button>
-                      <Link to="/events" onClick={handleProfileQuickLink('/events')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-1.5 py-1.5 text-[9px] font-bold text-brand-blue hover:bg-blue-50">
-                        <CalendarDaysIcon className="h-4 w-4" />
+                      <Link to="/events" onClick={handleProfileQuickLink('/events')} className="inline-flex flex-col items-center gap-0.5 rounded-xl border border-brand-blue/25 bg-white px-1.5 py-1.5 text-[9px] font-bold text-brand-blue hover:bg-blue-50">
+                        <CalendarDaysIcon className="h-5 w-5" />
                         Events
                       </Link>
-                      <Link to="/seva" onClick={handleProfileQuickLink('/seva')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-1.5 py-1.5 text-[9px] font-bold text-brand-blue hover:bg-blue-50">
-                        <HandRaisedIcon className="h-4 w-4" />
+                      <Link to="/seva" onClick={handleProfileQuickLink('/seva')} className="inline-flex flex-col items-center gap-0.5 rounded-xl border border-brand-blue/25 bg-white px-1.5 py-1.5 text-[9px] font-bold text-brand-blue hover:bg-blue-50">
+                        <HandRaisedIcon className="h-5 w-5" />
                         Seva
                       </Link>
-                      <Link to="/donation" onClick={handleProfileQuickLink('/donation')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-1.5 py-1.5 text-[9px] font-bold text-brand-blue hover:bg-blue-50">
-                        <HeartIcon className="h-4 w-4" />
+                      <Link to="/donation" onClick={handleProfileQuickLink('/donation')} className="inline-flex flex-col items-center gap-0.5 rounded-xl border border-brand-blue/25 bg-white px-1.5 py-1.5 text-[9px] font-bold text-brand-blue hover:bg-blue-50">
+                        <HeartIcon className="h-5 w-5" />
                         Donation
                       </Link>
                       <LangarNeedsBoard items={homeContent?.langarItems || []} triggerOnly navItem />
@@ -3252,20 +3252,20 @@ const Navbar = () => {
               </div>
 
               <div className="mt-3 grid grid-cols-5 gap-1.5">
-                <button type="button" onClick={openProfileModal} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-1.5 py-1.5 text-[9px] font-bold text-brand-blue">
-                  <UserCircleIcon className="h-4 w-4" />
+                <button type="button" onClick={openProfileModal} className="inline-flex flex-col items-center gap-0.5 rounded-xl border border-brand-blue/25 bg-white px-1.5 py-1.5 text-[9px] font-bold text-brand-blue">
+                  <UserCircleIcon className="h-5 w-5" />
                   Profile
                 </button>
-                <Link to="/events" onClick={handleProfileQuickLink('/events')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-1.5 py-1.5 text-[9px] font-bold text-brand-blue">
-                  <CalendarDaysIcon className="h-4 w-4" />
+                <Link to="/events" onClick={handleProfileQuickLink('/events')} className="inline-flex flex-col items-center gap-0.5 rounded-xl border border-brand-blue/25 bg-white px-1.5 py-1.5 text-[9px] font-bold text-brand-blue">
+                  <CalendarDaysIcon className="h-5 w-5" />
                   Events
                 </Link>
-                <Link to="/seva" onClick={handleProfileQuickLink('/seva')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-1.5 py-1.5 text-[9px] font-bold text-brand-blue">
-                  <HandRaisedIcon className="h-4 w-4" />
+                <Link to="/seva" onClick={handleProfileQuickLink('/seva')} className="inline-flex flex-col items-center gap-0.5 rounded-xl border border-brand-blue/25 bg-white px-1.5 py-1.5 text-[9px] font-bold text-brand-blue">
+                  <HandRaisedIcon className="h-5 w-5" />
                   Seva
                 </Link>
-                <Link to="/donation" onClick={handleProfileQuickLink('/donation')} className="inline-flex flex-col items-center rounded-xl border border-brand-blue/25 bg-white px-1.5 py-1.5 text-[9px] font-bold text-brand-blue">
-                  <HeartIcon className="h-4 w-4" />
+                <Link to="/donation" onClick={handleProfileQuickLink('/donation')} className="inline-flex flex-col items-center gap-0.5 rounded-xl border border-brand-blue/25 bg-white px-1.5 py-1.5 text-[9px] font-bold text-brand-blue">
+                  <HeartIcon className="h-5 w-5" />
                   Donate
                 </Link>
                 <LangarNeedsBoard items={homeContent?.langarItems || []} triggerOnly navItem />
