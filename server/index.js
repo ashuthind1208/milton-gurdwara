@@ -6929,6 +6929,14 @@ const server = http.createServer(async (request, response) => {
         body.donorEmail = actorEmail;
         body.anonymous = Boolean(body.anonymous);
         body.status = 'pending';
+        const homeContentForQuantity = await eventsDb.getSingleton('cms_home_content', null);
+        const matchedItem = Array.isArray(homeContentForQuantity?.langarItems)
+          ? homeContentForQuantity.langarItems.find((item) => String(item?.id || '') === String(body.itemId || ''))
+          : null;
+        if (matchedItem) {
+          const remaining = Math.max(0, Number(matchedItem.quantityRequired || 0) - Number(matchedItem.quantityReceived || 0));
+          assertInput(Number(body.quantity || 0) <= remaining, `Only ${remaining} ${matchedItem.unit || 'items'} remain needed for this item.`, 400);
+        }
       }
       let validatedBody = resource === 'users'
         ? enforceUserMembershipActivity(body, body)
