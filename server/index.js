@@ -7026,6 +7026,7 @@ const server = http.createServer(async (request, response) => {
         const previousStatus = String(existingContribution?.status || 'pending').trim().toLowerCase();
         const nextStatus = String(validatedBody?.status || previousStatus).trim().toLowerCase();
         if (existingContribution && previousStatus !== nextStatus && ['received', 'pending', 'cancelled'].includes(nextStatus)) {
+          validatedBody.updatedAt = new Date().toISOString();
           const homeContent = await eventsDb.getSingleton('cms_home_content', null);
           if (homeContent && Array.isArray(homeContent.langarItems)) {
             const quantity = Number(existingContribution.quantity || 0);

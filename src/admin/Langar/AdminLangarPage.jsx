@@ -335,8 +335,8 @@ const AdminLangarPage = () => {
           </div>
           <div className="flex items-center gap-2">
             <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">{filteredCommitments.length} of {contributions.length} total</span>
-            <Button type="button" onClick={() => setReportOpen(true)} className="bg-brand-blue text-white hover:bg-blue-800">
-              <ArrowDownTrayIcon className="mr-1.5 h-4 w-4" /> Download Report
+            <Button type="button" onClick={() => setReportOpen(true)} className="rounded-full bg-brand-blue px-3.5 py-1.5 text-xs text-white hover:bg-blue-800">
+              <ArrowDownTrayIcon className="mr-1.5 h-3.5 w-3.5" /> Download Report
             </Button>
           </div>
         </div>
@@ -380,7 +380,7 @@ const AdminLangarPage = () => {
                     <td className="py-2 pr-3 text-slate-700">{entry.itemName}</td>
                     <td className="py-2 pr-3 text-slate-700">{entry.quantity} {entry.unit}</td>
                     <td className="py-2 pr-3 text-slate-700">{entry.createdAt ? formatShortDate(entry.createdAt) : '-'}</td>
-                    <td className="py-2 pr-3 text-slate-700">{entry.expectedDeliveryDate || '-'}</td>
+                    <td className="py-2 pr-3 text-slate-700">{entry.expectedDeliveryDate ? formatShortDate(entry.expectedDeliveryDate) : '-'}</td>
                     <td className="py-2 pr-3">
                       <StatusPill
                         isReceived={isReceived}
@@ -656,28 +656,28 @@ const AdminLangarPage = () => {
                   <p className="font-heading text-lg font-bold text-slate-900">Contributors</p>
                   <p className="text-xs text-slate-500">People who committed to this item.</p>
                   <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
-                    <table className="min-w-full text-left text-sm">
+                    <table className="min-w-full text-left text-xs">
                       <thead>
-                        <tr className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
-                          <th className="px-3 py-2">Name</th>
-                          <th className="px-3 py-2">Contributed</th>
-                          <th className="px-3 py-2">When</th>
-                          <th className="px-3 py-2">Status</th>
+                        <tr className="border-b border-slate-200 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
+                          <th className="px-2 py-1.5">Name</th>
+                          <th className="px-2 py-1.5">Contributed</th>
+                          <th className="px-2 py-1.5">When</th>
+                          <th className="px-2 py-1.5">Status</th>
                         </tr>
                       </thead>
                       <tbody>
                         {visibleViewContributions.map((entry) => (
                           <tr key={entry.id} className="border-b border-slate-100">
-                            <td className="px-3 py-2 font-semibold text-slate-800">{entry.anonymous ? 'Anonymous' : entry.donorName}</td>
-                            <td className="px-3 py-2 text-slate-700">{entry.quantity} {entry.unit}</td>
-                            <td className="px-3 py-2 text-slate-700">{entry.createdAt ? formatShortDate(entry.createdAt) : '-'}</td>
-                            <td className="px-3 py-2">
-                              <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${entry.status === 'received' ? 'bg-emerald-100 text-emerald-700' : entry.status === 'cancelled' ? 'bg-slate-200 text-slate-600' : 'bg-amber-100 text-amber-800'}`}>{entry.status === 'received' ? 'Received' : entry.status === 'cancelled' ? 'Cancelled' : 'Pending'}</span>
+                            <td className="whitespace-nowrap px-2 py-1 font-semibold text-slate-800">{entry.anonymous ? 'Anonymous' : entry.donorName}</td>
+                            <td className="whitespace-nowrap px-2 py-1 text-slate-700">{entry.quantity} {entry.unit}</td>
+                            <td className="whitespace-nowrap px-2 py-1 text-slate-700">{entry.createdAt ? formatShortDate(entry.createdAt) : '-'}</td>
+                            <td className="whitespace-nowrap px-2 py-1">
+                              <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${entry.status === 'received' ? 'bg-emerald-100 text-emerald-700' : entry.status === 'cancelled' ? 'bg-slate-200 text-slate-600' : 'bg-amber-100 text-amber-800'}`}>{entry.status === 'received' ? 'Received' : entry.status === 'cancelled' ? 'Cancelled' : 'Pending'}</span>
                             </td>
                           </tr>
                         ))}
                         {viewItemContributions.length === 0 ? (
-                          <tr><td className="px-3 py-4 text-center text-slate-500" colSpan={4}>No contributions yet for this item.</td></tr>
+                          <tr><td className="px-2 py-4 text-center text-slate-500" colSpan={4}>No contributions yet for this item.</td></tr>
                         ) : null}
                       </tbody>
                     </table>

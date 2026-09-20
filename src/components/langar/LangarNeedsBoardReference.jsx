@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArchiveBoxIcon, CalendarDaysIcon, ChevronRightIcon, ClockIcon, GiftIcon, MinusIcon, PlusIcon, UserIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { ArchiveBoxIcon, CalendarDaysIcon, ChevronRightIcon, GiftIcon, MinusIcon, PlusIcon, UserIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../../context/AuthContext';
 import langarService, { LANGAR_CONTRIBUTIONS_RESOURCE } from '../../services/langarService';
 import gurdwaraLogo from '../../assets/gurdwara-logo.webp';
@@ -285,8 +285,12 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
                         <p className="truncate text-sm text-brand-blue">{entry.itemName} · {entry.quantity} {entry.unit}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-[11px] font-bold text-sky-600">{formatSubmittedAt(entry.createdAt)}</p>
-                        <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${entry.status === 'received' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>{entry.status === 'received' ? 'Completed' : 'Pending'}</span>
+                        <p className="text-[10px] font-bold text-sky-600">Submitted {formatSubmittedAt(entry.createdAt)}</p>
+                        {entry.status === 'received' ? (
+                          <p className="text-[10px] font-bold text-emerald-600">Completed {formatSubmittedAt(entry.updatedAt || entry.createdAt)}</p>
+                        ) : (
+                          <span className="mt-0.5 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">Pending</span>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -325,11 +329,15 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
             </div>
 
             <form className="space-y-4 p-4 sm:p-6" onSubmit={submitContribution}>
-              <div className="flex items-center gap-3 rounded-xl border border-sky-100 bg-sky-50 p-3">
-                <img src={imageForItem(selectedItem)} alt="" className="h-12 w-12 shrink-0 rounded-lg object-cover" />
-                <div>
-                  <p className="font-bold text-slate-900">{selectedItem.name}</p>
-                  <p className="text-xs text-slate-500">{selectedItem.category} · {selectedItem.unit}</p>
+              <div className="rounded-xl border border-sky-200 bg-sky-50 p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand-blue">Contribution Summary</p>
+                <div className="mt-3 flex items-center gap-3">
+                  <img src={imageForItem(selectedItem)} alt="" className="h-14 w-14 rounded-lg object-cover" />
+                  <div>
+                    <p className="font-bold text-slate-900">{selectedItem.name} ({selectedItem.unit})</p>
+                    <p className="text-sm text-slate-600">Quantity: <strong>{quantity}</strong> {selectedItem.unit}</p>
+                    <p className="text-xs text-slate-500">Expected Delivery Date: {formatDate(deliveryDate)}</p>
+                  </div>
                 </div>
               </div>
 
@@ -362,23 +370,6 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
               </div>
 
               {notice ? <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">{notice}</p> : null}
-
-              <div className="rounded-xl border border-sky-200 bg-sky-50 p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand-blue">Contribution Summary</p>
-                <div className="mt-3 flex items-center gap-3">
-                  <img src={imageForItem(selectedItem)} alt="" className="h-14 w-14 rounded-lg object-cover" />
-                  <div>
-                    <p className="font-bold text-slate-900">{selectedItem.name} ({selectedItem.unit})</p>
-                    <p className="text-sm text-slate-600">Quantity: <strong>{quantity}</strong> {selectedItem.unit}</p>
-                    <p className="text-xs text-slate-500">Expected Delivery Date: {formatDate(deliveryDate)}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs leading-5 text-slate-600">
-                <ClockIcon className="h-5 w-5 shrink-0 text-brand-blue" />
-                <span><strong>A kind reminder</strong><br />Your contribution will be shared with the Gurdwara team and help us serve the sangat.</span>
-              </div>
 
               <button type="submit" disabled={contributionMutation.isPending} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-brand-saffron px-4 py-3 text-sm font-bold text-slate-950 hover:bg-amber-500 disabled:opacity-50">
                 <GiftIcon className="h-4 w-4" />

@@ -44,7 +44,8 @@ const normalizeContribution = (entry = {}) => ({
   anonymous: Boolean(entry.anonymous),
   expectedDeliveryDate: String(entry.expectedDeliveryDate || '').trim(),
   status: String(entry.status || 'pending').trim().toLowerCase(),
-  createdAt: String(entry.createdAt || '').trim()
+  createdAt: String(entry.createdAt || '').trim(),
+  updatedAt: String(entry.updatedAt || '').trim()
 });
 
 const normalizeItem = (entry = {}) => ({
