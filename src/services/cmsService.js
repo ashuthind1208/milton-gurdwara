@@ -487,6 +487,7 @@ const normalizeContent = (content) => {
     quantityReceived: Math.max(0, Number(item.quantityReceived ?? 0)),
     unit: item.unit || 'items',
     imageUrl: item.imageUrl || '',
+    updatedAt: item.updatedAt || '',
     displayStatusLabel: resolveLangarStatusLabel(item)
   }))
   };
@@ -673,7 +674,8 @@ const cmsService = {
       quantityRequired: Math.max(0, Number(payload.quantityRequired || 0)),
       quantityReceived: Math.max(0, Number(payload.quantityReceived || 0)),
       unit: payload.unit || 'items',
-      imageUrl: payload.imageUrl || ''
+      imageUrl: payload.imageUrl || '',
+      updatedAt: new Date().toISOString()
     };
     const nextValue = {
       ...current,
@@ -698,7 +700,7 @@ const cmsService = {
   },
   updateLangarItem: async (id, payload) => {
     const current = await readHomeContent();
-    const updatedItem = { ...(current.langarItems.find((item) => item.id === id) || {}), ...payload };
+    const updatedItem = { ...(current.langarItems.find((item) => item.id === id) || {}), ...payload, updatedAt: new Date().toISOString() };
     const nextValue = {
       ...current,
       langarItems: current.langarItems.map((item) => (

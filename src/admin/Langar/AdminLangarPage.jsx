@@ -5,6 +5,7 @@ import { useOutletContext } from 'react-router-dom';
 import {
   ArrowDownTrayIcon,
   CalendarDaysIcon,
+  CheckIcon,
   ClockIcon,
   EyeIcon,
   FunnelIcon,
@@ -27,6 +28,34 @@ const LANGAR_PAGE_SIZE = 10;
 const COMMITMENTS_PAGE_SIZE = 10;
 const VIEW_CONTRIBUTORS_PAGE_SIZE = 10;
 const LANGAR_UNIT_OPTIONS = ['items', 'kg', 'gm', 'lb', 'unit'];
+const LANGAR_CATEGORY_OPTIONS = ['Grocery', 'Dairy', 'Produce', 'Spices', 'Pantry', 'Other'];
+const CUSTOM_UNITS_STORAGE_KEY = 'ssm_langar_custom_units';
+const CUSTOM_CATEGORIES_STORAGE_KEY = 'ssm_langar_custom_categories';
+const ADD_CUSTOM_VALUE = '__add_custom_option__';
+
+const loadStoredList = (storageKey) => {
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((value) => typeof value === 'string' && value.trim()) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveStoredList = (storageKey, values) => {
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(values));
+  } catch {
+    // Ignore storage write failures.
+  }
+};
+
+const loadCustomUnits = () => loadStoredList(CUSTOM_UNITS_STORAGE_KEY);
+const saveCustomUnits = (units) => saveStoredList(CUSTOM_UNITS_STORAGE_KEY, units);
+const loadCustomCategories = () => loadStoredList(CUSTOM_CATEGORIES_STORAGE_KEY);
+const saveCustomCategories = (categories) => saveStoredList(CUSTOM_CATEGORIES_STORAGE_KEY, categories);
+
 const REPORT_PRESETS = [
   { value: 'week', label: '7 Days', days: 7 },
   { value: 'month', label: '30 Days', days: 30 },
@@ -87,6 +116,51 @@ const StatusPill = ({ isReceived, onToggle, disabled }) => (
   </button>
 );
 
+const DropdownField = ({ label, value, options, onSelectChange, onAddCustomOption, placeholder, addOptionLabel, className = 'w-32' }) => {
+  const [addingCustom, setAddingCustom] = useState(false);
+  const [draft, setDraft] = useState('');
+
+  const commitDraft = () => {
+    const trimmed = draft.trim();
+    if (!trimmed) { setAddingCustom(false); return; }
+    onAddCustomOption(trimmed);
+    setDraft('');
+    setAddingCustom(false);
+  };
+
+  return (
+    <label className={`${labelClass} ${className}`}>{label}
+      {addingCustom ? (
+        <div className="mt-1 flex gap-1">
+          <input
+            autoFocus
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); commitDraft(); } }}
+            placeholder={placeholder}
+            className={inputClass}
+          />
+          <button type="button" onClick={commitDraft} className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-blue text-white" aria-label="Save">
+            <CheckIcon className="h-4 w-4" />
+          </button>
+        </div>
+      ) : (
+        <select
+          value={value}
+          onChange={(event) => {
+            if (event.target.value === ADD_CUSTOM_VALUE) { setAddingCustom(true); return; }
+            onSelectChange(event.target.value);
+          }}
+          className={inputClass}
+        >
+          {options.map((option) => <option key={option} value={option}>{option}</option>)}
+          <option value={ADD_CUSTOM_VALUE}>{addOptionLabel}</option>
+        </select>
+      )}
+    </label>
+  );
+};
+
 const AdminLangarPage = () => {
   const { setHeaderAction } = useOutletContext();
   const queryClient = useQueryClient();
@@ -105,11 +179,43 @@ const AdminLangarPage = () => {
 
   const [reportOpen, setReportOpen] = useState(false);
   const [reportDates, setReportDates] = useState(defaultReportDates);
+  const [customUnits, setCustomUnits] = useState(loadCustomUnits);
+  const [customCategories, setCustomCategories] = useState(loadCustomCategories);
 
   const form = useForm({ defaultValues: defaultForm });
   const editForm = useForm({ defaultValues: defaultForm });
   const createName = form.watch('name');
   const editName = editForm.watch('name');
+  const createUnit = form.watch('unit');
+  const editUnit = editForm.watch('unit');
+  const createCategory = form.watch('category');
+  const editCategory = editForm.watch('category');
+  const unitOptions = useMemo(() => [...new Set([...LANGAR_UNIT_OPTIONS, ...customUnits])], [customUnits]);
+  const categoryFormOptions = useMemo(() => [...new Set([...LANGAR_CATEGORY_OPTIONS, ...customCategories])], [customCategories]);
+
+  const addCustomUnit = (unit, formToUpdate) => {
+    const trimmed = unit.trim();
+    if (!trimmed) return;
+    setCustomUnits((prev) => {
+      if (prev.includes(trimmed) || LANGAR_UNIT_OPTIONS.includes(trimmed)) return prev;
+      const next = [...prev, trimmed];
+      saveCustomUnits(next);
+      return next;
+    });
+    formToUpdate.setValue('unit', trimmed);
+  };
+
+  const addCustomCategory = (category, formToUpdate) => {
+    const trimmed = category.trim();
+    if (!trimmed) return;
+    setCustomCategories((prev) => {
+      if (prev.includes(trimmed) || LANGAR_CATEGORY_OPTIONS.includes(trimmed)) return prev;
+      const next = [...prev, trimmed];
+      saveCustomCategories(next);
+      return next;
+    });
+    formToUpdate.setValue('category', trimmed);
+  };
 
   const { data: cmsData } = useQuery({
     queryKey: ['cms-home'],
@@ -590,9 +696,16 @@ const AdminLangarPage = () => {
                 <label className={labelClass}>Item Name
                   <input {...form.register('name', { required: true })} required className={inputClass} />
                 </label>
-                <label className={labelClass}>Category
-                  <input {...form.register('category', { required: true })} required className={inputClass} />
-                </label>
+                <DropdownField
+                  label="Category"
+                  className="w-full"
+                  value={createCategory}
+                  options={categoryFormOptions}
+                  onSelectChange={(value) => form.setValue('category', value)}
+                  onAddCustomOption={(category) => addCustomCategory(category, form)}
+                  placeholder="e.g. Beverages"
+                  addOptionLabel="+ Add custom category…"
+                />
                 <div className="grid grid-cols-2 gap-3">
                   <label className={labelClass}>Added Date
                     <input type="date" {...form.register('addedOn', { required: true })} required className={inputClass} />
@@ -605,11 +718,15 @@ const AdminLangarPage = () => {
                   <label className={labelClass}>Quantity Needed
                     <input type="number" min="0" step="0.01" {...form.register('quantityRequired', { valueAsNumber: true })} className={inputClass} />
                   </label>
-                  <label className={`${labelClass} w-28`}>Unit
-                    <select {...form.register('unit')} className={inputClass}>
-                      {LANGAR_UNIT_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-                    </select>
-                  </label>
+                  <DropdownField
+                    label="Unit"
+                    value={createUnit}
+                    options={unitOptions}
+                    onSelectChange={(value) => form.setValue('unit', value)}
+                    onAddCustomOption={(unit) => addCustomUnit(unit, form)}
+                    placeholder="e.g. bags"
+                    addOptionLabel="+ Add custom unit…"
+                  />
                 </div>
                 <div className="flex gap-2 pt-2">
                   <Button type="submit" disabled={addMutation.isPending}>{addMutation.isPending ? 'Saving...' : 'Create Item'}</Button>
@@ -640,47 +757,45 @@ const AdminLangarPage = () => {
                       <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${viewItem.needed ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-700'}`}>{resolveStatusPreview(viewItem)}</span>
                     </div>
                   </div>
-                  <div className="mt-4 overflow-hidden rounded-xl border border-slate-200">
-                    <table className="min-w-full text-left text-sm">
-                      <tbody>
-                        <tr className="border-b border-slate-200 bg-white"><td className="px-3 py-2 font-semibold text-brand-blue">Category</td><td className="px-3 py-2 text-slate-800">{viewItem.category || '-'}</td></tr>
-                        <tr className="border-b border-slate-200 bg-slate-50"><td className="px-3 py-2 font-semibold text-brand-blue">Added On</td><td className="px-3 py-2 text-slate-800">{viewItem.addedOn || '-'}</td></tr>
-                        <tr className="border-b border-slate-200 bg-white"><td className="px-3 py-2 font-semibold text-brand-blue">Expiry</td><td className="px-3 py-2 text-slate-800">{viewItem.expiryDate || '-'}</td></tr>
-                        <tr className="border-b border-slate-200 bg-slate-50"><td className="px-3 py-2 font-semibold text-brand-blue">Quantity</td><td className="px-3 py-2 text-slate-800">{Number(viewItem.quantityReceived || 0)} / {Number(viewItem.quantityRequired || 0)} {viewItem.unit || 'items'}</td></tr>
-                        <tr className="bg-white"><td className="px-3 py-2 font-semibold text-brand-blue">Status</td><td className="px-3 py-2 font-bold text-brand-saffron">{resolveStatusPreview(viewItem)}</td></tr>
-                      </tbody>
-                    </table>
+                  <div className="mt-4 space-y-2">
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2">
+                      <span className="shrink-0 text-xs font-bold uppercase tracking-wide text-brand-blue">Category</span>
+                      <span className="truncate text-sm text-slate-800">{viewItem.category || '-'}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2">
+                      <span className="shrink-0 text-xs font-bold uppercase tracking-wide text-brand-blue">Added On</span>
+                      <span className="truncate text-sm text-slate-800">{viewItem.addedOn || '-'}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2">
+                      <span className="shrink-0 text-xs font-bold uppercase tracking-wide text-brand-blue">Expiry</span>
+                      <span className="truncate text-sm text-slate-800">{viewItem.expiryDate || '-'}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2">
+                      <span className="shrink-0 text-xs font-bold uppercase tracking-wide text-brand-blue">Quantity</span>
+                      <span className="truncate text-sm text-slate-800">{Number(viewItem.quantityReceived || 0)} / {Number(viewItem.quantityRequired || 0)} {viewItem.unit || 'items'}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2">
+                      <span className="shrink-0 text-xs font-bold uppercase tracking-wide text-brand-blue">Status</span>
+                      <span className="truncate text-sm font-bold text-brand-saffron">{resolveStatusPreview(viewItem)}</span>
+                    </div>
                   </div>
                 </div>
                 <div>
                   <p className="font-heading text-lg font-bold text-slate-900">Contributors</p>
                   <p className="text-xs text-slate-500">People who committed to this item.</p>
-                  <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
-                    <table className="min-w-full text-left text-xs">
-                      <thead>
-                        <tr className="border-b border-slate-200 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
-                          <th className="px-2 py-1.5">Name</th>
-                          <th className="px-2 py-1.5">Contributed</th>
-                          <th className="px-2 py-1.5">When</th>
-                          <th className="px-2 py-1.5">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {visibleViewContributions.map((entry) => (
-                          <tr key={entry.id} className="border-b border-slate-100">
-                            <td className="whitespace-nowrap px-2 py-1 font-semibold text-slate-800">{entry.anonymous ? 'Anonymous' : entry.donorName}</td>
-                            <td className="whitespace-nowrap px-2 py-1 text-slate-700">{entry.quantity} {entry.unit}</td>
-                            <td className="whitespace-nowrap px-2 py-1 text-slate-700">{entry.createdAt ? formatShortDate(entry.createdAt) : '-'}</td>
-                            <td className="whitespace-nowrap px-2 py-1">
-                              <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${entry.status === 'received' ? 'bg-emerald-100 text-emerald-700' : entry.status === 'cancelled' ? 'bg-slate-200 text-slate-600' : 'bg-amber-100 text-amber-800'}`}>{entry.status === 'received' ? 'Received' : entry.status === 'cancelled' ? 'Cancelled' : 'Pending'}</span>
-                            </td>
-                          </tr>
-                        ))}
-                        {viewItemContributions.length === 0 ? (
-                          <tr><td className="px-2 py-4 text-center text-slate-500" colSpan={4}>No contributions yet for this item.</td></tr>
-                        ) : null}
-                      </tbody>
-                    </table>
+                  <div className="mt-3 border-t border-slate-200 pt-3 space-y-2">
+                    {visibleViewContributions.map((entry) => (
+                      <div key={entry.id} className="flex items-center justify-between gap-2 border-b border-slate-100 py-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-slate-800">{entry.anonymous ? 'Anonymous' : entry.donorName}</p>
+                          <p className="truncate text-xs text-slate-500">{entry.quantity} {entry.unit} · {entry.createdAt ? formatShortDate(entry.createdAt) : '-'}</p>
+                        </div>
+                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${entry.status === 'received' ? 'bg-emerald-100 text-emerald-700' : entry.status === 'cancelled' ? 'bg-slate-200 text-slate-600' : 'bg-amber-100 text-amber-800'}`}>{entry.status === 'received' ? 'Received' : entry.status === 'cancelled' ? 'Cancelled' : 'Pending'}</span>
+                      </div>
+                    ))}
+                    {viewItemContributions.length === 0 ? (
+                      <p className="py-4 text-center text-sm text-slate-500">No contributions yet for this item.</p>
+                    ) : null}
                   </div>
                   {viewItemContributions.length > 0 ? (
                     <div className="mt-3 flex items-center justify-between gap-2">
@@ -714,9 +829,16 @@ const AdminLangarPage = () => {
                 <label className={labelClass}>Item Name
                   <input {...editForm.register('name', { required: true })} required className={inputClass} />
                 </label>
-                <label className={labelClass}>Category
-                  <input {...editForm.register('category', { required: true })} required className={inputClass} />
-                </label>
+                <DropdownField
+                  label="Category"
+                  className="w-full"
+                  value={editCategory}
+                  options={categoryFormOptions}
+                  onSelectChange={(value) => editForm.setValue('category', value)}
+                  onAddCustomOption={(category) => addCustomCategory(category, editForm)}
+                  placeholder="e.g. Beverages"
+                  addOptionLabel="+ Add custom category…"
+                />
                 <div className="grid grid-cols-2 gap-3">
                   <label className={labelClass}>Added Date
                     <input type="date" {...editForm.register('addedOn', { required: true })} required className={inputClass} />
@@ -729,11 +851,15 @@ const AdminLangarPage = () => {
                   <label className={labelClass}>Quantity Needed
                     <input type="number" min="0" step="0.01" {...editForm.register('quantityRequired', { valueAsNumber: true })} className={inputClass} />
                   </label>
-                  <label className={`${labelClass} w-28`}>Unit
-                    <select {...editForm.register('unit')} className={inputClass}>
-                      {LANGAR_UNIT_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-                    </select>
-                  </label>
+                  <DropdownField
+                    label="Unit"
+                    value={editUnit}
+                    options={unitOptions}
+                    onSelectChange={(value) => editForm.setValue('unit', value)}
+                    onAddCustomOption={(unit) => addCustomUnit(unit, editForm)}
+                    placeholder="e.g. bags"
+                    addOptionLabel="+ Add custom unit…"
+                  />
                 </div>
                 <label className={labelClass}>Quantity Received <span className="font-normal normal-case text-slate-400">(updates automatically as commitments are marked received)</span>
                   <input type="number" readOnly disabled {...editForm.register('quantityReceived', { valueAsNumber: true })} className={`${inputClass} cursor-not-allowed bg-slate-100 text-slate-500`} />

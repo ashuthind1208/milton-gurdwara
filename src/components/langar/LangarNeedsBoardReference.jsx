@@ -86,6 +86,13 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
     return { received, progress: required ? Math.min(100, Math.round(received / required * 100)) : 0, contributors, receivedThisWeek };
   }, [activeItems, contributions]);
 
+  const lastUpdatedAt = useMemo(() => {
+    const timestamps = activeItems.map((item) => new Date(item.updatedAt || 0).getTime()).filter((value) => Number.isFinite(value) && value > 0);
+    if (timestamps.length === 0) return '';
+    return new Date(Math.max(...timestamps)).toISOString();
+  }, [activeItems]);
+  const lastUpdatedLabel = lastUpdatedAt ? formatSubmittedAt(lastUpdatedAt) : 'Not available yet';
+
   const pendingByItem = useMemo(() => contributions.reduce((result, entry) => {
     if (String(entry.status || 'pending').toLowerCase() !== 'pending') return result;
     const itemId = String(entry.itemId || '');
@@ -140,6 +147,8 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
             <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-100">Langar needs board</p>
             <h3 className="mt-1 font-heading text-3xl font-bold leading-tight">Help stock the kitchen</h3>
             <p className="mt-2 text-sm text-blue-100">Only supplies currently requested by the Langar team are shown here.</p>
+            <hr className="mt-3 border-t border-white/20" />
+            <p className="mt-2 pt-1 text-[11px] font-semibold text-amber-200">Last updated {lastUpdatedLabel}</p>
           </div>
           <ArchiveBoxIcon className="h-12 w-12 shrink-0 rounded-xl bg-white/15 p-2.5" />
         </div>
@@ -203,8 +212,10 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
                   <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-amber-300">Langar needs board</p>
                   <h2 className="mt-1 max-w-xl font-heading text-3xl font-bold leading-tight sm:text-4xl">Help stock the kitchen</h2>
                   <p className="mt-2 max-w-md text-sm leading-5 text-blue-100">Support the Langar by bringing supplies or contributing to the items below.</p>
+                  <hr className="mt-3 border-t border-white/20" />
+                  <p className="mt-2 pt-1 text-xs font-semibold text-amber-200">Last updated {lastUpdatedLabel}</p>
                 </div>
-                <button type="button" onClick={() => setBoardOpen(false)} className="rounded-full border border-white/60 bg-slate-900/60 p-2 text-white shadow-lg backdrop-blur-sm hover:bg-slate-900/80" aria-label="Close Langar needs board">
+                <button type="button" onClick={() => setBoardOpen(false)} className="rounded-full border border-brand-saffron bg-brand-saffron p-2 text-slate-950 shadow-lg hover:bg-amber-400" aria-label="Close Langar needs board">
                   <XMarkIcon className="h-5 w-5" />
                 </button>
               </div>
@@ -250,7 +261,7 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
                         <img src={imageForItem(item)} alt="" className="mt-1 h-12 w-12 shrink-0 rounded-lg object-cover sm:mt-0" />
                         <div className="min-w-0 flex-1 sm:min-w-[8rem] sm:flex-none">
                           <h4 className="text-lg font-black leading-tight text-slate-900 sm:text-xl">{item.name}</h4>
-                          <p className="truncate text-xs text-slate-500">{item.category} · {item.unit}</p>
+                          <p className="truncate text-xs text-slate-500">{item.category} · {required} {item.unit} needed</p>
                         </div>
                         <div className="mt-1 flex w-20 shrink-0 items-center gap-1 sm:mt-0 sm:w-auto sm:flex-1 sm:gap-2">
                           <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100">

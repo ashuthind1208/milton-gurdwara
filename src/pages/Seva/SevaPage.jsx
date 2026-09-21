@@ -600,7 +600,7 @@ const SevaPage = () => {
           ) : null}
         </div>
 
-        <aside className="space-y-2">
+        <aside className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-1 xl:content-start">
           <Card className="mx-auto w-full max-w-[150px] border border-brand-blue/20 bg-gradient-to-br from-blue-50 to-white p-2">
             <p className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-brand-blue"><UserGroupIcon className="h-3.5 w-3.5" /> Today</p>
             <p className="mt-1 text-xl font-black text-slate-900">{sevaKpis.totalToday}</p>
