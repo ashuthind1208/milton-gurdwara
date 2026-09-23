@@ -32,6 +32,7 @@ const LANGAR_UNIT_OPTIONS = ['items', 'kg', 'gm', 'lb', 'unit'];
 const LANGAR_CATEGORY_OPTIONS = ['Grocery', 'Dairy', 'Produce', 'Spices', 'Pantry', 'Other'];
 const CUSTOM_UNITS_STORAGE_KEY = 'ssm_langar_custom_units';
 const CUSTOM_CATEGORIES_STORAGE_KEY = 'ssm_langar_custom_categories';
+const CUSTOM_BRANDS_STORAGE_KEY = 'ssm_langar_custom_brands';
 const ADD_CUSTOM_VALUE = '__add_custom_option__';
 
 const loadStoredList = (storageKey) => {
@@ -56,6 +57,8 @@ const loadCustomUnits = () => loadStoredList(CUSTOM_UNITS_STORAGE_KEY);
 const saveCustomUnits = (units) => saveStoredList(CUSTOM_UNITS_STORAGE_KEY, units);
 const loadCustomCategories = () => loadStoredList(CUSTOM_CATEGORIES_STORAGE_KEY);
 const saveCustomCategories = (categories) => saveStoredList(CUSTOM_CATEGORIES_STORAGE_KEY, categories);
+const loadCustomBrands = () => loadStoredList(CUSTOM_BRANDS_STORAGE_KEY);
+const saveCustomBrands = (brands) => saveStoredList(CUSTOM_BRANDS_STORAGE_KEY, brands);
 
 const REPORT_PRESETS = [
   { value: 'week', label: '7 Days', days: 7 },
@@ -73,6 +76,7 @@ const defaultReportDates = () => {
 const defaultForm = {
   name: '',
   category: 'Grocery',
+  brand: '',
   addedOn: new Date().toISOString().slice(0, 10),
   expiryDate: '',
   quantityRequired: 0,
@@ -95,6 +99,7 @@ const buildLangarPayload = (values) => {
     needed,
     stockStatus: needed ? 'required_soon' : 'stock_available',
     customStatusLabel: '',
+    brand: String(values.brand || '').trim(),
     quantityRequired,
     quantityReceived,
     unit: String(values.unit || 'items').trim() || 'items',
@@ -185,6 +190,7 @@ const AdminLangarPage = () => {
   const [reportPage, setReportPage] = useState(1);
   const [customUnits, setCustomUnits] = useState(loadCustomUnits);
   const [customCategories, setCustomCategories] = useState(loadCustomCategories);
+  const [customBrands, setCustomBrands] = useState(loadCustomBrands);
 
   const form = useForm({ defaultValues: defaultForm });
   const editForm = useForm({ defaultValues: defaultForm });
@@ -194,6 +200,8 @@ const AdminLangarPage = () => {
   const editUnit = editForm.watch('unit');
   const createCategory = form.watch('category');
   const editCategory = editForm.watch('category');
+  const createBrand = form.watch('brand');
+  const editBrand = editForm.watch('brand');
   const createImageUrl = form.watch('imageUrl');
   const editImageUrl = editForm.watch('imageUrl');
   const [createImageLookupPending, setCreateImageLookupPending] = useState(false);
@@ -210,13 +218,13 @@ const AdminLangarPage = () => {
       const imageOptions = await searchGroceryImages(trimmed);
       const options = [...new Set(imageOptions.filter(Boolean))].slice(0, 10);
       setOptions(options);
-      formToUpdate.setValue('imageUrl', options[0] || resolveGroceryImage(trimmed), { shouldDirty: true });
     } finally {
       setPending(false);
     }
   };
   const unitOptions = useMemo(() => [...new Set([...LANGAR_UNIT_OPTIONS, ...customUnits])], [customUnits]);
   const categoryFormOptions = useMemo(() => [...new Set([...LANGAR_CATEGORY_OPTIONS, ...customCategories])], [customCategories]);
+  const brandFormOptions = useMemo(() => [...new Set(['Any brand', ...customBrands])], [customBrands]);
 
   const addCustomUnit = (unit, formToUpdate) => {
     const trimmed = unit.trim();
@@ -240,6 +248,18 @@ const AdminLangarPage = () => {
       return next;
     });
     formToUpdate.setValue('category', trimmed);
+  };
+
+  const addCustomBrand = (brand, formToUpdate) => {
+    const trimmed = brand.trim();
+    if (!trimmed) return;
+    setCustomBrands((prev) => {
+      if (prev.includes(trimmed)) return prev;
+      const next = [...prev, trimmed];
+      saveCustomBrands(next);
+      return next;
+    });
+    formToUpdate.setValue('brand', trimmed);
   };
 
   const { data: cmsData } = useQuery({
@@ -393,6 +413,7 @@ const AdminLangarPage = () => {
     editForm.reset({
       name: item.name,
       category: item.category || 'Grocery',
+      brand: item.brand || '',
       addedOn: item.addedOn || '',
       expiryDate: item.expiryDate || '',
       quantityRequired: item.quantityRequired || 0,
@@ -523,16 +544,14 @@ const AdminLangarPage = () => {
 
         <div className="mt-4 overflow-x-auto">
           {filteredCommitments.length > 0 ? (
-            <table className="min-w-full text-left text-sm">
+            <table className="langar-commitments-table min-w-full text-left text-sm">
               <thead>
               <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
                 <th className="py-2 pr-3">Name</th>
                 <th className="py-2 pr-3">Contributed For</th>
                 <th className="py-2 pr-3">Quantity</th>
-                <th className="py-2 pr-3">Created</th>
-                <th className="py-2 pr-3">Expected Date</th>
+                <th className="py-2 pr-3">Dates</th>
                 <th className="py-2 pr-3">Status</th>
-                <th className="py-2 pr-3">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -542,27 +561,33 @@ const AdminLangarPage = () => {
                   <tr key={entry.id} className="border-b border-slate-100">
                     <td className="py-2 pr-3 font-semibold text-slate-800">{entry.anonymous ? 'Anonymous' : entry.donorName}</td>
                     <td className="py-2 pr-3 text-slate-700">{entry.itemName}</td>
-                    <td className="py-2 pr-3 text-slate-700">{entry.quantity} {entry.unit}</td>
-                    <td className="py-2 pr-3 text-slate-700">{entry.createdAt ? formatShortDate(entry.createdAt) : '-'}</td>
-                    <td className="py-2 pr-3 text-slate-700">{entry.expectedDeliveryDate ? formatShortDate(entry.expectedDeliveryDate) : '-'}</td>
+                    <td className="py-2 pr-3 font-bold text-slate-800">{entry.quantity} {entry.unit}</td>
                     <td className="py-2 pr-3">
-                      <StatusPill
-                        isReceived={isReceived}
-                        disabled={contributionStatusMutation.isPending}
-                        onToggle={() => contributionStatusMutation.mutate({ id: entry.id, status: isReceived ? 'pending' : 'received' })}
-                      />
+                      <div className="mb-3 flex flex-wrap gap-1 pt-2">
+                        <span className={`${datePillClass} bg-violet-100 text-violet-800`}>Committed {entry.createdAt ? formatShortDate(entry.createdAt) : '-'}</span>
+                        {entry.expectedDeliveryDate ? <span className={`${datePillClass} bg-amber-100 text-amber-800`}>Expected {formatShortDate(entry.expectedDeliveryDate)}</span> : null}
+                        {isReceived && entry.updatedAt ? <span className={`${datePillClass} bg-emerald-100 text-emerald-800`}>Received {formatShortDate(entry.updatedAt)}</span> : null}
+                      </div>
                     </td>
-                    <td className="py-2 pr-3">
-                      <button
-                        type="button"
-                        onClick={() => { if (window.confirm('Delete this Langar commitment?')) contributionDeleteMutation.mutate(entry.id); }}
-                        disabled={contributionDeleteMutation.isPending}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-50"
-                        title="Delete commitment"
-                        aria-label="Delete commitment"
-                      >
-                        <TrashIcon className={actionIconClass} />
-                      </button>
+                    <td className="border-t border-slate-200 py-2 pr-3">
+                      <div className="flex flex-nowrap items-center gap-2">
+                        <StatusPill
+                          isReceived={isReceived}
+                          disabled={contributionStatusMutation.isPending}
+                          onToggle={() => contributionStatusMutation.mutate({ id: entry.id, status: isReceived ? 'pending' : 'received' })}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => { if (window.confirm('Delete this Langar commitment?')) contributionDeleteMutation.mutate(entry.id); }}
+                          disabled={contributionDeleteMutation.isPending}
+                          className="inline-flex h-8 items-center justify-center gap-1 rounded-full border border-red-200 bg-red-50 px-3 text-xs font-bold text-red-700 hover:bg-red-100 hover:text-red-900 disabled:opacity-50"
+                          title="Delete commitment"
+                          aria-label="Delete commitment"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -647,7 +672,7 @@ const AdminLangarPage = () => {
                         <p className="text-[12px] leading-snug text-slate-600">{item.category || 'Grocery'}</p>
                         <div className="flex max-w-full flex-wrap gap-1">
                           <span className={`${datePillClass} bg-sky-100 text-sky-800`}>Added {item.addedOn || '-'}</span>
-                          <span className={`${datePillClass} bg-amber-100 text-amber-800`}>Expiry {item.expiryDate || '-'}</span>
+                          {item.expiryDate ? <span className={`${datePillClass} bg-amber-100 text-amber-800`}>Expiry {item.expiryDate}</span> : null}
                         </div>
                         <div className="pt-0.5">
                           <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${item.needed ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-700'}`}>
@@ -775,6 +800,16 @@ const AdminLangarPage = () => {
                   placeholder="e.g. Beverages"
                   addOptionLabel="+ Add custom category…"
                 />
+                <DropdownField
+                  label="Brand"
+                  className="w-full"
+                  value={createBrand || 'Any brand'}
+                  options={brandFormOptions}
+                  onSelectChange={(value) => form.setValue('brand', value === 'Any brand' ? '' : value)}
+                  onAddCustomOption={(brand) => addCustomBrand(brand, form)}
+                  placeholder="e.g. Nestlé"
+                  addOptionLabel="+ Add custom brand…"
+                />
                 <div className="grid grid-cols-2 gap-3">
                   <label className={labelClass}>Added Date
                     <input type="date" {...form.register('addedOn', { required: true })} required className={inputClass} />
@@ -833,7 +868,7 @@ const AdminLangarPage = () => {
                     </div>
                     <div className="flex flex-wrap gap-1 rounded-xl border border-slate-200 px-3 py-2">
                       <span className={`${datePillClass} bg-sky-100 text-sky-800`}>Added {viewItem.addedOn || '-'}</span>
-                      <span className={`${datePillClass} bg-amber-100 text-amber-800`}>Expiry {viewItem.expiryDate || '-'}</span>
+                      {viewItem.expiryDate ? <span className={`${datePillClass} bg-amber-100 text-amber-800`}>Expiry {viewItem.expiryDate}</span> : null}
                     </div>
                     <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2">
                       <span className="shrink-0 text-xs font-bold uppercase tracking-wide text-brand-blue">Quantity</span>
@@ -853,7 +888,8 @@ const AdminLangarPage = () => {
                       <div key={entry.id} className="flex items-center justify-between gap-2 border-b border-slate-100 py-2">
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-slate-800">{entry.anonymous ? 'Anonymous' : entry.donorName}</p>
-                          <p className="truncate text-xs text-slate-500">{entry.quantity} {entry.unit} · {entry.createdAt ? formatShortDate(entry.createdAt) : '-'}</p>
+                          <p className="truncate text-xs text-slate-500">{entry.quantity} {entry.unit}</p>
+                          <div className="mt-1 flex flex-wrap gap-1"><span className={`${datePillClass} bg-violet-100 text-violet-800`}>Committed {entry.createdAt ? formatShortDate(entry.createdAt) : '-'}</span><span className={`${datePillClass} bg-emerald-100 text-emerald-800`}>Received {entry.updatedAt ? formatShortDate(entry.updatedAt) : '-'}</span></div>
                         </div>
                         <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${entry.status === 'received' ? 'bg-emerald-100 text-emerald-700' : entry.status === 'cancelled' ? 'bg-slate-200 text-slate-600' : 'bg-amber-100 text-amber-800'}`}>{entry.status === 'received' ? 'Received' : entry.status === 'cancelled' ? 'Cancelled' : 'Pending'}</span>
                       </div>
@@ -914,6 +950,16 @@ const AdminLangarPage = () => {
                   onAddCustomOption={(category) => addCustomCategory(category, editForm)}
                   placeholder="e.g. Beverages"
                   addOptionLabel="+ Add custom category…"
+                />
+                <DropdownField
+                  label="Brand"
+                  className="w-full"
+                  value={editBrand || 'Any brand'}
+                  options={brandFormOptions}
+                  onSelectChange={(value) => editForm.setValue('brand', value === 'Any brand' ? '' : value)}
+                  onAddCustomOption={(brand) => addCustomBrand(brand, editForm)}
+                  placeholder="e.g. Nestlé"
+                  addOptionLabel="+ Add custom brand…"
                 />
                 <div className="grid grid-cols-2 gap-3">
                   <label className={labelClass}>Added Date

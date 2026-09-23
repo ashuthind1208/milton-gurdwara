@@ -61,6 +61,7 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
   const [boardOpen, setBoardOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [quantity, setQuantity] = useState(1);
+  const [quantityDraft, setQuantityDraft] = useState('1');
   const [deliveryDate, setDeliveryDate] = useState('');
   const [anonymous, setAnonymous] = useState(false);
   const [notice, setNotice] = useState('');
@@ -115,6 +116,7 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
       queryClient.invalidateQueries({ queryKey: [LANGAR_CONTRIBUTIONS_RESOURCE] });
       setSelectedItem(null);
       setQuantity(1);
+      setQuantityDraft('1');
       setDeliveryDate('');
       setAnonymous(false);
     },
@@ -122,7 +124,7 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
   });
 
   const openBoard = () => { setBoardOpen(true); onOpen?.(); };
-  const openContribution = (item) => { setSelectedItem(item); setQuantity(1); setNotice(''); };
+  const openContribution = (item) => { setSelectedItem(item); setQuantity(1); setQuantityDraft('1'); setNotice(''); };
 
   useEffect(() => {
     if (!isAuthenticated || activeItems.length === 0) return;
@@ -169,7 +171,15 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
   };
 
   const adjustQuantity = (delta) => {
-    setQuantity((current) => Math.min(remainingForSelected, Math.max(1, current + delta)));
+    const nextQuantity = Math.min(remainingForSelected, Math.max(1, quantity + delta));
+    setQuantity(nextQuantity);
+    setQuantityDraft(String(nextQuantity));
+  };
+
+  const setContributionQuantity = (value) => {
+    const nextQuantity = Math.min(remainingForSelected, Math.max(1, Number(value) || 1));
+    setQuantity(nextQuantity);
+    setQuantityDraft(String(nextQuantity));
   };
 
   const submitContribution = (event) => {
@@ -350,8 +360,8 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
                     <div key={entry.id} className="flex items-center gap-3 border-b border-sky-100 py-2">
                       <img src={avatarFor(entry)} alt="" className="h-10 w-10 rounded-full object-cover" />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-base font-bold text-slate-800">{entry.anonymous ? 'Anonymous' : entry.donorName}</p>
-                        <p className="truncate text-sm text-brand-blue">{entry.itemName} · {entry.quantity} {entry.unit}</p>
+                        <p className="truncate text-sm font-bold text-slate-800">{entry.anonymous ? 'Anonymous' : entry.donorName}</p>
+                        <p className="truncate text-xs text-brand-blue">{entry.itemName} · {entry.quantity} {entry.unit}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-[10px] font-bold text-sky-600">Submitted {formatSubmittedAt(entry.createdAt)}</p>
@@ -412,11 +422,18 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
 
               <div>
                 <p className="text-sm font-semibold text-slate-700">Quantity</p>
-                <div className="mt-1 flex items-center gap-3">
+                <div className="mt-1 flex items-center gap-2">
                   <button type="button" onClick={() => adjustQuantity(-1)} disabled={quantity <= 1} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-300 text-slate-700 disabled:opacity-40"><MinusIcon className="h-4 w-4" /></button>
-                  <span className="flex-1 rounded-lg border border-slate-300 px-3 py-2.5 text-center text-lg font-black text-brand-blue">{quantity}</span>
+                  <div className="relative min-w-0 flex-1">
+                    <input type="number" min="1" max={remainingForSelected} value={quantityDraft} onChange={(event) => setQuantityDraft(event.target.value)} onBlur={(event) => setContributionQuantity(event.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 pr-14 text-center text-lg font-black text-brand-blue outline-none focus:border-brand-blue" aria-label="Contribution quantity" />
+                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-bold text-slate-500">{selectedItem.unit}</span>
+                  </div>
                   <button type="button" onClick={() => adjustQuantity(1)} disabled={quantity >= remainingForSelected} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-300 text-slate-700 disabled:opacity-40"><PlusIcon className="h-4 w-4" /></button>
-                  <span className="shrink-0 text-sm font-semibold text-slate-500">{selectedItem.unit}</span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {[20, 40, 60].filter((suggestion) => suggestion <= remainingForSelected).map((suggestion) => (
+                    <button key={suggestion} type="button" onClick={() => setContributionQuantity(suggestion)} className="rounded-full border border-brand-blue/25 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-brand-blue hover:bg-blue-100">{suggestion} {selectedItem.unit}</button>
+                  ))}
                 </div>
                 <p className="mt-1 text-[11px] text-slate-500">Up to {remainingForSelected} {selectedItem.unit} still needed for this item.</p>
               </div>

@@ -525,6 +525,33 @@
     text-align: left !important;
   }
 
+  .admin-main-content table.langar-commitments-table tbody tr td:last-child {
+    grid-column: 1;
+    grid-row: auto;
+    display: block;
+    justify-self: stretch;
+    width: 100%;
+    padding-top: 8px;
+    border-top: 1px solid #e2e8f0;
+  }
+
+  .admin-main-content table.langar-commitments-table tbody tr td:last-child > div {
+    align-items: center !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    justify-content: flex-start !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  .admin-main-content table.langar-commitments-table tbody tr td:last-child > div > button {
+    width: auto !important;
+    min-width: 32px !important;
+    height: 32px !important;
+    padding: 0 8px !important;
+    flex: 0 0 auto !important;
+  }
+
   .admin-langar-mobile-hidden {
     display: none !important;
   }

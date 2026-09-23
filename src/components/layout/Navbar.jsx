@@ -22,6 +22,7 @@ import {
   PhoneIcon,
   FilmIcon,
   UserCircleIcon,
+  ArrowLeftOnRectangleIcon,
   ArrowRightOnRectangleIcon,
   HeartIcon,
   SparklesIcon
@@ -3028,7 +3029,17 @@ const Navbar = () => {
                   }}
                 />
               </button>
-            ) : null}
+            ) : (
+              <Link
+                to="/login"
+                onClick={handleSignInClick}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-brand-saffron bg-white text-brand-blue shadow-[0_4px_10px_rgba(15,23,42,0.35)]"
+                aria-label="Sign in"
+                title="Sign in"
+              >
+                <ArrowLeftOnRectangleIcon className="h-5 w-5 stroke-[2.5]" />
+              </Link>
+            )}
             <button
               type="button"
               onClick={() => {
@@ -3735,18 +3746,6 @@ const Navbar = () => {
                 className="rounded-xl border border-brand-saffron bg-brand-saffron px-3 py-2 text-center text-sm font-extrabold text-brand-navy shadow-[0_8px_18px_rgba(245,166,35,0.35)]"
               >
                 Become Member
-              </Link>
-            ) : null}
-            {!isAuthenticated ? (
-              <Link
-              to={isAuthenticated ? resolveLandingPathByRole(user?.role) : '/login'}
-              onClick={(event) => {
-                handleSignInClick(event);
-                setOpen(false);
-              }}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-blue bg-brand-blue px-3 py-2 text-center text-sm font-extrabold text-white shadow-[0_8px_18px_rgba(10,77,159,0.34)]"
-            >
-              Sign In
               </Link>
             ) : null}
           </div>
