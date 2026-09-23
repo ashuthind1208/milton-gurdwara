@@ -3033,11 +3033,12 @@ const Navbar = () => {
               <Link
                 to="/login"
                 onClick={handleSignInClick}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-brand-saffron bg-white text-brand-blue shadow-[0_4px_10px_rgba(15,23,42,0.35)]"
+                className="inline-flex h-7 min-w-[4.25rem] items-center justify-center gap-1 rounded-full border border-brand-saffron bg-brand-saffron px-2.5 py-1 text-[10px] font-extrabold text-brand-blue shadow-[0_6px_14px_rgba(15,23,42,0.3)]"
                 aria-label="Sign in"
                 title="Sign in"
               >
-                <ArrowLeftOnRectangleIcon className="h-5 w-5 stroke-[2.5]" />
+                <ArrowLeftOnRectangleIcon className="h-3.5 w-3.5 stroke-[2.5]" />
+                <span>Sign In</span>
               </Link>
             )}
             <button

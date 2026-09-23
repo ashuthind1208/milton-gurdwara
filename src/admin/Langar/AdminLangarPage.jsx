@@ -654,6 +654,7 @@ const AdminLangarPage = () => {
               <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
                 <th className="py-2 pr-3">Item</th>
                 <th className="py-2 pr-3">Category</th>
+                <th className="py-2 pr-3">Brand</th>
                 <th className="py-2 pr-3">Added</th>
                 <th className="py-2 pr-3">Expiry</th>
                 <th className="py-2 pr-3">Received</th>
@@ -670,6 +671,7 @@ const AdminLangarPage = () => {
                       <div className="space-y-1.5 lg:hidden">
                         <p className="text-sm font-bold leading-tight text-slate-800">{item.name || '-'}</p>
                         <p className="text-[12px] leading-snug text-slate-600">{item.category || 'Grocery'}</p>
+                        {item.brand ? <p className="text-[12px] leading-snug text-slate-600">{item.brand}</p> : null}
                         <div className="flex max-w-full flex-wrap gap-1">
                           <span className={`${datePillClass} bg-sky-100 text-sky-800`}>Added {item.addedOn || '-'}</span>
                           {item.expiryDate ? <span className={`${datePillClass} bg-amber-100 text-amber-800`}>Expiry {item.expiryDate}</span> : null}
@@ -684,6 +686,7 @@ const AdminLangarPage = () => {
                     </div>
                   </td>
                   <td className="admin-langar-mobile-hidden py-2 pr-3">{item.category || 'Grocery'}</td>
+                  <td className="admin-langar-mobile-hidden py-2 pr-3">{item.brand || '-'}</td>
                   <td className="admin-langar-mobile-hidden py-2 pr-3">{item.addedOn || '-'}</td>
                   <td className="admin-langar-mobile-hidden py-2 pr-3">{item.expiryDate || '-'}</td>
                   <td className="admin-langar-mobile-hidden py-2 pr-3">
@@ -729,7 +732,7 @@ const AdminLangarPage = () => {
               ))}
               {filteredItems.length === 0 ? (
                 <tr>
-                  <td className="py-4 text-center text-slate-500" colSpan={7}>No seva items found.</td>
+                  <td className="py-4 text-center text-slate-500" colSpan={8}>No seva items found.</td>
                 </tr>
               ) : null}
             </tbody>

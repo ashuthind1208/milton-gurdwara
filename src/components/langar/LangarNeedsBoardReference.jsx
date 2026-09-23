@@ -25,13 +25,6 @@ const LANGAR_REOPEN_ITEM_KEY = 'ssm_langar_reopen_item_id';
 const imageForItem = (item) => item.imageUrl || Object.entries(fallbackImages).find(([key]) => String(item.name || '').toLowerCase().includes(key))?.[1] || gurdwaraLogo;
 const avatarFor = (entry) => entry.anonymous ? ANONYMOUS_AVATAR : (entry.donorAvatarUrl || `https://ui-avatars.com/api/?background=0f3b75&color=fff&bold=true&name=${encodeURIComponent(entry.donorName || 'Member')}`);
 const formatDate = (value) => value ? new Date(`${value}T12:00:00`).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }) : 'Select date';
-const getStatus = (progress, complete = progress >= 100) => {
-  if (progress >= 100 && complete) return { label: 'Complete', pill: 'bg-emerald-200 text-emerald-800', bar: 'bg-emerald-500' };
-  if (progress >= 60) return { label: 'On Track', pill: 'bg-emerald-100 text-emerald-700', bar: 'bg-emerald-500' };
-  if (progress > 0) return { label: 'Partial', pill: 'bg-amber-100 text-amber-800', bar: 'bg-amber-400' };
-  return { label: 'Urgent', pill: 'bg-rose-100 text-rose-700', bar: 'bg-rose-500' };
-};
-
 const formatSubmittedAt = (value) => {
   if (!value) return 'Recent';
   const submitted = new Date(value);
@@ -313,7 +306,6 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
                     const required = Number(item.quantityRequired || 0);
                     const received = Number(item.quantityReceived || 0);
                     const receivedProgress = required ? Math.min(100, Math.round((received / required) * 100)) : 0;
-                    const status = getStatus(receivedProgress);
                     const isFullyDone = required > 0 && remainingForItem(item) <= 0;
                     return (
                       <article key={item.id} className="flex flex-wrap items-start gap-x-3 gap-y-2 border-b border-slate-200 py-4 sm:flex-nowrap sm:items-center">
@@ -323,8 +315,8 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
                           <p className="truncate text-xs text-slate-500">{item.category} · {required} {item.unit} needed</p>
                         </div>
                         <div className="mt-1 flex w-20 shrink-0 items-center gap-1 sm:mt-0 sm:w-auto sm:flex-1 sm:gap-2">
-                          <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100">
-                            <div className={`h-full rounded-full ${status.bar}`} style={{ width: `${receivedProgress}%` }} />
+                          <div className="relative h-3 min-w-0 flex-1 overflow-hidden rounded-full shadow-inner" style={{ background: 'linear-gradient(90deg, #ef4444 0%, #f59e0b 52%, #22c55e 100%)' }}>
+                            <div className="absolute inset-y-0 right-0 rounded-r-full bg-slate-200 transition-[width] duration-500" style={{ width: `${100 - receivedProgress}%` }} />
                           </div>
                           <span className="w-7 shrink-0 text-right text-[10px] font-bold text-slate-600 sm:w-9 sm:text-[11px]">{receivedProgress}%</span>
                         </div>
@@ -421,21 +413,22 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
               </div>
 
               <div>
+                <p className="mb-2 text-[11px] text-slate-500">Up to {remainingForSelected} {selectedItem.unit} still needed for this item.</p>
                 <p className="text-sm font-semibold text-slate-700">Quantity</p>
                 <div className="mt-1 flex items-center gap-2">
                   <button type="button" onClick={() => adjustQuantity(-1)} disabled={quantity <= 1} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-300 text-slate-700 disabled:opacity-40"><MinusIcon className="h-4 w-4" /></button>
-                  <div className="relative min-w-0 flex-1">
-                    <input type="number" min="1" max={remainingForSelected} value={quantityDraft} onChange={(event) => setQuantityDraft(event.target.value)} onBlur={(event) => setContributionQuantity(event.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 pr-14 text-center text-lg font-black text-brand-blue outline-none focus:border-brand-blue" aria-label="Contribution quantity" />
+                  <div className="relative min-w-0 max-w-[12rem] flex-1">
+                    <input type="number" min="1" max={remainingForSelected} value={quantityDraft} onChange={(event) => setQuantityDraft(event.target.value)} onBlur={(event) => setContributionQuantity(event.target.value)} className="w-full appearance-none rounded-lg border border-slate-300 px-3 py-2.5 pr-14 text-center text-lg font-black text-brand-blue outline-none focus:border-brand-blue [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" aria-label="Contribution quantity" />
                     <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-bold text-slate-500">{selectedItem.unit}</span>
                   </div>
                   <button type="button" onClick={() => adjustQuantity(1)} disabled={quantity >= remainingForSelected} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-300 text-slate-700 disabled:opacity-40"><PlusIcon className="h-4 w-4" /></button>
                 </div>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {[20, 40, 60].filter((suggestion) => suggestion <= remainingForSelected).map((suggestion) => (
+                <p className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Suggested quantity</p>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {[20, 40, 60, 80, 100].filter((suggestion) => suggestion <= remainingForSelected).map((suggestion) => (
                     <button key={suggestion} type="button" onClick={() => setContributionQuantity(suggestion)} className="rounded-full border border-brand-blue/25 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-brand-blue hover:bg-blue-100">{suggestion} {selectedItem.unit}</button>
                   ))}
                 </div>
-                <p className="mt-1 text-[11px] text-slate-500">Up to {remainingForSelected} {selectedItem.unit} still needed for this item.</p>
               </div>
 
               <div>
