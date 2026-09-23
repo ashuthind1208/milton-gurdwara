@@ -1,5 +1,6 @@
 import contentApiService from './contentApiService';
 import { serviceResponse } from './serviceResponse';
+import apiClient from './apiClient';
 
 export const LANGAR_CONTRIBUTIONS_RESOURCE = 'langar_contributions';
 
@@ -30,6 +31,20 @@ export const resolveGroceryImage = (name = '') => {
   const match = Object.entries(GROCERY_IMAGE_KEYWORDS).find(([key]) => query.includes(key));
   if (match) return match[1];
   return `https://loremflickr.com/300/300/${encodeURIComponent(query)},grocery`;
+};
+
+export const searchGroceryImage = async (name = '') => {
+  const query = String(name || '').split('').filter((character) => character.charCodeAt(0) >= 32).join('').trim().replace(/\s+/g, ' ');
+  if (!query) return '';
+  const normalizedQuery = query.toLowerCase();
+  const exactKeyword = Object.keys(GROCERY_IMAGE_KEYWORDS).find((keyword) => normalizedQuery === keyword);
+  if (exactKeyword) return GROCERY_IMAGE_KEYWORDS[exactKeyword];
+  try {
+    const response = await apiClient.get('/media/image-search', { params: { q: query } });
+    return String(response.data?.data?.imageUrl || '').trim() || resolveGroceryImage(query);
+  } catch {
+    return resolveGroceryImage(query);
+  }
 };
 
 const normalizeContribution = (entry = {}) => ({

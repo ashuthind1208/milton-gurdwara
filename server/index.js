@@ -665,6 +665,60 @@ const logServerError = (error, context) => {
   });
 };
 
+const extractFirstGoogleImageResult = (html = '') => {
+  const unescapeUrl = (value) => value.replace(/\\u003d/gi, '=').replace(/\\u0026/gi, '&').replace(/\\\//g, '/');
+  const isImageUrl = (value) => {
+    try {
+      const parsed = new URL(unescapeUrl(value));
+      if (!/^https?:$/.test(parsed.protocol) || /(^|\.)google\./i.test(parsed.hostname) || /encrypted-tbn/i.test(parsed.hostname)) return false;
+      return /\.(?:jpg|jpeg|png|webp|gif)(?:$|[?#])/i.test(parsed.pathname + parsed.search) || /[?&](?:imgurl|image|w)=/i.test(parsed.search);
+    } catch {
+      return false;
+    }
+  };
+  const candidates = [];
+  const source = String(html || '');
+  const addCandidates = (pattern) => {
+    for (const match of source.matchAll(pattern)) {
+      const candidate = unescapeUrl(match[1]);
+      if (isImageUrl(candidate) && !candidates.includes(candidate)) candidates.push(candidate);
+    }
+  };
+
+  addCandidates(/"ou":"(https?:\\?\/\\?\/[^"\\]+?)"/gi);
+  addCandidates(/\["(https?:\\?\/\\?\/[^"\\]+?)",\d+,\d+\]/gi);
+  addCandidates(/(https?:\\?\/\\?\/[^"'\s\\]+?(?:\.(?:jpg|jpeg|png|webp|gif)(?:[?#][^"'\s\\]*)?))/gi);
+  return candidates[0] || '';
+};
+
+const fetchFirstDuckDuckGoImage = async (query) => {
+  const headers = { 'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'en-US,en;q=0.9' };
+  const landingUrl = new URL('https://duckduckgo.com/');
+  landingUrl.searchParams.set('q', query);
+  landingUrl.searchParams.set('iax', 'images');
+  landingUrl.searchParams.set('ia', 'images');
+  const landingResponse = await fetch(landingUrl, { headers });
+  if (!landingResponse.ok) return '';
+  const landingHtml = await landingResponse.text();
+  const token = landingHtml.match(/vqd="([^"]+)"/)?.[1] || '';
+  if (!token) return '';
+
+  const imageUrl = new URL('https://duckduckgo.com/i.js');
+  imageUrl.searchParams.set('l', 'us-en');
+  imageUrl.searchParams.set('o', 'json');
+  imageUrl.searchParams.set('q', query);
+  imageUrl.searchParams.set('vqd', token);
+  imageUrl.searchParams.set('f', ',,,,,');
+  imageUrl.searchParams.set('p', '1');
+  imageUrl.searchParams.set('s', '0');
+  const imageResponse = await fetch(imageUrl, { headers: { ...headers, Referer: landingUrl.toString() } });
+  if (!imageResponse.ok) return '';
+  const imageData = await imageResponse.json();
+  const firstImage = String(imageData?.results?.[0]?.image || '').trim();
+  if (!firstImage || /(^|:\/\/)(?:[^/]+\.)?google\./i.test(firstImage)) return '';
+  return firstImage;
+};
+
 const readBody = async (request) => {
   if (request.__cachedBodyBuffer) {
     return request.__cachedBodyBuffer;
@@ -7342,6 +7396,82 @@ const server = http.createServer(async (request, response) => {
         ok: false,
         message: error.message || 'Unable to update Phase 2 channel config.'
       });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/media/image-search' && request.method === 'GET') {
+    try {
+      const query = String(requestUrl.searchParams.get('q') || '').trim();
+      assertInput(query.length > 0 && query.length <= 200, 'A search query is required.');
+
+      let imageUrl = '';
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      try {
+        const searchUrl = new URL('https://www.google.com/search');
+        searchUrl.searchParams.set('q', query);
+        searchUrl.searchParams.set('tbm', 'isch');
+        searchUrl.searchParams.set('safe', 'active');
+
+        const searchResponse = await fetch(searchUrl, {
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9'
+          }
+        });
+
+        if (searchResponse.ok) {
+          const html = await searchResponse.text();
+          imageUrl = extractFirstGoogleImageResult(html);
+        }
+      } catch {
+        imageUrl = '';
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
+      if (imageUrl && /(^|:\/\/)(?:[^/]+\.)?google\./i.test(imageUrl)) {
+        imageUrl = '';
+      }
+      if (!imageUrl) {
+        try {
+          imageUrl = await fetchFirstDuckDuckGoImage(query);
+        } catch {
+          imageUrl = '';
+        }
+      }
+      if (!imageUrl) {
+        try {
+          const commonsUrl = new URL('https://commons.wikimedia.org/w/api.php');
+          commonsUrl.searchParams.set('action', 'query');
+          commonsUrl.searchParams.set('generator', 'search');
+          commonsUrl.searchParams.set('gsrsearch', query);
+          commonsUrl.searchParams.set('gsrnamespace', '6');
+          commonsUrl.searchParams.set('gsrlimit', '1');
+          commonsUrl.searchParams.set('prop', 'imageinfo');
+          commonsUrl.searchParams.set('iiprop', 'url');
+          commonsUrl.searchParams.set('iiurlwidth', '500');
+          commonsUrl.searchParams.set('format', 'json');
+          const commonsResponse = await fetch(commonsUrl, {
+            headers: { 'User-Agent': 'SinghSabhaMilton/1.0 langar-image-search' }
+          });
+          const commonsData = commonsResponse.ok ? await commonsResponse.json() : null;
+          imageUrl = Object.values(commonsData?.query?.pages || {})[0]?.imageinfo?.[0]?.thumburl
+            || Object.values(commonsData?.query?.pages || {})[0]?.imageinfo?.[0]?.url
+            || '';
+        } catch {
+          imageUrl = '';
+        }
+      }
+      if (!imageUrl) {
+        imageUrl = `https://loremflickr.com/300/300/${encodeURIComponent(query)},grocery`;
+      }
+
+      sendJson(response, 200, { ok: true, data: { imageUrl } });
+    } catch (error) {
+      sendJson(response, error.status || 200, { ok: true, data: { imageUrl: '' } });
     }
     return;
   }

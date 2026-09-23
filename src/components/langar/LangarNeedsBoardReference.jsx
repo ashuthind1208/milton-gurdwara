@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ArchiveBoxIcon, CalendarDaysIcon, ChevronRightIcon, GiftIcon, MinusIcon, PlusIcon, UserIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../../context/AuthContext';
 import langarService, { LANGAR_CONTRIBUTIONS_RESOURCE } from '../../services/langarService';
@@ -18,6 +19,8 @@ const fallbackImages = {
 };
 
 const CONTRIBUTORS_PER_PAGE = 10;
+const LANGAR_REOPEN_BOARD_KEY = 'ssm_langar_reopen_board';
+const LANGAR_REOPEN_ITEM_KEY = 'ssm_langar_reopen_item_id';
 
 const imageForItem = (item) => item.imageUrl || Object.entries(fallbackImages).find(([key]) => String(item.name || '').toLowerCase().includes(key))?.[1] || gurdwaraLogo;
 const avatarFor = (entry) => entry.anonymous ? ANONYMOUS_AVATAR : (entry.donorAvatarUrl || `https://ui-avatars.com/api/?background=0f3b75&color=fff&bold=true&name=${encodeURIComponent(entry.donorName || 'Member')}`);
@@ -53,6 +56,8 @@ const Donut = ({ value, size = 'h-16 w-16' }) => (
 const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = false, onOpen }) => {
   const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [boardOpen, setBoardOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [quantity, setQuantity] = useState(1);
@@ -119,13 +124,57 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
   const openBoard = () => { setBoardOpen(true); onOpen?.(); };
   const openContribution = (item) => { setSelectedItem(item); setQuantity(1); setNotice(''); };
 
+  useEffect(() => {
+    if (!isAuthenticated || activeItems.length === 0) return;
+    let shouldReopenBoard = false;
+    let reopenItemId = '';
+    try {
+      shouldReopenBoard = window.sessionStorage.getItem(LANGAR_REOPEN_BOARD_KEY) === '1' || window.localStorage.getItem(LANGAR_REOPEN_BOARD_KEY) === '1';
+      reopenItemId = window.sessionStorage.getItem(LANGAR_REOPEN_ITEM_KEY) || window.localStorage.getItem(LANGAR_REOPEN_ITEM_KEY) || '';
+    } catch {
+      return;
+    }
+    if (!shouldReopenBoard) return;
+
+    setBoardOpen(true);
+    if (reopenItemId) {
+      const matchedItem = activeItems.find((entry) => String(entry.id) === reopenItemId);
+      if (matchedItem) {
+        openContribution(matchedItem);
+      }
+    }
+    try {
+      window.sessionStorage.removeItem(LANGAR_REOPEN_BOARD_KEY);
+      window.localStorage.removeItem(LANGAR_REOPEN_BOARD_KEY);
+      window.sessionStorage.removeItem(LANGAR_REOPEN_ITEM_KEY);
+      window.localStorage.removeItem(LANGAR_REOPEN_ITEM_KEY);
+    } catch {
+      // Ignore storage errors.
+    }
+  }, [isAuthenticated, activeItems]);
+
+  const startSignInForContribution = () => {
+    try {
+      window.sessionStorage.setItem(LANGAR_REOPEN_BOARD_KEY, '1');
+      window.localStorage.setItem(LANGAR_REOPEN_BOARD_KEY, '1');
+      if (selectedItem?.id) {
+        window.sessionStorage.setItem(LANGAR_REOPEN_ITEM_KEY, String(selectedItem.id));
+        window.localStorage.setItem(LANGAR_REOPEN_ITEM_KEY, String(selectedItem.id));
+      }
+    } catch {
+      // Ignore storage errors.
+    }
+    const nextPath = `${location.pathname}${location.search || ''}`;
+    navigate(`/login?next=${encodeURIComponent(nextPath)}`);
+  };
+
   const adjustQuantity = (delta) => {
     setQuantity((current) => Math.min(remainingForSelected, Math.max(1, current + delta)));
   };
 
   const submitContribution = (event) => {
     event.preventDefault();
-    if (!isAuthenticated) { setNotice('Please sign in before making a contribution.'); return; }
+    if (!isAuthenticated) { startSignInForContribution(); return; }
     contributionMutation.mutate({
       itemId: selectedItem.id,
       itemName: selectedItem.name,

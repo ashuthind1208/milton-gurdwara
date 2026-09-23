@@ -740,7 +740,6 @@ export const downloadLangarReceivedReportPdf = async ({
   const logoDataUrl = await loadLogoDataUrl();
   const generatedOn = new Date().toLocaleString();
   const groupedRows = groupLangarReportRows(rows);
-  const grandTotal = rows.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
 
   doc.setFillColor(...LOGO_BLUE_RGB);
   doc.rect(0, 0, pageWidth, 98, 'F');
@@ -766,34 +765,39 @@ export const downloadLangarReceivedReportPdf = async ({
   doc.text(`Total Commitments: ${rows.length}`, pageWidth - 40, 60, { align: 'right' });
   doc.text(`Generated: ${generatedOn}`, pageWidth - 40, 74, { align: 'right' });
 
-  const body = [];
+  let nextY = 126;
   groupedRows.forEach(([itemName, entries]) => {
-    entries.forEach((row) => body.push([
-      itemName,
-      row.donorName || '-',
-      `${row.quantity} ${row.unit}`,
-      row.createdDate || '-',
-      row.expectedDate || '-'
-    ]));
+    if (nextY > pageHeight - 130) {
+      doc.addPage();
+      nextY = 42;
+    }
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text(itemName, 40, nextY);
     const subtotal = entries.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
-    body.push([
-      { content: `${itemName} — Subtotal`, colSpan: 3, styles: { fontStyle: 'bold', fillColor: [241, 245, 249], textColor: [15, 23, 42] } },
-      { content: `${subtotal} ${entries[0]?.unit || ''}`, colSpan: 2, styles: { fontStyle: 'bold', fillColor: [241, 245, 249], textColor: [15, 23, 42] } }
-    ]);
-  });
-  body.push([
-    { content: 'Grand Total', colSpan: 3, styles: { fontStyle: 'bold', fillColor: LOGO_BLUE_RGB, textColor: 255 } },
-    { content: `${grandTotal}`, colSpan: 2, styles: { fontStyle: 'bold', fillColor: LOGO_BLUE_RGB, textColor: 255 } }
-  ]);
-
-  autoTable(doc, {
-    startY: 126,
-    head: [['Item', 'Contributor', 'Quantity', 'Created Date', 'Expected Date']],
-    body,
-    styles: { fontSize: 9, cellPadding: 6 },
-    headStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold' },
-    theme: 'grid',
-    margin: { left: 40, right: 40 }
+    autoTable(doc, {
+      startY: nextY + 8,
+      head: [['Contributor', 'Quantity', 'Received Date', 'Created Date', 'Expected Date']],
+      body: [
+        ...entries.map((row) => [
+          row.donorName || '-',
+          `${row.quantity} ${row.unit}`,
+          row.receivedDate || '-',
+          row.createdDate || '-',
+          row.expectedDate || '-'
+        ]),
+        [
+          { content: 'Subtotal', colSpan: 1, styles: { fontStyle: 'bold', fillColor: [241, 245, 249], textColor: [15, 23, 42] } },
+          { content: `${subtotal} ${entries[0]?.unit || ''}`, colSpan: 4, styles: { fontStyle: 'bold', fillColor: [241, 245, 249], textColor: [15, 23, 42] } }
+        ]
+      ],
+      styles: { fontSize: 9, cellPadding: 6 },
+      headStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold' },
+      theme: 'grid',
+      margin: { left: 40, right: 40 }
+    });
+    nextY = (doc.lastAutoTable?.finalY || nextY + 50) + 28;
   });
 
   const finalY = doc.lastAutoTable?.finalY || 260;
@@ -811,21 +815,19 @@ export const downloadLangarReceivedReportCsv = ({
   fileName
 }) => {
   const groupedRows = groupLangarReportRows(rows);
-  const grandTotal = rows.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
   const dataRows = [];
   groupedRows.forEach(([itemName, entries]) => {
     entries.forEach((row) => dataRows.push([
       itemName,
       row.donorName || '-',
       `${row.quantity} ${row.unit}`,
+      row.receivedDate || '-',
       row.createdDate || '-',
       row.expectedDate || '-'
     ]));
     const subtotal = entries.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
-    dataRows.push([`${itemName} — Subtotal`, '', `${subtotal} ${entries[0]?.unit || ''}`, '', '']);
+    dataRows.push([`${itemName} — Subtotal`, '', `${subtotal} ${entries[0]?.unit || ''}`, '', '', '']);
   });
-  dataRows.push(['Grand Total', '', `${grandTotal}`, '', '']);
-
   const metadataRows = [
     ['Organization', organizationName || ''],
     ['Report', 'Langar Items Received Report'],
@@ -836,7 +838,7 @@ export const downloadLangarReceivedReportCsv = ({
 
   const csvData = [
     ...metadataRows.map((row) => row.map((cell) => escapeCsvCell(cell)).join(',')),
-    buildCsv(['Item', 'Contributor', 'Quantity', 'Created Date', 'Expected Date'], dataRows)
+    buildCsv(['Item', 'Contributor', 'Quantity', 'Received Date', 'Created Date', 'Expected Date'], dataRows)
   ].join('\n');
 
   const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });

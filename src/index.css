@@ -437,6 +437,94 @@
     min-width: 0;
   }
 
+  .admin-main-content table.langar-report-table {
+    display: table;
+    table-layout: fixed;
+    width: 100%;
+  }
+
+  .admin-main-content table.langar-report-table thead {
+    display: table-header-group;
+  }
+
+  .admin-main-content table.langar-report-table tbody {
+    display: table-row-group;
+  }
+
+  .admin-main-content table.langar-report-table tr {
+    display: table-row;
+    width: auto;
+    margin-bottom: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .admin-main-content table.langar-report-table th,
+  .admin-main-content table.langar-report-table td {
+    display: table-cell;
+    width: auto;
+    padding: 8px;
+    vertical-align: top;
+    text-align: left !important;
+  }
+
+  .admin-main-content table.langar-report-table td:last-child {
+    display: table-cell;
+    grid-column: auto;
+    grid-row: auto;
+    justify-self: auto;
+    width: auto;
+    max-width: none;
+    margin-top: 0;
+    padding-top: 8px;
+    border-top: 0;
+    white-space: normal;
+  }
+
+  .admin-main-content table.langar-report-table td:not(:last-child) {
+    grid-column: auto;
+    min-width: 0;
+  }
+
+  .admin-main-content table.langar-report-table thead {
+    display: none;
+  }
+
+  .admin-main-content table.langar-report-table tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: 0 10px 24px -20px rgba(15, 23, 42, 0.35);
+  }
+
+  .admin-main-content table.langar-report-table tbody tr td,
+  .admin-main-content table.langar-report-table tbody tr td:last-child,
+  .admin-main-content table.langar-report-table tbody tr td:not(:last-child) {
+    display: block;
+    grid-column: 1;
+    grid-row: auto;
+    width: 100%;
+    min-width: 0;
+    padding: 4px 0;
+    text-align: left !important;
+  }
+
+  .admin-main-content table.langar-report-table tbody tr td:last-child > div {
+    flex-direction: row !important;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+  }
+
   .admin-langar-mobile-hidden {
     display: none !important;
   }

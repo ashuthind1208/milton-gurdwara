@@ -5,6 +5,7 @@ import { useOutletContext } from 'react-router-dom';
 import {
   ArrowDownTrayIcon,
   CalendarDaysIcon,
+  CheckCircleIcon,
   CheckIcon,
   ClockIcon,
   EyeIcon,
@@ -18,7 +19,7 @@ import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton';
 import cmsService from '../../services/cmsService';
-import langarService, { LANGAR_CONTRIBUTIONS_RESOURCE, resolveGroceryImage } from '../../services/langarService';
+import langarService, { LANGAR_CONTRIBUTIONS_RESOURCE, resolveGroceryImage, searchGroceryImage } from '../../services/langarService';
 import contentApiService from '../../services/contentApiService';
 import { downloadLangarReceivedReportCsv, downloadLangarReceivedReportPdf } from '../../utils/csvExport';
 import { siteConfig } from '../../constants/siteConfig';
@@ -76,7 +77,8 @@ const defaultForm = {
   expiryDate: '',
   quantityRequired: 0,
   quantityReceived: 0,
-  unit: 'items'
+  unit: 'items',
+  imageUrl: ''
 };
 
 const resolveStatusPreview = (item = {}) => (item.needed === false ? 'Stock Available' : 'Required Soon');
@@ -96,13 +98,14 @@ const buildLangarPayload = (values) => {
     quantityRequired,
     quantityReceived,
     unit: String(values.unit || 'items').trim() || 'items',
-    imageUrl: resolveGroceryImage(values.name)
+    imageUrl: String(values.imageUrl || '').trim() || resolveGroceryImage(values.name)
   };
 };
 
 const inputClass = 'mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-800 outline-none transition focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20';
 const labelClass = 'text-xs font-bold uppercase tracking-wide text-slate-500';
 const formatShortDate = (value) => (value ? new Date(value).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' }) : '-');
+const datePillClass = 'inline-flex max-w-full items-center rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight';
 
 const StatusPill = ({ isReceived, onToggle, disabled }) => (
   <button
@@ -179,6 +182,7 @@ const AdminLangarPage = () => {
 
   const [reportOpen, setReportOpen] = useState(false);
   const [reportDates, setReportDates] = useState(defaultReportDates);
+  const [reportPage, setReportPage] = useState(1);
   const [customUnits, setCustomUnits] = useState(loadCustomUnits);
   const [customCategories, setCustomCategories] = useState(loadCustomCategories);
 
@@ -190,6 +194,22 @@ const AdminLangarPage = () => {
   const editUnit = editForm.watch('unit');
   const createCategory = form.watch('category');
   const editCategory = editForm.watch('category');
+  const createImageUrl = form.watch('imageUrl');
+  const editImageUrl = editForm.watch('imageUrl');
+  const [createImageLookupPending, setCreateImageLookupPending] = useState(false);
+  const [editImageLookupPending, setEditImageLookupPending] = useState(false);
+
+  const lookupItemImage = async (name, formToUpdate, setPending) => {
+    const trimmed = String(name || '').trim();
+    if (!trimmed) return;
+    setPending(true);
+    try {
+      const foundImageUrl = await searchGroceryImage(trimmed);
+      formToUpdate.setValue('imageUrl', foundImageUrl || resolveGroceryImage(trimmed), { shouldDirty: true });
+    } finally {
+      setPending(false);
+    }
+  };
   const unitOptions = useMemo(() => [...new Set([...LANGAR_UNIT_OPTIONS, ...customUnits])], [customUnits]);
   const categoryFormOptions = useMemo(() => [...new Set([...LANGAR_CATEGORY_OPTIONS, ...customCategories])], [customCategories]);
 
@@ -311,6 +331,11 @@ const AdminLangarPage = () => {
   }, [sortedContributions, reportDates]);
 
   const reportGrandTotal = useMemo(() => reportRows.reduce((sum, row) => sum + Number(row.quantity || 0), 0), [reportRows]);
+  const totalReportPages = Math.max(1, Math.ceil(reportRows.length / COMMITMENTS_PAGE_SIZE));
+  const visibleReportRows = useMemo(() => {
+    const start = (reportPage - 1) * COMMITMENTS_PAGE_SIZE;
+    return reportRows.slice(start, start + COMMITMENTS_PAGE_SIZE);
+  }, [reportPage, reportRows]);
 
   const addMutation = useMutation({
     mutationFn: (values) => cmsService.addLangarItem(buildLangarPayload(values)),
@@ -363,7 +388,8 @@ const AdminLangarPage = () => {
       expiryDate: item.expiryDate || '',
       quantityRequired: item.quantityRequired || 0,
       quantityReceived: item.quantityReceived || 0,
-      unit: item.unit || 'items'
+      unit: item.unit || 'items',
+      imageUrl: item.imageUrl || ''
     });
   };
 
@@ -389,6 +415,7 @@ const AdminLangarPage = () => {
     donorName: entry.anonymous ? 'Anonymous' : (entry.donorName || 'Member'),
     quantity: entry.quantity,
     unit: entry.unit,
+    receivedDate: entry.updatedAt ? formatShortDate(entry.updatedAt) : '-',
     createdDate: entry.createdAt ? formatShortDate(entry.createdAt) : '-',
     expectedDate: entry.expectedDeliveryDate ? formatShortDate(entry.expectedDeliveryDate) : '-'
   }));
@@ -424,10 +451,20 @@ const AdminLangarPage = () => {
   }, [commitmentStatusFilter, commitmentItemFilter]);
 
   useEffect(() => {
+    setReportPage(1);
+  }, [reportDates]);
+
+  useEffect(() => {
     if (commitmentPage > totalCommitmentPages) {
       setCommitmentPage(totalCommitmentPages);
     }
   }, [commitmentPage, totalCommitmentPages]);
+
+  useEffect(() => {
+    if (reportPage > totalReportPages) {
+      setReportPage(totalReportPages);
+    }
+  }, [reportPage, totalReportPages]);
 
   return (
     <div className="space-y-6">
@@ -465,8 +502,9 @@ const AdminLangarPage = () => {
         </div>
 
         <div className="mt-4 overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead>
+          {filteredCommitments.length > 0 ? (
+            <table className="min-w-full text-left text-sm">
+              <thead>
               <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
                 <th className="py-2 pr-3">Name</th>
                 <th className="py-2 pr-3">Contributed For</th>
@@ -509,13 +547,11 @@ const AdminLangarPage = () => {
                   </tr>
                 );
               })}
-              {filteredCommitments.length === 0 ? (
-                <tr>
-                  <td className="py-4 text-center text-slate-500" colSpan={7}>No Langar commitments found.</td>
-                </tr>
-              ) : null}
             </tbody>
-          </table>
+            </table>
+          ) : (
+            <p className="whitespace-nowrap py-4 text-center text-sm text-slate-500">No Langar commitments found.</p>
+          )}
         </div>
         {filteredCommitments.length > 0 ? (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
@@ -589,8 +625,10 @@ const AdminLangarPage = () => {
                       <div className="space-y-1.5 lg:hidden">
                         <p className="text-sm font-bold leading-tight text-slate-800">{item.name || '-'}</p>
                         <p className="text-[12px] leading-snug text-slate-600">{item.category || 'Grocery'}</p>
-                        <p className="text-[12px] leading-snug text-slate-600">{item.addedOn || '-'}</p>
-                        <p className="text-[12px] leading-snug text-slate-600">{item.expiryDate || '-'}</p>
+                        <div className="flex max-w-full flex-wrap gap-1">
+                          <span className={`${datePillClass} bg-sky-100 text-sky-800`}>Added {item.addedOn || '-'}</span>
+                          <span className={`${datePillClass} bg-amber-100 text-amber-800`}>Expiry {item.expiryDate || '-'}</span>
+                        </div>
                         <div className="pt-0.5">
                           <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${item.needed ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-700'}`}>
                             {resolveStatusPreview(item)}
@@ -690,11 +728,11 @@ const AdminLangarPage = () => {
               </div>
               <form className="space-y-4 p-5" onSubmit={form.handleSubmit((values) => addMutation.mutate(values))}>
                 <div className="flex items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
-                  <img src={resolveGroceryImage(createName) || undefined} alt="" className="h-14 w-14 shrink-0 rounded-lg border border-slate-200 object-cover" onError={(event) => { event.currentTarget.style.visibility = 'hidden'; }} onLoad={(event) => { event.currentTarget.style.visibility = 'visible'; }} />
-                  <p className="text-xs text-slate-500">The item image is fetched automatically from the item name.</p>
+                  <img src={createImageUrl || resolveGroceryImage(createName) || undefined} alt="" className="h-14 w-14 shrink-0 rounded-lg border border-slate-200 object-cover" onError={(event) => { event.currentTarget.style.visibility = 'hidden'; }} onLoad={(event) => { event.currentTarget.style.visibility = 'visible'; }} />
+                  <p className="text-xs text-slate-500">{createImageLookupPending ? 'Looking up an image for this item…' : 'The item image is fetched automatically from the item name.'}</p>
                 </div>
                 <label className={labelClass}>Item Name
-                  <input {...form.register('name', { required: true })} required className={inputClass} />
+                  <input {...form.register('name', { required: true })} required className={inputClass} onBlur={(event) => { form.register('name').onBlur(event); lookupItemImage(event.target.value, form, setCreateImageLookupPending); }} />
                 </label>
                 <DropdownField
                   label="Category"
@@ -762,13 +800,9 @@ const AdminLangarPage = () => {
                       <span className="shrink-0 text-xs font-bold uppercase tracking-wide text-brand-blue">Category</span>
                       <span className="truncate text-sm text-slate-800">{viewItem.category || '-'}</span>
                     </div>
-                    <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2">
-                      <span className="shrink-0 text-xs font-bold uppercase tracking-wide text-brand-blue">Added On</span>
-                      <span className="truncate text-sm text-slate-800">{viewItem.addedOn || '-'}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2">
-                      <span className="shrink-0 text-xs font-bold uppercase tracking-wide text-brand-blue">Expiry</span>
-                      <span className="truncate text-sm text-slate-800">{viewItem.expiryDate || '-'}</span>
+                    <div className="flex flex-wrap gap-1 rounded-xl border border-slate-200 px-3 py-2">
+                      <span className={`${datePillClass} bg-sky-100 text-sky-800`}>Added {viewItem.addedOn || '-'}</span>
+                      <span className={`${datePillClass} bg-amber-100 text-amber-800`}>Expiry {viewItem.expiryDate || '-'}</span>
                     </div>
                     <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2">
                       <span className="shrink-0 text-xs font-bold uppercase tracking-wide text-brand-blue">Quantity</span>
@@ -823,11 +857,11 @@ const AdminLangarPage = () => {
               </div>
               <form className="space-y-4 p-5" onSubmit={editForm.handleSubmit((values) => updateMutation.mutate({ id: editingItem.id, values }))}>
                 <div className="flex items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
-                  <img src={resolveGroceryImage(editName) || undefined} alt="" className="h-14 w-14 shrink-0 rounded-lg border border-slate-200 object-cover" onError={(event) => { event.currentTarget.style.visibility = 'hidden'; }} onLoad={(event) => { event.currentTarget.style.visibility = 'visible'; }} />
-                  <p className="text-xs text-slate-500">The item image is fetched automatically from the item name.</p>
+                  <img src={editImageUrl || resolveGroceryImage(editName) || undefined} alt="" className="h-14 w-14 shrink-0 rounded-lg border border-slate-200 object-cover" onError={(event) => { event.currentTarget.style.visibility = 'hidden'; }} onLoad={(event) => { event.currentTarget.style.visibility = 'visible'; }} />
+                  <p className="text-xs text-slate-500">{editImageLookupPending ? 'Looking up an image for this item…' : 'The item image is fetched automatically from the item name.'}</p>
                 </div>
                 <label className={labelClass}>Item Name
-                  <input {...editForm.register('name', { required: true })} required className={inputClass} />
+                  <input {...editForm.register('name', { required: true })} required className={inputClass} onBlur={(event) => { editForm.register('name').onBlur(event); lookupItemImage(event.target.value, editForm, setEditImageLookupPending); }} />
                 </label>
                 <DropdownField
                   label="Category"
@@ -861,7 +895,7 @@ const AdminLangarPage = () => {
                     addOptionLabel="+ Add custom unit…"
                   />
                 </div>
-                <label className={labelClass}>Quantity Received <span className="font-normal normal-case text-slate-400">(updates automatically as commitments are marked received)</span>
+                <label className={labelClass}>Quantity Received
                   <input type="number" readOnly disabled {...editForm.register('quantityReceived', { valueAsNumber: true })} className={`${inputClass} cursor-not-allowed bg-slate-100 text-slate-500`} />
                 </label>
                 <div className="flex gap-2 pt-2">
@@ -887,15 +921,16 @@ const AdminLangarPage = () => {
                   <XMarkIcon className="h-4 w-4" />
                 </button>
               </div>
-              <div className="space-y-4 p-5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <FunnelIcon className="h-4 w-4 text-slate-400" />
-                  <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Quick range:</span>
-                  {REPORT_PRESETS.map((preset) => (
-                    <button key={preset.value} type="button" onClick={() => applyReportPreset(preset.days)} className="rounded-full border border-brand-blue/30 bg-blue-50 px-3 py-1 text-xs font-bold text-brand-blue hover:bg-blue-100">
-                      Past {preset.label}
-                    </button>
-                  ))}
+              <div className="min-w-0 space-y-4 p-3 sm:p-5">
+                <div className="space-y-1.5">
+                  <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-500"><FunnelIcon className="h-4 w-4 text-slate-400" />Quick range:</span>
+                  <div className="flex flex-wrap gap-2 pb-1">
+                    {REPORT_PRESETS.map((preset) => (
+                      <button key={preset.value} type="button" onClick={() => applyReportPreset(preset.days)} className="shrink-0 whitespace-nowrap rounded-full border border-brand-blue/30 bg-blue-50 px-3 py-1 text-xs font-bold text-brand-blue hover:bg-blue-100">
+                        Past {preset.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className={labelClass}><CalendarDaysIcon className="mr-1 inline h-3.5 w-3.5" />Start Date
@@ -905,43 +940,76 @@ const AdminLangarPage = () => {
                     <input type="date" value={reportDates.end} onChange={(event) => setReportDates((prev) => ({ ...prev, end: event.target.value }))} className={inputClass} />
                   </label>
                 </div>
-                <div className="flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-slate-600">
-                  <ClockIcon className="h-4 w-4 shrink-0 text-brand-blue" />
-                  Showing {reportRows.length} received commitment{reportRows.length === 1 ? '' : 's'} totaling <strong className="text-brand-blue">{reportGrandTotal}</strong> units between {formatShortDate(reportDates.start)} and {formatShortDate(reportDates.end)}.
+                <div className="flex min-w-0 items-stretch gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-slate-600">
+                  <div className="flex shrink-0 flex-col justify-between py-0.5">
+                    <ClockIcon className="h-4 w-4 text-brand-blue" />
+                    <CheckCircleIcon className="h-3.5 w-3.5 text-emerald-600" />
+                  </div>
+                  <div className="min-w-0 flex-1 text-left">
+                    <p className="break-words">Showing {reportRows.length} received commitment{reportRows.length === 1 ? '' : 's'}.</p>
+                    <hr className="my-1.5 border-sky-200" />
+                    <p className="flex flex-wrap items-center gap-1 break-words">Total received: <strong className="text-brand-blue">{reportGrandTotal}</strong> units.</p>
+                    <p className="break-words">Report period: {formatShortDate(reportDates.start)} to {formatShortDate(reportDates.end)}.</p>
+                  </div>
                 </div>
-                <div className="max-h-72 overflow-y-auto rounded-xl border border-slate-200">
-                  <table className="min-w-full text-left text-sm">
+                <div className="max-h-72 overflow-y-auto">
+                  <table className="langar-report-table w-full table-fixed !text-left text-xs sm:text-sm" style={{ textAlign: 'left' }}>
                     <thead className="sticky top-0">
                       <tr className="border-b border-slate-200 bg-slate-100 text-xs uppercase tracking-wide text-slate-500">
-                        <th className="px-3 py-2">Item</th>
-                        <th className="px-3 py-2">Contributor</th>
-                        <th className="px-3 py-2">Quantity</th>
-                        <th className="px-3 py-2">Created</th>
+                        <th className="w-[28%] px-2 py-2 !text-left sm:px-3">Item</th>
+                        <th className="w-[30%] px-2 py-2 !text-left sm:px-3">Dates</th>
+                        <th className="w-[42%] px-2 py-2 !text-left sm:px-3">User</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {reportRows.map((entry, index) => (
-                        <tr key={entry.id} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                          <td className="px-3 py-2 font-semibold text-slate-800">{entry.itemName}</td>
-                          <td className="px-3 py-2 text-slate-700">{entry.anonymous ? 'Anonymous' : entry.donorName}</td>
-                          <td className="px-3 py-2 text-slate-700">{entry.quantity} {entry.unit}</td>
-                          <td className="px-3 py-2 text-slate-700">{entry.createdAt ? formatShortDate(entry.createdAt) : '-'}</td>
+                      {visibleReportRows.map((entry, index) => (
+                        <tr key={entry.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50'} !text-left`} style={{ textAlign: 'left' }}>
+                          <td className="break-words px-2 py-2 !text-left text-base font-bold text-slate-900 sm:px-3" style={{ textAlign: 'left' }}>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span>{entry.itemName}</span>
+                              <span className={`${datePillClass} bg-blue-100 text-brand-blue`}>Committed: {entry.quantity} {entry.unit}</span>
+                            </div>
+                          </td>
+                          <td className="px-2 py-2 !text-left text-slate-700 sm:px-3" style={{ textAlign: 'left' }}>
+                            <div className="flex flex-wrap gap-1 border-b border-slate-200 pb-2">
+                              <span className={`${datePillClass} bg-emerald-100 text-emerald-800`}>Received {entry.updatedAt ? formatShortDate(entry.updatedAt) : '-'}</span>
+                              <span className={`${datePillClass} bg-violet-100 text-violet-800`}>Committed {entry.createdAt ? formatShortDate(entry.createdAt) : '-'}</span>
+                            </div>
+                          </td>
+                          <td className="px-2 py-2 !text-left text-slate-700 sm:px-3" style={{ textAlign: 'left' }}>
+                            <div className="flex min-w-0 items-center justify-start gap-2 text-left">
+                              <img
+                                src={entry.anonymous ? 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"%3E%3Ccircle cx="20" cy="20" r="20" fill="%23dbeafe"/%3E%3Ccircle cx="20" cy="15" r="7" fill="%230f3b75"/%3E%3Cpath d="M8 35c1-8 6-12 12-12s11 4 12 12" fill="%230f3b75"/%3E%3C/svg%3E' : (entry.donorAvatarUrl || `https://ui-avatars.com/api/?background=0f3b75&color=fff&bold=true&name=${encodeURIComponent(entry.donorName || 'Member')}`)}
+                                alt=""
+                                className="mr-1 h-7 w-7 shrink-0 rounded-full object-cover"
+                                onError={(event) => {
+                                  event.currentTarget.onerror = null;
+                                  event.currentTarget.src = `https://ui-avatars.com/api/?background=0f3b75&color=fff&bold=true&name=${encodeURIComponent(entry.donorName || 'Member')}`;
+                                }}
+                              />
+                              <div className="min-w-0 text-left">
+                                <p className="flex min-h-7 items-center break-words font-semibold text-slate-800">{entry.anonymous ? 'Anonymous' : entry.donorName}</p>
+                              </div>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                       {reportRows.length === 0 ? (
-                        <tr><td className="px-3 py-4 text-center text-slate-500" colSpan={4}>No items received in this period.</td></tr>
+                        <tr><td className="px-3 py-4 text-center text-slate-500" colSpan={3}>No items received in this period.</td></tr>
                       ) : null}
                     </tbody>
-                    {reportRows.length > 0 ? (
-                      <tfoot>
-                        <tr className="border-t-2 border-slate-300 bg-slate-100">
-                          <td className="px-3 py-2 font-bold text-brand-blue" colSpan={2}>Grand Total</td>
-                          <td className="px-3 py-2 font-bold text-brand-blue" colSpan={2}>{reportGrandTotal} units</td>
-                        </tr>
-                      </tfoot>
-                    ) : null}
                   </table>
                 </div>
+                {reportRows.length > 0 ? (
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3">
+                    <p className="text-xs text-slate-600">Showing {visibleReportRows.length} of {reportRows.length} received items</p>
+                    <div className="flex items-center gap-2">
+                      <button type="button" className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-40" disabled={reportPage <= 1} onClick={() => setReportPage((prev) => prev - 1)}>Prev</button>
+                      <span className="text-xs font-semibold text-slate-600">Page {reportPage} of {totalReportPages}</span>
+                      <button type="button" className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 disabled:opacity-40" disabled={reportPage >= totalReportPages} onClick={() => setReportPage((prev) => prev + 1)}>Next</button>
+                    </div>
+                  </div>
+                ) : null}
                 <div className="flex flex-wrap gap-2">
                   <Button type="button" onClick={() => downloadReport('pdf')} disabled={reportRows.length === 0} className="bg-brand-blue text-white hover:bg-blue-800">
                     <ArrowDownTrayIcon className="mr-1.5 h-4 w-4" /> Download PDF
