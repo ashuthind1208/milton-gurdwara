@@ -27,23 +27,32 @@ const GROCERY_IMAGE_KEYWORDS = {
 
 export const resolveGroceryImage = (name = '') => {
   const query = String(name || '').trim().toLowerCase();
-  if (!query) return '';
+  if (!query) return [];
   const match = Object.entries(GROCERY_IMAGE_KEYWORDS).find(([key]) => query.includes(key));
   if (match) return match[1];
   return `https://loremflickr.com/300/300/${encodeURIComponent(query)},grocery`;
 };
 
 export const searchGroceryImage = async (name = '') => {
+  const results = await searchGroceryImages(name);
+  return results[0] || resolveGroceryImage(name);
+};
+
+export const searchGroceryImages = async (name = '') => {
   const query = String(name || '').split('').filter((character) => character.charCodeAt(0) >= 32).join('').trim().replace(/\s+/g, ' ');
   if (!query) return '';
   const normalizedQuery = query.toLowerCase();
   const exactKeyword = Object.keys(GROCERY_IMAGE_KEYWORDS).find((keyword) => normalizedQuery === keyword);
-  if (exactKeyword) return GROCERY_IMAGE_KEYWORDS[exactKeyword];
+  const preferredImage = exactKeyword ? GROCERY_IMAGE_KEYWORDS[exactKeyword] : '';
   try {
     const response = await apiClient.get('/media/image-search', { params: { q: query } });
-    return String(response.data?.data?.imageUrl || '').trim() || resolveGroceryImage(query);
+    const imageUrls = Array.isArray(response.data?.data?.imageUrls)
+      ? response.data.data.imageUrls.map((url) => String(url || '').trim()).filter(Boolean)
+      : [];
+    const firstImage = String(response.data?.data?.imageUrl || '').trim();
+    return [...new Set([preferredImage, ...imageUrls, firstImage].filter(Boolean))].slice(0, 10);
   } catch {
-    return resolveGroceryImage(query);
+    return [preferredImage || resolveGroceryImage(query)];
   }
 };
 

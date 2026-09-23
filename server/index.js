@@ -665,7 +665,7 @@ const logServerError = (error, context) => {
   });
 };
 
-const extractFirstGoogleImageResult = (html = '') => {
+const extractGoogleImageResults = (html = '', limit = 10) => {
   const unescapeUrl = (value) => value.replace(/\\u003d/gi, '=').replace(/\\u0026/gi, '&').replace(/\\\//g, '/');
   const isImageUrl = (value) => {
     try {
@@ -688,20 +688,20 @@ const extractFirstGoogleImageResult = (html = '') => {
   addCandidates(/"ou":"(https?:\\?\/\\?\/[^"\\]+?)"/gi);
   addCandidates(/\["(https?:\\?\/\\?\/[^"\\]+?)",\d+,\d+\]/gi);
   addCandidates(/(https?:\\?\/\\?\/[^"'\s\\]+?(?:\.(?:jpg|jpeg|png|webp|gif)(?:[?#][^"'\s\\]*)?))/gi);
-  return candidates[0] || '';
+  return candidates.slice(0, limit);
 };
 
-const fetchFirstDuckDuckGoImage = async (query) => {
+const fetchDuckDuckGoImages = async (query, limit = 10) => {
   const headers = { 'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'en-US,en;q=0.9' };
   const landingUrl = new URL('https://duckduckgo.com/');
   landingUrl.searchParams.set('q', query);
   landingUrl.searchParams.set('iax', 'images');
   landingUrl.searchParams.set('ia', 'images');
   const landingResponse = await fetch(landingUrl, { headers });
-  if (!landingResponse.ok) return '';
+  if (!landingResponse.ok) return [];
   const landingHtml = await landingResponse.text();
   const token = landingHtml.match(/vqd="([^"]+)"/)?.[1] || '';
-  if (!token) return '';
+  if (!token) return [];
 
   const imageUrl = new URL('https://duckduckgo.com/i.js');
   imageUrl.searchParams.set('l', 'us-en');
@@ -712,11 +712,12 @@ const fetchFirstDuckDuckGoImage = async (query) => {
   imageUrl.searchParams.set('p', '1');
   imageUrl.searchParams.set('s', '0');
   const imageResponse = await fetch(imageUrl, { headers: { ...headers, Referer: landingUrl.toString() } });
-  if (!imageResponse.ok) return '';
+  if (!imageResponse.ok) return [];
   const imageData = await imageResponse.json();
-  const firstImage = String(imageData?.results?.[0]?.image || '').trim();
-  if (!firstImage || /(^|:\/\/)(?:[^/]+\.)?google\./i.test(firstImage)) return '';
-  return firstImage;
+  return (imageData?.results || [])
+    .map((result) => String(result?.image || '').trim())
+    .filter((image) => image && !/(^|:\/\/)(?:[^/]+\.)?google\./i.test(image))
+    .slice(0, limit);
 };
 
 const readBody = async (request) => {
@@ -7405,7 +7406,7 @@ const server = http.createServer(async (request, response) => {
       const query = String(requestUrl.searchParams.get('q') || '').trim();
       assertInput(query.length > 0 && query.length <= 200, 'A search query is required.');
 
-      let imageUrl = '';
+      let imageUrls = [];
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000);
       try {
@@ -7424,32 +7425,29 @@ const server = http.createServer(async (request, response) => {
 
         if (searchResponse.ok) {
           const html = await searchResponse.text();
-          imageUrl = extractFirstGoogleImageResult(html);
+          imageUrls = extractGoogleImageResults(html);
         }
       } catch {
-        imageUrl = '';
+        imageUrls = [];
       } finally {
         clearTimeout(timeoutId);
       }
 
-      if (imageUrl && /(^|:\/\/)(?:[^/]+\.)?google\./i.test(imageUrl)) {
-        imageUrl = '';
-      }
-      if (!imageUrl) {
+      if (!imageUrls.length) {
         try {
-          imageUrl = await fetchFirstDuckDuckGoImage(query);
+          imageUrls = await fetchDuckDuckGoImages(query);
         } catch {
-          imageUrl = '';
+          imageUrls = [];
         }
       }
-      if (!imageUrl) {
+      if (!imageUrls.length) {
         try {
           const commonsUrl = new URL('https://commons.wikimedia.org/w/api.php');
           commonsUrl.searchParams.set('action', 'query');
           commonsUrl.searchParams.set('generator', 'search');
           commonsUrl.searchParams.set('gsrsearch', query);
           commonsUrl.searchParams.set('gsrnamespace', '6');
-          commonsUrl.searchParams.set('gsrlimit', '1');
+          commonsUrl.searchParams.set('gsrlimit', '10');
           commonsUrl.searchParams.set('prop', 'imageinfo');
           commonsUrl.searchParams.set('iiprop', 'url');
           commonsUrl.searchParams.set('iiurlwidth', '500');
@@ -7458,20 +7456,21 @@ const server = http.createServer(async (request, response) => {
             headers: { 'User-Agent': 'SinghSabhaMilton/1.0 langar-image-search' }
           });
           const commonsData = commonsResponse.ok ? await commonsResponse.json() : null;
-          imageUrl = Object.values(commonsData?.query?.pages || {})[0]?.imageinfo?.[0]?.thumburl
-            || Object.values(commonsData?.query?.pages || {})[0]?.imageinfo?.[0]?.url
-            || '';
+          imageUrls = Object.values(commonsData?.query?.pages || {})
+            .map((page) => page?.imageinfo?.[0]?.thumburl || page?.imageinfo?.[0]?.url || '')
+            .filter(Boolean)
+            .slice(0, 10);
         } catch {
-          imageUrl = '';
+          imageUrls = [];
         }
       }
-      if (!imageUrl) {
-        imageUrl = `https://loremflickr.com/300/300/${encodeURIComponent(query)},grocery`;
+      if (!imageUrls.length) {
+        imageUrls = [`https://loremflickr.com/300/300/${encodeURIComponent(query)},grocery`];
       }
 
-      sendJson(response, 200, { ok: true, data: { imageUrl } });
+      sendJson(response, 200, { ok: true, data: { imageUrl: imageUrls[0], imageUrls } });
     } catch (error) {
-      sendJson(response, error.status || 200, { ok: true, data: { imageUrl: '' } });
+      sendJson(response, error.status || 200, { ok: true, data: { imageUrl: '', imageUrls: [] } });
     }
     return;
   }

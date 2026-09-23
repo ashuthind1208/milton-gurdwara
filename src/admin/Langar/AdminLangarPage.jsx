@@ -1,6 +1,6 @@
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
   ArrowDownTrayIcon,
@@ -19,7 +19,7 @@ import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton';
 import cmsService from '../../services/cmsService';
-import langarService, { LANGAR_CONTRIBUTIONS_RESOURCE, resolveGroceryImage, searchGroceryImage } from '../../services/langarService';
+import langarService, { LANGAR_CONTRIBUTIONS_RESOURCE, resolveGroceryImage, searchGroceryImages } from '../../services/langarService';
 import contentApiService from '../../services/contentApiService';
 import { downloadLangarReceivedReportCsv, downloadLangarReceivedReportPdf } from '../../utils/csvExport';
 import { siteConfig } from '../../constants/siteConfig';
@@ -98,7 +98,7 @@ const buildLangarPayload = (values) => {
     quantityRequired,
     quantityReceived,
     unit: String(values.unit || 'items').trim() || 'items',
-    imageUrl: String(values.imageUrl || '').trim() || resolveGroceryImage(values.name)
+    imageUrl: String(values.imageUrl || '').trim()
   };
 };
 
@@ -198,14 +198,19 @@ const AdminLangarPage = () => {
   const editImageUrl = editForm.watch('imageUrl');
   const [createImageLookupPending, setCreateImageLookupPending] = useState(false);
   const [editImageLookupPending, setEditImageLookupPending] = useState(false);
+  const [createImageOptions, setCreateImageOptions] = useState([]);
+  const [editImageOptions, setEditImageOptions] = useState([]);
 
-  const lookupItemImage = async (name, formToUpdate, setPending) => {
+  const lookupItemImage = async (name, formToUpdate, setPending, setOptions) => {
     const trimmed = String(name || '').trim();
     if (!trimmed) return;
+    formToUpdate.setValue('imageUrl', '', { shouldDirty: true });
     setPending(true);
     try {
-      const foundImageUrl = await searchGroceryImage(trimmed);
-      formToUpdate.setValue('imageUrl', foundImageUrl || resolveGroceryImage(trimmed), { shouldDirty: true });
+      const imageOptions = await searchGroceryImages(trimmed);
+      const options = [...new Set(imageOptions.filter(Boolean))].slice(0, 10);
+      setOptions(options);
+      formToUpdate.setValue('imageUrl', options[0] || resolveGroceryImage(trimmed), { shouldDirty: true });
     } finally {
       setPending(false);
     }
@@ -342,6 +347,7 @@ const AdminLangarPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cms-home'] });
       form.reset(defaultForm);
+      setCreateImageOptions([]);
       setCreateOpen(false);
     }
   });
@@ -350,6 +356,7 @@ const AdminLangarPage = () => {
     mutationFn: ({ id, values }) => cmsService.updateLangarItem(id, buildLangarPayload(values)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cms-home'] });
+      setEditImageOptions([]);
       setEditingItem(null);
     }
   });
@@ -380,6 +387,8 @@ const AdminLangarPage = () => {
   });
 
   const openEdit = (item) => {
+    setEditImageOptions([]);
+    setEditImageLookupPending(false);
     setEditingItem(item);
     editForm.reset({
       name: item.name,
@@ -393,6 +402,13 @@ const AdminLangarPage = () => {
     });
   };
 
+  const openCreate = useCallback(() => {
+    form.reset(defaultForm);
+    setCreateImageOptions([]);
+    setCreateImageLookupPending(false);
+    setCreateOpen(true);
+  }, [form]);
+
   const openView = (item) => {
     setViewItem(item);
     setViewContributorsPage(1);
@@ -402,6 +418,10 @@ const AdminLangarPage = () => {
     setCreateOpen(false);
     setViewItem(null);
     setEditingItem(null);
+    setCreateImageOptions([]);
+    setEditImageOptions([]);
+    setCreateImageLookupPending(false);
+    setEditImageLookupPending(false);
   };
 
   const applyReportPreset = (days) => {
@@ -431,10 +451,10 @@ const AdminLangarPage = () => {
   };
 
   useEffect(() => {
-    setHeaderAction(<AdminHeaderActionButton label="Add New Seva Item" onClick={() => setCreateOpen(true)} />);
+    setHeaderAction(<AdminHeaderActionButton label="Add New Seva Item" onClick={openCreate} />);
 
     return () => setHeaderAction(null);
-  }, [setHeaderAction]);
+  }, [openCreate, setHeaderAction]);
 
   useEffect(() => {
     setPage(1);
@@ -729,10 +749,21 @@ const AdminLangarPage = () => {
               <form className="space-y-4 p-5" onSubmit={form.handleSubmit((values) => addMutation.mutate(values))}>
                 <div className="flex items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
                   <img src={createImageUrl || resolveGroceryImage(createName) || undefined} alt="" className="h-14 w-14 shrink-0 rounded-lg border border-slate-200 object-cover" onError={(event) => { event.currentTarget.style.visibility = 'hidden'; }} onLoad={(event) => { event.currentTarget.style.visibility = 'visible'; }} />
-                  <p className="text-xs text-slate-500">{createImageLookupPending ? 'Looking up an image for this item…' : 'The item image is fetched automatically from the item name.'}</p>
+                  <div className="min-w-0">
+                    <p className="text-xs text-slate-500">{createImageLookupPending ? 'Looking up images for this item…' : createImageOptions.length ? 'Choose one image to continue.' : 'Image selection is required.'}</p>
+                    {createImageOptions.length > 0 ? (
+                      <div className="mt-2 grid grid-cols-5 gap-1.5">
+                        {createImageOptions.map((imageUrl, index) => (
+                          <button key={imageUrl} type="button" onClick={() => form.setValue('imageUrl', imageUrl, { shouldDirty: true })} className={`overflow-hidden rounded-md border-2 ${createImageUrl === imageUrl ? 'border-brand-blue ring-2 ring-brand-blue/20' : 'border-slate-200'}`} aria-label={`Select image ${index + 1}`}>
+                            <img src={imageUrl} alt="" className="h-10 w-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
                 <label className={labelClass}>Item Name
-                  <input {...form.register('name', { required: true })} required className={inputClass} onBlur={(event) => { form.register('name').onBlur(event); lookupItemImage(event.target.value, form, setCreateImageLookupPending); }} />
+                  <input {...form.register('name', { required: true })} required className={inputClass} onBlur={(event) => { form.register('name').onBlur(event); lookupItemImage(event.target.value, form, setCreateImageLookupPending, setCreateImageOptions); }} />
                 </label>
                 <DropdownField
                   label="Category"
@@ -767,7 +798,7 @@ const AdminLangarPage = () => {
                   />
                 </div>
                 <div className="flex gap-2 pt-2">
-                  <Button type="submit" disabled={addMutation.isPending}>{addMutation.isPending ? 'Saving...' : 'Create Item'}</Button>
+                  <Button type="submit" disabled={addMutation.isPending || !createImageUrl}>{addMutation.isPending ? 'Saving...' : 'Create Item'}</Button>
                   <Button type="button" variant="ghost" onClick={closeModals}>Cancel</Button>
                 </div>
               </form>
@@ -858,10 +889,21 @@ const AdminLangarPage = () => {
               <form className="space-y-4 p-5" onSubmit={editForm.handleSubmit((values) => updateMutation.mutate({ id: editingItem.id, values }))}>
                 <div className="flex items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
                   <img src={editImageUrl || resolveGroceryImage(editName) || undefined} alt="" className="h-14 w-14 shrink-0 rounded-lg border border-slate-200 object-cover" onError={(event) => { event.currentTarget.style.visibility = 'hidden'; }} onLoad={(event) => { event.currentTarget.style.visibility = 'visible'; }} />
-                  <p className="text-xs text-slate-500">{editImageLookupPending ? 'Looking up an image for this item…' : 'The item image is fetched automatically from the item name.'}</p>
+                  <div className="min-w-0">
+                    <p className="text-xs text-slate-500">{editImageLookupPending ? 'Looking up images for this item…' : editImageOptions.length ? 'Choose one image to continue.' : 'Image selection is required.'}</p>
+                    {editImageOptions.length > 0 ? (
+                      <div className="mt-2 grid grid-cols-5 gap-1.5">
+                        {editImageOptions.map((imageUrl, index) => (
+                          <button key={imageUrl} type="button" onClick={() => editForm.setValue('imageUrl', imageUrl, { shouldDirty: true })} className={`overflow-hidden rounded-md border-2 ${editImageUrl === imageUrl ? 'border-brand-blue ring-2 ring-brand-blue/20' : 'border-slate-200'}`} aria-label={`Select image ${index + 1}`}>
+                            <img src={imageUrl} alt="" className="h-10 w-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
                 <label className={labelClass}>Item Name
-                  <input {...editForm.register('name', { required: true })} required className={inputClass} onBlur={(event) => { editForm.register('name').onBlur(event); lookupItemImage(event.target.value, editForm, setEditImageLookupPending); }} />
+                  <input {...editForm.register('name', { required: true })} required className={inputClass} onBlur={(event) => { editForm.register('name').onBlur(event); lookupItemImage(event.target.value, editForm, setEditImageLookupPending, setEditImageOptions); }} />
                 </label>
                 <DropdownField
                   label="Category"
@@ -899,7 +941,7 @@ const AdminLangarPage = () => {
                   <input type="number" readOnly disabled {...editForm.register('quantityReceived', { valueAsNumber: true })} className={`${inputClass} cursor-not-allowed bg-slate-100 text-slate-500`} />
                 </label>
                 <div className="flex gap-2 pt-2">
-                  <Button type="submit" disabled={updateMutation.isPending}>{updateMutation.isPending ? 'Saving...' : 'Save Changes'}</Button>
+                  <Button type="submit" disabled={updateMutation.isPending || !editImageUrl}>{updateMutation.isPending ? 'Saving...' : 'Save Changes'}</Button>
                   <Button type="button" variant="ghost" onClick={closeModals}>Cancel</Button>
                 </div>
               </form>
