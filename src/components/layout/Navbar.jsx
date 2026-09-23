@@ -2915,7 +2915,7 @@ const Navbar = () => {
             </Link>
           </div>
 
-          <div className="pointer-events-none absolute inset-x-0 top-1/2 z-[205] -translate-y-1/2 px-[4.25rem] md:px-[5.5rem]">
+          <div className="pointer-events-none absolute left-[4.25rem] right-[6rem] top-1/2 z-[205] -translate-y-1/2 md:left-[5.5rem] md:right-[7rem]">
             <div className="pointer-events-auto flex items-center justify-center gap-1.5 whitespace-nowrap">
               <button
                 type="button"
