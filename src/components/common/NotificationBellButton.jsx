@@ -57,12 +57,12 @@ const NotificationBellButton = ({ className = '', iconClassName = 'h-3.5 w-3.5' 
       type="button"
       onClick={toggleSubscription}
       disabled={isBusy}
-      className={`${className} ${isBlocked ? 'opacity-50' : ''}`}
+      className={className}
       aria-label={isSubscribed ? 'Turn off notifications' : 'Turn on notifications'}
       aria-pressed={isSubscribed}
       title={isBlocked ? 'Notifications are blocked in your browser settings' : (isSubscribed ? 'Notifications on' : 'Turn on notifications')}
     >
-      <Icon className={iconClassName} />
+      <Icon className={`${iconClassName} ${isBlocked ? 'opacity-50' : ''}`} />
     </button>
   );
 };
