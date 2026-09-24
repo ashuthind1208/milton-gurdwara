@@ -2915,7 +2915,7 @@ const Navbar = () => {
             </Link>
           </div>
 
-          <div className="pointer-events-none absolute left-[4.25rem] right-[6rem] top-1/2 z-[205] -translate-y-1/2 md:left-[5.5rem] md:right-[7rem]">
+          <div className="pointer-events-none absolute left-[4.25rem] right-[7rem] top-1/2 z-[205] -translate-y-1/2 md:left-[5.5rem] md:right-[8rem]">
             <div className="pointer-events-auto flex items-center justify-center gap-1.5 whitespace-nowrap">
               <button
                 type="button"
@@ -3033,7 +3033,7 @@ const Navbar = () => {
               <Link
                 to="/login"
                 onClick={handleSignInClick}
-                className="inline-flex h-7 min-w-[4.25rem] items-center justify-center gap-1 rounded-full border border-brand-saffron bg-brand-saffron px-2.5 py-1 text-[10px] font-extrabold text-brand-blue shadow-[0_6px_14px_rgba(15,23,42,0.3)]"
+                className="inline-flex h-7 min-w-[3.75rem] items-center justify-center gap-1 rounded-full border border-brand-saffron bg-brand-saffron px-2 py-1 text-[10px] font-extrabold text-brand-blue shadow-[0_6px_14px_rgba(15,23,42,0.3)]"
                 aria-label="Sign in"
                 title="Sign in"
               >
