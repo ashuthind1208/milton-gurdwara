@@ -37,7 +37,8 @@
     "react-router-dom": "^6.30.4",
     "react-scripts": "5.0.1",
     "recharts": "^3.9.2",
-    "stripe": "^18.5.0"
+    "stripe": "^18.5.0",
+    "web-push": "^3.6.7"
   },
   "scripts": {
     "start": "node scripts/start.js",

@@ -78,6 +78,7 @@ loadEnvFile(path.join(workspaceRoot, '.env'));
 loadEnvFile(path.join(workspaceRoot, '.env.local'));
 
 const eventsDb = require('./db/adapter');
+const pushNotifications = require('./pushNotifications');
 
 const API_VERSION = '2026-07-27.phase2';
 const API_STARTUP_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -345,6 +346,14 @@ const triggerSocialAutomation = async ({ type, payload = {} }) => {
     results
   };
 };
+
+// Sends a native-style push notification without ever failing the request that triggered it.
+const notifyAppUpdate = ({ title, body, url = '/', tag = 'ssm-update', icon }) => {
+  pushNotifications.broadcastNotification(eventsDb, { title, body, url, tag, icon }).catch((error) => {
+    console.error('Push notification broadcast failed:', error.message || error);
+  });
+};
+
 let smtpTransport = null;
 let volunteerReminderSweepRunning = false;
 let volunteerReminderLastRunDateKey = '';
@@ -7013,6 +7022,7 @@ const server = http.createServer(async (request, response) => {
         ? (await eventsDb.listItems('users')).some((user) => String(user.email || '').trim().toLowerCase() === normalizedNewUserEmail)
         : false;
       const data = await eventsDb.createItem(resource, validatedBody);
+      const actorName = String(getRequestActor(request).name || '').trim() || 'A sangat member';
       if (resource === 'seva_opportunities') {
         await triggerSocialAutomation({
           type: 'seva.created',
@@ -7024,6 +7034,28 @@ const server = http.createServer(async (request, response) => {
             whatsappNumber: process.env.WHATSAPP_GROUP_NUMBER || '',
             hashtags: ['Seva', 'Sangat', 'Community']
           }
+        });
+        notifyAppUpdate({
+          title: 'New Seva Opportunity',
+          body: `${actorName} posted a new seva opportunity: ${data?.title || data?.sevaType || 'Seva opportunity'}.`,
+          url: '/seva',
+          tag: 'ssm-seva'
+        });
+      }
+      if (resource === 'news_articles') {
+        notifyAppUpdate({
+          title: 'New Community Update',
+          body: `${actorName} published a news update: ${data?.heading || data?.title || 'Community news'}.`,
+          url: '/news',
+          tag: 'ssm-news'
+        });
+      }
+      if (resource === 'langar_contributions') {
+        notifyAppUpdate({
+          title: 'New Langar Commitment',
+          body: `${actorName} committed ${data?.quantity || 0} ${data?.unit || 'items'} of ${data?.itemName || 'a Langar item'}.`,
+          url: '/',
+          tag: 'ssm-langar-commitment'
         });
       }
       if (resource !== 'audit_logs') {
@@ -7098,6 +7130,15 @@ const server = http.createServer(async (request, response) => {
               ));
               await eventsDb.setSingleton('cms_home_content', { ...homeContent, langarItems: nextLangarItems });
             }
+          }
+          if (nextStatus === 'received') {
+            const receivedByActorName = String(getRequestActor(request).name || '').trim() || 'A Gurdwara team member';
+            notifyAppUpdate({
+              title: 'Langar Item Received',
+              body: `${receivedByActorName} marked ${existingContribution.quantity || 0} ${existingContribution.unit || 'items'} of ${existingContribution.itemName || 'a Langar item'} as received.`,
+              url: '/',
+              tag: 'ssm-langar-received'
+            });
           }
         }
       }
@@ -7233,6 +7274,8 @@ const server = http.createServer(async (request, response) => {
         assertInput(canManageBookingDuties(request), 'Only Admin and Super Admin can assign booking duties.', 403);
       }
       const body = await parseAndValidateGenericStructuredBody(request, { maxBytes: maxJsonBodyBytes });
+      const actorName = String(getRequestActor(request).name || '').trim() || 'A Gurdwara team member';
+      const previousSingleton = resource === 'cms_home_content' ? await eventsDb.getSingleton(resource, null) : null;
       const data = await eventsDb.setSingleton(resource, body);
       if (String(resource || '').toLowerCase().includes('hukamnama')) {
         const title = body?.title || 'Daily Hukamnama';
@@ -7247,6 +7290,24 @@ const server = http.createServer(async (request, response) => {
             whatsappNumber: process.env.WHATSAPP_GROUP_NUMBER || '',
             hashtags: ['Hukamnama', 'Gurbani', 'SikhCommunity']
           }
+        });
+        notifyAppUpdate({
+          title: 'New Hukamnama Posted',
+          body: `${actorName} posted today's Hukamnama. ${summary}`.trim(),
+          url: '/hukamnama',
+          tag: 'ssm-hukamnama'
+        });
+      }
+      if (resource === 'cms_home_content') {
+        const previousItemIds = new Set((previousSingleton?.langarItems || []).map((item) => String(item?.id || '')));
+        const newlyAddedItems = (body?.langarItems || []).filter((item) => item?.id && !previousItemIds.has(String(item.id)));
+        newlyAddedItems.forEach((item) => {
+          notifyAppUpdate({
+            title: 'New Langar Item Requested',
+            body: `${actorName} listed "${item.name || 'a new item'}" (${item.quantityRequired || 0} ${item.unit || 'items'}) for Langar seva.`,
+            url: '/',
+            tag: 'ssm-langar-item'
+          });
         });
       }
       await appendAuditLog(request, {
@@ -7475,6 +7536,34 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (requestUrl.pathname === '/api/push/public-key' && request.method === 'GET') {
+    sendJson(response, 200, { ok: true, data: { publicKey: pushNotifications.getPublicKey() } });
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/push/subscribe' && request.method === 'POST') {
+    try {
+      const body = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
+      assertInput(Boolean(body.endpoint), 'A push subscription endpoint is required.', 400);
+      const data = await pushNotifications.saveSubscription(eventsDb, body);
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to save push subscription.' });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/push/unsubscribe' && request.method === 'POST') {
+    try {
+      const body = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: true });
+      const data = await pushNotifications.removeSubscription(eventsDb, body?.endpoint);
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to remove push subscription.' });
+    }
+    return;
+  }
+
   if (requestUrl.pathname === '/api/social/langar-item-update' && request.method === 'POST') {
     try {
       const body = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
@@ -7619,6 +7708,12 @@ const server = http.createServer(async (request, response) => {
           whatsappNumber: process.env.WHATSAPP_GROUP_NUMBER || '',
           hashtags: ['SinghSabha', 'Community', 'Event']
         }
+      });
+      notifyAppUpdate({
+        title: 'New Event Added',
+        body: `${String(getRequestActor(request).name || '').trim() || 'A Gurdwara team member'} added a new event: ${data?.title || body?.title}.`,
+        url: '/events',
+        tag: 'ssm-event'
       });
       await appendAuditLog(request, {
         action: 'event.create',

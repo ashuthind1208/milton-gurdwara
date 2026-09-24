@@ -22,13 +22,13 @@ import {
   PhoneIcon,
   FilmIcon,
   UserCircleIcon,
-  ArrowLeftOnRectangleIcon,
   ArrowRightOnRectangleIcon,
   HeartIcon,
   SparklesIcon
 } from '@heroicons/react/24/outline';
 import { publicNav } from '../../constants/navigation';
 import { siteConfig } from '../../constants/siteConfig';
+import NotificationBellButton from '../common/NotificationBellButton';
 import notoSansGurmukhiRegular from '../../assets/fonts/NotoSansGurmukhi-Regular.ttf';
 import notoSansGurmukhiBold from '../../assets/fonts/NotoSansGurmukhi-Bold.ttf';
 import { getNanakshahiDate, getNanakshahiMonthCalendar, getUpcomingPunjabiObservances } from '../../utils/punjabiCalendar';
@@ -394,11 +394,9 @@ const YouTubeGlyph = () => (
   </svg>
 );
 
-const LiveStreamGlyph = () => (
-  <svg viewBox="0 0 24 24" className={streamGlyphClass} aria-hidden="true">
-    <path d="M22 12c0 2.5-.3 4.2-.7 5.2a3.6 3.6 0 0 1-2 2C18.2 19.6 16.5 20 12 20s-6.2-.4-7.3-.8a3.6 3.6 0 0 1-2-2C2.3 16.2 2 14.5 2 12s.3-4.2.7-5.2a3.6 3.6 0 0 1 2-2C5.8 4.4 7.5 4 12 4s6.2.4 7.3.8a3.6 3.6 0 0 1 2 2c.4 1 .7 2.7.7 5.2Z" fill="#0a4d9f" />
-    <path d="m10 9 5 3-5 3V9Z" fill="#ffffff" />
-    <circle cx="19" cy="6.5" r="1.6" fill="#f5a623" />
+const LiveStreamGlyph = ({ className = streamGlyphClass }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+    <path d="M8 5v14l11-7z" />
   </svg>
 );
 
@@ -2655,6 +2653,10 @@ const Navbar = () => {
               </div>
             </div>
             <div className="ml-auto flex items-center gap-3">
+              <NotificationBellButton
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-brand-blue/25 bg-white text-brand-blue shadow-sm transition hover:border-brand-blue/50 disabled:opacity-50"
+                iconClassName="h-4 w-4"
+              />
               {!isAuthenticated ? (
                 <Link to={getBecomeMemberLoginTarget('/family-dashboard')} onClick={handleBecomeMemberClick} className="my-1 rounded-full border border-brand-saffron bg-brand-saffron px-3 py-1 text-[11px] font-extrabold text-brand-navy shadow-[0_8px_18px_rgba(245,166,35,0.4)] transition hover:bg-amber-300 hover:shadow-[0_0_18px_rgba(245,166,35,0.55)]">Become Member</Link>
               ) : null}
@@ -2915,7 +2917,7 @@ const Navbar = () => {
             </Link>
           </div>
 
-          <div className="pointer-events-none absolute left-[4.25rem] right-[7rem] top-1/2 z-[205] -translate-y-1/2 md:left-[5.5rem] md:right-[8rem]">
+          <div className="pointer-events-none absolute left-[6rem] right-[8rem] top-1/2 z-[205] -translate-y-1/2 md:left-[7.25rem] md:right-[9rem]">
             <div className="pointer-events-auto flex items-center justify-center gap-1.5 whitespace-nowrap">
               <button
                 type="button"
@@ -2935,7 +2937,7 @@ const Navbar = () => {
                   armBackdropGuard(searchBackdropGuardRef, searchBackdropGuardTimeoutRef);
                   setIsSearchModalOpen(true);
                 }}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-sky-300 bg-sky-100 text-sky-900 touch-manipulation select-none md:w-auto md:gap-1 md:px-2.5"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-sky-300 bg-sky-100 text-sky-900 touch-manipulation select-none md:w-auto md:gap-1 md:px-2.5"
                 aria-label="Open search"
                 title="Search"
               >
@@ -2960,13 +2962,16 @@ const Navbar = () => {
                   armBackdropGuard(dateInfoBackdropGuardRef, dateInfoBackdropGuardTimeoutRef);
                   setDateInfoOpen(true);
                 }}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-brand-blue/30 bg-gradient-to-r from-white via-blue-50 to-amber-50 text-brand-blue touch-manipulation select-none md:w-auto md:gap-1 md:px-2.5"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-blue/30 bg-gradient-to-r from-white via-blue-50 to-amber-50 text-brand-blue touch-manipulation select-none md:w-auto md:gap-1 md:px-2.5"
                 aria-label="Open calendar"
                 title="Calendar"
               >
                 <CalendarDaysIcon className="h-3.5 w-3.5" />
                 <span className="hidden text-[10px] font-bold md:inline">Calendar</span>
               </button>
+              <NotificationBellButton
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-blue/30 bg-gradient-to-r from-white via-blue-50 to-amber-50 text-brand-blue touch-manipulation select-none disabled:opacity-50"
+              />
               {liveStreams.length > 0 ? (
                 <button
                   type="button"
@@ -2981,10 +2986,11 @@ const Navbar = () => {
                     openCompactStreams();
                   }}
                   onClick={openCompactStreams}
-                  className="inline-flex items-center gap-1 rounded-full bg-brand-blue px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-[0_8px_18px_rgba(10,77,159,0.35)] touch-manipulation select-none"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-transparent bg-brand-saffron text-brand-blue shadow-[0_8px_18px_rgba(245,166,35,0.4)] touch-manipulation select-none"
+                  aria-label="Watch live stream"
+                  title="Live"
                 >
-                  <LiveStreamGlyph />
-                  Live
+                  <LiveStreamGlyph className="h-3.5 w-3.5" />
                 </button>
               ) : null}
             </div>
@@ -3033,11 +3039,10 @@ const Navbar = () => {
               <Link
                 to="/login"
                 onClick={handleSignInClick}
-                className="inline-flex h-7 min-w-[3.75rem] items-center justify-center gap-1 rounded-full border border-brand-saffron bg-brand-saffron px-2 py-1 text-[10px] font-extrabold text-brand-blue shadow-[0_6px_14px_rgba(15,23,42,0.3)]"
+                className="inline-flex h-7 min-w-[3.25rem] items-center justify-center rounded-full border border-brand-saffron bg-brand-saffron px-2.5 py-1 text-[10px] font-extrabold text-brand-blue shadow-[0_6px_14px_rgba(15,23,42,0.3)]"
                 aria-label="Sign in"
                 title="Sign in"
               >
-                <ArrowLeftOnRectangleIcon className="h-3.5 w-3.5 stroke-[2.5]" />
                 <span>Sign In</span>
               </Link>
             )}
