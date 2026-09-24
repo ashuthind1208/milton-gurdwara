@@ -11,6 +11,7 @@
 # production
 /build
 /server/uploads/
+/server/data/vapid-keys.json
 /*.zip
 /*.tar.gz
 

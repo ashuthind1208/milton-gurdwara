@@ -29,6 +29,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { publicNav } from '../../constants/navigation';
 import { siteConfig } from '../../constants/siteConfig';
+import NotificationBellButton from '../common/NotificationBellButton';
 import notoSansGurmukhiRegular from '../../assets/fonts/NotoSansGurmukhi-Regular.ttf';
 import notoSansGurmukhiBold from '../../assets/fonts/NotoSansGurmukhi-Bold.ttf';
 import { getNanakshahiDate, getNanakshahiMonthCalendar, getUpcomingPunjabiObservances } from '../../utils/punjabiCalendar';
@@ -2655,6 +2656,10 @@ const Navbar = () => {
               </div>
             </div>
             <div className="ml-auto flex items-center gap-3">
+              <NotificationBellButton
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-brand-blue/25 bg-white text-brand-blue shadow-sm transition hover:border-brand-blue/50 disabled:opacity-50"
+                iconClassName="h-4 w-4"
+              />
               {!isAuthenticated ? (
                 <Link to={getBecomeMemberLoginTarget('/family-dashboard')} onClick={handleBecomeMemberClick} className="my-1 rounded-full border border-brand-saffron bg-brand-saffron px-3 py-1 text-[11px] font-extrabold text-brand-navy shadow-[0_8px_18px_rgba(245,166,35,0.4)] transition hover:bg-amber-300 hover:shadow-[0_0_18px_rgba(245,166,35,0.55)]">Become Member</Link>
               ) : null}
@@ -2915,7 +2920,7 @@ const Navbar = () => {
             </Link>
           </div>
 
-          <div className="pointer-events-none absolute left-[4.25rem] right-[7rem] top-1/2 z-[205] -translate-y-1/2 md:left-[5.5rem] md:right-[8rem]">
+          <div className="pointer-events-none absolute left-[4.25rem] right-[9.5rem] top-1/2 z-[205] -translate-y-1/2 md:left-[5.5rem] md:right-[10.5rem]">
             <div className="pointer-events-auto flex items-center justify-center gap-1.5 whitespace-nowrap">
               <button
                 type="button"
@@ -2967,6 +2972,9 @@ const Navbar = () => {
                 <CalendarDaysIcon className="h-3.5 w-3.5" />
                 <span className="hidden text-[10px] font-bold md:inline">Calendar</span>
               </button>
+              <NotificationBellButton
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-brand-blue/30 bg-gradient-to-r from-white via-blue-50 to-amber-50 text-brand-blue touch-manipulation select-none disabled:opacity-50"
+              />
               {liveStreams.length > 0 ? (
                 <button
                   type="button"
