@@ -28,7 +28,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { publicNav } from '../../constants/navigation';
 import { siteConfig } from '../../constants/siteConfig';
-import NotificationBellButton from '../common/NotificationBellButton';
+import NotificationPermissionPrompt from '../common/NotificationPermissionPrompt';
 import notoSansGurmukhiRegular from '../../assets/fonts/NotoSansGurmukhi-Regular.ttf';
 import notoSansGurmukhiBold from '../../assets/fonts/NotoSansGurmukhi-Bold.ttf';
 import { getNanakshahiDate, getNanakshahiMonthCalendar, getUpcomingPunjabiObservances } from '../../utils/punjabiCalendar';
@@ -2653,10 +2653,6 @@ const Navbar = () => {
               </div>
             </div>
             <div className="ml-auto flex items-center gap-3">
-              <NotificationBellButton
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-brand-blue/25 bg-white text-brand-blue shadow-sm transition hover:border-brand-blue/50 disabled:opacity-50"
-                iconClassName="h-4 w-4"
-              />
               {!isAuthenticated ? (
                 <Link to={getBecomeMemberLoginTarget('/family-dashboard')} onClick={handleBecomeMemberClick} className="my-1 rounded-full border border-brand-saffron bg-brand-saffron px-3 py-1 text-[11px] font-extrabold text-brand-navy shadow-[0_8px_18px_rgba(245,166,35,0.4)] transition hover:bg-amber-300 hover:shadow-[0_0_18px_rgba(245,166,35,0.55)]">Become Member</Link>
               ) : null}
@@ -2969,9 +2965,6 @@ const Navbar = () => {
                 <CalendarDaysIcon className="h-3.5 w-3.5" />
                 <span className="hidden text-[10px] font-bold md:inline">Calendar</span>
               </button>
-              <NotificationBellButton
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-blue/30 bg-gradient-to-r from-white via-blue-50 to-amber-50 text-brand-blue touch-manipulation select-none disabled:opacity-50"
-              />
               {liveStreams.length > 0 ? (
                 <button
                   type="button"
@@ -2986,11 +2979,12 @@ const Navbar = () => {
                     openCompactStreams();
                   }}
                   onClick={openCompactStreams}
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-transparent bg-brand-saffron text-brand-blue shadow-[0_8px_18px_rgba(245,166,35,0.4)] touch-manipulation select-none"
+                  className="inline-flex h-7 min-w-[3.25rem] shrink-0 items-center justify-center gap-1 rounded-full border border-brand-saffron bg-brand-saffron px-2.5 py-1 text-[10px] font-extrabold text-brand-blue shadow-[0_6px_14px_rgba(245,166,35,0.35)] touch-manipulation select-none"
                   aria-label="Watch live stream"
                   title="Live"
                 >
                   <LiveStreamGlyph className="h-3.5 w-3.5" />
+                  <span>LIVE</span>
                 </button>
               ) : null}
             </div>
@@ -3061,6 +3055,8 @@ const Navbar = () => {
           </div>
         </div>
       </div>
+
+      <NotificationPermissionPrompt />
 
       <div
         className={`hidden transition-[grid-template-rows,opacity] duration-300 ease-in-out xl:grid ${(isCompact || !isHomePage) ? 'pointer-events-none grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'}`}
