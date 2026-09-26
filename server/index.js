@@ -79,6 +79,7 @@ loadEnvFile(path.join(workspaceRoot, '.env.local'));
 
 const eventsDb = require('./db/adapter');
 const pushNotifications = require('./pushNotifications');
+const langarBoardEventClients = new Set();
 
 const API_VERSION = '2026-07-27.phase2';
 const API_STARTUP_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -6013,6 +6014,24 @@ const resolveYouTubeLiveVideo = async (source) => {
 const server = http.createServer(async (request, response) => {
   const requestUrl = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
 
+  if (requestUrl.pathname === '/api/live/langar' && request.method === 'GET') {
+    response.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no'
+    });
+    response.write('retry: 3000\n\n');
+    langarBoardEventClients.add(response);
+    const heartbeat = setInterval(() => response.write(': heartbeat\n\n'), 25000);
+    heartbeat.unref?.();
+    response.on('close', () => {
+      clearInterval(heartbeat);
+      langarBoardEventClients.delete(response);
+    });
+    return;
+  }
+
   const rateLimitAllowed = await enforceRateLimit(request, response, requestUrl);
   if (!rateLimitAllowed) {
     return;
@@ -7118,6 +7137,11 @@ const server = http.createServer(async (request, response) => {
       const existingUser = Array.isArray(existingUsers) ? existingUsers.find((entry) => String(entry?.id || '') === String(id)) : null;
       const existingBookings = resource === 'bookings' ? await eventsDb.listItems('bookings') : null;
       const existingBooking = Array.isArray(existingBookings) ? existingBookings.find((entry) => String(entry?.id || '') === String(id)) : null;
+      const existingLangarContributions = resource === 'langar_contributions' ? await eventsDb.listItems(resource) : null;
+      const existingLangarContribution = Array.isArray(existingLangarContributions)
+        ? existingLangarContributions.find((entry) => String(entry?.id || '') === String(id))
+        : null;
+      const previousLangarStatus = String(existingLangarContribution?.status || 'pending').trim().toLowerCase();
       const changedRoleToMember = resource === 'users'
         && String(existingUser?.role || '').trim().toLowerCase() !== 'member'
         && String(body?.role || '').trim().toLowerCase() === 'member';
@@ -7136,11 +7160,14 @@ const server = http.createServer(async (request, response) => {
         await assertNoScheduleOverlap(validatedBody, { kind: 'booking', excludeId: id });
       }
       if (resource === 'langar_contributions') {
-        const existingContribution = await eventsDb.listItems(resource).then((rows) => rows.find((entry) => String(entry?.id || '') === String(id)));
+        const existingContribution = existingLangarContribution;
         const previousStatus = String(existingContribution?.status || 'pending').trim().toLowerCase();
         const nextStatus = String(validatedBody?.status || previousStatus).trim().toLowerCase();
         if (existingContribution && previousStatus !== nextStatus && ['received', 'pending', 'cancelled'].includes(nextStatus)) {
-          validatedBody.updatedAt = new Date().toISOString();
+          const statusChangedAt = new Date().toISOString();
+          validatedBody.updatedAt = statusChangedAt;
+          if (nextStatus === 'received') validatedBody.receivedAt = statusChangedAt;
+          else if (previousStatus === 'received') validatedBody.receivedAt = '';
           const homeContent = await eventsDb.getSingleton('cms_home_content', null);
           if (homeContent && Array.isArray(homeContent.langarItems)) {
             const quantity = Number(existingContribution.quantity || 0);
@@ -7154,18 +7181,29 @@ const server = http.createServer(async (request, response) => {
               await eventsDb.setSingleton('cms_home_content', { ...homeContent, langarItems: nextLangarItems });
             }
           }
-          if (nextStatus === 'received') {
-            const receivedByActorName = String(getRequestActor(request).name || '').trim() || 'A Gurdwara team member';
-            notifyAppUpdate({
-              title: 'Langar Item Received',
-              body: `${receivedByActorName} marked ${existingContribution.quantity || 0} ${existingContribution.unit || 'items'} of ${existingContribution.itemName || 'a Langar item'} as received.`,
-              url: '/',
-              tag: 'ssm-langar-received'
-            });
-          }
         }
       }
       const data = await eventsDb.updateItem(resource, id, validatedBody);
+
+      if (resource === 'langar_contributions' && existingLangarContribution) {
+        const nextStatus = String(data?.status || validatedBody?.status || previousLangarStatus).trim().toLowerCase();
+        if (previousLangarStatus !== nextStatus && nextStatus === 'received') {
+          const receivedByActorName = String(getRequestActor(request).name || '').trim() || 'A Gurdwara team member';
+          notifyAppUpdate({
+            title: 'Langar Item Received',
+            body: `${receivedByActorName} marked ${existingLangarContribution.quantity || 0} ${existingLangarContribution.unit || 'items'} of ${existingLangarContribution.itemName || 'a Langar item'} as received.`,
+            url: '/',
+            tag: 'ssm-langar-received'
+          });
+        } else if (previousLangarStatus !== nextStatus && nextStatus === 'cancelled') {
+          notifyAppUpdate({
+            title: 'Langar Commitment Cancelled',
+            body: `A commitment for ${existingLangarContribution.itemName || 'a Langar item'} was cancelled.`,
+            url: '/',
+            tag: 'ssm-langar-cancelled'
+          });
+        }
+      }
 
       if (resource === 'users' && eventsDb.hasDatabaseConnection) {
         const mergedUser = {
@@ -7200,6 +7238,42 @@ const server = http.createServer(async (request, response) => {
             && String(mergedBooking.refundStatus || '').trim().toLowerCase() === 'processed';
           await sendBookingNotificationEmail(mergedBooking, { changeType: refundReleased ? 'refund-released' : 'updated' });
         }
+        notifyAppUpdate({
+          title: String(existingBooking?.refundStatus || '').trim().toLowerCase() !== 'processed'
+            && String(mergedBooking.refundStatus || '').trim().toLowerCase() === 'processed'
+            ? 'Booking Refund Released'
+            : 'Booking Updated',
+          body: `A booking for ${mergedBooking.eventName || mergedBooking.eventTitle || mergedBooking.bookingDate || 'a Gurdwara service'} was updated.`,
+          url: '/bookings',
+          tag: 'ssm-booking-updated'
+        });
+      } else if (['news_articles', 'seva_opportunities'].includes(resource)) {
+        const isNews = resource === 'news_articles';
+        notifyAppUpdate({
+          title: isNews ? 'Community Update Edited' : 'Seva Opportunity Updated',
+          body: isNews
+            ? `A community update was edited: ${data?.heading || data?.title || 'Community news'}.`
+            : `A seva opportunity was updated: ${data?.title || data?.sevaType || 'Seva opportunity'}.`,
+          url: isNews ? '/news' : '/seva',
+          tag: isNews ? 'ssm-news-updated' : 'ssm-seva-updated'
+        });
+      } else if (resource === 'volunteer_registrations') {
+        notifyAppUpdate({
+          title: 'Volunteer Registration Updated',
+          body: `A seva volunteer registration was updated for ${data?.sevaType || data?.area || 'a seva opportunity'}.`,
+          url: '/seva',
+          tag: 'ssm-volunteer-registration-updated'
+        });
+      } else if (resource === 'langar_contributions' && existingLangarContribution) {
+        const nextStatus = String(data?.status || validatedBody?.status || previousLangarStatus).trim().toLowerCase();
+        if (previousLangarStatus === nextStatus || !['received', 'cancelled'].includes(nextStatus)) {
+          notifyAppUpdate({
+            title: 'Langar Commitment Updated',
+            body: `A commitment for ${data?.itemName || existingLangarContribution.itemName || 'a Langar item'} was updated.`,
+            url: '/',
+            tag: 'ssm-langar-updated'
+          });
+        }
       }
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
@@ -7212,6 +7286,12 @@ const server = http.createServer(async (request, response) => {
     try {
       const resource = String(contentResourceIdMatch[1]).toLowerCase();
       const id = parseStringPathId(decodeURIComponent(contentResourceIdMatch[2]), 'id');
+      const existingResourceItems = ['bookings', 'news_articles', 'seva_opportunities', 'langar_contributions', 'volunteer_registrations'].includes(resource)
+        ? await eventsDb.listItems(resource)
+        : null;
+      const deletedResourceItem = Array.isArray(existingResourceItems)
+        ? existingResourceItems.find((entry) => String(entry?.id || '') === String(id))
+        : null;
       if (resource === 'bookings') {
         assertInput(canManageBookingDuties(request), 'Only Admin and Super Admin can delete bookings.', 403);
       }
@@ -7267,6 +7347,16 @@ const server = http.createServer(async (request, response) => {
             : undefined
         });
       }
+      if (deletedResourceItem && ['bookings', 'news_articles', 'seva_opportunities', 'langar_contributions', 'volunteer_registrations'].includes(resource)) {
+        const notificationDetails = {
+          bookings: { title: 'Booking Cancelled', body: 'A Gurdwara booking was cancelled.', url: '/bookings', tag: 'ssm-booking-deleted' },
+          news_articles: { title: 'Community Update Removed', body: `A community update was removed: ${deletedResourceItem.heading || deletedResourceItem.title || 'Community news'}.`, url: '/news', tag: 'ssm-news-deleted' },
+          seva_opportunities: { title: 'Seva Opportunity Removed', body: `A seva opportunity was removed: ${deletedResourceItem.title || deletedResourceItem.sevaType || 'Seva opportunity'}.`, url: '/seva', tag: 'ssm-seva-deleted' },
+          langar_contributions: { title: 'Langar Commitment Removed', body: `A commitment for ${deletedResourceItem.itemName || 'a Langar item'} was removed.`, url: '/', tag: 'ssm-langar-deleted' },
+          volunteer_registrations: { title: 'Seva Registration Removed', body: `A volunteer registration for ${deletedResourceItem.sevaType || 'a seva opportunity'} was removed.`, url: '/seva', tag: 'ssm-volunteer-registration-removed' }
+        }[resource];
+        notifyAppUpdate(notificationDetails);
+      }
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
       sendJson(response, error.status || 500, {
@@ -7298,32 +7388,67 @@ const server = http.createServer(async (request, response) => {
       }
       const body = await parseAndValidateGenericStructuredBody(request, { maxBytes: maxJsonBodyBytes });
       const actorName = String(getRequestActor(request).name || '').trim() || 'A Gurdwara team member';
-      const previousSingleton = resource === 'cms_home_content' ? await eventsDb.getSingleton(resource, null) : null;
+      const previousSingleton = ['cms_home_content', 'hukamnama_ssm_hukamnama_entries'].includes(resource)
+        ? await eventsDb.getSingleton(resource, null)
+        : null;
       const data = await eventsDb.setSingleton(resource, body);
-      if (String(resource || '').toLowerCase().includes('hukamnama')) {
-        const title = body?.title || 'Daily Hukamnama';
-        const summary = body?.summary || body?.metadata?.source || 'Daily hukamnama updated.';
-        await triggerSocialAutomation({
-          type: 'hukamnama.updated',
-          payload: {
-            title,
-            summary,
-            imageUrl: body?.imageUrl || body?.coverImageUrl || '',
-            link: `${newsletterPublicBaseUrl || volunteerReminderBaseUrl || process.env.APP_URL || 'https://example.com'}/hukamnama`,
-            whatsappNumber: process.env.WHATSAPP_GROUP_NUMBER || '',
-            hashtags: ['Hukamnama', 'Gurbani', 'SikhCommunity']
+      if (resource === 'hukamnama_ssm_hukamnama_entries') {
+        const previousEntries = previousSingleton || {};
+        const allDateKeys = new Set([...Object.keys(previousEntries), ...Object.keys(body || {})]);
+        const changes = [...allDateKeys].flatMap((dateKey) => {
+          const previousDay = previousEntries[dateKey] || {};
+          const nextDay = body?.[dateKey] || {};
+          return ['morning', 'evening'].flatMap((slot) => {
+            const previousEntry = previousDay?.[slot];
+            const nextEntry = nextDay?.[slot];
+            if (!previousEntry && nextEntry) return [{ kind: 'posted', dateKey }];
+            if (previousEntry && !nextEntry) return [{ kind: 'removed', dateKey }];
+            if (previousEntry && nextEntry && JSON.stringify(previousEntry) !== JSON.stringify(nextEntry)) return [{ kind: 'updated', dateKey }];
+            return [];
+          });
+        });
+        if (changes.length) {
+          const posted = changes.filter((change) => change.kind === 'posted').length;
+          const updated = changes.filter((change) => change.kind === 'updated').length;
+          const removed = changes.filter((change) => change.kind === 'removed').length;
+          const summary = [posted && `${posted} posted`, updated && `${updated} updated`, removed && `${removed} removed`].filter(Boolean).join(', ');
+          notifyAppUpdate({
+            title: 'Hukamnama Schedule Updated',
+            body: `${actorName} changed the Hukamnama schedule: ${summary}.`,
+            url: '/hukamnama',
+            tag: 'ssm-hukamnama'
+          });
+          if (posted || updated) {
+            const changedEntry = changes.find((change) => change.kind !== 'removed');
+            const entry = changedEntry && body?.[changedEntry.dateKey]?.morning || changedEntry && body?.[changedEntry.dateKey]?.evening;
+            if (entry) {
+              await triggerSocialAutomation({
+                type: 'hukamnama.updated',
+                payload: {
+                  title: entry.title || 'Daily Hukamnama',
+                  summary: entry.summary || entry.metadata?.source || `Hukamnama for ${changedEntry.dateKey}.`,
+                  imageUrl: entry.imageUrl || entry.coverImageUrl || '',
+                  link: `${newsletterPublicBaseUrl || volunteerReminderBaseUrl || process.env.APP_URL || 'https://example.com'}/hukamnama`,
+                  whatsappNumber: process.env.WHATSAPP_GROUP_NUMBER || '',
+                  hashtags: ['Hukamnama', 'Gurbani', 'SikhCommunity']
+                }
+              });
+            }
           }
-        });
-        notifyAppUpdate({
-          title: 'New Hukamnama Posted',
-          body: `${actorName} posted today's Hukamnama. ${summary}`.trim(),
-          url: '/hukamnama',
-          tag: 'ssm-hukamnama'
-        });
+        }
       }
       if (resource === 'cms_home_content') {
-        const previousItemIds = new Set((previousSingleton?.langarItems || []).map((item) => String(item?.id || '')));
-        const newlyAddedItems = (body?.langarItems || []).filter((item) => item?.id && !previousItemIds.has(String(item.id)));
+        const previousItems = previousSingleton?.langarItems || [];
+        const nextItems = body?.langarItems || [];
+        const previousById = new Map(previousItems.map((item) => [String(item?.id || ''), item]));
+        const nextById = new Map(nextItems.map((item) => [String(item?.id || ''), item]));
+        const newlyAddedItems = nextItems.filter((item) => item?.id && !previousById.has(String(item.id)));
+        const materialItemFields = ['name', 'category', 'needed', 'quantityRequired', 'unit', 'imageUrl', 'expiryDate', 'description'];
+        const updatedItems = nextItems.filter((item) => {
+          const previous = previousById.get(String(item?.id || ''));
+          return item?.id && previous && materialItemFields.some((field) => item[field] !== previous[field]);
+        });
+        const removedItems = previousItems.filter((item) => item?.id && !nextById.has(String(item.id)));
         newlyAddedItems.forEach((item) => {
           notifyAppUpdate({
             title: 'New Langar Item Requested',

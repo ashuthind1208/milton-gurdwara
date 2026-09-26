@@ -547,10 +547,12 @@ const ensureEventsSchema = async () => {
       anonymous BOOLEAN NOT NULL DEFAULT FALSE,
       expected_delivery_date DATE,
       status TEXT NOT NULL DEFAULT 'pending',
+      received_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
+  await pool.query('ALTER TABLE langar_contributions ADD COLUMN IF NOT EXISTS received_at TIMESTAMPTZ;');
   await pool.query('CREATE INDEX IF NOT EXISTS idx_langar_contributions_item ON langar_contributions(item_id);');
   await pool.query('CREATE INDEX IF NOT EXISTS idx_langar_contributions_email ON langar_contributions(donor_email);');
 
