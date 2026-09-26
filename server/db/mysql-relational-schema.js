@@ -161,11 +161,13 @@ const relationalSchemaStatements = [
     anonymous TINYINT(1) NOT NULL DEFAULT 0,
     expected_delivery_date DATE NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'pending',
+    received_at DATETIME(3) NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     INDEX idx_langar_contributions_item (item_id),
     INDEX idx_langar_contributions_email (donor_email)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `ALTER TABLE langar_contributions ADD COLUMN received_at DATETIME(3) NULL`,
   `CREATE TABLE IF NOT EXISTS advertisements (
     id VARCHAR(191) PRIMARY KEY,
     title TEXT NOT NULL,

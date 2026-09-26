@@ -146,6 +146,7 @@ const mirrorItemResource = async (db, resource, payload = {}) => {
       anonymous: Boolean(item.anonymous),
       expected_delivery_date: toDateValue(item.expectedDeliveryDate),
       status: item.status || 'pending',
+      received_at: item.receivedAt ? new Date(item.receivedAt) : null,
       created_at: item.createdAt ? new Date(item.createdAt) : new Date(),
       updated_at: item.updatedAt ? new Date(item.updatedAt) : new Date()
     });

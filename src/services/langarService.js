@@ -69,7 +69,8 @@ const normalizeContribution = (entry = {}) => ({
   expectedDeliveryDate: String(entry.expectedDeliveryDate || '').trim(),
   status: String(entry.status || 'pending').trim().toLowerCase(),
   createdAt: String(entry.createdAt || '').trim(),
-  updatedAt: String(entry.updatedAt || '').trim()
+  updatedAt: String(entry.updatedAt || '').trim(),
+  receivedAt: String(entry.receivedAt || '').trim()
 });
 
 const normalizeItem = (entry = {}) => ({
