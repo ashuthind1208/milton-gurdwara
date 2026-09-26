@@ -19,6 +19,7 @@ const KidsLearningPage = lazy(() => import('../pages/KidsLearning/KidsLearningPa
 const DonationDisplayBoardPage = lazy(() => import('../pages/Donation/DonationDisplayBoardPage'));
 const EventCalendarBoardPage = lazy(() => import('../pages/Events/EventCalendarBoardPage'));
 const LangarDisplayBoardPage = lazy(() => import('../pages/Langar/LangarDisplayBoardPage'));
+const LangarItemContributionPage = lazy(() => import('../pages/Langar/LangarItemContributionPage'));
 const DailyScheduleDisplayBoardPage = lazy(() => import('../pages/Schedule/DailyScheduleDisplayBoardPage'));
 const LedBoardLauncherPage = lazy(() => import('../pages/Boards/LedBoardLauncherPage'));
 const AskGranthiBoardPage = lazy(() => import('../pages/AskGranthi/AskGranthiBoardPage'));
@@ -95,6 +96,7 @@ const AppRoutes = () => {
         <Route path="/donation-board" element={<DonationDisplayBoardPage />} />
         <Route path="/event-calendar-board" element={<EventCalendarBoardPage />} />
         <Route path="/langar-board" element={<LangarDisplayBoardPage />} />
+        <Route path="/langar-contribute" element={<LangarItemContributionPage />} />
         <Route path="/daily-schedule-board" element={<DailyScheduleDisplayBoardPage />} />
         <Route path="/led-boards" element={<LedBoardLauncherPage />} />
         <Route path="/ask-a-granthi" element={<AskGranthiBoardPage />} />
