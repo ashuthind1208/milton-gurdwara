@@ -116,12 +116,13 @@ const LangarDisplayBoardPage = () => {
 
           <main className="mt-3 min-h-0 flex-1">
             <div className="flex items-center justify-between"><h2 className="font-heading text-2xl font-bold">Current needs</h2><span className="rounded-full border border-brand-saffron/50 bg-brand-saffron/10 px-3 py-1 text-xs font-bold text-brand-saffron">Live</span></div>
-            <div className="mt-2 grid min-h-0 grid-cols-1 gap-1.5 md:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-2 grid min-h-0 grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
             {displayedItems.map((item) => {
               const required = toNumber(item.quantityRequired);
               const received = Math.min(toNumber(item.quantityReceived), required);
               const percent = required ? Math.min(100, Math.round((received / required) * 100)) : 0;
-              return <article key={item.id} className="rounded-xl border border-white/15 bg-white/10 px-3 py-2.5"><div className="flex items-center gap-2.5"><img src={imageFallback(item)} alt="" className="h-11 w-11 shrink-0 rounded-lg object-cover" /><div className="min-w-0 flex-1"><div className="flex items-baseline justify-between gap-2"><h3 className="truncate text-sm font-extrabold">{item.name}</h3><span className="shrink-0 text-[10px] font-bold text-cyan-100">{received}/{required} {item.unit}</span></div><div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/15"><div className="h-full rounded-full bg-gradient-to-r from-red-400 via-amber-300 to-emerald-400" style={{ width: `${percent}%` }} /></div><p className="mt-0.5 text-right text-[10px] font-bold text-slate-300">{percent}% fulfilled</p></div></div></article>;
+              const itemUrl = new URL(`/langar-contribute?itemId=${encodeURIComponent(item.id)}`, window.location.origin).toString();
+              return <article key={item.id} className="flex min-h-[138px] items-center gap-3 rounded-xl border border-white/15 bg-white/10 p-3"><img src={imageFallback(item)} alt="" className="h-14 w-14 shrink-0 rounded-lg object-cover" /><div className="min-w-0 flex-1"><h3 className="truncate text-base font-extrabold">{item.name}</h3><p className="text-[11px] font-semibold text-cyan-100">{item.category} · {required} {item.unit} needed</p><div className="mt-2 h-2 overflow-hidden rounded-full bg-white/15"><div className="h-full rounded-full bg-gradient-to-r from-red-400 via-amber-300 to-emerald-400" style={{ width: `${percent}%` }} /></div><p className="mt-1 text-[10px] font-bold text-slate-200">{received} received · {percent}% fulfilled</p></div><div className="flex shrink-0 flex-col items-center gap-1 rounded-lg bg-white p-1.5 text-center"><QRCodeSVG value={itemUrl} size={68} level="M" marginSize={1} fgColor="#071b3b" bgColor="#ffffff" aria-label={`Scan to donate ${item.name}`} /><span className="text-[8px] font-black uppercase leading-tight tracking-wide text-brand-blue">Donate this item<br />Scan this</span></div></article>;
             })}
             </div>
             {!items.length ? <p className="rounded-2xl bg-white/10 p-6 text-center text-slate-200">The Langar team has no open needs right now.</p> : null}

@@ -7057,6 +7057,29 @@ const server = http.createServer(async (request, response) => {
           url: '/',
           tag: 'ssm-langar-commitment'
         });
+        const contributorEmail = String(data?.donorEmail || '').trim().toLowerCase();
+        if (isValidEmailAddress(contributorEmail)) {
+          const itemName = String(data?.itemName || 'Langar item').trim();
+          const amount = `${Number(data?.quantity || 0)} ${String(data?.unit || 'items').trim()}`;
+          const expectedDate = data?.expectedDeliveryDate
+            ? new Date(`${data.expectedDeliveryDate}T12:00:00`).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })
+            : 'To be coordinated with the Langar team';
+          const safeItemName = escapeHtml(itemName);
+          const safeAmount = escapeHtml(amount);
+          const safeExpectedDate = escapeHtml(expectedDate);
+          const safeContributorName = escapeHtml(data?.anonymous ? 'Sangat member' : (data?.donorName || 'Sangat member'));
+          try {
+            await sendViaConfiguredMailTransport({
+              from: localMailFromAddress,
+              toList: [contributorEmail],
+              subject: `Langar commitment confirmation: ${itemName}`,
+              textBody: `Waheguru Ji Ka Khalsa, Waheguru Ji Ki Fateh\n\n${safeContributorName}, thank you for your Langar seva. Your commitment has been recorded:\n\nItem: ${itemName}\nQuantity: ${amount}\nExpected delivery: ${expectedDate}\n\nThank you for supporting the sangat.`,
+              htmlBody: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#17345f"><h2 style="color:#0b4ea2">Langar commitment confirmed</h2><p>Waheguru Ji Ka Khalsa, Waheguru Ji Ki Fateh</p><p>${safeContributorName}, thank you for your Langar seva. We recorded your commitment:</p><table style="border-collapse:collapse;width:100%;margin:20px 0"><tr><td style="padding:10px;border:1px solid #dbe5f0;font-weight:bold">Item</td><td style="padding:10px;border:1px solid #dbe5f0">${safeItemName}</td></tr><tr><td style="padding:10px;border:1px solid #dbe5f0;font-weight:bold">Quantity</td><td style="padding:10px;border:1px solid #dbe5f0">${safeAmount}</td></tr><tr><td style="padding:10px;border:1px solid #dbe5f0;font-weight:bold">Expected delivery</td><td style="padding:10px;border:1px solid #dbe5f0">${safeExpectedDate}</td></tr></table><p>Thank you for supporting the sangat.</p></div>`
+            });
+          } catch (emailError) {
+            console.warn('Langar contribution confirmation email was not sent:', emailError.message || emailError);
+          }
+        }
       }
       if (resource !== 'audit_logs') {
         await appendAuditLog(request, {
