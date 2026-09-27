@@ -4,7 +4,9 @@ const webpush = require('web-push');
 
 const PUSH_SUBSCRIPTIONS_RESOURCE = 'push_subscriptions';
 const VAPID_KEYS_FILE = path.join(__dirname, 'data', 'vapid-keys.json');
-const DEFAULT_ICON = '/logo192.png';
+const DEFAULT_ICON = '/notification-icon.svg';
+const DEFAULT_BADGE = '/notification-badge.svg';
+const DEFAULT_IMAGE = '/gurdwara-logo.webp';
 const DEFAULT_TAG = 'ssm-update';
 
 const loadOrCreateVapidKeys = () => {
@@ -83,7 +85,7 @@ const removeSubscription = async (eventsDb, endpoint) => {
 };
 
 // Sends a native-style push notification to every subscribed device, pruning subscriptions the browser has revoked.
-const broadcastNotification = async (eventsDb, { title, body, url = '/', tag = DEFAULT_TAG, icon = DEFAULT_ICON }) => {
+const broadcastNotification = async (eventsDb, { title, body, url = '/', tag = DEFAULT_TAG, icon = DEFAULT_ICON, badge = DEFAULT_BADGE, image = DEFAULT_IMAGE, actions = [], data = {} }) => {
   if (!eventsDb?.hasDatabaseConnection) {
     return { sent: 0, skipped: true, reason: 'no_database' };
   }
@@ -105,17 +107,28 @@ const broadcastNotification = async (eventsDb, { title, body, url = '/', tag = D
     body: String(body || '').slice(0, 500),
     url,
     tag,
-    icon
+    icon,
+    badge,
+    badgeMonochrome: true,
+    ...(image ? { image } : {}),
+    actions: Array.isArray(actions) ? actions.slice(0, 2) : [],
+    data: {
+      ...(data && typeof data === 'object' ? data : {}),
+      actions: Array.isArray(actions) ? actions.slice(0, 2) : []
+    }
   });
 
   let sent = 0;
+  const results = [];
   await Promise.all(subscriptions.map(async (entry) => {
     const pushSubscription = { endpoint: entry.endpoint, keys: entry.keys };
     try {
-      await webpush.sendNotification(pushSubscription, payload);
+      await webpush.sendNotification(pushSubscription, payload, { TTL: 3600, urgency: 'high' });
       sent += 1;
+      results.push({ id: entry.id, ok: true });
     } catch (error) {
       const statusCode = error?.statusCode;
+      results.push({ id: entry.id, ok: false, statusCode: statusCode || null, message: error.message || String(error) });
       if (statusCode === 404 || statusCode === 410) {
         await eventsDb.removeItem(PUSH_SUBSCRIPTIONS_RESOURCE, entry.id).catch(() => undefined);
       } else {
@@ -124,7 +137,7 @@ const broadcastNotification = async (eventsDb, { title, body, url = '/', tag = D
     }
   }));
 
-  return { sent, total: subscriptions.length };
+  return { sent, total: subscriptions.length, results };
 };
 
 module.exports = {

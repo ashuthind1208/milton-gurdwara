@@ -19,6 +19,7 @@ const LangarItemContributionPage = () => {
   const [quantity, setQuantity] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notice, setNotice] = useState('');
+  const [hasSubmitted, setHasSubmitted] = useState(false);
   const [anonymous, setAnonymous] = useState(false);
   const meta = useSeoMeta('Make a Langar Contribution', 'Commit a requested Langar item to support the sangat.');
 
@@ -34,6 +35,16 @@ const LangarItemContributionPage = () => {
   });
 
   const item = useMemo(() => (content?.langarItems || []).map(langarService.normalizeItem).find((entry) => String(entry.id) === String(itemId)) || null, [content, itemId]);
+  const openAllLangarNeeds = () => {
+    try { window.sessionStorage.setItem('ssm_langar_reopen_board', '1'); } catch { /* Storage may be disabled. */ }
+    queryClient.invalidateQueries({ queryKey: ['cms-home'] });
+    queryClient.invalidateQueries({ queryKey: [LANGAR_CONTRIBUTIONS_RESOURCE] });
+    navigate('/?openLangar=1');
+  };
+  const closeContributionPage = () => {
+    window.close();
+    window.setTimeout(() => navigate('/'), 150);
+  };
   const remaining = useMemo(() => {
     if (!item) return 0;
     const pending = contributions.filter((entry) => String(entry.itemId) === String(item.id) && String(entry.status).toLowerCase() === 'pending').reduce((sum, entry) => sum + Number(entry.quantity || 0), 0);
@@ -66,7 +77,7 @@ const LangarItemContributionPage = () => {
         expectedDeliveryDate: ''
       });
       await queryClient.invalidateQueries({ queryKey: [LANGAR_CONTRIBUTIONS_RESOURCE] });
-      setNotice(`Your commitment is recorded. A confirmation email will be sent to ${String(user?.email || 'your account email')} if email delivery is available.`);
+      setHasSubmitted(true);
     } catch (error) {
       setNotice(error?.message || 'Unable to record your commitment. Please try again.');
     } finally {
@@ -81,22 +92,32 @@ const LangarItemContributionPage = () => {
         <div className="mx-auto max-w-2xl overflow-hidden rounded-3xl border border-sky-100 bg-white shadow-2xl">
           <header className="flex items-center gap-4 bg-gradient-to-r from-brand-blue via-blue-700 to-brand-saffron p-5 text-white sm:p-7">
             <img src={logoSrc} alt={`${branding.organizationName} logo`} className="h-14 w-14 rounded-full border-2 border-brand-saffron object-cover" />
-            <div><p className="text-xs font-black uppercase tracking-[0.2em] text-blue-100">{branding.shortName}</p><h1 className="mt-1 font-heading text-3xl font-bold">Make a Contribution</h1><p className="mt-1 text-sm text-blue-50">Commit this requested item for Langar seva.</p></div>
+            <div><p className="text-xs font-black uppercase tracking-[0.2em] text-blue-100">{branding.shortName}</p><h1 className="mt-1 font-heading text-3xl font-bold">{hasSubmitted ? 'Thank You for Your Seva' : 'Make a Contribution'}</h1><p className="mt-1 text-sm text-blue-50">{hasSubmitted ? 'Your Langar commitment has been recorded.' : 'Commit this requested item for Langar seva.'}</p></div>
           </header>
-          <div className="space-y-5 p-5 sm:p-7">
+          {hasSubmitted ? <div className="space-y-5 p-5 sm:p-7">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-center">
+              <p className="font-heading text-2xl font-bold text-emerald-900">Waheguru Ji Ka Khalsa, Waheguru Ji Ki Fateh</p>
+              <p className="mt-2 text-sm leading-6 text-emerald-800">Thank you for committing {quantity} {item?.unit || 'items'} of {item?.name || 'a Langar need'}. Your generosity helps serve the sangat.</p>
+              <p className="mt-2 text-xs text-emerald-700">A confirmation email will be sent to {String(user?.email || 'your account email')} if email delivery is available.</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <button type="button" onClick={openAllLangarNeeds} className="min-h-12 rounded-xl bg-brand-saffron px-5 py-3 font-extrabold text-brand-navy shadow-lg hover:bg-amber-400">Donate more</button>
+              <button type="button" onClick={closeContributionPage} className="min-h-12 rounded-xl border border-slate-300 bg-white px-5 py-3 font-bold text-slate-700 hover:bg-slate-50">Close page</button>
+            </div>
+          </div> : <div className="space-y-5 p-5 sm:p-7">
             <Link to="/langar-board" className="inline-flex items-center gap-2 text-sm font-bold text-brand-blue hover:underline"><ArrowLeftIcon className="h-4 w-4" /> Back to Langar needs</Link>
-            {!item ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">This Langar item is not available. Please scan the QR code from a current needs board.</div> : <>
+            {!item ? <div className="space-y-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900"><p>This Langar item is not available. You can still see and contribute to all current Langar needs.</p><button type="button" onClick={openAllLangarNeeds} className="min-h-11 rounded-xl bg-brand-saffron px-4 py-2 font-extrabold text-brand-navy">Open all Langar needs</button></div> : <>
               <section className="flex items-center gap-4 rounded-2xl border border-sky-200 bg-sky-50 p-4">
                 <img src={item.imageUrl || logoSrc} alt="" className="h-20 w-20 rounded-xl object-cover" />
                 <div className="min-w-0 flex-1"><p className="font-heading text-2xl font-bold text-brand-navy">{item.name}</p><p className="text-sm font-semibold text-slate-600">{item.category || 'Langar need'} · {item.quantityRequired} {item.unit} required</p><p className="mt-1 text-sm font-bold text-brand-blue">{remaining} {item.unit} still available to commit</p></div>
               </section>
               {remaining > 0 ? <section className="rounded-2xl border border-slate-200 p-4"><label className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Quantity to commit</label><div className="mt-2 flex items-center gap-3"><button type="button" onClick={() => adjustQuantity(-1)} disabled={quantity <= 1} aria-label="Decrease quantity" className="flex h-12 w-12 items-center justify-center rounded-xl border border-slate-300 text-slate-700 disabled:opacity-40"><MinusIcon className="h-5 w-5" /></button><div className="flex min-h-12 flex-1 items-center justify-center rounded-xl border border-slate-300 text-xl font-black text-brand-blue">{quantity} {item.unit}</div><button type="button" onClick={() => adjustQuantity(1)} disabled={quantity >= remaining} aria-label="Increase quantity" className="flex h-12 w-12 items-center justify-center rounded-xl border border-slate-300 text-slate-700 disabled:opacity-40"><PlusIcon className="h-5 w-5" /></button></div><p className="mt-2 text-xs text-slate-500">Maximum commitment: {remaining} {item.unit}</p></section> : <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900">This item is fully committed. Thank you for supporting the sangat.</div>}
               <label className="flex items-center gap-3 rounded-xl bg-slate-50 p-3 text-sm font-semibold text-slate-700"><input type="checkbox" checked={anonymous} onChange={(event) => setAnonymous(event.target.checked)} className="h-4 w-4" /> Keep my name anonymous</label>
-              {notice ? <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-900">{notice}</p> : null}
+              {notice && !hasSubmitted ? <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-900">{notice}</p> : null}
               {isAuthenticated ? <p className="text-xs text-slate-500">Contributing as {user?.name || user?.email}</p> : <p className="text-sm text-slate-600">Sign in is required to commit this item. You’ll return here after signing in.</p>}
               <button type="button" onClick={() => void submitCommitment()} disabled={!item || remaining <= 0 || isSubmitting} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand-saffron px-5 py-3 font-extrabold text-brand-navy shadow-lg hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"><GiftIcon className="h-5 w-5" />{isSubmitting ? 'Recording commitment…' : isAuthenticated ? 'Make Commitment' : 'Sign in to contribute'}</button>
             </>}
-          </div>
+          </div>}
         </div>
       </main>
     </>
