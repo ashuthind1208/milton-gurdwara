@@ -22,6 +22,12 @@ export const getExistingPushSubscription = async () => {
   return registration.pushManager.getSubscription();
 };
 
+const registerSubscription = async (subscription) => {
+  if (!subscription) return null;
+  await apiClient.post('/push/subscribe', { ...subscription.toJSON(), userAgent: navigator.userAgent });
+  return subscription;
+};
+
 export const subscribeToPushNotifications = async () => {
   if (!isPushSupported()) {
     throw new Error('Push notifications are not supported on this device.');
@@ -35,7 +41,7 @@ export const subscribeToPushNotifications = async () => {
   const registration = await navigator.serviceWorker.ready;
   const existingSubscription = await registration.pushManager.getSubscription();
   if (existingSubscription) {
-    return existingSubscription;
+    return registerSubscription(existingSubscription);
   }
 
   const response = await apiClient.get('/push/public-key');
@@ -49,8 +55,23 @@ export const subscribeToPushNotifications = async () => {
     applicationServerKey: urlBase64ToUint8Array(publicKey)
   });
 
-  await apiClient.post('/push/subscribe', { ...subscription.toJSON(), userAgent: navigator.userAgent });
-  return subscription;
+  return registerSubscription(subscription);
+};
+
+export const syncGrantedPushSubscription = async () => {
+  if (!isPushSupported() || Notification.permission !== 'granted') return null;
+  const registration = await navigator.serviceWorker.ready;
+  let subscription = await registration.pushManager.getSubscription();
+  if (!subscription) {
+    const response = await apiClient.get('/push/public-key');
+    const publicKey = response.data?.data?.publicKey || '';
+    if (!publicKey) throw new Error('Push notifications are not configured on the server.');
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey)
+    });
+  }
+  return registerSubscription(subscription);
 };
 
 export const unsubscribeFromPushNotifications = async () => {

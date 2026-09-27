@@ -81,7 +81,7 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
     const received = activeItems.reduce((sum, item) => sum + Math.min(Number(item.quantityReceived || 0), Number(item.quantityRequired || 0)), 0);
     const contributors = new Set(contributions.map((entry) => entry.anonymous ? `anonymous-${entry.id}` : entry.donorEmail).filter(Boolean)).size;
     const weekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
-    const receivedThisWeek = contributions.filter((entry) => String(entry.status || '').toLowerCase() === 'received' && new Date(entry.createdAt || 0).getTime() >= weekAgo).length;
+    const receivedThisWeek = contributions.filter((entry) => String(entry.status || '').toLowerCase() === 'received' && new Date(entry.receivedAt || entry.updatedAt || entry.createdAt || 0).getTime() >= weekAgo).length;
     return { received, progress: required ? Math.min(100, Math.round(received / required * 100)) : 0, contributors, receivedThisWeek };
   }, [activeItems, contributions]);
 
@@ -358,7 +358,7 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
                       <div className="text-right">
                         <p className="text-[10px] font-bold text-sky-600">Submitted {formatSubmittedAt(entry.createdAt)}</p>
                         {entry.status === 'received' ? (
-                          <p className="text-[10px] font-bold text-emerald-600">Completed {formatSubmittedAt(entry.updatedAt || entry.createdAt)}</p>
+                          <p className="text-[10px] font-bold text-emerald-600">Received {formatSubmittedAt(entry.receivedAt || entry.updatedAt || entry.createdAt)}</p>
                         ) : (
                           <span className="mt-0.5 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">Pending</span>
                         )}

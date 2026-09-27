@@ -349,8 +349,32 @@ const triggerSocialAutomation = async ({ type, payload = {} }) => {
 };
 
 // Sends a native-style push notification without ever failing the request that triggered it.
-const notifyAppUpdate = ({ title, body, url = '/', tag = 'ssm-update', icon }) => {
-  pushNotifications.broadcastNotification(eventsDb, { title, body, url, tag, icon }).catch((error) => {
+const notifyAppUpdate = ({ title, body, url = '/', tag = 'ssm-update', icon, badge, image, actions, data }) => {
+  if (String(tag || '').startsWith('ssm-langar')) {
+    langarBoardEventClients.forEach((client) => {
+      try {
+        client.write(`event: refresh\ndata: {"type":"langar-refresh"}\n\n`);
+      } catch {
+        langarBoardEventClients.delete(client);
+      }
+    });
+  }
+  const uniqueTag = `${String(tag || 'ssm-update').slice(0, 80)}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  pushNotifications.broadcastNotification(eventsDb, {
+    title,
+    body: `${String(body || '').trim()} You are receiving this because you enabled Singh Sabha Milton app notifications.`,
+    url,
+    tag: uniqueTag,
+    icon,
+    badge,
+    image,
+    actions: actions || [{ action: 'open', title: 'View update' }, { action: 'dismiss', title: 'Dismiss' }],
+    data: { ...(data || {}), category: tag }
+  }).then((result) => {
+    if (result?.error || (Number(result?.total || 0) > 0 && Number(result?.sent || 0) < Number(result.total))) {
+      console.warn(`Push notification delivery incomplete (${result?.sent || 0}/${result?.total || 0}) for ${tag}.`);
+    }
+  }).catch((error) => {
     console.error('Push notification broadcast failed:', error.message || error);
   });
 };
@@ -4320,7 +4344,7 @@ const sendBookingNotificationEmail = async (booking, options = {}) => {
   }
 };
 
-const bookingNotificationFields = ['status', 'paymentStatus', 'date', 'startTime', 'endTime', 'bookingLocation', 'categoryName', 'receiptNumber', 'refundStatus', 'refundAmount', 'refundMethod', 'refundReference', 'refundDate', 'refundNotes'];
+  const bookingNotificationFields = ['status', 'paymentStatus', 'paymentMethod', 'date', 'toDate', 'startTime', 'endTime', 'bookingLocation', 'categoryName', 'requesterName', 'dutyAssigneeId', 'dutyAssigneeEmail', 'receiptNumber', 'refundStatus', 'refundAmount', 'refundMethod', 'refundReference', 'refundDate', 'refundNotes'];
 const hasBookingNotificationChange = (existing = {}, updated = {}) => bookingNotificationFields.some(
   (field) => String(existing?.[field] ?? '') !== String(updated?.[field] ?? '')
 );
@@ -6867,6 +6891,12 @@ const server = http.createServer(async (request, response) => {
         createdAt: new Date().toISOString()
       };
       const created = await eventsDb.createItem('volunteer_registrations', record);
+      notifyAppUpdate({
+        title: status === 'waitlisted' ? 'New Seva Waitlist Registration' : 'New Seva Volunteer',
+        body: `A volunteer ${status === 'waitlisted' ? 'joined the waitlist' : 'signed up'} for ${opportunity.sevaType || 'a seva opportunity'}.`,
+        url: '/seva',
+        tag: 'ssm-volunteer-registration'
+      });
       const emailResult = await sendRegistrationStatusEmail({ registration: created, kind: 'seva' });
       const waitlistCount = matching.filter((entry) => String(entry?.status || '').toLowerCase() === 'waitlisted').length
         + (status === 'waitlisted' ? 1 : 0);
@@ -6903,6 +6933,12 @@ const server = http.createServer(async (request, response) => {
       const registrationId = parseStringPathId(decodeURIComponent(volunteerRemovalMatch[1]), 'registration id');
       const data = await eventsDb.removeVolunteerRegistration(registrationId);
       const promotedRegistration = data?.promotedRegistration || null;
+      notifyAppUpdate({
+        title: 'Seva Registration Removed',
+        body: `A volunteer registration for ${data?.removedRegistration?.sevaType || 'a seva opportunity'} was removed.${promotedRegistration ? ' A waitlisted volunteer was promoted.' : ''}`,
+        url: '/seva',
+        tag: 'ssm-volunteer-registration-removed'
+      });
       const promotionEmailResult = promotedRegistration
         ? await sendRegistrationStatusEmail({ registration: promotedRegistration, kind: 'seva', promoted: true })
         : { sent: false, reason: 'no_promotion' };
@@ -7042,6 +7078,14 @@ const server = http.createServer(async (request, response) => {
         : false;
       const data = await eventsDb.createItem(resource, validatedBody);
       const actorName = String(getRequestActor(request).name || '').trim() || 'A sangat member';
+      if (resource === 'users' && !userPreviouslyExisted) {
+        notifyAppUpdate({
+          title: 'New Member Registration',
+          body: `${data?.name || 'A new member'} registered to join the sangat.`,
+          url: '/admin/users',
+          tag: 'ssm-member-created'
+        });
+      }
       if (resource === 'seva_opportunities') {
         await triggerSocialAutomation({
           type: 'seva.created',
@@ -7072,7 +7116,7 @@ const server = http.createServer(async (request, response) => {
       if (resource === 'langar_contributions') {
         notifyAppUpdate({
           title: 'New Langar Commitment',
-          body: `${actorName} committed ${data?.quantity || 0} ${data?.unit || 'items'} of ${data?.itemName || 'a Langar item'}.`,
+          body: `${data?.anonymous ? 'A sangat member' : data?.donorName || actorName} committed ${data?.quantity || 0} ${data?.unit || 'items'} of ${data?.itemName || 'a Langar item'}${data?.expectedDeliveryDate ? `, expected ${data.expectedDeliveryDate}` : ''}.`,
           url: '/',
           tag: 'ssm-langar-commitment'
         });
@@ -7113,6 +7157,12 @@ const server = http.createServer(async (request, response) => {
         if (!shouldDelayBookingEmailUntilPayment(data)) {
           await sendBookingNotificationEmail(data, { changeType: 'created' });
         }
+        notifyAppUpdate({
+          title: 'New Booking Received',
+          body: `${data?.requesterName || data?.name || 'A sangat member'} requested ${data?.categoryName || data?.title || 'a Gurdwara booking'} for ${data?.date || data?.bookingDate || 'an upcoming date'}${data?.dutyAssigneeName ? `; assigned to ${data.dutyAssigneeName}` : ''}.`,
+          url: '/bookings',
+          tag: 'ssm-booking-created'
+        });
       }
       if (resource === 'users' && !userPreviouslyExisted) {
         const welcomeResult = await sendNewUserWelcomeEmail(data);
@@ -7137,6 +7187,12 @@ const server = http.createServer(async (request, response) => {
       const existingUser = Array.isArray(existingUsers) ? existingUsers.find((entry) => String(entry?.id || '') === String(id)) : null;
       const existingBookings = resource === 'bookings' ? await eventsDb.listItems('bookings') : null;
       const existingBooking = Array.isArray(existingBookings) ? existingBookings.find((entry) => String(entry?.id || '') === String(id)) : null;
+      const existingNotifiableRows = ['news_articles', 'seva_opportunities', 'volunteer_registrations'].includes(resource)
+        ? await eventsDb.listItems(resource)
+        : null;
+      const existingNotifiableItem = Array.isArray(existingNotifiableRows)
+        ? existingNotifiableRows.find((entry) => String(entry?.id || '') === String(id))
+        : null;
       const existingLangarContributions = resource === 'langar_contributions' ? await eventsDb.listItems(resource) : null;
       const existingLangarContribution = Array.isArray(existingLangarContributions)
         ? existingLangarContributions.find((entry) => String(entry?.id || '') === String(id))
@@ -7191,7 +7247,7 @@ const server = http.createServer(async (request, response) => {
           const receivedByActorName = String(getRequestActor(request).name || '').trim() || 'A Gurdwara team member';
           notifyAppUpdate({
             title: 'Langar Item Received',
-            body: `${receivedByActorName} marked ${existingLangarContribution.quantity || 0} ${existingLangarContribution.unit || 'items'} of ${existingLangarContribution.itemName || 'a Langar item'} as received.`,
+            body: `${receivedByActorName} received ${existingLangarContribution.quantity || 0} ${existingLangarContribution.unit || 'items'} of ${existingLangarContribution.itemName || 'a Langar item'}${existingLangarContribution.anonymous ? ' from a sangat member' : ` from ${existingLangarContribution.donorName || 'a sangat member'}`} today. The Langar progress has been updated.`,
             url: '/',
             tag: 'ssm-langar-received'
           });
@@ -7221,6 +7277,24 @@ const server = http.createServer(async (request, response) => {
           });
         }
       }
+      if (resource === 'users' && existingUser) {
+        const mergedUser = { ...existingUser, ...(data || {}), ...(validatedBody || {}), id: String(id) };
+        if (existingUser.approvalStatus !== mergedUser.approvalStatus) {
+          notifyAppUpdate({
+            title: mergedUser.approvalStatus === 'approved' ? 'Member Approved' : `Member ${mergedUser.approvalStatus || 'Status Updated'}`,
+            body: `${mergedUser.name || 'A member'}'s membership application is now ${mergedUser.approvalStatus || 'updated'}.`,
+            url: '/admin/users',
+            tag: 'ssm-member-approval'
+          });
+        } else if (existingUser.isActive !== mergedUser.isActive) {
+          notifyAppUpdate({
+            title: mergedUser.isActive === false ? 'Member Deactivated' : 'Member Reactivated',
+            body: `${mergedUser.name || 'A member'}'s account was ${mergedUser.isActive === false ? 'deactivated' : 'reactivated'}.`,
+            url: '/admin/users',
+            tag: 'ssm-member-activity'
+          });
+        }
+      }
 
       if (resource !== 'audit_logs') {
         await appendAuditLog(request, {
@@ -7233,34 +7307,44 @@ const server = http.createServer(async (request, response) => {
       }
       if (resource === 'bookings') {
         const mergedBooking = { ...(existingBooking || {}), ...(data || {}), ...(validatedBody || {}), id: String(id) };
-        if (hasBookingNotificationChange(existingBooking || {}, mergedBooking)) {
+        const bookingChanged = hasBookingNotificationChange(existingBooking || {}, mergedBooking);
+        const dutyAssigneeChanged = String(existingBooking?.dutyAssigneeId || '') !== String(mergedBooking.dutyAssigneeId || '')
+          || String(existingBooking?.dutyAssigneeEmail || '').toLowerCase() !== String(mergedBooking.dutyAssigneeEmail || '').toLowerCase();
+        if (bookingChanged) {
           const refundReleased = String(existingBooking?.refundStatus || '').trim().toLowerCase() !== 'processed'
             && String(mergedBooking.refundStatus || '').trim().toLowerCase() === 'processed';
           await sendBookingNotificationEmail(mergedBooking, { changeType: refundReleased ? 'refund-released' : 'updated' });
         }
-        notifyAppUpdate({
-          title: String(existingBooking?.refundStatus || '').trim().toLowerCase() !== 'processed'
-            && String(mergedBooking.refundStatus || '').trim().toLowerCase() === 'processed'
-            ? 'Booking Refund Released'
-            : 'Booking Updated',
-          body: `A booking for ${mergedBooking.eventName || mergedBooking.eventTitle || mergedBooking.bookingDate || 'a Gurdwara service'} was updated.`,
-          url: '/bookings',
-          tag: 'ssm-booking-updated'
-        });
+        if (bookingChanged || dutyAssigneeChanged) {
+          const refundReleased = String(existingBooking?.refundStatus || '').trim().toLowerCase() !== 'processed'
+            && String(mergedBooking.refundStatus || '').trim().toLowerCase() === 'processed';
+          notifyAppUpdate({
+            title: dutyAssigneeChanged ? 'Booking Duty Assignment Changed' : refundReleased ? 'Booking Refund Released' : 'Booking Updated',
+            body: dutyAssigneeChanged
+              ? `${mergedBooking.categoryName || 'A booking'} on ${mergedBooking.date || 'an upcoming date'} is assigned to ${mergedBooking.dutyAssigneeName || 'a different duty performer'}${bookingChanged ? `; booking status is ${mergedBooking.status || 'pending'}${mergedBooking.paymentStatus ? ` and payment is ${mergedBooking.paymentStatus}` : ''}` : ''}.`
+              : `${mergedBooking.categoryName || 'A booking'} for ${mergedBooking.requesterName || 'a sangat member'} on ${mergedBooking.date || 'an upcoming date'} was updated (${mergedBooking.status || 'status pending'}${mergedBooking.paymentStatus ? `, payment ${mergedBooking.paymentStatus}` : ''}).`,
+            url: '/admin/booking-duties',
+            tag: dutyAssigneeChanged ? 'ssm-booking-duty-assignment' : 'ssm-booking-updated'
+          });
+        }
       } else if (['news_articles', 'seva_opportunities'].includes(resource)) {
         const isNews = resource === 'news_articles';
+        const entityTitle = data?.heading || data?.title || data?.sevaType || (isNews ? 'Community news' : 'Seva opportunity');
+        const changedFields = Object.keys(validatedBody || {}).filter((field) => (
+          field !== 'updatedAt' && JSON.stringify((existingNotifiableItem || {})[field]) !== JSON.stringify(data?.[field])
+        ));
         notifyAppUpdate({
           title: isNews ? 'Community Update Edited' : 'Seva Opportunity Updated',
           body: isNews
-            ? `A community update was edited: ${data?.heading || data?.title || 'Community news'}.`
-            : `A seva opportunity was updated: ${data?.title || data?.sevaType || 'Seva opportunity'}.`,
+            ? `${entityTitle} was edited${changedFields.length ? ` (${changedFields.slice(0, 3).join(', ')} changed)` : ''}. You are receiving this because you subscribed to community updates.`
+            : `${entityTitle} was updated${changedFields.length ? ` (${changedFields.slice(0, 3).join(', ')} changed)` : ''}. Check the new seva details.`,
           url: isNews ? '/news' : '/seva',
           tag: isNews ? 'ssm-news-updated' : 'ssm-seva-updated'
         });
       } else if (resource === 'volunteer_registrations') {
         notifyAppUpdate({
           title: 'Volunteer Registration Updated',
-          body: `A seva volunteer registration was updated for ${data?.sevaType || data?.area || 'a seva opportunity'}.`,
+          body: `${data?.name || 'A volunteer'}'s registration for ${data?.sevaType || data?.area || 'a seva opportunity'} is now ${data?.status || 'updated'}.`,
           url: '/seva',
           tag: 'ssm-volunteer-registration-updated'
         });
@@ -7269,7 +7353,7 @@ const server = http.createServer(async (request, response) => {
         if (previousLangarStatus === nextStatus || !['received', 'cancelled'].includes(nextStatus)) {
           notifyAppUpdate({
             title: 'Langar Commitment Updated',
-            body: `A commitment for ${data?.itemName || existingLangarContribution.itemName || 'a Langar item'} was updated.`,
+            body: `${existingLangarContribution.anonymous ? 'A sangat member' : existingLangarContribution.donorName || 'A sangat member'} changed the commitment for ${data?.itemName || existingLangarContribution.itemName || 'a Langar item'} (${data?.quantity || existingLangarContribution.quantity || 0} ${data?.unit || existingLangarContribution.unit || 'items'}).`,
             url: '/',
             tag: 'ssm-langar-updated'
           });
@@ -7297,7 +7381,7 @@ const server = http.createServer(async (request, response) => {
       }
 
       if (resource === 'langar_contributions') {
-        const existingContribution = await eventsDb.listItems(resource).then((rows) => rows.find((entry) => String(entry?.id || '') === String(id)));
+        const existingContribution = deletedResourceItem;
         if (existingContribution && String(existingContribution.status || '').trim().toLowerCase() === 'received') {
           const homeContent = await eventsDb.getSingleton('cms_home_content', null);
           if (homeContent && Array.isArray(homeContent.langarItems)) {
@@ -7347,13 +7431,21 @@ const server = http.createServer(async (request, response) => {
             : undefined
         });
       }
+        if (resource === 'users' && deletedResourceItem) {
+          notifyAppUpdate({
+            title: 'Member Account Removed',
+            body: `${deletedResourceItem.name || 'A member'}'s account and related registrations were removed.`,
+            url: '/admin/users',
+            tag: 'ssm-member-deleted'
+          });
+        }
       if (deletedResourceItem && ['bookings', 'news_articles', 'seva_opportunities', 'langar_contributions', 'volunteer_registrations'].includes(resource)) {
         const notificationDetails = {
           bookings: { title: 'Booking Cancelled', body: 'A Gurdwara booking was cancelled.', url: '/bookings', tag: 'ssm-booking-deleted' },
           news_articles: { title: 'Community Update Removed', body: `A community update was removed: ${deletedResourceItem.heading || deletedResourceItem.title || 'Community news'}.`, url: '/news', tag: 'ssm-news-deleted' },
           seva_opportunities: { title: 'Seva Opportunity Removed', body: `A seva opportunity was removed: ${deletedResourceItem.title || deletedResourceItem.sevaType || 'Seva opportunity'}.`, url: '/seva', tag: 'ssm-seva-deleted' },
           langar_contributions: { title: 'Langar Commitment Removed', body: `A commitment for ${deletedResourceItem.itemName || 'a Langar item'} was removed.`, url: '/', tag: 'ssm-langar-deleted' },
-          volunteer_registrations: { title: 'Seva Registration Removed', body: `A volunteer registration for ${deletedResourceItem.sevaType || 'a seva opportunity'} was removed.`, url: '/seva', tag: 'ssm-volunteer-registration-removed' }
+          volunteer_registrations: { title: 'Seva Registration Removed', body: `Registration for ${deletedResourceItem.name || 'a volunteer'} in ${deletedResourceItem.sevaType || 'a seva opportunity'} was removed.`, url: '/seva', tag: 'ssm-volunteer-registration-removed' }
         }[resource];
         notifyAppUpdate(notificationDetails);
       }
@@ -7408,17 +7500,20 @@ const server = http.createServer(async (request, response) => {
           });
         });
         if (changes.length) {
-          const posted = changes.filter((change) => change.kind === 'posted').length;
-          const updated = changes.filter((change) => change.kind === 'updated').length;
-          const removed = changes.filter((change) => change.kind === 'removed').length;
-          const summary = [posted && `${posted} posted`, updated && `${updated} updated`, removed && `${removed} removed`].filter(Boolean).join(', ');
+          const changeDetails = changes.slice(0, 3).map((change) => {
+            const entry = body?.[change.dateKey]?.[change.slot] || previousEntries?.[change.dateKey]?.[change.slot];
+            const heading = entry?.title || entry?.metadata?.source || `Ang ${entry?.ang || ''}`.trim();
+            return `${change.dateKey} ${change.slot}: ${change.kind}${heading ? ` ${heading}` : ''}`;
+          });
+          const remainingChanges = changes.length - changeDetails.length;
+          const summary = `${changeDetails.join('; ')}${remainingChanges ? `; and ${remainingChanges} more schedule change${remainingChanges === 1 ? '' : 's'}` : ''}`;
           notifyAppUpdate({
             title: 'Hukamnama Schedule Updated',
-            body: `${actorName} changed the Hukamnama schedule: ${summary}.`,
+            body: `${actorName} changed the Hukamnama schedule: ${summary}. You are receiving this because you enabled Hukamnama updates.`,
             url: '/hukamnama',
             tag: 'ssm-hukamnama'
           });
-          if (posted || updated) {
+          if (changes.some((change) => change.kind !== 'removed')) {
             const changedEntry = changes.find((change) => change.kind !== 'removed');
             const entry = changedEntry && body?.[changedEntry.dateKey]?.morning || changedEntry && body?.[changedEntry.dateKey]?.evening;
             if (entry) {
@@ -7452,11 +7547,23 @@ const server = http.createServer(async (request, response) => {
         newlyAddedItems.forEach((item) => {
           notifyAppUpdate({
             title: 'New Langar Item Requested',
-            body: `${actorName} listed "${item.name || 'a new item'}" (${item.quantityRequired || 0} ${item.unit || 'items'}) for Langar seva.`,
+            body: `${actorName} added ${item.name || 'a new item'} to Langar needs: ${item.quantityRequired || 0} ${item.unit || 'items'} required${item.category ? ` in ${item.category}` : ''}.`,
             url: '/',
             tag: 'ssm-langar-item'
           });
         });
+        updatedItems.forEach((item) => notifyAppUpdate({
+          title: 'Langar Need Updated',
+          body: `${actorName} changed ${item.name || 'a Langar item'}: ${item.quantityRequired || 0} ${item.unit || 'items'} required${item.needed === false ? ', no longer needed' : ''}.`,
+          url: '/',
+          tag: 'ssm-langar-item-updated'
+        }));
+        removedItems.forEach((item) => notifyAppUpdate({
+          title: 'Langar Need Removed',
+          body: `${actorName} removed ${item.name || 'a Langar item'} from the Langar needs list.`,
+          url: '/',
+          tag: 'ssm-langar-item-removed'
+        }));
       }
       await appendAuditLog(request, {
         action: 'content.singleton.update',
@@ -7859,7 +7966,7 @@ const server = http.createServer(async (request, response) => {
       });
       notifyAppUpdate({
         title: 'New Event Added',
-        body: `${String(getRequestActor(request).name || '').trim() || 'A Gurdwara team member'} added a new event: ${data?.title || body?.title}.`,
+        body: `${String(getRequestActor(request).name || '').trim() || 'A Gurdwara team member'} added ${data?.title || body?.title}, scheduled for ${data?.date || body?.date}${data?.location || body?.location ? ` at ${data?.location || body?.location}` : ''}.`,
         url: '/events',
         tag: 'ssm-event'
       });
@@ -7902,6 +8009,12 @@ const server = http.createServer(async (request, response) => {
         body.wantsEventEmails = wantsEventEmails;
       }
       const data = await eventsDb.registerForEvent(body);
+      notifyAppUpdate({
+        title: data?.registration?.status === 'waitlisted' ? 'New Event Waitlist Registration' : 'New Event Registration',
+        body: `${body.name} ${data?.registration?.status === 'waitlisted' ? 'joined the waitlist for' : 'registered for'} ${data?.title || 'a community event'}${data?.date ? ` on ${data.date}` : ''}.`,
+        url: '/events',
+        tag: 'ssm-event-registration'
+      });
       const registration = data?.registration ? normalizeEventRegistrantForReminder(data.registration, data) : null;
       const emailResult = registration
         ? await sendRegistrationStatusEmail({ registration, kind: 'event' })
@@ -7943,6 +8056,12 @@ const server = http.createServer(async (request, response) => {
       const promotionEmailResult = promotedRegistration
         ? await sendRegistrationStatusEmail({ registration: promotedRegistration, kind: 'event', promoted: true })
         : { sent: false, reason: 'no_promotion' };
+      notifyAppUpdate({
+        title: 'Event Registration Removed',
+        body: `An attendee was removed from ${data?.title || 'a community event'}${promotedRegistration ? `; ${promotedRegistration.name || 'a waitlisted attendee'} was promoted from the waitlist` : ''}.`,
+        url: '/events',
+        tag: 'ssm-event-registration-removed'
+      });
       await appendAuditLog(request, {
         action: 'event.registrant.remove',
         targetType: 'event',
@@ -7973,6 +8092,15 @@ const server = http.createServer(async (request, response) => {
       const validatedEvent = { ...(existingEvent || {}), ...body, id };
       await assertNoScheduleOverlap(validatedEvent, { kind: 'event', excludeId: id });
       const data = await eventsDb.updateEvent(id, body);
+      const changedEventFields = Object.keys(body).filter((field) => JSON.stringify(existingEvent?.[field]) !== JSON.stringify(data?.[field]));
+      if (changedEventFields.length) {
+        notifyAppUpdate({
+          title: data?.active === false ? 'Event Cancelled' : 'Event Updated',
+          body: `${data?.title || existingEvent?.title || 'Community event'} was ${data?.active === false ? 'cancelled' : 'updated'}${changedEventFields.length ? ` (${changedEventFields.slice(0, 3).join(', ')} changed)` : ''}; scheduled for ${data?.date || existingEvent?.date || 'a new date'}${data?.location ? ` at ${data.location}` : ''}.`,
+          url: '/events',
+          tag: 'ssm-event-updated'
+        });
+      }
       await appendAuditLog(request, {
         action: 'event.update',
         targetType: 'event',
@@ -7993,7 +8121,17 @@ const server = http.createServer(async (request, response) => {
   if (eventPathMatch && request.method === 'DELETE') {
     try {
       const id = parseNumericPathId(decodeURIComponent(eventPathMatch[1]), 'event id');
+      const existingEvents = await eventsDb.getEvents();
+      const deletedEvent = (Array.isArray(existingEvents) ? existingEvents : []).find((entry) => String(entry?.id || '') === String(id));
       const data = await eventsDb.removeEvent(id);
+      if (deletedEvent) {
+        notifyAppUpdate({
+          title: 'Event Cancelled',
+          body: `${deletedEvent.title || 'Community event'} on ${deletedEvent.date || 'its scheduled date'}${deletedEvent.location ? ` at ${deletedEvent.location}` : ''} was cancelled and removed from the calendar.`,
+          url: '/events',
+          tag: 'ssm-event-deleted'
+        });
+      }
       await appendAuditLog(request, {
         action: 'event.delete',
         targetType: 'event',
@@ -8274,6 +8412,12 @@ const server = http.createServer(async (request, response) => {
         if (delivery.ok) sent += 1;
       }
       assertInput(recipientCount > 0, 'The selected booking does not have an eligible duty performer assigned.');
+      notifyAppUpdate({
+        title: 'Booking Duty Briefing Sent',
+        body: `Admin sent a ${scope === 'single' ? 'duty briefing' : 'schedule briefing'} to ${sent} of ${recipientCount} assigned performer${recipientCount === 1 ? '' : 's'}.`,
+        url: '/admin/booking-duties',
+        tag: 'ssm-booking-duty-briefing'
+      });
       await appendAuditLog(request, { action: 'booking.duty-notifications.send', targetType: 'bookings', targetId: bookingId || 'upcoming', description: `Sent booking duty briefing to ${role}`, payload: { role, scope, bookingCount: bookings.length, recipientCount, sent } });
       sendJson(response, 200, { ok: true, data: { role, scope, bookingCount: bookings.length, recipientCount, sent } });
     } catch (error) {
@@ -9072,7 +9216,9 @@ const server = http.createServer(async (request, response) => {
       assertInput(['approved', 'pending', 'rejected'].includes(nextApprovalStatus), 'approvalStatus must be approved, pending, or rejected.');
       const approvalStatus = String(body.approvalStatus || 'pending').toLowerCase();
 
-      const next = readUsers().map((user) => (
+      const currentUsers = readUsers();
+      const previousUser = currentUsers.find((user) => String(user.id) === id) || null;
+      const next = currentUsers.map((user) => (
         user.id !== id
           ? user
           : normalizeUser({
@@ -9084,7 +9230,16 @@ const server = http.createServer(async (request, response) => {
       ));
 
       writeUsers(next);
-      sendJson(response, 200, { ok: true, data: next.find((user) => user.id === id) || null });
+      const updatedUser = next.find((user) => user.id === id) || null;
+      if (updatedUser && previousUser?.approvalStatus !== updatedUser.approvalStatus) {
+        notifyAppUpdate({
+          title: updatedUser.approvalStatus === 'approved' ? 'Member Approved' : `Member ${updatedUser.approvalStatus || 'Status Updated'}`,
+          body: `${updatedUser.name || 'A member'}'s membership application is now ${updatedUser.approvalStatus}.`,
+          url: '/admin/users',
+          tag: 'ssm-member-approval'
+        });
+      }
+      sendJson(response, 200, { ok: true, data: updatedUser });
     } catch (error) {
       sendJson(response, error.status || 500, {
         ok: false,
@@ -9146,6 +9301,28 @@ const server = http.createServer(async (request, response) => {
       }
 
       writeUsers(next);
+      if (targetUser.approvalStatus !== updatedUser.approvalStatus) {
+        notifyAppUpdate({
+          title: updatedUser.approvalStatus === 'approved' ? 'Member Approved' : `Member ${updatedUser.approvalStatus || 'Status Updated'}`,
+          body: `${updatedUser.name || 'A member'}'s membership application is now ${updatedUser.approvalStatus}.`,
+          url: '/admin/users',
+          tag: 'ssm-member-approval'
+        });
+      } else if (targetUser.isActive !== updatedUser.isActive) {
+        notifyAppUpdate({
+          title: updatedUser.isActive === false ? 'Member Deactivated' : 'Member Reactivated',
+          body: `${updatedUser.name || 'A member'}'s account was ${updatedUser.isActive === false ? 'deactivated' : 'reactivated'}.`,
+          url: '/admin/users',
+          tag: 'ssm-member-activity'
+        });
+      } else {
+        notifyAppUpdate({
+          title: 'Member Profile Updated',
+          body: `${updatedUser.name || 'A member'}'s contact information, role, or account profile was updated.`,
+          url: '/admin/users',
+          tag: 'ssm-member-updated'
+        });
+      }
       sendJson(response, 200, { ok: true, data: updatedUser });
     } catch (error) {
       sendJson(response, error.status || 500, {
@@ -9174,6 +9351,12 @@ const server = http.createServer(async (request, response) => {
 
       const next = readUsers().filter((user) => user.id !== id);
       writeUsers(next);
+      notifyAppUpdate({
+        title: 'Member Account Removed',
+        body: `${targetUser.name || 'A member'}'s account and related registrations were removed.`,
+        url: '/admin/users',
+        tag: 'ssm-member-deleted'
+      });
       sendJson(response, 200, { ok: true, data: { success: true } });
     } catch (error) {
       sendJson(response, error.status || 500, {

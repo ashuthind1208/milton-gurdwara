@@ -1,5 +1,5 @@
-const CACHE_NAME = 'ssm-app-shell-v1';
-const APP_SHELL = ['/', '/manifest.json', '/logo192.png'];
+const CACHE_NAME = 'ssm-app-shell-v5';
+const APP_SHELL = ['/', '/manifest.json', '/logo192.png', '/logo512.png', '/gurdwara-logo.webp', '/favicon-32.png', '/notification-icon.svg', '/notification-badge.svg'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
@@ -29,13 +29,18 @@ self.addEventListener('push', (event) => {
   }
 
   const title = payload.title || 'Singh Sabha Milton';
+  const icon = new URL(payload.icon || '/notification-icon.svg', self.location.origin).href;
   const options = {
     body: payload.body || '',
-    icon: payload.icon || '/logo192.png',
-    badge: payload.badge || '/logo192.png',
+    icon,
+    image: new URL(payload.image || '/gurdwara-logo.webp', self.location.origin).href,
+    badge: new URL(payload.badge || '/notification-badge.svg', self.location.origin).href,
     tag: payload.tag || 'ssm-update',
-    renotify: true,
-    data: { url: payload.url || '/' }
+    renotify: false,
+    vibrate: [120, 60, 120],
+    timestamp: Date.now(),
+    actions: Array.isArray(payload.actions) ? payload.actions.slice(0, 2) : [],
+    data: { url: payload.url || '/', body: payload.body || '', actions: payload.actions || [], ...(payload.data || {}) }
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
@@ -43,7 +48,11 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = event.notification.data?.url || '/';
+  if (event.action === 'dismiss') return;
+  const actionUrl = event.action
+    ? event.notification.data?.actions?.find((action) => action.action === event.action)?.url
+    : null;
+  const targetUrl = new URL(actionUrl || event.notification.data?.url || '/', self.location.origin).href;
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientsList) => {

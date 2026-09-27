@@ -4,6 +4,7 @@ import AppRoutes from './routes/AppRoutes';
 import DeleteConfirmationGuard from './components/common/DeleteConfirmationGuard';
 import FormValidationGuard from './components/common/FormValidationGuard';
 import AppInstallPrompt from './components/common/AppInstallPrompt';
+import { isPushSupported, syncGrantedPushSubscription } from './services/pushNotificationService';
 
 function App() {
   useEffect(() => {
@@ -43,6 +44,20 @@ function App() {
       window.removeEventListener('resize', syncScrollLock);
       body.style.overflow = initialOverflow;
       body.style.paddingRight = initialPaddingRight;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isPushSupported() || Notification.permission !== 'granted') return undefined;
+    let cancelled = false;
+    const syncSubscription = () => {
+      if (!cancelled) syncGrantedPushSubscription().catch((error) => console.warn('Unable to sync push subscription:', error?.message || error));
+    };
+    syncSubscription();
+    navigator.serviceWorker?.addEventListener('controllerchange', syncSubscription);
+    return () => {
+      cancelled = true;
+      navigator.serviceWorker?.removeEventListener('controllerchange', syncSubscription);
     };
   }, []);
 
