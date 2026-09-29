@@ -4061,10 +4061,34 @@ const schedulesOverlap = (firstIntervals, secondIntervals) => firstIntervals.som
   secondIntervals.some((second) => first.start < second.end && second.start < first.end)
 ));
 
+const isValidScheduleDate = (value) => {
+  const date = String(value || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const parsed = new Date(`${date}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date;
+};
+
+const isValidScheduleTime = (value) => {
+  const time = String(value || '').trim();
+  if (!/^\d{2}:\d{2}$/.test(time)) return false;
+  const [hours, minutes] = time.split(':').map(Number);
+  return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
+};
+
 const assertNoScheduleOverlap = async (candidate, { kind = 'booking', excludeId = '' } = {}) => {
   if ((kind === 'booking' && String(candidate.status || '').trim().toLowerCase() === 'cancelled')
     || (kind === 'event' && (candidate.active === false || candidate.isActive === false))) {
     return;
+  }
+  if (kind === 'booking') {
+    const startDate = String(candidate.date || '').trim();
+    const endDate = String(candidate.toDate || candidate.date || '').trim();
+    const fullDay = isAkhandPathBooking(candidate);
+    assertInput(isValidScheduleDate(startDate) && isValidScheduleDate(endDate) && endDate >= startDate,
+      'Booking start and end dates must be valid, and the end date cannot be before the start date.');
+    assertInput(fullDay || (isValidScheduleTime(candidate.startTime) && isValidScheduleTime(candidate.endTime)
+      && candidate.endTime > candidate.startTime),
+    'Booking start and end times must be valid, and the end time must be later than the start time.');
   }
   const candidateIntervals = getScheduleIntervals(candidate, kind);
   assertInput(candidateIntervals.length > 0, kind === 'event'
@@ -4076,11 +4100,19 @@ const assertNoScheduleOverlap = async (candidate, { kind = 'booking', excludeId 
     eventsDb.getEvents()
   ]);
   const conflicts = [];
+  const candidateAssigneeId = String(candidate.dutyAssigneeId || '').trim();
+  const candidateAssigneeEmail = String(candidate.dutyAssigneeEmail || '').trim().toLowerCase();
   for (const booking of Array.isArray(bookings) ? bookings : []) {
     if (kind === 'booking' && String(booking.id || '') === String(excludeId || '')) continue;
     if (String(booking.status || '').trim().toLowerCase() === 'cancelled') continue;
     if (schedulesOverlap(candidateIntervals, getScheduleIntervals(booking, 'booking'))) {
-      conflicts.push(String(booking.categoryName || booking.title || 'booking').trim());
+      const bookingAssigneeId = String(booking.dutyAssigneeId || '').trim();
+      const bookingAssigneeEmail = String(booking.dutyAssigneeEmail || '').trim().toLowerCase();
+      const sameDutyPerformer = (candidateAssigneeId && candidateAssigneeId === bookingAssigneeId)
+        || (candidateAssigneeEmail && candidateAssigneeEmail === bookingAssigneeEmail);
+      conflicts.push(sameDutyPerformer
+        ? `${String(candidate.dutyAssigneeName || booking.dutyAssigneeName || 'The selected duty performer').trim()} is already assigned to ${String(booking.categoryName || booking.title || 'another booking').trim()}`
+        : String(booking.categoryName || booking.title || 'booking').trim());
     }
   }
   for (const event of Array.isArray(events) ? events : []) {
@@ -5349,6 +5381,7 @@ const attachDonationReceiptToBooking = async (donationRecord = {}) => {
     paymentMethod: String(donationRecord.paymentProvider || booking.paymentMethod || '').trim().toUpperCase(),
     paymentProvider: String(donationRecord.paymentProvider || booking.paymentProvider || '').trim().toUpperCase(),
     paymentStatus: 'paid',
+    paymentReceivedAt: booking.paymentReceivedAt || new Date().toISOString(),
     status: String(booking.status || 'pending').trim().toLowerCase() === 'confirmed' ? 'confirmed' : 'pending',
     amount: Number(donationRecord.amount || booking.amount || 0),
     updatedAt: new Date().toISOString()
@@ -7198,6 +7231,13 @@ const server = http.createServer(async (request, response) => {
         ? existingLangarContributions.find((entry) => String(entry?.id || '') === String(id))
         : null;
       const previousLangarStatus = String(existingLangarContribution?.status || 'pending').trim().toLowerCase();
+      if (resource === 'bookings' && existingBooking) {
+        const previousPaymentStatus = String(existingBooking.paymentStatus || 'pending').trim().toLowerCase();
+        const nextPaymentStatus = String(body.paymentStatus || previousPaymentStatus).trim().toLowerCase();
+        if (['paid', 'partial'].includes(nextPaymentStatus) && previousPaymentStatus !== nextPaymentStatus && !existingBooking.paymentReceivedAt) {
+          body.paymentReceivedAt = new Date().toISOString();
+        }
+      }
       const changedRoleToMember = resource === 'users'
         && String(existingUser?.role || '').trim().toLowerCase() !== 'member'
         && String(body?.role || '').trim().toLowerCase() === 'member';

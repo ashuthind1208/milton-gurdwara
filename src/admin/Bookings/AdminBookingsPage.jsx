@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useOutletContext } from 'react-router-dom';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import {
@@ -11,6 +12,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   CreditCardIcon,
+  DocumentArrowDownIcon,
   EnvelopeIcon,
   EyeIcon,
   MagnifyingGlassIcon,
@@ -21,10 +23,12 @@ import {
 } from '@heroicons/react/24/outline';
 import { ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
 import RichTextEditor from '../../components/forms/RichTextEditor';
+import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton';
 import bookingService from '../../services/bookingService';
 import donationService from '../../services/donationService';
 import eventService from '../../services/eventService';
 import contentApiService from '../../services/contentApiService';
+import { downloadBookingRevenueCsv, downloadBookingRevenuePdf } from '../../utils/csvExport';
 
 const BOOKINGS_PAGE_SIZE = 10;
 const DUTY_PAGE_PATH = '/admin/booking-duties';
@@ -73,6 +77,20 @@ const toCalendarDate = (value) => {
   return match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12) : new Date();
 };
 
+const isValidBookingDate = (value) => {
+  const date = String(value || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const parsed = new Date(`${date}T00:00:00`);
+  return !Number.isNaN(parsed.getTime()) && toDateKey(parsed) === date;
+};
+
+const isValidBookingTime = (value) => {
+  const time = String(value || '').trim();
+  if (!/^\d{2}:\d{2}$/.test(time)) return false;
+  const [hours, minutes] = time.split(':').map(Number);
+  return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
+};
+
 const eachDateKey = (startValue, endValue = startValue) => {
   const start = toCalendarDate(startValue);
   const end = toCalendarDate(endValue || startValue);
@@ -88,12 +106,17 @@ const eachDateKey = (startValue, endValue = startValue) => {
   return keys;
 };
 
-const getBookingIntervals = (booking = {}) => eachDateKey(booking.date, booking.toDate || booking.date)
+const getBookingIntervals = (booking = {}) => {
+  const fullDay = /akhand\s*(paath|path)/i.test(`${booking.categoryName || ''} ${booking.title || ''}`);
+  return eachDateKey(booking.date, booking.toDate || booking.date)
   .map((dateKey) => ({
-    start: new Date(`${dateKey}T${booking.startTime || '00:00'}:00`),
-    end: new Date(`${dateKey}T${booking.endTime || '00:00'}:00`)
+    start: new Date(`${dateKey}T${fullDay ? '00:00' : booking.startTime || '00:00'}:00`),
+    end: fullDay
+      ? new Date(new Date(`${dateKey}T00:00:00`).getTime() + (24 * 60 * 60 * 1000))
+      : new Date(`${dateKey}T${booking.endTime || '00:00'}:00`)
   }))
   .filter((interval) => !Number.isNaN(interval.start.getTime()) && !Number.isNaN(interval.end.getTime()) && interval.end > interval.start);
+};
 
 const getEventIntervals = (event = {}) => {
   const start = new Date(event.date || '');
@@ -106,11 +129,20 @@ const intervalsOverlap = (first, second) => first.some((left) => second.some((ri
 
 const findScheduleConflict = (candidate, bookings, events) => {
   const candidateIntervals = getBookingIntervals(candidate);
-  const bookingConflict = bookings.find((entry) => (
+  const overlappingBookings = bookings.filter((entry) => (
     String(entry.id || '') !== String(candidate.id || '')
     && String(entry.status || '').toLowerCase() !== 'cancelled'
     && intervalsOverlap(candidateIntervals, getBookingIntervals(entry))
   ));
+  const samePerformerConflict = overlappingBookings.find((entry) => (
+    candidate.dutyAssigneeId
+    && String(entry.dutyAssigneeId || '') === String(candidate.dutyAssigneeId)
+  ));
+  if (samePerformerConflict) {
+    const performerName = candidate.dutyAssigneeName || samePerformerConflict.dutyAssigneeName || 'The selected duty performer';
+    return `${performerName} is already assigned to ${samePerformerConflict.categoryName || samePerformerConflict.title || 'another booking'}`;
+  }
+  const bookingConflict = overlappingBookings[0];
   if (bookingConflict) return bookingConflict.categoryName || bookingConflict.title || 'another booking';
   const eventConflict = events.find((entry) => (
     entry.active !== false && intervalsOverlap(candidateIntervals, getEventIntervals(entry))
@@ -163,6 +195,7 @@ const refundBadgeClass = (status) => {
 };
 
 const AdminBookingsPage = () => {
+  const { setHeaderAction } = useOutletContext();
   const queryClient = useQueryClient();
   const [currentPage, setCurrentPage] = useState(1);
   const [guidelinesDraft, setGuidelinesDraft] = useState({ guidelines: '', donationCampaignId: '', showCreateBookingButton: true });
@@ -177,6 +210,11 @@ const AdminBookingsPage = () => {
   const [bookingFormError, setBookingFormError] = useState('');
   const [bookingCalendarOpen, setBookingCalendarOpen] = useState(false);
   const [bookingFilters, setBookingFilters] = useState({ search: '', status: '', paymentStatus: '', categoryId: '', sort: 'newest' });
+  const [revenuePeriod, setRevenuePeriod] = useState('30');
+  const [revenueFromDate, setRevenueFromDate] = useState('');
+  const [revenueToDate, setRevenueToDate] = useState('');
+  const [revenueCategoryId, setRevenueCategoryId] = useState('');
+  const [revenueExportError, setRevenueExportError] = useState('');
 
   const { data: bookings = [], isLoading: bookingsLoading, error: bookingsError } = useQuery({
     queryKey: ['bookings'],
@@ -328,8 +366,61 @@ const AdminBookingsPage = () => {
       }
       byMonth.set(key, existing);
     });
-    return [...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month)).slice(-12);
+    return [...byMonth.values()].sort((first, second) => first.month.localeCompare(second.month)).slice(-12);
   }, [bookings]);
+
+  const revenueReport = useMemo(() => {
+    const today = new Date();
+    const customDatesValid = revenuePeriod !== 'custom'
+      || Boolean(revenueFromDate && revenueToDate && revenueFromDate <= revenueToDate);
+    const endDate = revenuePeriod === 'custom' ? revenueToDate : toDateKey(today);
+    const startDate = revenuePeriod === 'custom' ? revenueFromDate : (() => {
+        const start = new Date(today);
+        start.setDate(start.getDate() - Number(revenuePeriod || 30) + 1);
+        return toDateKey(start);
+      })();
+    const rows = bookings.filter((booking) => {
+      const receivedDate = toDateKey(booking.paymentReceivedAt || booking.createdAt);
+      const dateInRange = customDatesValid && receivedDate && receivedDate >= startDate && receivedDate <= endDate;
+      const categoryMatches = !revenueCategoryId || String(booking.categoryId) === String(revenueCategoryId);
+      const isRevenue = String(booking.status).toLowerCase() === 'confirmed'
+        && ['paid', 'partial'].includes(String(booking.paymentStatus).toLowerCase())
+        && (Number(booking.amount) > 0);
+      return dateInRange && categoryMatches && isRevenue;
+    }).sort((first, second) => String(first.paymentReceivedAt || first.createdAt || '').localeCompare(String(second.paymentReceivedAt || second.createdAt || '')));
+    const total = rows.reduce((sum, booking) => {
+      const gross = Number(booking.amount || 0);
+      const refunded = String(booking.refundStatus || '').toLowerCase() === 'processed'
+        || String(booking.paymentStatus || '').toLowerCase() === 'refunded'
+        ? Number(booking.refundAmount || 0)
+        : 0;
+      return sum + Math.max(0, gross - refunded);
+    }, 0);
+    return { startDate, endDate, rows, total, customDatesValid };
+  }, [bookings, revenueCategoryId, revenueFromDate, revenuePeriod, revenueToDate]);
+
+  const exportBookingRevenue = async (format) => {
+    setRevenueExportError('');
+    if (revenuePeriod === 'custom' && (!revenueFromDate || !revenueToDate || revenueFromDate > revenueToDate)) {
+      setRevenueExportError('Choose a valid custom date range before exporting.');
+      return;
+    }
+    const common = {
+      fileName: `booking-revenue-${revenueReport.startDate}-to-${revenueReport.endDate}.${format}`,
+      organizationName: 'Singh Sabha Milton Gurdwara',
+      bookings: revenueReport.rows,
+      startDate: revenueReport.startDate,
+      endDate: revenueReport.endDate,
+      categoryName: categories.find((category) => String(category.id) === String(revenueCategoryId))?.name || 'All booking types',
+      totalRevenue: revenueReport.total
+    };
+    try {
+      if (format === 'pdf') await downloadBookingRevenuePdf(common);
+      else downloadBookingRevenueCsv(common);
+    } catch (error) {
+      setRevenueExportError(error?.message || 'Unable to create the booking report.');
+    }
+  };
 
   const occupiedDates = useMemo(() => {
     const dates = new Map();
@@ -514,6 +605,34 @@ const AdminBookingsPage = () => {
     }));
   };
 
+  const getBookingItems = (booking = {}) => {
+    if (Array.isArray(booking.itemizedItems)) return booking.itemizedItems;
+    if (!booking.categoryId) return [];
+    const category = categories.find((entry) => String(entry.id) === String(booking.categoryId));
+    return category ? [{ categoryId: category.id, name: category.name, description: category.description || '', amount: Number(booking.amount || category.feeAmount || 0) }] : [];
+  };
+
+  const isGurdwaraLocation = (location = '') => /gurdwara|7035\s+sixth\s+line/i.test(String(location || ''));
+
+  const updateBookingItems = (nextItems) => {
+    const firstItem = nextItems[0];
+    const total = nextItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    setBookingModal((current) => ({
+      ...current,
+      booking: {
+        ...current.booking,
+        itemizedItems: nextItems,
+        categoryId: firstItem?.categoryId || '',
+        categoryName: firstItem?.name || '',
+        title: nextItems.map((item) => item.name).join(', ') || 'Booking Request',
+        color: categories.find((entry) => String(entry.id) === String(firstItem?.categoryId))?.color || '',
+        amount: total,
+        paymentStatus: total > 0 ? (current.booking.paymentStatus || 'pending') : 'pending',
+        paymentMethod: total > 0 ? (current.booking.paymentMethod || '') : ''
+      }
+    }));
+  };
+
   const openStatusModal = (booking) => {
     setStatusModal({ open: true, booking: { ...booking }, status: booking.status || 'pending' });
   };
@@ -590,19 +709,30 @@ const AdminBookingsPage = () => {
       ['toDate', 'To date'],
       ['startTime', 'Start time'],
       ['endTime', 'End time'],
-      ['categoryId', 'Booking type'],
       ['bookingLocation', 'Booking location'],
       ['requesterName', 'Name'],
-      ['requesterEmail', 'Email'],
-      ['requesterPhone', 'Phone'],
-      ['requesterAddress', 'Address'],
       ['dutyAssigneeId', 'Duty performer'],
-      ['paymentStatus', 'Payment status'],
-      ['paymentMethod', 'Payment method']
+      ['paymentStatus', 'Payment status']
     ];
     const missingField = requiredFields.find(([field]) => !String(booking[field] || '').trim());
     if (missingField) {
       setBookingFormError(`${missingField[1]} is required.`);
+      return;
+    }
+    if (!isValidBookingDate(booking.date) || !isValidBookingDate(booking.toDate)) {
+      setBookingFormError('Enter valid start and end dates.');
+      return;
+    }
+    if (!isValidBookingTime(booking.startTime) || !isValidBookingTime(booking.endTime)) {
+      setBookingFormError('Enter valid start and end times.');
+      return;
+    }
+    if (bookingModal.mode === 'create' && !getBookingItems(booking).length) {
+      setBookingFormError('Select at least one booking item for the receipt.');
+      return;
+    }
+    if (Number(booking.amount) > 0 && ['paid', 'partial'].includes(String(booking.paymentStatus).toLowerCase()) && !String(booking.paymentMethod || '').trim()) {
+      setBookingFormError('Choose a payment method when recording a payment.');
       return;
     }
     if (booking.toDate < booking.date) {
@@ -622,11 +752,16 @@ const AdminBookingsPage = () => {
       setBookingFormError('Amount cannot be negative.');
       return;
     }
+    if (booking.paymentStatus === 'partial' && !(Number(booking.amountPaid) > 0 && Number(booking.amountPaid) < Number(booking.amount))) {
+      setBookingFormError('Enter an amount received that is greater than zero and less than the receipt total.');
+      return;
+    }
     setBookingFormError('');
     if (bookingModal.mode === 'create') {
       createBookingMutation.mutate({
         ...booking,
         id: '',
+        itemizedItems: getBookingItems(booking),
         amount: Number(booking.amount || 0),
         source: 'admin-manual'
       });
@@ -635,19 +770,19 @@ const AdminBookingsPage = () => {
     if (!booking.id) {
       return;
     }
-    bookingMutation.mutate({ id: booking.id, payload: { ...booking, amount: Number(booking.amount || 0) } });
+    bookingMutation.mutate({ id: booking.id, payload: { ...booking, itemizedItems: getBookingItems(booking), amount: Number(booking.amount || 0) } });
   };
 
-  const openManualBooking = () => {
-    const category = categories.find((entry) => entry.active !== false) || categories[0] || { id: 'cat-other', name: 'Other', color: '#475569' };
+  const openManualBooking = useCallback(() => {
     setBookingModal({
       open: true,
       mode: 'create',
       booking: {
-        categoryId: category.id,
-        categoryName: category.name,
-        title: category.name,
-        color: category.color,
+        categoryId: '',
+        categoryName: '',
+        title: 'Booking Request',
+        color: '',
+        itemizedItems: [],
         date: toDateKey(new Date()),
         toDate: toDateKey(new Date()),
         startTime: '10:00',
@@ -662,7 +797,7 @@ const AdminBookingsPage = () => {
         dutyAssigneeEmail: '',
         status: 'confirmed',
         paymentStatus: 'pending',
-        paymentMethod: 'cash',
+        paymentMethod: '',
         paymentProvider: '',
         amount: 0,
         receiptNumber: '',
@@ -672,7 +807,12 @@ const AdminBookingsPage = () => {
     });
     setBookingFormError('');
     setBookingCalendarOpen(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    setHeaderAction(<AdminHeaderActionButton label="Add Bookings" onClick={openManualBooking} />);
+    return () => setHeaderAction(null);
+  }, [openManualBooking, setHeaderAction]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -692,14 +832,11 @@ const AdminBookingsPage = () => {
           </div>
         </div>
       ) : null}
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-heading text-3xl font-semibold text-slate-900">Bookings Management</h1>
+          <h2 className="font-heading text-3xl font-semibold text-slate-900">Bookings Management</h2>
           <p className="mt-1 text-sm text-slate-600">Track requests, payment status, schedules, and booking types.</p>
         </div>
-        <button type="button" onClick={openManualBooking} className="inline-flex items-center gap-2 rounded-lg border border-brand-blue px-4 py-2 text-sm font-semibold text-brand-blue hover:bg-blue-50">
-          <PlusIcon className="h-4 w-4" /> Manual Booking
-        </button>
       </div>
 
       <section className="grid gap-4 xl:grid-cols-2">
@@ -734,6 +871,34 @@ const AdminBookingsPage = () => {
           </div>
         </div>
       </section>
+
+      <section className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-4 shadow-sm sm:p-5" data-testid="booking-revenue-report">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">Booking revenue report</p>
+            <h2 className="mt-1 font-heading text-xl font-bold text-slate-900">Export paid bookings</h2>
+            <p className="mt-1 text-xs text-slate-600">Revenue uses confirmed bookings with payment received in the selected period. Processed refunds are deducted.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => void exportBookingRevenue('pdf')} disabled={!revenueReport.rows.length} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-brand-blue px-3 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"><DocumentArrowDownIcon className="h-4 w-4" /> Download PDF</button>
+            <button type="button" onClick={() => void exportBookingRevenue('csv')} disabled={!revenueReport.rows.length} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-emerald-700 bg-white px-3 py-2 text-sm font-bold text-emerald-800 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"><ArrowDownTrayIcon className="h-4 w-4" /> Download CSV</button>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(180px,0.7fr)_minmax(190px,0.8fr)_repeat(2,minmax(150px,0.65fr))]">
+          <label className="text-xs font-bold text-slate-700">Period<select value={revenuePeriod} onChange={(event) => setRevenuePeriod(event.target.value)} className="mt-1.5 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="60">Last 60 days</option><option value="90">Last 90 days</option><option value="custom">Custom range</option></select></label>
+          <label className="text-xs font-bold text-slate-700">Booking type<select value={revenueCategoryId} onChange={(event) => setRevenueCategoryId(event.target.value)} className="mt-1.5 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="">All booking types</option>{categories.filter((category) => category.active !== false).map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+          {revenuePeriod === 'custom' ? <>
+            <label className="text-xs font-bold text-slate-700">From date<input type="date" value={revenueFromDate} onChange={(event) => setRevenueFromDate(event.target.value)} className="mt-1.5 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm" /></label>
+            <label className="text-xs font-bold text-slate-700">To date<input type="date" value={revenueToDate} onChange={(event) => setRevenueToDate(event.target.value)} className="mt-1.5 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm" /></label>
+          </> : null}
+        </div>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-white/90 p-3">
+          <div><p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Included bookings</p><p className="mt-0.5 text-sm font-bold text-slate-800">{revenueReport.customDatesValid ? `${revenueReport.rows.length} paid/partial booking${revenueReport.rows.length === 1 ? '' : 's'} · ${revenueReport.startDate} to ${revenueReport.endDate}` : 'Select a valid start and end date to preview the report.'}</p></div>
+          <div className="text-right"><p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">Net revenue · CAD</p><p className="text-2xl font-black text-emerald-800">${revenueReport.total.toFixed(2)}</p></div>
+        </div>
+        {revenueExportError ? <p role="alert" className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{revenueExportError}</p> : null}
+      </section>
+
 
       <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
         <div className="border-b border-slate-200 px-4 py-3">
@@ -770,7 +935,7 @@ const AdminBookingsPage = () => {
             <tbody>
               {bookingsLoading ? <tr><td className="px-3 py-8 text-center text-slate-500" colSpan={9}>Loading bookings…</td></tr> : null}
               {pagedBookings.map((row) => (
-                <tr key={row.id} className="border-t border-slate-200 hover:bg-slate-50/70">
+                <tr key={row.id} className={`border-t border-slate-200 transition-colors ${bookingModal.booking?.id === row.id ? 'bg-blue-100 ring-1 ring-inset ring-blue-300' : 'hover:bg-slate-50/70'}`} aria-selected={bookingModal.booking?.id === row.id}>
                   <td className="whitespace-nowrap px-3 py-2">{row.date || '-'}{row.toDate && row.toDate !== row.date ? ` to ${row.toDate}` : ''}</td>
                   <td className="px-3 py-2 font-semibold text-slate-900">{row.requesterName || '-'}</td>
                   <td className="px-3 py-2">{row.categoryName || '-'}</td>
@@ -884,34 +1049,51 @@ const AdminBookingsPage = () => {
                     ].map(([field, label, type]) => (
                       <label key={field} className="min-w-0 text-sm font-semibold text-slate-700">{label} <span className="text-rose-600">*</span>{type === 'time' ? <select required disabled={bookingModal.mode === 'view'} value={bookingModal.booking[field] || ''} onChange={(event) => updateBookingDraft(field, event.target.value)} className="mt-1 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 disabled:bg-slate-100"><option value="">Select time</option>{BOOKING_TIME_OPTIONS.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}</select> : <input required type={type} disabled={bookingModal.mode === 'view'} value={bookingModal.booking[field] || ''} min={field === 'toDate' ? bookingModal.booking.date || undefined : undefined} onChange={(event) => updateBookingDraft(field, event.target.value)} className="mt-1 w-full min-w-0 rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" />}</label>
                     ))}
-                    <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Booking Type <span className="text-rose-600">*</span><select required disabled={bookingModal.mode === 'view'} value={bookingModal.booking.categoryId || ''} onChange={(event) => { const category = categories.find((entry) => entry.id === event.target.value); setBookingModal((current) => ({ ...current, booking: { ...current.booking, categoryId: event.target.value, categoryName: category?.name || '', title: category?.name || '', color: category?.color || '' } })); }} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100">{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
                     <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Booking Location <span className="text-rose-600">*</span><input required disabled={bookingModal.mode === 'view'} value={bookingModal.booking.bookingLocation || ''} onChange={(event) => updateBookingDraft('bookingLocation', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label>
                     <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Duty Performer <span className="text-rose-600">*</span><select required disabled={bookingModal.mode === 'view'} value={bookingModal.booking.dutyAssigneeId || ''} onChange={(event) => { const assignee = dutyAssignees.find((entry) => String(entry.id) === event.target.value); setBookingModal((current) => ({ ...current, booking: { ...current.booking, dutyAssigneeId: String(assignee?.id || ''), dutyAssigneeName: String(assignee?.name || assignee?.email || ''), dutyAssigneeEmail: String(assignee?.email || '').toLowerCase() } })); }} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 disabled:bg-slate-100"><option value="">Select duty performer</option>{bookingModal.booking.dutyAssigneeId && !dutyAssignees.some((entry) => String(entry.id) === String(bookingModal.booking.dutyAssigneeId)) ? <option value={bookingModal.booking.dutyAssigneeId}>{bookingModal.booking.dutyAssigneeName || 'Previously assigned user'}</option> : null}{dutyAssignees.map((entry) => <option key={entry.id} value={entry.id}>{entry.name || entry.email}{entry.role ? ` (${entry.role})` : ''}</option>)}</select></label>
+                    {bookingModal.mode === 'create' ? <div className="rounded-lg border border-slate-200 bg-white sm:col-span-4">
+                      <div className="border-b border-slate-100 px-3 py-2.5"><p className="text-sm font-bold text-slate-900">Booking items</p><p className="text-xs text-slate-500">Choose the services to list on the receipt.</p></div>
+                      <div className="divide-y divide-slate-100 px-3">{categories.filter((category) => category.active !== false).map((category) => {
+                        const selected = getBookingItems(bookingModal.booking).some((item) => String(item.categoryId) === String(category.id));
+                        return <label key={category.id} className={`-mx-3 flex min-h-12 cursor-pointer items-center gap-3 border-l-4 px-3 py-2 transition-colors ${selected ? 'border-brand-blue bg-blue-50 text-slate-950' : 'border-transparent text-slate-600 hover:bg-slate-50'}`}>
+                          <input type="checkbox" checked={selected} onChange={(event) => {
+                            const currentItems = getBookingItems(bookingModal.booking);
+                            updateBookingItems(event.target.checked
+                              ? [...currentItems, { categoryId: category.id, name: category.name, description: category.description || '', amount: Number(category.feeAmount || 0) }]
+                              : currentItems.filter((item) => String(item.categoryId) !== String(category.id)));
+                          }} className="h-4 w-4 shrink-0 accent-brand-blue" />
+                          <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{category.name}</span>{category.description ? <span className="block truncate text-xs text-slate-500">{category.description}</span> : null}</span>
+                          <span className="shrink-0 text-sm font-semibold">CAD ${Number(category.feeAmount || 0).toFixed(2)}</span>
+                        </label>;
+                      })}</div>
+                      {!getBookingItems(bookingModal.booking).length ? <p className="border-t border-slate-100 px-3 py-2 text-xs text-slate-500">Select at least one service.</p> : null}
+                    </div> : null}
                 </div>
               </section>
-              <div className="grid gap-4 lg:grid-cols-2">
-              <section className="rounded-lg border border-slate-200 bg-white p-4">
-                <h4 className="border-b border-slate-200 pb-3 font-heading text-base font-semibold text-slate-900">Contact Details</h4>
-                <div className="mt-3 grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-brand-blue">Booker information</p><h4 className="mt-1 font-heading text-base font-bold text-slate-900">Contact details</h4><p className="mt-1 text-xs text-slate-500">Who should we contact about this booking?</p></div><span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-800">Required</span></div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   {[
                     ['requesterName', 'Name', 'text'],
-                    ['requesterEmail', 'Email', 'email'],
-                    ['requesterPhone', 'Phone', 'text'],
-                    ['requesterAddress', 'Address', 'text']
+                    ['requesterEmail', 'Email (optional)', 'email'],
+                    ['requesterPhone', 'Phone (optional)', 'text']
                   ].map(([field, label, type]) => (
-                    <label key={field} className="text-sm font-semibold text-slate-700">{label} <span className="text-rose-600">*</span><input required type={type} disabled={bookingModal.mode === 'view'} value={bookingModal.booking[field] || ''} onChange={(event) => updateBookingDraft(field, event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label>
+                    <label key={field} className="text-sm font-semibold text-slate-700">{label}<input type={type} disabled={bookingModal.mode === 'view'} value={bookingModal.booking[field] || ''} onChange={(event) => updateBookingDraft(field, event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label>
                   ))}
+                  {!isGurdwaraLocation(bookingModal.booking.bookingLocation) ? <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Event address <span className="text-rose-600">*</span><input required type="text" disabled={bookingModal.mode === 'view'} value={bookingModal.booking.requesterAddress || ''} onChange={(event) => updateBookingDraft('requesterAddress', event.target.value)} placeholder="Enter the off-site venue address" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label> : null}
                 </div>
               </section>
 
-              <section className="rounded-lg border border-blue-200 bg-blue-50/40 p-4">
-                <h4 className="border-b border-blue-200 pb-3 font-heading text-base font-semibold text-slate-900">Payment Details</h4>
-                <div className="mt-3 grid gap-4 sm:grid-cols-2">
-              <label className="text-sm font-semibold text-slate-700">Payment Status <span className="text-rose-600">*</span><select required disabled={bookingModal.mode === 'view'} value={bookingModal.booking.paymentStatus || 'pending'} onChange={(event) => updateBookingDraft('paymentStatus', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100"><option value="pending">Pending</option><option value="paid">Paid</option><option value="partial">Partial</option><option value="refunded">Refunded</option></select></label>
-              <label className="text-sm font-semibold text-slate-700">Payment Method <span className="text-rose-600">*</span><select required disabled={bookingModal.mode === 'view'} value={bookingModal.booking.paymentMethod || ''} onChange={(event) => updateBookingDraft('paymentMethod', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 disabled:bg-slate-100">{bookingModal.booking.source !== 'admin-manual' && bookingModal.booking.paymentMethod && !['cash', 'credit-card', 'interac'].includes(bookingModal.booking.paymentMethod) ? <option value={bookingModal.booking.paymentMethod}>{bookingModal.booking.paymentMethod}</option> : null}<option value="cash">Cash</option><option value="credit-card">Credit Card</option><option value="interac">Interac</option></select></label>
-              <label className="text-sm font-semibold text-slate-700">Amount (CAD) <span className="text-rose-600">*</span><input required type="number" min="0" step="0.01" disabled={bookingModal.mode === 'view'} value={bookingModal.booking.amount ?? ''} onChange={(event) => updateBookingDraft('amount', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label>
-              <label className="text-sm font-semibold text-slate-700">Receipt Number<input disabled={bookingModal.mode === 'view'} value={bookingModal.booking.receiptNumber || ''} onChange={(event) => updateBookingDraft('receiptNumber', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label>
-                </div>
+              <section className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-blue-50 p-4 shadow-sm sm:p-5">
+                <div className="border-b border-emerald-100 pb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">Receipt summary</p><h4 className="mt-1 font-heading text-base font-bold text-slate-900">Payment</h4><p className="mt-1 text-xs text-slate-500">Payment fields are based on the selected receipt items.</p></div>
+                <div className="mt-3 rounded-lg border border-emerald-100 bg-white p-3"><div className="space-y-2">{getBookingItems(bookingModal.booking).map((item) => <div key={item.categoryId} className="flex justify-between gap-3 text-xs"><span className="text-slate-600">{item.name}</span><span className="font-bold text-slate-800">${Number(item.amount || 0).toFixed(2)}</span></div>)}{!getBookingItems(bookingModal.booking).length ? <p className="text-xs text-slate-500">Select booking items to calculate payment.</p> : null}</div><div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3"><span className="text-sm font-bold text-slate-800">Amount due · CAD</span><strong className="text-xl font-black text-emerald-800">${Number(bookingModal.booking.amount || 0).toFixed(2)}</strong></div></div>
+                {Number(bookingModal.booking.amount || 0) > 0 ? <div className="mt-3 grid gap-3">
+                  <label className="text-sm font-semibold text-slate-700">Payment status<select disabled={bookingModal.mode === 'view'} value={bookingModal.booking.paymentStatus || 'pending'} onChange={(event) => updateBookingDraft('paymentStatus', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 disabled:bg-slate-100"><option value="pending">Unpaid · payment due</option><option value="paid">Paid in full</option><option value="partial">Partially paid</option><option value="refunded">Refunded</option></select></label>
+                  {['paid', 'partial'].includes(String(bookingModal.booking.paymentStatus || '').toLowerCase()) ? <label className="text-sm font-semibold text-slate-700">Payment method<select disabled={bookingModal.mode === 'view'} value={bookingModal.booking.paymentMethod || ''} onChange={(event) => updateBookingDraft('paymentMethod', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 disabled:bg-slate-100"><option value="">Choose method</option>{bookingModal.booking.source !== 'admin-manual' && bookingModal.booking.paymentMethod && !['cash', 'credit-card', 'interac'].includes(bookingModal.booking.paymentMethod) ? <option value={bookingModal.booking.paymentMethod}>{bookingModal.booking.paymentMethod}</option> : null}<option value="cash">Cash</option><option value="credit-card">Credit Card</option><option value="interac">Interac</option></select></label> : null}
+                  {bookingModal.booking.paymentStatus === 'partial' ? <label className="text-sm font-semibold text-slate-700">Amount received (CAD)<input type="number" min="0.01" max={Number(bookingModal.booking.amount || 0)} step="0.01" disabled={bookingModal.mode === 'view'} value={bookingModal.booking.amountPaid ?? ''} onChange={(event) => updateBookingDraft('amountPaid', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label> : null}
+                  <label className="text-sm font-semibold text-slate-700">Receipt number<input disabled={bookingModal.mode === 'view'} value={bookingModal.booking.receiptNumber || ''} onChange={(event) => updateBookingDraft('receiptNumber', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 disabled:bg-slate-100" /></label>
+                </div> : null}
               </section>
               </div>
               <section className="rounded-lg border border-slate-200 bg-white p-4">
