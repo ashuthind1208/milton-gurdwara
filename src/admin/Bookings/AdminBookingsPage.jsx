@@ -736,10 +736,6 @@ const AdminBookingsPage = () => {
       setBookingFormError('Enter valid start and end times.');
       return;
     }
-    if (String(booking.occasionType || '').length > 25) {
-      setBookingFormError('Booking occasion must be 25 characters or fewer.');
-      return;
-    }
     if (bookingModal.mode === 'create' && !getBookingItems(booking).length) {
       setBookingFormError('Select at least one booking item for the receipt.');
       return;
@@ -1065,7 +1061,7 @@ const AdminBookingsPage = () => {
                     ))}
                     <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Booking Location <span className="text-rose-600">*</span><input required disabled={bookingModal.mode === 'view'} value={bookingModal.booking.bookingLocation || ''} onChange={(event) => updateBookingDraft('bookingLocation', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label>
                     <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Duty Performer <span className="text-rose-600">*</span><select required disabled={bookingModal.mode === 'view'} value={bookingModal.booking.dutyAssigneeId || ''} onChange={(event) => { const assignee = dutyAssignees.find((entry) => String(entry.id) === event.target.value); setBookingModal((current) => ({ ...current, booking: { ...current.booking, dutyAssigneeId: String(assignee?.id || ''), dutyAssigneeName: String(assignee?.name || assignee?.email || ''), dutyAssigneeEmail: String(assignee?.email || '').toLowerCase() } })); }} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 disabled:bg-slate-100"><option value="">Select duty performer</option>{bookingModal.booking.dutyAssigneeId && !dutyAssignees.some((entry) => String(entry.id) === String(bookingModal.booking.dutyAssigneeId)) ? <option value={bookingModal.booking.dutyAssigneeId}>{bookingModal.booking.dutyAssigneeName || 'Previously assigned user'}</option> : null}{dutyAssignees.map((entry) => <option key={entry.id} value={entry.id}>{entry.name || entry.email}{entry.role ? ` (${entry.role})` : ''}</option>)}</select></label>
-                    <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Booking occasion <span className="font-normal text-slate-500">(25 characters max)</span><input maxLength={25} disabled={bookingModal.mode === 'view'} value={bookingModal.booking.occasionType || ''} onChange={(event) => updateBookingDraft('occasionType', event.target.value)} placeholder="For example: Wedding, memorial" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label>
+                    <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Booking occasion<input disabled={bookingModal.mode === 'view'} value={bookingModal.booking.occasionType || ''} onChange={(event) => updateBookingDraft('occasionType', event.target.value)} placeholder="For example: Wedding, memorial" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label>
                     {bookingModal.mode !== 'view' ? <div className="rounded-lg border border-slate-200 bg-white sm:col-span-4">
                       <div className="border-b border-slate-100 px-3 py-2.5"><p className="text-sm font-bold text-slate-900">Booking items</p><p className="text-xs text-slate-500">Choose the services to list on the receipt.</p></div>
                       <div className="divide-y divide-slate-100 px-3">{sortBookingCategories(categories.filter((category) => category.active !== false)).map((category) => {
