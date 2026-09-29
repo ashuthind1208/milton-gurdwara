@@ -8,6 +8,14 @@ import {
   subscribeToPushNotifications
 } from '../../services/pushNotificationService';
 
+const isInstalledPwa = () => {
+  if (typeof window === 'undefined') return false;
+  const displayMode = window.matchMedia?.('(display-mode: standalone)').matches
+    || window.matchMedia?.('(display-mode: fullscreen)').matches
+    || window.matchMedia?.('(display-mode: minimal-ui)').matches;
+  return Boolean(displayMode || window.navigator.standalone === true);
+};
+
 const NotificationPermissionPrompt = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
@@ -17,7 +25,7 @@ const NotificationPermissionPrompt = () => {
     let cancelled = false;
 
     const checkPermission = async () => {
-      if (!isPushSupported()) return;
+      if (!isInstalledPwa() || !isPushSupported()) return;
 
       if (getPushPermission() === 'granted') {
         const existingSubscription = await getExistingPushSubscription().catch(() => null);
