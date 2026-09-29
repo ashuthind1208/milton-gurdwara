@@ -409,11 +409,30 @@ export const createBookingReceiptPdfBlob = async ({
 
   autoTable(doc, {
     startY: (doc.lastAutoTable?.finalY || 330) + 24,
+    head: [['Receipt Items', 'Amount (CAD)']],
+    body: [
+      ...(Array.isArray(booking.itemizedItems) && booking.itemizedItems.length
+        ? booking.itemizedItems.map((item) => [item.name || 'Booking item', Number(item.amount || 0).toFixed(2)])
+        : [[booking.categoryName || booking.title || 'Booking', Number(booking.amount || 0).toFixed(2)]]),
+      ['Total', Number(booking.amount || 0).toFixed(2)]
+    ],
+    styles: { fontSize: 10, cellPadding: 8, valign: 'top' },
+    headStyles: { fillColor: LOGO_BLUE_RGB, textColor: 255, fontStyle: 'bold' },
+    columnStyles: {
+      0: { cellWidth: 140, fontStyle: 'bold', fillColor: [238, 245, 255], textColor: [0, 64, 129] },
+      1: { cellWidth: 'auto', halign: 'right' }
+    },
+    theme: 'grid',
+    margin: { left: 40, right: 40 }
+  });
+
+  autoTable(doc, {
+    startY: (doc.lastAutoTable?.finalY || 420) + 16,
     head: [['Payment Information', 'Details']],
     body: [
+      ['Amount Received', `CAD ${Number(booking.amountPaid || (booking.paymentStatus === 'paid' ? booking.amount : 0)).toFixed(2)}`],
       ['Payment Status', toDisplayLabel(booking.paymentStatus)],
       ['Payment Method', toDisplayLabel(booking.paymentMethod || booking.paymentProvider)],
-      ['Amount', `CAD ${Number(booking.amount || 0).toFixed(2)}`],
       ['Receipt Number', booking.receiptNumber || 'Not assigned'],
       ['Payment Reference', booking.paymentReference || '-'],
       ...(booking.status === 'cancelled' ? [
@@ -610,6 +629,106 @@ export const downloadBookingReceiptPdf = async (payload) => {
   const blob = await createBookingReceiptPdfBlob(payload);
   const reference = payload?.booking?.receiptNumber || payload?.booking?.id || 'booking';
   triggerFileDownload(blob, payload?.fileName || `booking-receipt-${reference}.pdf`);
+};
+
+const formatBookingReportDate = (value) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' });
+};
+
+const getBookingRevenueReportRows = (bookings = []) => (Array.isArray(bookings) ? bookings : []).map((booking) => ([
+  formatBookingReportDate(booking.createdAt),
+  formatBookingReportDate(booking.date),
+  booking.toDate && booking.toDate !== booking.date ? formatBookingReportDate(booking.toDate) : '',
+  booking.requesterName || '',
+  booking.createdByName || booking.bookedByName || booking.createdBy || booking.bookedBy || (booking.source === 'admin-manual' ? 'Admin (not recorded)' : 'Website'),
+  booking.requesterEmail || '',
+  booking.requesterPhone || '',
+  booking.categoryName || booking.title || '',
+  `${booking.startTime || ''}${booking.endTime ? ` - ${booking.endTime}` : ''}`,
+  booking.bookingLocation || booking.location || '',
+  Number(booking.amount || 0).toFixed(2),
+  String(booking.paymentStatus || 'pending'),
+  String(booking.status || 'pending'),
+  booking.refundStatus || '',
+  Number(booking.refundAmount || 0).toFixed(2),
+  booking.paymentMethod || booking.paymentProvider || '',
+  booking.receiptNumber || booking.paymentReference || ''
+]));
+
+const BOOKING_REVENUE_HEADERS = [
+  'Date Created', 'Date of Event', 'Event End Date', 'Booked By', 'Booking Taken By',
+  'Booker Email', 'Booker Phone', 'Event Type', 'Event Time', 'Location',
+  'Gross Amount (CAD)', 'Payment Status', 'Booking Status', 'Refund Status',
+  'Refund Amount (CAD)', 'Payment Method', 'Receipt / Reference'
+];
+
+export const downloadBookingRevenueCsv = ({ fileName, organizationName, bookings = [], startDate, endDate, categoryName, totalRevenue = 0 }) => {
+  const rows = getBookingRevenueReportRows(bookings);
+  const metadataRows = [
+    ['Organization', organizationName || 'Singh Sabha Milton Gurdwara'],
+    ['Report', 'Booking Revenue'],
+    ['Created Date Range', `${startDate || '-'} to ${endDate || '-'}`],
+    ['Booking Type', categoryName || 'All booking types'],
+    ['Included Paid Bookings', bookings.length],
+    ['Net Revenue (CAD)', Number(totalRevenue || 0).toFixed(2)],
+    ['Generated On', new Date().toLocaleString()],
+    []
+  ];
+  const csvData = [...metadataRows.map((row) => row.map(escapeCsvCell).join(',')), buildCsv(BOOKING_REVENUE_HEADERS, rows)].join('\n');
+  triggerFileDownload(new Blob([`\uFEFF${csvData}`], { type: 'text/csv;charset=utf-8;' }), fileName || 'booking-revenue.csv');
+};
+
+export const createBookingRevenuePdfBlob = async ({ organizationName, bookings = [], startDate, endDate, categoryName, totalRevenue = 0 }) => {
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const generatedOn = new Date().toLocaleString();
+  const rows = getBookingRevenueReportRows(bookings);
+
+  doc.setFillColor(...LOGO_BLUE_RGB);
+  doc.rect(0, 0, pageWidth, 102, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.text(organizationName || 'Singh Sabha Milton Gurdwara', 34, 36);
+  doc.setFontSize(15);
+  doc.text('Booking Revenue Report', 34, 60);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text(`Created date: ${formatBookingReportDate(startDate)} to ${formatBookingReportDate(endDate)}`, 34, 80);
+  doc.text(`Booking type: ${categoryName || 'All booking types'}  |  Generated: ${generatedOn}`, 34, 94);
+
+  doc.setTextColor(15, 23, 42);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text(`Bookings: ${bookings.length}`, 34, 126);
+  doc.text(`Net revenue: CAD ${Number(totalRevenue || 0).toFixed(2)}`, pageWidth - 34, 126, { align: 'right' });
+
+  autoTable(doc, {
+    startY: 140,
+    head: [BOOKING_REVENUE_HEADERS],
+    body: rows,
+    styles: { fontSize: 6.3, cellPadding: 3, overflow: 'linebreak', valign: 'middle' },
+    headStyles: { fillColor: LOGO_BLUE_RGB, textColor: 255, fontStyle: 'bold', fontSize: 6.5 },
+    columnStyles: { 0: { cellWidth: 58 }, 1: { cellWidth: 58 }, 2: { cellWidth: 58 }, 3: { cellWidth: 72 }, 4: { cellWidth: 76 }, 5: { cellWidth: 95 }, 6: { cellWidth: 65 }, 7: { cellWidth: 67 }, 8: { cellWidth: 58 }, 9: { cellWidth: 75 }, 10: { cellWidth: 57, halign: 'right' }, 11: { cellWidth: 53 }, 12: { cellWidth: 53 }, 13: { cellWidth: 48 }, 14: { cellWidth: 52, halign: 'right' }, 15: { cellWidth: 57 }, 16: { cellWidth: 67 } },
+    didDrawPage: () => {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Generated ${generatedOn}`, 34, pageHeight - 18);
+      doc.text(`Page ${doc.internal.getCurrentPageInfo().pageNumber}`, pageWidth - 34, pageHeight - 18, { align: 'right' });
+    },
+    theme: 'grid',
+    margin: { left: 34, right: 34, bottom: 34 }
+  });
+  return doc.output('blob');
+};
+
+export const downloadBookingRevenuePdf = async ({ fileName, ...payload }) => {
+  const blob = await createBookingRevenuePdfBlob(payload);
+  triggerFileDownload(blob, fileName || 'booking-revenue.pdf');
 };
 
 export const downloadCampaignDonationsCsv = ({

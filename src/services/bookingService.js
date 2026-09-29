@@ -35,6 +35,12 @@ const normalizeBooking = (record = {}, index = 0) => {
     title: String(record.title || record.categoryName || 'Booking Request').trim(),
     categoryId: String(record.categoryId || '').trim(),
     categoryName: String(record.categoryName || 'Other').trim() || 'Other',
+    itemizedItems: Array.isArray(record.itemizedItems) ? record.itemizedItems.map((item) => ({
+      categoryId: String(item?.categoryId || '').trim(),
+      name: String(item?.name || '').trim(),
+      description: String(item?.description || '').trim(),
+      amount: Math.max(0, Number(item?.amount || 0))
+    })).filter((item) => item.categoryId || item.name) : [],
     date: String(record.date || '').trim(),
     toDate: String(record.toDate || record.date || '').trim(),
     startTime: String(record.startTime || '').trim(),
@@ -53,6 +59,8 @@ const normalizeBooking = (record = {}, index = 0) => {
     paymentStatus: PAYMENT_STATUS_VALUES.has(paymentStatus) ? paymentStatus : 'pending',
     paymentMethod: String(record.paymentMethod || '').trim(),
     amount: Number(record.amount || 0),
+    amountPaid: Math.max(0, Number(record.amountPaid || 0)),
+    paymentReceivedAt: String(record.paymentReceivedAt || '').trim(),
     receiptNumber: String(record.receiptNumber || '').trim(),
     paymentReference: String(record.paymentReference || '').trim(),
     refundStatus: String(record.refundStatus || '').trim().toLowerCase(),
@@ -75,6 +83,7 @@ const normalizeBooking = (record = {}, index = 0) => {
 const normalizeCategory = (entry = {}, index = 0) => ({
   id: String(entry.id || `booking-category-${Date.now()}-${index}`).trim(),
   name: String(entry.name || '').trim(),
+  description: String(entry.description || '').trim(),
   color: String(entry.color || '#0a4d9f').trim() || '#0a4d9f',
   active: entry.active !== false,
   paymentRequired: entry.paymentRequired === true,
