@@ -390,11 +390,11 @@ export const createBookingReceiptPdfBlob = async ({
     startY: 140,
     head: [['Booking Information', 'Details']],
     body: [
-      ['Booking Type', booking.categoryName || booking.title || '-'],
-      ['Date', booking.date || '-'],
+      ['Occasion Type', booking.occasionType || '-'],
+      ['Event Date', formatBookingReportDate(booking.date)],
+      ...(booking.toDate && booking.toDate !== booking.date ? [['Event End Date', formatBookingReportDate(booking.toDate)]] : []),
       ['Time', `${booking.startTime || '-'} - ${booking.endTime || '-'}`],
       ['Location', booking.bookingLocation || '-'],
-      ['Booking Status', toDisplayLabel(booking.status)],
       ['Booking ID', booking.id || '-']
     ],
     styles: { fontSize: 10, cellPadding: 8, valign: 'top' },
@@ -633,6 +633,11 @@ export const downloadBookingReceiptPdf = async (payload) => {
 
 const formatBookingReportDate = (value) => {
   if (!value) return '-';
+  const dateOnly = String(value).match(/^(\d{4})-(\d{2})-(\d{2})(?:T00:00(?::00(?:\.000)?)?(?:Z|[+-]00:00)?)?$/);
+  if (dateOnly) {
+    const localDate = new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]), 12);
+    return localDate.toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' });
+  }
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' });
 };
@@ -645,12 +650,11 @@ const getBookingRevenueReportRows = (bookings = []) => (Array.isArray(bookings) 
   booking.createdByName || booking.bookedByName || booking.createdBy || booking.bookedBy || (booking.source === 'admin-manual' ? 'Admin (not recorded)' : 'Website'),
   booking.requesterEmail || '',
   booking.requesterPhone || '',
-  booking.categoryName || booking.title || '',
+  booking.occasionType || '-',
   `${booking.startTime || ''}${booking.endTime ? ` - ${booking.endTime}` : ''}`,
   booking.bookingLocation || booking.location || '',
   Number(booking.amount || 0).toFixed(2),
   String(booking.paymentStatus || 'pending'),
-  String(booking.status || 'pending'),
   booking.refundStatus || '',
   Number(booking.refundAmount || 0).toFixed(2),
   booking.paymentMethod || booking.paymentProvider || '',
@@ -659,8 +663,8 @@ const getBookingRevenueReportRows = (bookings = []) => (Array.isArray(bookings) 
 
 const BOOKING_REVENUE_HEADERS = [
   'Date Created', 'Date of Event', 'Event End Date', 'Booked By', 'Booking Taken By',
-  'Booker Email', 'Booker Phone', 'Event Type', 'Event Time', 'Location',
-  'Gross Amount (CAD)', 'Payment Status', 'Booking Status', 'Refund Status',
+  'Booker Email', 'Booker Phone', 'Occasion Type', 'Event Time', 'Location',
+  'Gross Amount (CAD)', 'Payment Status', 'Refund Status',
   'Refund Amount (CAD)', 'Payment Method', 'Receipt / Reference'
 ];
 
@@ -670,7 +674,7 @@ export const downloadBookingRevenueCsv = ({ fileName, organizationName, bookings
     ['Organization', organizationName || 'Singh Sabha Milton Gurdwara'],
     ['Report', 'Booking Revenue'],
     ['Created Date Range', `${startDate || '-'} to ${endDate || '-'}`],
-    ['Booking Type', categoryName || 'All booking types'],
+    ['Occasion Type', categoryName || 'All booking types'],
     ['Included Paid Bookings', bookings.length],
     ['Net Revenue (CAD)', Number(totalRevenue || 0).toFixed(2)],
     ['Generated On', new Date().toLocaleString()],
@@ -712,7 +716,7 @@ export const createBookingRevenuePdfBlob = async ({ organizationName, bookings =
     body: rows,
     styles: { fontSize: 6.3, cellPadding: 3, overflow: 'linebreak', valign: 'middle' },
     headStyles: { fillColor: LOGO_BLUE_RGB, textColor: 255, fontStyle: 'bold', fontSize: 6.5 },
-    columnStyles: { 0: { cellWidth: 58 }, 1: { cellWidth: 58 }, 2: { cellWidth: 58 }, 3: { cellWidth: 72 }, 4: { cellWidth: 76 }, 5: { cellWidth: 95 }, 6: { cellWidth: 65 }, 7: { cellWidth: 67 }, 8: { cellWidth: 58 }, 9: { cellWidth: 75 }, 10: { cellWidth: 57, halign: 'right' }, 11: { cellWidth: 53 }, 12: { cellWidth: 53 }, 13: { cellWidth: 48 }, 14: { cellWidth: 52, halign: 'right' }, 15: { cellWidth: 57 }, 16: { cellWidth: 67 } },
+    columnStyles: { 0: { cellWidth: 58 }, 1: { cellWidth: 58 }, 2: { cellWidth: 58 }, 3: { cellWidth: 72 }, 4: { cellWidth: 76 }, 5: { cellWidth: 95 }, 6: { cellWidth: 65 }, 7: { cellWidth: 67 }, 8: { cellWidth: 58 }, 9: { cellWidth: 75 }, 10: { cellWidth: 57, halign: 'right' }, 11: { cellWidth: 53 }, 12: { cellWidth: 48 }, 13: { cellWidth: 52, halign: 'right' }, 14: { cellWidth: 57 }, 15: { cellWidth: 67 } },
     didDrawPage: () => {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);

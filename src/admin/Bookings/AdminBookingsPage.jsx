@@ -40,6 +40,8 @@ const BOOKING_TIME_OPTIONS = Array.from({ length: 96 }, (_, index) => {
   const value = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
   return { value, label: new Date(2000, 0, 1, hours, minutes).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' }) };
 });
+const isJathaCategory = (category = {}) => /kirtan|dhadhi\s*jatha|dhadi\s*jatha/i.test(String(category.name || ''));
+const sortBookingCategories = (rows = []) => [...rows].sort((first, second) => Number(isJathaCategory(first)) - Number(isJathaCategory(second)));
 
 const emptyCategory = {
   id: '',
@@ -606,10 +608,17 @@ const AdminBookingsPage = () => {
   };
 
   const getBookingItems = (booking = {}) => {
-    if (Array.isArray(booking.itemizedItems)) return booking.itemizedItems;
+    if (Array.isArray(booking.itemizedItems) && booking.itemizedItems.length) return booking.itemizedItems;
+    if (bookingModal.mode === 'create' && Array.isArray(booking.itemizedItems)) return [];
     if (!booking.categoryId) return [];
     const category = categories.find((entry) => String(entry.id) === String(booking.categoryId));
     return category ? [{ categoryId: category.id, name: category.name, description: category.description || '', amount: Number(booking.amount || category.feeAmount || 0) }] : [];
+  };
+
+  const getReceiptDisplayItems = (booking = {}) => {
+    const items = getBookingItems(booking);
+    const categoryOrder = new Map(sortBookingCategories(categories).map((category, index) => [String(category.id), index]));
+    return [...items].sort((first, second) => (categoryOrder.get(String(first.categoryId)) ?? Number.MAX_SAFE_INTEGER) - (categoryOrder.get(String(second.categoryId)) ?? Number.MAX_SAFE_INTEGER));
   };
 
   const isGurdwaraLocation = (location = '') => /gurdwara|7035\s+sixth\s+line/i.test(String(location || ''));
@@ -787,6 +796,7 @@ const AdminBookingsPage = () => {
         toDate: toDateKey(new Date()),
         startTime: '10:00',
         endTime: '11:00',
+        occasionType: '',
         bookingLocation: 'Gurdwara Singh Sabha Milton, 7035 Sixth Line, Milton, ON',
         requesterName: '',
         requesterEmail: '',
@@ -1051,19 +1061,23 @@ const AdminBookingsPage = () => {
                     ))}
                     <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Booking Location <span className="text-rose-600">*</span><input required disabled={bookingModal.mode === 'view'} value={bookingModal.booking.bookingLocation || ''} onChange={(event) => updateBookingDraft('bookingLocation', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label>
                     <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Duty Performer <span className="text-rose-600">*</span><select required disabled={bookingModal.mode === 'view'} value={bookingModal.booking.dutyAssigneeId || ''} onChange={(event) => { const assignee = dutyAssignees.find((entry) => String(entry.id) === event.target.value); setBookingModal((current) => ({ ...current, booking: { ...current.booking, dutyAssigneeId: String(assignee?.id || ''), dutyAssigneeName: String(assignee?.name || assignee?.email || ''), dutyAssigneeEmail: String(assignee?.email || '').toLowerCase() } })); }} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 disabled:bg-slate-100"><option value="">Select duty performer</option>{bookingModal.booking.dutyAssigneeId && !dutyAssignees.some((entry) => String(entry.id) === String(bookingModal.booking.dutyAssigneeId)) ? <option value={bookingModal.booking.dutyAssigneeId}>{bookingModal.booking.dutyAssigneeName || 'Previously assigned user'}</option> : null}{dutyAssignees.map((entry) => <option key={entry.id} value={entry.id}>{entry.name || entry.email}{entry.role ? ` (${entry.role})` : ''}</option>)}</select></label>
-                    {bookingModal.mode === 'create' ? <div className="rounded-lg border border-slate-200 bg-white sm:col-span-4">
+                    <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Booking occasion<input disabled={bookingModal.mode === 'view'} value={bookingModal.booking.occasionType || ''} onChange={(event) => updateBookingDraft('occasionType', event.target.value)} placeholder="For example: Akhand Path, wedding, memorial service" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label>
+                    {bookingModal.mode !== 'view' ? <div className="rounded-lg border border-slate-200 bg-white sm:col-span-4">
                       <div className="border-b border-slate-100 px-3 py-2.5"><p className="text-sm font-bold text-slate-900">Booking items</p><p className="text-xs text-slate-500">Choose the services to list on the receipt.</p></div>
-                      <div className="divide-y divide-slate-100 px-3">{categories.filter((category) => category.active !== false).map((category) => {
+                      <div className="divide-y divide-slate-100 px-3">{sortBookingCategories(categories.filter((category) => category.active !== false)).map((category) => {
                         const selected = getBookingItems(bookingModal.booking).some((item) => String(item.categoryId) === String(category.id));
+                        const selectedItem = getBookingItems(bookingModal.booking).find((item) => String(item.categoryId) === String(category.id));
+                        const displayName = selectedItem?.name || category.name;
                         return <label key={category.id} className={`-mx-3 flex min-h-12 cursor-pointer items-center gap-3 border-l-4 px-3 py-2 transition-colors ${selected ? 'border-brand-blue bg-blue-50 text-slate-950' : 'border-transparent text-slate-600 hover:bg-slate-50'}`}>
                           <input type="checkbox" checked={selected} onChange={(event) => {
                             const currentItems = getBookingItems(bookingModal.booking);
-                            updateBookingItems(event.target.checked
+                            const nextItems = event.target.checked
                               ? [...currentItems, { categoryId: category.id, name: category.name, description: category.description || '', amount: Number(category.feeAmount || 0) }]
-                              : currentItems.filter((item) => String(item.categoryId) !== String(category.id)));
+                              : currentItems.filter((item) => String(item.categoryId) !== String(category.id));
+                            updateBookingItems(nextItems);
                           }} className="h-4 w-4 shrink-0 accent-brand-blue" />
-                          <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{category.name}</span>{category.description ? <span className="block truncate text-xs text-slate-500">{category.description}</span> : null}</span>
-                          <span className="shrink-0 text-sm font-semibold">CAD ${Number(category.feeAmount || 0).toFixed(2)}</span>
+                          <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{displayName}</span>{category.description ? <span className="block truncate text-xs text-slate-500">{category.description}</span> : null}</span>
+                          <span className="shrink-0 text-sm font-semibold">CAD ${Number(selectedItem?.amount ?? category.feeAmount ?? 0).toFixed(2)}</span>
                         </label>;
                       })}</div>
                       {!getBookingItems(bookingModal.booking).length ? <p className="border-t border-slate-100 px-3 py-2 text-xs text-slate-500">Select at least one service.</p> : null}
@@ -1087,7 +1101,7 @@ const AdminBookingsPage = () => {
 
               <section className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-blue-50 p-4 shadow-sm sm:p-5">
                 <div className="border-b border-emerald-100 pb-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">Receipt summary</p><h4 className="mt-1 font-heading text-base font-bold text-slate-900">Payment</h4><p className="mt-1 text-xs text-slate-500">Payment fields are based on the selected receipt items.</p></div>
-                <div className="mt-3 rounded-lg border border-emerald-100 bg-white p-3"><div className="space-y-2">{getBookingItems(bookingModal.booking).map((item) => <div key={item.categoryId} className="flex justify-between gap-3 text-xs"><span className="text-slate-600">{item.name}</span><span className="font-bold text-slate-800">${Number(item.amount || 0).toFixed(2)}</span></div>)}{!getBookingItems(bookingModal.booking).length ? <p className="text-xs text-slate-500">Select booking items to calculate payment.</p> : null}</div><div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3"><span className="text-sm font-bold text-slate-800">Amount due · CAD</span><strong className="text-xl font-black text-emerald-800">${Number(bookingModal.booking.amount || 0).toFixed(2)}</strong></div></div>
+                <div className="mt-3 rounded-lg border border-emerald-100 bg-white p-3"><div className="space-y-2">{getReceiptDisplayItems(bookingModal.booking).map((item, index) => <div key={`${item.categoryId}-${index}`} className="flex justify-between gap-3 text-xs"><span className="text-slate-600">{item.name}</span><span className="font-bold text-slate-800">${Number(item.amount || 0).toFixed(2)}</span></div>)}{!getBookingItems(bookingModal.booking).length ? <p className="text-xs text-slate-500">Select booking items to calculate payment.</p> : null}</div><div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3"><span className="text-sm font-bold text-slate-800">Amount due · CAD</span><strong className="text-xl font-black text-emerald-800">${Number(bookingModal.booking.amount || 0).toFixed(2)}</strong></div></div>
                 {Number(bookingModal.booking.amount || 0) > 0 ? <div className="mt-3 grid gap-3">
                   <label className="text-sm font-semibold text-slate-700">Payment status<select disabled={bookingModal.mode === 'view'} value={bookingModal.booking.paymentStatus || 'pending'} onChange={(event) => updateBookingDraft('paymentStatus', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 disabled:bg-slate-100"><option value="pending">Unpaid · payment due</option><option value="paid">Paid in full</option><option value="partial">Partially paid</option><option value="refunded">Refunded</option></select></label>
                   {['paid', 'partial'].includes(String(bookingModal.booking.paymentStatus || '').toLowerCase()) ? <label className="text-sm font-semibold text-slate-700">Payment method<select disabled={bookingModal.mode === 'view'} value={bookingModal.booking.paymentMethod || ''} onChange={(event) => updateBookingDraft('paymentMethod', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 disabled:bg-slate-100"><option value="">Choose method</option>{bookingModal.booking.source !== 'admin-manual' && bookingModal.booking.paymentMethod && !['cash', 'credit-card', 'interac'].includes(bookingModal.booking.paymentMethod) ? <option value={bookingModal.booking.paymentMethod}>{bookingModal.booking.paymentMethod}</option> : null}<option value="cash">Cash</option><option value="credit-card">Credit Card</option><option value="interac">Interac</option></select></label> : null}
