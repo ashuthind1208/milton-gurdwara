@@ -35,7 +35,7 @@ const normalizeBooking = (record = {}, index = 0) => {
     title: String(record.title || record.categoryName || 'Booking Request').trim(),
     categoryId: String(record.categoryId || '').trim(),
     categoryName: String(record.categoryName || 'Other').trim() || 'Other',
-    occasionType: String(record.occasionType || '').trim(),
+    occasionType: String(record.occasionType || '').trim().slice(0, 25),
     itemizedItems: Array.isArray(record.itemizedItems) ? record.itemizedItems.map((item) => ({
       categoryId: String(item?.categoryId || '').trim(),
       name: String(item?.name || '').trim(),
