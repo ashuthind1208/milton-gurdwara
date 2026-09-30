@@ -219,6 +219,10 @@ const normalizeKidsLearningContent = (content = {}) => ({
       heroTitle: String(content.heroTitle || defaultKidsLearningContent.heroTitle),
       heroDescription: String(content.heroDescription || defaultKidsLearningContent.heroDescription),
       intro: String(content.intro || defaultKidsLearningContent.intro),
+      publishedWordOfDay: content.publishedWordOfDay && typeof content.publishedWordOfDay === 'object' ? content.publishedWordOfDay : null,
+      publishedWordOfDayArchive: Array.isArray(content.publishedWordOfDayArchive) ? content.publishedWordOfDayArchive : [],
+      publishedAiQuizId: String(content.publishedAiQuizId || ''),
+      publishedAiQuizzes: Array.isArray(content.publishedAiQuizzes) ? content.publishedAiQuizzes : [],
       wordOfWeek: currentWordCard,
       weeklyWords,
       previousWordWeeks: weeklyWords
@@ -270,6 +274,16 @@ const kidsLearningService = {
 
   getRecentGurmatGuides: async () => {
     const response = await apiClient.get('/kids-learning/gurmat-guide/recent');
+    return serviceResponse(Array.isArray(response.data?.data) ? response.data.data : []);
+  },
+
+  getAdminGeneratedWords: async () => {
+    const response = await apiClient.get('/admin/kids-learning/generated-words');
+    return serviceResponse(Array.isArray(response.data?.data) ? response.data.data : []);
+  },
+
+  getAdminGeneratedQuizzes: async () => {
+    const response = await apiClient.get('/admin/kids-learning/generated-quizzes');
     return serviceResponse(Array.isArray(response.data?.data) ? response.data.data : []);
   },
 

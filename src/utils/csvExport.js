@@ -645,9 +645,8 @@ const formatBookingReportDate = (value) => {
 const getBookingRevenueReportRows = (bookings = []) => (Array.isArray(bookings) ? bookings : []).map((booking) => ([
   formatBookingReportDate(booking.createdAt),
   formatBookingReportDate(booking.date),
-  booking.toDate && booking.toDate !== booking.date ? formatBookingReportDate(booking.toDate) : '',
   booking.requesterName || '',
-  booking.createdByName || booking.bookedByName || booking.createdBy || booking.bookedBy || (booking.source === 'admin-manual' ? 'Admin (not recorded)' : 'Website'),
+  booking.createdByName || booking.bookedByName || booking.createdBy || booking.bookedBy || (booking.source === 'admin-manual' ? 'Admin' : 'Website'),
   booking.requesterEmail || '',
   booking.requesterPhone || '',
   booking.occasionType || '-',
@@ -662,7 +661,7 @@ const getBookingRevenueReportRows = (bookings = []) => (Array.isArray(bookings) 
 ]));
 
 const BOOKING_REVENUE_HEADERS = [
-  'Date Created', 'Date of Event', 'Event End Date', 'Booked By', 'Booking Taken By',
+  'Date Created', 'Date of Event', 'Booked By', 'Booking Taken By',
   'Booker Email', 'Booker Phone', 'Occasion Type', 'Event Time', 'Location',
   'Gross Amount (CAD)', 'Payment Status', 'Refund Status',
   'Refund Amount (CAD)', 'Payment Method', 'Receipt / Reference'
@@ -716,7 +715,7 @@ export const createBookingRevenuePdfBlob = async ({ organizationName, bookings =
     body: rows,
     styles: { fontSize: 6.3, cellPadding: 3, overflow: 'linebreak', valign: 'middle' },
     headStyles: { fillColor: LOGO_BLUE_RGB, textColor: 255, fontStyle: 'bold', fontSize: 6.5 },
-    columnStyles: { 0: { cellWidth: 58 }, 1: { cellWidth: 58 }, 2: { cellWidth: 58 }, 3: { cellWidth: 72 }, 4: { cellWidth: 76 }, 5: { cellWidth: 95 }, 6: { cellWidth: 65 }, 7: { cellWidth: 67 }, 8: { cellWidth: 58 }, 9: { cellWidth: 75 }, 10: { cellWidth: 57, halign: 'right' }, 11: { cellWidth: 53 }, 12: { cellWidth: 48 }, 13: { cellWidth: 52, halign: 'right' }, 14: { cellWidth: 57 }, 15: { cellWidth: 67 } },
+    columnStyles: { 0: { cellWidth: 58 }, 1: { cellWidth: 58 }, 2: { cellWidth: 72 }, 3: { cellWidth: 76 }, 4: { cellWidth: 95 }, 5: { cellWidth: 65 }, 6: { cellWidth: 67 }, 7: { cellWidth: 58 }, 8: { cellWidth: 75 }, 9: { cellWidth: 57, halign: 'right' }, 10: { cellWidth: 53 }, 11: { cellWidth: 48 }, 12: { cellWidth: 52, halign: 'right' }, 13: { cellWidth: 57 }, 14: { cellWidth: 67 } },
     didDrawPage: () => {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);

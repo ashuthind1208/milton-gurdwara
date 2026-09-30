@@ -490,11 +490,11 @@ const LibraryPage = () => {
           <Card className="border border-sky-200/70 bg-gradient-to-br from-sky-100 via-white to-cyan-100">
             <h4 className="text-lg font-bold text-slate-900">Kids Learning</h4>
             <p className="mt-2 text-sm text-slate-700">{kidsLearningContent?.intro || 'Interactive Sikh learning for children ages 6-12.'}</p>
-            <GurmatLearningGuide compact />
+            <GurmatLearningGuide compact publishedGuide={kidsLearningContent?.publishedWordOfDay} publishedArchive={kidsLearningContent?.publishedWordOfDayArchive || []} />
           </Card>
 
           <Card className="border border-violet-200/70 bg-gradient-to-br from-violet-100 via-white to-indigo-100">
-            <AiQuizFlashcards />
+            <AiQuizFlashcards publishedQuizId={kidsLearningContent?.publishedAiQuizId} publishedQuizzes={kidsLearningContent?.publishedAiQuizzes || []} />
           </Card>
 
         </div>

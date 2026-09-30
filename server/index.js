@@ -18,10 +18,11 @@ const { createGurmatGuide } = require('./gurmatGuide');
 const {
   findStoredGurmatGuide,
   listRecentGurmatGuides,
+  listStoredGurmatGuides,
   storeGurmatGuide
 } = require('./gurmatGuideStore');
 const { createAiQuiz } = require('./aiQuiz');
-const { findDailyAiQuiz, storeDailyAiQuiz } = require('./aiQuizStore');
+const { findDailyAiQuiz, listStoredAiQuizzes, storeDailyAiQuiz } = require('./aiQuizStore');
 const { createGranthiAnswer, normalizeGranthiQuestion } = require('./askGranthi');
 const {
   completeGranthiAnswer,
@@ -3863,6 +3864,8 @@ const normalizeBookingForNotification = (entry = {}) => ({
   dutyAssigneeName: String(entry.dutyAssigneeName || '').trim(),
   dutyAssigneeEmail: String(entry.dutyAssigneeEmail || '').trim().toLowerCase(),
   categoryName: String(entry.categoryName || entry.title || 'Booking').trim(),
+  occasionType: String(entry.occasionType || '').trim(),
+  createdByName: String(entry.createdByName || entry.bookedByName || '').trim(),
   date: String(entry.date || '').trim(),
   toDate: String(entry.toDate || entry.date || '').trim(),
   startTime: String(entry.startTime || '').trim(),
@@ -4179,7 +4182,7 @@ const buildBookingReceiptPdfAttachment = (booking = {}) => {
     startY: 140,
     head: [['Booking Information', 'Details']],
     body: [
-      ['Booking Type', normalized.categoryName],
+      ['Occasion', normalized.occasionType || normalized.categoryName],
       ['Date', normalized.date || '-'],
       ['Time', `${normalized.startTime || '-'} - ${normalized.endTime || '-'}`],
       ['Location', normalized.bookingLocation],
@@ -4376,7 +4379,7 @@ const sendBookingNotificationEmail = async (booking, options = {}) => {
   }
 };
 
-  const bookingNotificationFields = ['status', 'paymentStatus', 'paymentMethod', 'date', 'toDate', 'startTime', 'endTime', 'bookingLocation', 'categoryName', 'requesterName', 'dutyAssigneeId', 'dutyAssigneeEmail', 'receiptNumber', 'refundStatus', 'refundAmount', 'refundMethod', 'refundReference', 'refundDate', 'refundNotes'];
+  const bookingNotificationFields = ['status', 'paymentStatus', 'paymentMethod', 'date', 'toDate', 'startTime', 'endTime', 'bookingLocation', 'categoryName', 'occasionType', 'requesterName', 'dutyAssigneeId', 'dutyAssigneeEmail', 'receiptNumber', 'refundStatus', 'refundAmount', 'refundMethod', 'refundReference', 'refundDate', 'refundNotes'];
 const hasBookingNotificationChange = (existing = {}, updated = {}) => bookingNotificationFields.some(
   (field) => String(existing?.[field] ?? '') !== String(updated?.[field] ?? '')
 );
@@ -6335,6 +6338,30 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (requestUrl.pathname === '/api/admin/kids-learning/generated-words' && request.method === 'GET') {
+    try {
+      const actor = getRequestActor(request);
+      assertInput(['admin', 'super admin'].includes(String(actor.role || '').trim().toLowerCase()), 'Admin access is required.', 403);
+      assertInput(eventsDb.hasDatabaseConnection, 'The Word of the Day database is unavailable.', 503);
+      sendJson(response, 200, { ok: true, data: await listStoredGurmatGuides(eventsDb, 200) });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to load generated words.' });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/admin/kids-learning/generated-quizzes' && request.method === 'GET') {
+    try {
+      const actor = getRequestActor(request);
+      assertInput(['admin', 'super admin'].includes(String(actor.role || '').trim().toLowerCase()), 'Admin access is required.', 403);
+      assertInput(eventsDb.hasDatabaseConnection, 'The AI quiz database is unavailable.', 503);
+      sendJson(response, 200, { ok: true, data: await listStoredAiQuizzes(eventsDb, 200) });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to load generated quizzes.' });
+    }
+    return;
+  }
+
   if (requestUrl.pathname === '/api/kids-learning/ai-quiz' && request.method === 'POST') {
     try {
       assertInput(eventsDb.hasDatabaseConnection, 'The AI quiz database is unavailable.', 503);
@@ -7111,6 +7138,18 @@ const server = http.createServer(async (request, response) => {
         : false;
       const data = await eventsDb.createItem(resource, validatedBody);
       const actorName = String(getRequestActor(request).name || '').trim() || 'A sangat member';
+      if (resource === 'bookings' && data?.id) {
+        const actor = getRequestActor(request);
+        const loggedInAdminName = String(actor.name || actor.email || '').trim();
+        if (loggedInAdminName) {
+          await eventsDb.updateItem('bookings', data.id, {
+            createdByName: loggedInAdminName,
+            bookedByName: loggedInAdminName
+          });
+          data.createdByName = loggedInAdminName;
+          data.bookedByName = loggedInAdminName;
+        }
+      }
       if (resource === 'users' && !userPreviouslyExisted) {
         notifyAppUpdate({
           title: 'New Member Registration',
