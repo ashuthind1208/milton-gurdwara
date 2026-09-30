@@ -653,18 +653,13 @@ const getBookingRevenueReportRows = (bookings = []) => (Array.isArray(bookings) 
   `${booking.startTime || ''}${booking.endTime ? ` - ${booking.endTime}` : ''}`,
   booking.bookingLocation || booking.location || '',
   Number(booking.amount || 0).toFixed(2),
-  String(booking.paymentStatus || 'pending'),
-  booking.refundStatus || '',
-  Number(booking.refundAmount || 0).toFixed(2),
-  booking.paymentMethod || booking.paymentProvider || '',
-  booking.receiptNumber || booking.paymentReference || ''
+  String(booking.paymentStatus || 'pending')
 ]));
 
 const BOOKING_REVENUE_HEADERS = [
   'Date Created', 'Date of Event', 'Booked By', 'Booking Taken By',
   'Booker Email', 'Booker Phone', 'Occasion Type', 'Event Time', 'Location',
-  'Gross Amount (CAD)', 'Payment Status', 'Refund Status',
-  'Refund Amount (CAD)', 'Payment Method', 'Receipt / Reference'
+  'Gross Amount (CAD)', 'Payment Status'
 ];
 
 export const downloadBookingRevenueCsv = ({ fileName, organizationName, bookings = [], startDate, endDate, categoryName, totalRevenue = 0 }) => {
@@ -687,35 +682,41 @@ export const createBookingRevenuePdfBlob = async ({ organizationName, bookings =
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
+  const logoDataUrl = await loadLogoDataUrl();
   const generatedOn = new Date().toLocaleString();
   const rows = getBookingRevenueReportRows(bookings);
 
   doc.setFillColor(...LOGO_BLUE_RGB);
-  doc.rect(0, 0, pageWidth, 102, 'F');
+  doc.rect(0, 0, pageWidth, 112, 'F');
+  if (logoDataUrl) {
+    doc.addImage(logoDataUrl, 'WEBP', 30, 22, 62, 62);
+  }
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(18);
-  doc.text(organizationName || 'Singh Sabha Milton Gurdwara', 34, 36);
+  doc.text(organizationName || 'Singh Sabha Milton Gurdwara', 106, 39);
   doc.setFontSize(15);
-  doc.text('Booking Revenue Report', 34, 60);
+  doc.text('Booking Revenue Report', 106, 64);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.text(`Created date: ${formatBookingReportDate(startDate)} to ${formatBookingReportDate(endDate)}`, 34, 80);
-  doc.text(`Booking type: ${categoryName || 'All booking types'}  |  Generated: ${generatedOn}`, 34, 94);
+  const headerRightX = pageWidth - 30;
+  doc.text(`Created date: ${formatBookingReportDate(startDate)} to ${formatBookingReportDate(endDate)}`, headerRightX, 32, { align: 'right' });
+  doc.text(`Booking type: ${categoryName || 'All booking types'}`, headerRightX, 51, { align: 'right' });
+  doc.text(`Generated: ${generatedOn}`, headerRightX, 70, { align: 'right' });
 
   doc.setTextColor(15, 23, 42);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
-  doc.text(`Bookings: ${bookings.length}`, 34, 126);
-  doc.text(`Net revenue: CAD ${Number(totalRevenue || 0).toFixed(2)}`, pageWidth - 34, 126, { align: 'right' });
+  doc.text(`Bookings: ${bookings.length}`, 34, 136);
+  doc.text(`Net revenue: CAD ${Number(totalRevenue || 0).toFixed(2)}`, pageWidth - 34, 136, { align: 'right' });
 
   autoTable(doc, {
-    startY: 140,
+    startY: 150,
     head: [BOOKING_REVENUE_HEADERS],
     body: rows,
-    styles: { fontSize: 6.3, cellPadding: 3, overflow: 'linebreak', valign: 'middle' },
-    headStyles: { fillColor: LOGO_BLUE_RGB, textColor: 255, fontStyle: 'bold', fontSize: 6.5 },
-    columnStyles: { 0: { cellWidth: 58 }, 1: { cellWidth: 58 }, 2: { cellWidth: 72 }, 3: { cellWidth: 76 }, 4: { cellWidth: 95 }, 5: { cellWidth: 65 }, 6: { cellWidth: 67 }, 7: { cellWidth: 58 }, 8: { cellWidth: 75 }, 9: { cellWidth: 57, halign: 'right' }, 10: { cellWidth: 53 }, 11: { cellWidth: 48 }, 12: { cellWidth: 52, halign: 'right' }, 13: { cellWidth: 57 }, 14: { cellWidth: 67 } },
+    styles: { fontSize: 7, cellPadding: 4, overflow: 'linebreak', valign: 'middle' },
+    headStyles: { fillColor: LOGO_BLUE_RGB, textColor: 255, fontStyle: 'bold', fontSize: 7 },
+    columnStyles: { 0: { cellWidth: 68 }, 1: { cellWidth: 68 }, 2: { cellWidth: 88 }, 3: { cellWidth: 90 }, 4: { cellWidth: 112 }, 5: { cellWidth: 72 }, 6: { cellWidth: 82 }, 7: { cellWidth: 74 }, 8: { cellWidth: 100 }, 9: { cellWidth: 68, halign: 'right' }, 10: { cellWidth: 72 } },
     didDrawPage: () => {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
