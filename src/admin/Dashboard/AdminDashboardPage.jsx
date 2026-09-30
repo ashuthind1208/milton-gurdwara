@@ -31,6 +31,7 @@ import {
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import Card from '../../components/ui/Card';
 import eventService from '../../services/eventService';
+import bookingService from '../../services/bookingService';
 import volunteerService from '../../services/volunteerService';
 import userService from '../../services/userService';
 import donationService from '../../services/donationService';
@@ -180,6 +181,7 @@ const AdminDashboardPage = () => {
   };
 
   const { data: events = [] } = useQuery({ queryKey: ['events', 'admin'], queryFn: () => eventService.getEvents({ includeInactive: true }).then((res) => res.data), ...liveQueryOptions });
+  const { data: bookings = [] } = useQuery({ queryKey: ['bookings'], queryFn: () => bookingService.getBookings().then((res) => res.data), ...liveQueryOptions });
   const { data: donations = [] } = useQuery({ queryKey: ['admin-donations'], queryFn: () => donationService.getDonations().then((res) => res.data), ...liveQueryOptions });
   const { data: campaigns = [] } = useQuery({ queryKey: ['admin-campaigns'], queryFn: () => donationService.getAllCampaigns().then((res) => res.data), ...liveQueryOptions });
   const { data: users = [] } = useQuery({ queryKey: ['admin-users'], queryFn: () => userService.getUsers().then((res) => res.data), ...liveQueryOptions });
@@ -278,17 +280,18 @@ const AdminDashboardPage = () => {
     };
   }, [users]);
 
-  const pendingVolunteers = useMemo(
-    () => volunteerApplications.filter((entry) => String(entry.status || 'pending').toLowerCase() === 'pending'),
-    [volunteerApplications]
-  );
-
-  const upcomingEvents = useMemo(() => {
-    return [...events]
-      .filter((event) => Boolean(event.active))
-      .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime())
-      .slice(0, 4);
-  }, [events]);
+  const upcomingCalendarItems = useMemo(() => {
+    const nowDate = toDateKey(new Date());
+    const eventItems = events
+      .filter((event) => Boolean(event.active) && String(event.date || '') >= nowDate)
+      .map((event) => ({ id: `event-${event.id}`, date: event.date, title: event.title || 'Event', detail: event.location || 'Event', kind: 'Event', event }));
+    const bookingItems = bookings
+      .filter((booking) => String(booking.status || '').toLowerCase() !== 'cancelled' && String(booking.date || '') >= nowDate)
+      .map((booking) => ({ id: `booking-${booking.id}`, date: booking.date, title: booking.occasionType || booking.categoryName || booking.title || 'Booking', detail: booking.bookingLocation || 'Booking', kind: 'Booking' }));
+    return [...eventItems, ...bookingItems]
+      .sort((first, second) => String(first.date || '').localeCompare(String(second.date || '')))
+      .slice(0, 6);
+  }, [bookings, events]);
 
   const latestDonations = useMemo(() => {
     return [...donations]
@@ -345,8 +348,8 @@ const AdminDashboardPage = () => {
   );
 
   const pendingApprovalsCount = useMemo(
-    () => pendingUsers.length + pendingVolunteers.length,
-    [pendingUsers.length, pendingVolunteers.length]
+    () => pendingUsers.length,
+    [pendingUsers.length]
   );
 
   const activeCampaignCount = useMemo(
@@ -862,7 +865,7 @@ const AdminDashboardPage = () => {
             </div>
             <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 text-sm">
               <span className="text-slate-500">Upcoming Events</span>
-              <span className="font-semibold text-slate-900">{upcomingEvents.length}</span>
+              <span className="font-semibold text-slate-900">{events.filter((event) => Boolean(event.active) && String(event.date || '') >= todayDateKey).length}</span>
             </div>
             <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 text-sm">
               <span className="text-slate-500">Event Registrations</span>
@@ -1060,7 +1063,7 @@ const AdminDashboardPage = () => {
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Quick Queue</p>
             <h2 className="mt-1 truncate font-heading text-xl font-semibold text-slate-900">Pending review</h2>
             <div className="mt-4 border-y border-slate-200">
-              {pendingUsers.length === 0 && pendingVolunteers.length === 0 ? (
+              {pendingUsers.length === 0 ? (
                 <div className="py-3"><EmptyState text="No pending approvals right now." /></div>
               ) : null}
               {pendingUsers.slice(0, 3).map((user) => (
@@ -1070,15 +1073,6 @@ const AdminDashboardPage = () => {
                     <p className="mt-1 text-xs text-slate-500">{user.email}</p>
                   </div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{user.role}</p>
-                </div>
-              ))}
-              {pendingVolunteers.slice(0, 2).map((entry) => (
-                <div key={entry.id} className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 py-2 first:border-t-0">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">{entry.name}</p>
-                    <p className="mt-1 text-xs text-slate-500">{entry.sevaType || entry.area || 'Volunteer'}</p>
-                  </div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Volunteer</p>
                 </div>
               ))}
             </div>
@@ -1169,18 +1163,19 @@ const AdminDashboardPage = () => {
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Upcoming Calendar</p>
               <h2 className="truncate font-heading text-xl font-semibold text-slate-900">What&apos;s next</h2>
             </div>
-            <Link to="/admin/events" className="text-sm font-semibold text-brand-blue hover:underline">Manage events</Link>
+            <Link to="/admin/events" className="text-sm font-semibold text-brand-blue hover:underline">Manage calendar</Link>
           </div>
           <div className="mt-4 border-y border-slate-200">
-            {upcomingEvents.length === 0 ? (
-              <div className="py-3"><EmptyState text="No upcoming events available." /></div>
-            ) : upcomingEvents.map((event) => (
-              <div key={event.id} className="grid grid-cols-[1fr_auto] items-center gap-3 border-t border-slate-200 py-2 first:border-t-0">
+            {upcomingCalendarItems.length === 0 ? (
+              <div className="py-3"><EmptyState text="No upcoming events or bookings available." /></div>
+            ) : upcomingCalendarItems.map((item) => (
+              <div key={item.id} className="grid grid-cols-[1fr_auto] items-center gap-3 border-t border-slate-200 py-2 first:border-t-0">
                 <div>
-                  <p className="text-sm font-semibold text-slate-900">{event.title}</p>
-                  <p className="mt-1 text-xs text-slate-500">{new Date(event.date).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })} • {event.location}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-brand-blue">{item.kind}</p>
+                  <p className="text-sm font-semibold text-slate-900">{item.title}</p>
+                  <p className="mt-1 text-xs text-slate-500">{new Date(`${item.date}T12:00:00`).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })} • {item.detail}</p>
                 </div>
-                <span className="text-xs font-semibold text-slate-600">{getExactEventRegistrationCount(event)} registrations</span>
+                {item.kind === 'Event' ? <span className="text-xs font-semibold text-slate-600">{getExactEventRegistrationCount(item.event)} registrations</span> : null}
               </div>
             ))}
           </div>

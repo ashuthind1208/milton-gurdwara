@@ -5,6 +5,7 @@ import { EllipsisVerticalIcon, EyeIcon, MagnifyingGlassIcon, PencilSquareIcon, T
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import libraryService from '../../services/libraryService';
+import kidsLearningService from '../../services/kidsLearningService';
 import uploadService from '../../services/uploadService';
 import { getYouTubeEmbedUrl, getYouTubeThumbnail } from '../../services/videoService';
 import { siteConfig } from '../../constants/siteConfig';
@@ -209,6 +210,10 @@ const AdminLibraryPage = () => {
   const [programImageUploadPending, setProgramImageUploadPending] = useState(false);
   const [programImageUploadProgress, setProgramImageUploadProgress] = useState(0);
   const [programImageUploadStatus, setProgramImageUploadStatus] = useState({ type: '', message: '' });
+  const [wordOfDayDraft, setWordOfDayDraft] = useState('');
+  const [quizTopicDraft, setQuizTopicDraft] = useState('mixed-review');
+  const [quizDifficultyDraft, setQuizDifficultyDraft] = useState('Easy');
+  const [kidsLearningActionError, setKidsLearningActionError] = useState('');
 
   const physicalForm = useForm({ defaultValues: emptyPhysicalForm });
   const digitalForm = useForm({ defaultValues: emptyDigitalForm });
@@ -219,6 +224,18 @@ const AdminLibraryPage = () => {
   const { data: libraryData } = useQuery({
     queryKey: ['library-content'],
     queryFn: () => libraryService.getLibraryData().then((res) => res.data)
+  });
+  const { data: kidsLearningContent } = useQuery({
+    queryKey: ['kids-learning-content'],
+    queryFn: () => kidsLearningService.getContent().then((res) => res.data)
+  });
+  const { data: generatedWords = [] } = useQuery({
+    queryKey: ['admin-kids-learning-generated-words'],
+    queryFn: () => kidsLearningService.getAdminGeneratedWords().then((res) => res.data)
+  });
+  const { data: generatedQuizzes = [] } = useQuery({
+    queryKey: ['admin-kids-learning-generated-quizzes'],
+    queryFn: () => kidsLearningService.getAdminGeneratedQuizzes().then((res) => res.data)
   });
 
   const physicalBooks = useMemo(() => libraryData?.physicalBooks || [], [libraryData]);
@@ -410,6 +427,52 @@ const AdminLibraryPage = () => {
   };
 
   const invalidateLibrary = () => queryClient.invalidateQueries({ queryKey: ['library-content'] });
+  const publishGeneratedWordMutation = useMutation({
+    mutationFn: async (word) => {
+      const current = kidsLearningContent || kidsLearningService.getDefaultContent();
+      const archive = [word, ...(current.publishedWordOfDayArchive || [])]
+        .filter((entry, index, rows) => rows.findIndex((candidate) => candidate.searchId === entry.searchId) === index)
+        .slice(0, 12);
+      return kidsLearningService.updateContent({ ...current, publishedWordOfDay: word, publishedWordOfDayArchive: archive });
+    },
+    onSuccess: async () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['kids-learning-content'] }),
+      queryClient.invalidateQueries({ queryKey: ['kids-learning-content-library'] })
+    ])
+  });
+
+  const publishGeneratedQuizMutation = useMutation({
+    mutationFn: async (quiz) => {
+      const current = kidsLearningContent || kidsLearningService.getDefaultContent();
+      const quizzes = [quiz, ...(current.publishedAiQuizzes || [])]
+        .filter((entry, index, rows) => rows.findIndex((candidate) => candidate.id === entry.id) === index)
+        .slice(0, 12);
+      return kidsLearningService.updateContent({ ...current, publishedAiQuizId: quiz.id, publishedAiQuizzes: quizzes });
+    },
+    onSuccess: async () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['kids-learning-content'] }),
+      queryClient.invalidateQueries({ queryKey: ['kids-learning-content-library'] })
+    ])
+  });
+
+  const generateWordMutation = useMutation({
+    mutationFn: (word) => kidsLearningService.generateGurmatGuide(word),
+    onSuccess: async () => {
+      setWordOfDayDraft('');
+      setKidsLearningActionError('');
+      await queryClient.invalidateQueries({ queryKey: ['admin-kids-learning-generated-words'] });
+    },
+    onError: (error) => setKidsLearningActionError(error?.message || 'Unable to generate the word lesson.')
+  });
+
+  const generateQuizMutation = useMutation({
+    mutationFn: () => kidsLearningService.generateAiQuiz({ topic: quizTopicDraft, difficulty: quizDifficultyDraft }),
+    onSuccess: async () => {
+      setKidsLearningActionError('');
+      await queryClient.invalidateQueries({ queryKey: ['admin-kids-learning-generated-quizzes'] });
+    },
+    onError: (error) => setKidsLearningActionError(error?.message || 'Unable to generate the AI quiz.')
+  });
 
   useEffect(() => {
     setPhysicalPage((prev) => Math.min(prev, physicalTotalPages));
@@ -678,6 +741,35 @@ const AdminLibraryPage = () => {
       <h1 className="sr-only">Library Management</h1>
 
       <div className="space-y-6">
+        <Card className="border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-sky-50">
+          <div>
+            <h2 className="font-heading text-xl font-semibold text-slate-900">Kids Learning content</h2>
+            <p className="mt-1 text-sm text-slate-600">Select saved generations to publish on the public Library page. Generating content remains in the Kids Learning workflow.</p>
+          </div>
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <section className="rounded-xl border border-sky-200 bg-white p-4">
+              <h3 className="font-semibold text-slate-900">Word of the Day</h3>
+              <p className="mt-1 text-xs text-slate-500">Currently published: {kidsLearningContent?.publishedWordOfDay?.wordEnglish || kidsLearningContent?.publishedWordOfDay?.requestedWord || 'None'}</p>
+              <form className="mt-3 flex gap-2" onSubmit={(event) => { event.preventDefault(); const word = wordOfDayDraft.trim(); if (word) generateWordMutation.mutate(word); }}>
+                <input value={wordOfDayDraft} onChange={(event) => setWordOfDayDraft(event.target.value)} minLength={2} maxLength={40} placeholder="Punjabi or English word" className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+                <Button type="submit" disabled={generateWordMutation.isPending || wordOfDayDraft.trim().length < 2}>{generateWordMutation.isPending ? 'Generating…' : 'Generate'}</Button>
+              </form>
+              <div className="mt-3 flex flex-wrap gap-2">{generatedWords.length ? generatedWords.slice(0, 6).map((word) => <button key={word.searchId} type="button" onClick={() => publishGeneratedWordMutation.mutate(word)} disabled={publishGeneratedWordMutation.isPending} className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-900 hover:bg-sky-100 disabled:opacity-50">Publish {word.wordEnglish || word.requestedWord || 'word'}</button>) : <p className="text-xs text-slate-500">No generated words are available yet.</p>}</div>
+            </section>
+            <section className="rounded-xl border border-violet-200 bg-white p-4">
+              <h3 className="font-semibold text-slate-900">AI Quiz Flashcards</h3>
+              <p className="mt-1 text-xs text-slate-500">Choose a generated topic/difficulty quiz to show publicly.</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_110px_auto]">
+                <select value={quizTopicDraft} onChange={(event) => setQuizTopicDraft(event.target.value)} className="min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><option value="mixed-review">Mixed Review</option><option value="guru-nanak">Guru Nanak Dev Ji</option><option value="ten-gurus">Ten Gurus</option><option value="khalsa-panj-pyare">Khalsa & Panj Pyare</option><option value="five-ks">Five Ks & Symbols</option><option value="gurdwara-gurbani">Gurdwara & Gurbani</option><option value="sikh-history">Sikh History</option><option value="values-festivals">Sikh Values & Festivals</option></select>
+                <select value={quizDifficultyDraft} onChange={(event) => setQuizDifficultyDraft(event.target.value)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><option>Easy</option><option>Medium</option><option>Hard</option></select>
+                <Button type="button" onClick={() => generateQuizMutation.mutate()} disabled={generateQuizMutation.isPending}>{generateQuizMutation.isPending ? 'Generating…' : 'Generate'}</Button>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">{generatedQuizzes.length ? generatedQuizzes.slice(0, 6).map((quiz) => <button key={quiz.id} type="button" onClick={() => publishGeneratedQuizMutation.mutate(quiz)} disabled={publishGeneratedQuizMutation.isPending} className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-900 hover:bg-violet-100 disabled:opacity-50">Publish {quiz.topic || 'Quiz'} · {quiz.difficulty || 'Easy'}</button>) : <p className="text-xs text-slate-500">No generated quizzes are available yet.</p>}</div>
+            </section>
+          </div>
+          {kidsLearningActionError ? <p role="alert" className="mt-3 text-sm font-semibold text-rose-700">{kidsLearningActionError}</p> : null}
+        </Card>
+
         <Card>
           <div className="flex items-center justify-between gap-3">
             <h2 className="font-heading text-xl font-semibold">Physical Books</h2>

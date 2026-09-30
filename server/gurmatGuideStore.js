@@ -22,6 +22,15 @@ const listRecentGurmatGuides = async (db, limit = 5) => {
     .map(toPublicGuide);
 };
 
+const listStoredGurmatGuides = async (db, limit = 100) => {
+  const records = await db.listItems(RESOURCE);
+  return records
+    .filter((record) => record?.guide && record?.generatedAt)
+    .sort((left, right) => new Date(right.generatedAt).getTime() - new Date(left.generatedAt).getTime())
+    .slice(0, Math.max(1, Math.min(Number(limit) || 100, 500)))
+    .map(toPublicGuide);
+};
+
 const findStoredGurmatGuide = async (db, word) => {
   const searchKey = normalizeSearchKey(word);
   const recordId = createRecordId(searchKey);
@@ -59,6 +68,7 @@ module.exports = {
   RESOURCE,
   findStoredGurmatGuide,
   listRecentGurmatGuides,
+  listStoredGurmatGuides,
   normalizeSearchKey,
   storeGurmatGuide
 };

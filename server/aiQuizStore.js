@@ -27,6 +27,14 @@ const findDailyAiQuiz = async (db, topicValue, difficultyValue, date = new Date(
   return records.find((record) => record.id === quizId) || null;
 };
 
+const listStoredAiQuizzes = async (db, limit = 100) => {
+  const records = await db.listItems(RESOURCE);
+  return records
+    .filter((record) => Array.isArray(record?.questions) && record.questions.length > 0)
+    .sort((left, right) => new Date(right.generatedAt || 0).getTime() - new Date(left.generatedAt || 0).getTime())
+    .slice(0, Math.max(1, Math.min(Number(limit) || 100, 500)));
+};
+
 const storeDailyAiQuiz = async (db, quiz, date = new Date()) => {
   const { topic, difficulty } = normalizeQuizRequest(quiz?.topic, quiz?.difficulty);
   const dateKey = getTorontoDateKey(date);
@@ -52,5 +60,6 @@ module.exports = {
   RESOURCE,
   findDailyAiQuiz,
   getTorontoDateKey,
+  listStoredAiQuizzes,
   storeDailyAiQuiz
 };

@@ -2875,8 +2875,7 @@ const Navbar = () => {
                     openCompactStreams();
                   }}
                   onClick={openCompactStreams}
-                  disabled={liveStreams.length === 0}
-                  className="inline-flex shrink-0 items-center gap-1 rounded-full border border-blue-100/35 bg-white/95 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-brand-blue shadow-[0_4px_14px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-blue-100/70 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-full border border-blue-100/35 bg-white/95 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-brand-blue shadow-[0_4px_14px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-blue-100/70"
                 >
                   <span className="inline-flex h-4.5 w-4.5 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-amber-100 text-brand-blue shadow-inner">
                     <LiveStreamGlyph />
@@ -2965,8 +2964,7 @@ const Navbar = () => {
                 <CalendarDaysIcon className="h-3.5 w-3.5" />
                 <span className="hidden text-[10px] font-bold md:inline">Calendar</span>
               </button>
-              {liveStreams.length > 0 ? (
-                <button
+              <button
                   type="button"
                   onPointerDown={(event) => {
                     event.preventDefault();
@@ -2985,8 +2983,7 @@ const Navbar = () => {
                 >
                   <LiveStreamGlyph className="h-3.5 w-3.5" />
                   <span>LIVE</span>
-                </button>
-              ) : null}
+              </button>
             </div>
           </div>
 

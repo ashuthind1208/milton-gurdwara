@@ -1,41 +1,9 @@
-import { useId, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { SparklesIcon } from '@heroicons/react/24/outline';
-import kidsLearningService from '../../services/kidsLearningService';
 
-const GurmatLearningGuide = ({ compact = false }) => {
-  const inputId = useId();
-  const queryClient = useQueryClient();
-  const [word, setWord] = useState('');
+const GurmatLearningGuide = ({ compact = false, publishedGuide = null, publishedArchive = [] }) => {
   const [selectedGuide, setSelectedGuide] = useState(null);
-
-  const { data: recentGuides = [] } = useQuery({
-    queryKey: ['gurmat-word-searches'],
-    queryFn: () => kidsLearningService.getRecentGurmatGuides().then((res) => res.data)
-  });
-
-  const guide = selectedGuide || recentGuides[0] || null;
-
-  const guideMutation = useMutation({
-    mutationFn: (requestedWord) => kidsLearningService.generateGurmatGuide(requestedWord).then((res) => res.data),
-    onSuccess: (nextGuide) => {
-      setSelectedGuide(nextGuide);
-      queryClient.setQueryData(['gurmat-word-searches'], (current = []) => [
-        nextGuide,
-        ...current.filter((entry) => entry.searchId !== nextGuide.searchId)
-      ].slice(0, 5));
-    }
-  });
-
-  const submitWord = (event) => {
-    event.preventDefault();
-    const requestedWord = word.trim();
-    if (!requestedWord || guideMutation.isPending) {
-      return;
-    }
-    setSelectedGuide(null);
-    guideMutation.mutate(requestedWord);
-  };
+  const guide = selectedGuide || publishedGuide || null;
 
   return (
     <div className={`${compact ? 'mt-4' : 'mt-5'} border-t border-slate-200 pt-4`}>
@@ -43,42 +11,15 @@ const GurmatLearningGuide = ({ compact = false }) => {
         <SparklesIcon className="mt-0.5 h-5 w-5 shrink-0 text-brand-saffron" aria-hidden="true" />
         <div>
           <h3 className="text-base font-bold text-slate-900">Word of the Day</h3>
-          <p className="mt-1 text-sm text-slate-600">Search one Punjabi or English word to explore its meaning and connection to Gurbani.</p>
+          <p className="mt-1 text-sm text-slate-600">Today&apos;s featured Gurmat word, selected by the Gurdwara team.</p>
         </div>
       </div>
 
-      <form className="mt-4 flex flex-col gap-2 sm:flex-row" onSubmit={submitWord}>
-        <label className="sr-only" htmlFor={inputId}>Punjabi or English word</label>
-        <input
-          id={inputId}
-          type="text"
-          value={word}
-          onChange={(event) => setWord(event.target.value)}
-          minLength={2}
-          maxLength={40}
-          placeholder="Try Seva, courage, or ਦਇਆ"
-          className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
-          required
-        />
-        <button
-          type="submit"
-          disabled={guideMutation.isPending}
-          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-brand-blue px-4 py-2 text-sm font-bold text-white transition hover:bg-brand-navy disabled:cursor-wait disabled:opacity-60"
-        >
-          <SparklesIcon className="h-4 w-4" aria-hidden="true" />
-          {guideMutation.isPending ? 'Creating lesson...' : 'Create lesson'}
-        </button>
-      </form>
-
-      {guideMutation.isError ? (
-        <p role="alert" className="mt-3 text-sm font-semibold text-rose-700">{guideMutation.error?.message || 'The AI guide is unavailable right now.'}</p>
-      ) : null}
-
-      {recentGuides.length > 0 ? (
+      {publishedArchive.length > 1 ? (
         <div className="mt-4">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Last 5 Searches</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Published word archive</p>
           <div className="mt-2 flex flex-wrap gap-2">
-            {recentGuides.slice(0, 5).map((entry) => (
+            {publishedArchive.slice(0, 5).map((entry) => (
               <button
                 key={entry.searchId}
                 type="button"

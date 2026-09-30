@@ -28,6 +28,7 @@ import bookingService from '../../services/bookingService';
 import donationService from '../../services/donationService';
 import eventService from '../../services/eventService';
 import contentApiService from '../../services/contentApiService';
+import { useAuth } from '../../context/AuthContext';
 import { downloadBookingRevenueCsv, downloadBookingRevenuePdf } from '../../utils/csvExport';
 
 const BOOKINGS_PAGE_SIZE = 10;
@@ -198,6 +199,7 @@ const refundBadgeClass = (status) => {
 
 const AdminBookingsPage = () => {
   const { setHeaderAction } = useOutletContext();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [currentPage, setCurrentPage] = useState(1);
   const [guidelinesDraft, setGuidelinesDraft] = useState({ guidelines: '', donationCampaignId: '', showCreateBookingButton: true });
@@ -772,6 +774,8 @@ const AdminBookingsPage = () => {
         id: '',
         itemizedItems: getBookingItems(booking),
         amount: Number(booking.amount || 0),
+        createdByName: String(user?.name || user?.email || 'Admin').trim(),
+        bookedByName: String(user?.name || user?.email || 'Admin').trim(),
         source: 'admin-manual'
       });
       return;

@@ -1,18 +1,5 @@
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
 import { ArrowPathIcon, SparklesIcon } from '@heroicons/react/24/outline';
-import kidsLearningService from '../../services/kidsLearningService';
-
-const QUIZ_TOPICS = [
-  ['mixed-review', 'Mixed Review'],
-  ['guru-nanak', 'Guru Nanak Dev Ji'],
-  ['ten-gurus', 'Ten Gurus'],
-  ['khalsa-panj-pyare', 'Khalsa & Panj Pyare'],
-  ['five-ks', 'Five Ks & Symbols'],
-  ['gurdwara-gurbani', 'Gurdwara & Gurbani'],
-  ['sikh-history', 'Sikh History'],
-  ['values-festivals', 'Sikh Values & Festivals']
-];
 
 const difficultyClasses = (difficulty) => {
   if (difficulty === 'Hard') return 'border-rose-300 bg-rose-100 text-rose-800';
@@ -20,10 +7,7 @@ const difficultyClasses = (difficulty) => {
   return 'border-emerald-300 bg-emerald-100 text-emerald-800';
 };
 
-const AiQuizFlashcards = () => {
-  const [topic, setTopic] = useState('mixed-review');
-  const [difficulty, setDifficulty] = useState('Easy');
-  const [quiz, setQuiz] = useState(null);
+const AiQuizFlashcards = ({ publishedQuizId = '', publishedQuizzes = [] }) => {
   const [questionIndex, setQuestionIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState(null);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -42,15 +26,9 @@ const AiQuizFlashcards = () => {
     setBestStreak(0);
   };
 
-  const quizMutation = useMutation({
-    mutationFn: () => kidsLearningService.generateAiQuiz({ topic, difficulty }).then((res) => res.data),
-    onSuccess: (nextQuiz) => {
-      setQuiz(nextQuiz);
-      resetProgress();
-    }
-  });
+  const activeQuiz = publishedQuizzes.find((entry) => String(entry.id) === String(publishedQuizId)) || publishedQuizzes[0] || null;
 
-  const questions = Array.isArray(quiz?.questions) ? quiz.questions : [];
+  const questions = Array.isArray(activeQuiz?.questions) ? activeQuiz.questions : [];
   const question = questions[questionIndex] || null;
   const score = questions.length > 0 ? Math.round((correctCount / questions.length) * 100) : 0;
   const progress = questions.length > 0 ? ((questionIndex + 1) / questions.length) * 100 : 0;
@@ -86,29 +64,12 @@ const AiQuizFlashcards = () => {
         <div>
           <div className="flex items-center gap-2">
             <SparklesIcon className="h-5 w-5 text-violet-700" aria-hidden="true" />
-            <h4 className="text-lg font-bold text-slate-900">AI Quiz Flashcards</h4>
+            <h4 className="text-lg font-bold text-slate-900">Sikh Learning Quiz</h4>
           </div>
-          <p className="mt-1 text-xs text-slate-600">Five bilingual questions grounded in the trusted Sikh learning bank.</p>
+          <p className="mt-1 text-xs text-slate-600">A bilingual quiz selected by the Gurdwara team.</p>
         </div>
         <span className="shrink-0 rounded-full bg-white/90 px-2.5 py-1 text-xs font-black text-violet-900 shadow-sm">Score {score}/100</span>
       </div>
-
-      <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_120px_auto]">
-        <label className="sr-only" htmlFor="ai-quiz-topic">Quiz topic</label>
-        <select id="ai-quiz-topic" value={topic} onChange={(event) => setTopic(event.target.value)} className="min-w-0 rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm text-slate-800">
-          {QUIZ_TOPICS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select>
-        <label className="sr-only" htmlFor="ai-quiz-difficulty">Difficulty</label>
-        <select id="ai-quiz-difficulty" value={difficulty} onChange={(event) => setDifficulty(event.target.value)} className="rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm text-slate-800">
-          {['Easy', 'Medium', 'Hard'].map((level) => <option key={level}>{level}</option>)}
-        </select>
-        <button type="button" disabled={quizMutation.isPending} onClick={() => quizMutation.mutate()} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-violet-700 px-3 py-2 text-sm font-bold text-white transition hover:bg-violet-800 disabled:cursor-wait disabled:opacity-60">
-          <SparklesIcon className="h-4 w-4" aria-hidden="true" />
-          {quizMutation.isPending ? 'Creating...' : 'Create Quiz'}
-        </button>
-      </div>
-
-      {quizMutation.isError ? <p role="alert" className="mt-3 text-sm font-semibold text-rose-700">{quizMutation.error?.message || 'The AI quiz is unavailable right now.'}</p> : null}
 
       {question ? (
         <>
@@ -162,7 +123,7 @@ const AiQuizFlashcards = () => {
           </div>
         </>
       ) : (
-        <div className="mt-4 rounded-xl border border-dashed border-violet-300 bg-white/70 px-4 py-8 text-center"><SparklesIcon className="mx-auto h-7 w-7 text-violet-500" aria-hidden="true" /><p className="mt-2 text-sm font-semibold text-slate-700">Choose a topic and create today&apos;s AI quiz.</p></div>
+        <div className="mt-4 rounded-xl border border-dashed border-violet-300 bg-white/70 px-4 py-8 text-center"><p className="text-sm font-semibold text-slate-700">A quiz will appear here when the Gurdwara team publishes one.</p></div>
       )}
     </div>
   );
