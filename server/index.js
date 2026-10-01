@@ -36,6 +36,13 @@ const {
 } = require('./askGranthiStore');
 const { getGurdwaraBranding, saveGurdwaraBranding } = require('./gurdwaraBrandingStore');
 const { resolveMembershipRenewal } = require('./membershipReminder');
+const { createOpenWaNotifications } = require('./openWaNotifications');
+const {
+  stableJson,
+  newsIsPublic,
+  stripVolatile,
+  getLangarMaterialChanges
+} = require('./openWaNotificationRules');
 const {
   InstagramService,
   WhatsAppService,
@@ -80,7 +87,31 @@ loadEnvFile(path.join(workspaceRoot, '.env.local'));
 
 const eventsDb = require('./db/adapter');
 const pushNotifications = require('./pushNotifications');
+const openWaNotifications = createOpenWaNotifications({ db: eventsDb });
 const langarBoardEventClients = new Set();
+
+const siteBaseUrl = String(process.env.SITE_BASE_URL || process.env.PUBLIC_SITE_URL || 'https://singhsabhamilton.com').trim().replace(/\/+$/, '');
+const openWaLink = (pathname) => `${siteBaseUrl}${pathname.startsWith('/') ? pathname : `/${pathname}`}`;
+const enqueueOpenWa = (options) => openWaNotifications.enqueue(options).catch((error) => {
+  console.warn('OpenWA notification enqueue failed:', error.message || error);
+  return { queued: false, reason: 'enqueue_error' };
+});
+const queueOpenWaNotice = ({ type, key, titleEn, titlePa, bodyEn, bodyPa, pathname, coalesceKey = '', coalesceWindowMs, newsId } = {}) => (
+  enqueueOpenWa({
+    type,
+    idempotencyKey: key,
+    text: openWaNotifications.makeBilingualText({
+      titleEn,
+      titlePa,
+      bodyEn,
+      bodyPa,
+      url: pathname ? openWaLink(pathname) : ''
+    }),
+    coalesceKey,
+    coalesceWindowMs,
+    newsId
+  })
+);
 
 const API_VERSION = '2026-07-27.phase2';
 const API_STARTUP_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -321,7 +352,7 @@ const triggerSocialAutomation = async ({ type, payload = {} }) => {
     }
   }
 
-  if (socialWhatsAppService && whatsappNumber) {
+  if (!normalizedPayload.skipWhatsApp && socialWhatsAppService && whatsappNumber) {
     try {
       const whatsappParameters = normalizedPayload.whatsappParameters || [
         actionTitle || 'Community Update',
@@ -6957,6 +6988,15 @@ const server = http.createServer(async (request, response) => {
         url: '/seva',
         tag: 'ssm-volunteer-registration'
       });
+      queueOpenWaNotice({
+        type: 'volunteer-registration',
+        key: `volunteer-registration:${created.id}`,
+        titleEn: status === 'waitlisted' ? 'New seva volunteer waitlist registration' : 'New seva volunteer registration',
+        titlePa: status === 'waitlisted' ? 'ਸੇਵਾ ਲਈ ਨਵੀਂ ਉਡੀਕ ਸੂਚੀ ਰਜਿਸਟ੍ਰੇਸ਼ਨ' : 'ਸੇਵਾ ਲਈ ਨਵੀਂ ਵਲੰਟੀਅਰ ਰਜਿਸਟ੍ਰੇਸ਼ਨ',
+        bodyEn: `${name} ${status === 'waitlisted' ? 'joined the waitlist' : 'signed up'} for ${opportunity.sevaType || 'a seva opportunity'}${opportunity.date ? ` on ${opportunity.date}` : ''}${opportunity.time ? ` at ${opportunity.time}` : ''}.`,
+        bodyPa: `${name} ਨੇ ${opportunity.sevaType || 'ਸੇਵਾ ਦੇ ਮੌਕੇ'} ਲਈ ${status === 'waitlisted' ? 'ਉਡੀਕ ਸੂਚੀ ਵਿੱਚ ਨਾਮ ਦਰਜ ਕਰਵਾਇਆ' : 'ਨਾਮ ਦਰਜ ਕਰਵਾਇਆ'}${opportunity.date ? `, ਮਿਤੀ ${opportunity.date}` : ''}${opportunity.time ? `, ਸਮਾਂ ${opportunity.time}` : ''}।`,
+        pathname: '/seva'
+      });
       const emailResult = await sendRegistrationStatusEmail({ registration: created, kind: 'seva' });
       const waitlistCount = matching.filter((entry) => String(entry?.status || '').toLowerCase() === 'waitlisted').length
         + (status === 'waitlisted' ? 1 : 0);
@@ -7237,6 +7277,18 @@ const server = http.createServer(async (request, response) => {
           url: '/news',
           tag: 'ssm-news'
         });
+        if (newsIsPublic(data)) {
+          queueOpenWaNotice({
+            type: 'news',
+            key: `news:${data.id}:created:${stableJson(data)}`,
+            titleEn: 'New community news',
+            titlePa: 'ਸੰਗਤ ਲਈ ਨਵੀਂ ਖ਼ਬਰ',
+            bodyEn: data.heading || data.title || 'A new community update is now available.',
+            bodyPa: data.heading || data.title || 'ਸੰਗਤ ਲਈ ਨਵੀਂ ਜਾਣਕਾਰੀ ਉਪਲਬਧ ਹੈ।',
+            pathname: '/news',
+            newsId: data.id
+          });
+        }
       }
       if (resource === 'langar_contributions') {
         notifyAppUpdate({
@@ -7465,7 +7517,7 @@ const server = http.createServer(async (request, response) => {
         const changedFields = Object.keys(validatedBody || {}).filter((field) => (
           field !== 'updatedAt' && JSON.stringify((existingNotifiableItem || {})[field]) !== JSON.stringify(data?.[field])
         ));
-        notifyAppUpdate({
+        if (!isNews || changedFields.length) notifyAppUpdate({
           title: isNews ? 'Community Update Edited' : 'Seva Opportunity Updated',
           body: isNews
             ? `${entityTitle} was edited${changedFields.length ? ` (${changedFields.slice(0, 3).join(', ')} changed)` : ''}. You are receiving this because you subscribed to community updates.`
@@ -7473,6 +7525,18 @@ const server = http.createServer(async (request, response) => {
           url: isNews ? '/news' : '/seva',
           tag: isNews ? 'ssm-news-updated' : 'ssm-seva-updated'
         });
+        if (isNews && changedFields.length && newsIsPublic(data)) {
+          queueOpenWaNotice({
+            type: 'news',
+            key: `news:${id}:updated:${crypto.createHash('sha256').update(stableJson(data)).digest('hex')}`,
+            titleEn: 'Community news updated',
+            titlePa: 'ਸੰਗਤ ਦੀ ਖ਼ਬਰ ਅੱਪਡੇਟ ਹੋਈ',
+            bodyEn: entityTitle,
+            bodyPa: entityTitle,
+            pathname: '/news',
+            newsId: id
+          });
+        }
       } else if (resource === 'volunteer_registrations') {
         notifyAppUpdate({
           title: 'Volunteer Registration Updated',
@@ -7612,7 +7676,7 @@ const server = http.createServer(async (request, response) => {
       }
       const body = await parseAndValidateGenericStructuredBody(request, { maxBytes: maxJsonBodyBytes });
       const actorName = String(getRequestActor(request).name || '').trim() || 'A Gurdwara team member';
-      const previousSingleton = ['cms_home_content', 'hukamnama_ssm_hukamnama_entries'].includes(resource)
+      const previousSingleton = ['cms_home_content', 'cms_page_content', 'hukamnama_ssm_hukamnama_entries'].includes(resource)
         ? await eventsDb.getSingleton(resource, null)
         : null;
       const data = await eventsDb.setSingleton(resource, body);
@@ -7625,25 +7689,42 @@ const server = http.createServer(async (request, response) => {
           return ['morning', 'evening'].flatMap((slot) => {
             const previousEntry = previousDay?.[slot];
             const nextEntry = nextDay?.[slot];
-            if (!previousEntry && nextEntry) return [{ kind: 'posted', dateKey }];
-            if (previousEntry && !nextEntry) return [{ kind: 'removed', dateKey }];
-            if (previousEntry && nextEntry && JSON.stringify(previousEntry) !== JSON.stringify(nextEntry)) return [{ kind: 'updated', dateKey }];
+            if (!previousEntry && nextEntry) return [{ kind: 'posted', dateKey, slot }];
+            if (previousEntry && !nextEntry) return [{ kind: 'removed', dateKey, slot }];
+            if (previousEntry && nextEntry && JSON.stringify(previousEntry) !== JSON.stringify(nextEntry)) return [{ kind: 'updated', dateKey, slot }];
             return [];
           });
         });
         if (changes.length) {
-          const changeDetails = changes.slice(0, 3).map((change) => {
+          const pushChangeDetails = changes.slice(0, 3).map((change) => {
             const entry = body?.[change.dateKey]?.[change.slot] || previousEntries?.[change.dateKey]?.[change.slot];
             const heading = entry?.title || entry?.metadata?.source || `Ang ${entry?.ang || ''}`.trim();
             return `${change.dateKey} ${change.slot}: ${change.kind}${heading ? ` ${heading}` : ''}`;
           });
-          const remainingChanges = changes.length - changeDetails.length;
-          const summary = `${changeDetails.join('; ')}${remainingChanges ? `; and ${remainingChanges} more schedule change${remainingChanges === 1 ? '' : 's'}` : ''}`;
+          const pushRemainingChanges = changes.length - pushChangeDetails.length;
+          const summary = `${pushChangeDetails.join('; ')}${pushRemainingChanges ? `; and ${pushRemainingChanges} more schedule change${pushRemainingChanges === 1 ? '' : 's'}` : ''}`;
           notifyAppUpdate({
             title: 'Hukamnama Schedule Updated',
             body: `${actorName} changed the Hukamnama schedule: ${summary}. You are receiving this because you enabled Hukamnama updates.`,
             url: '/hukamnama',
             tag: 'ssm-hukamnama'
+          });
+          const changeDetails = changes.slice(0, 6).map((change) => {
+            const entry = body?.[change.dateKey]?.[change.slot] || previousEntries?.[change.dateKey]?.[change.slot] || {};
+            const heading = entry?.title || entry?.metadata?.source || `Ang ${entry?.ang || ''}`.trim();
+            return `${change.dateKey} ${change.slot === 'morning' ? 'Morning' : 'Evening'} ${change.kind}${heading ? `: ${heading}` : ''}`;
+          });
+          const remainingChanges = changes.length - changeDetails.length;
+          const changeSummary = `${changeDetails.join('; ')}${remainingChanges ? `; and ${remainingChanges} more change${remainingChanges === 1 ? '' : 's'}` : ''}`;
+          const punjabiSummary = changes.slice(0, 6).map((change) => `${change.dateKey} ${change.slot === 'morning' ? 'ਸਵੇਰ' : 'ਸ਼ਾਮ'} ${change.kind === 'posted' ? 'ਜੋੜਿਆ' : change.kind === 'removed' ? 'ਹਟਾਇਆ' : 'ਅੱਪਡੇਟ ਕੀਤਾ'}`).join('; ');
+          queueOpenWaNotice({
+            type: 'hukamnama',
+            key: `hukamnama:${stableJson(body)}`,
+            titleEn: 'Hukamnama updated',
+            titlePa: 'ਹੁਕਮਨਾਮਾ ਅੱਪਡੇਟ ਹੋਇਆ',
+            bodyEn: `${actorName} updated the Hukamnama: ${changeSummary}.`,
+            bodyPa: `${actorName} ਨੇ ਹੁਕਮਨਾਮਾ ਅੱਪਡੇਟ ਕੀਤਾ: ${punjabiSummary}।`,
+            pathname: '/hukamnama'
           });
           if (changes.some((change) => change.kind !== 'removed')) {
             const changedEntry = changes.find((change) => change.kind !== 'removed');
@@ -7657,6 +7738,7 @@ const server = http.createServer(async (request, response) => {
                   imageUrl: entry.imageUrl || entry.coverImageUrl || '',
                   link: `${newsletterPublicBaseUrl || volunteerReminderBaseUrl || process.env.APP_URL || 'https://example.com'}/hukamnama`,
                   whatsappNumber: process.env.WHATSAPP_GROUP_NUMBER || '',
+                  skipWhatsApp: true,
                   hashtags: ['Hukamnama', 'Gurbani', 'SikhCommunity']
                 }
               });
@@ -7667,15 +7749,29 @@ const server = http.createServer(async (request, response) => {
       if (resource === 'cms_home_content') {
         const previousItems = previousSingleton?.langarItems || [];
         const nextItems = body?.langarItems || [];
-        const previousById = new Map(previousItems.map((item) => [String(item?.id || ''), item]));
-        const nextById = new Map(nextItems.map((item) => [String(item?.id || ''), item]));
-        const newlyAddedItems = nextItems.filter((item) => item?.id && !previousById.has(String(item.id)));
-        const materialItemFields = ['name', 'category', 'needed', 'quantityRequired', 'unit', 'imageUrl', 'expiryDate', 'description'];
-        const updatedItems = nextItems.filter((item) => {
-          const previous = previousById.get(String(item?.id || ''));
-          return item?.id && previous && materialItemFields.some((field) => item[field] !== previous[field]);
-        });
-        const removedItems = previousItems.filter((item) => item?.id && !nextById.has(String(item.id)));
+        const { added: newlyAddedItems, updated: updatedItems, removed: removedItems } = getLangarMaterialChanges(previousItems, nextItems);
+        if (previousSingleton && (newlyAddedItems.length || updatedItems.length || removedItems.length)) {
+          const changeSummaryEn = [
+            newlyAddedItems.length ? `Added: ${newlyAddedItems.map((item) => item.name || 'item').slice(0, 8).join(', ')}` : '',
+            updatedItems.length ? `Updated: ${updatedItems.map((item) => item.name || 'item').slice(0, 8).join(', ')}` : '',
+            removedItems.length ? `Removed: ${removedItems.map((item) => item.name || 'item').slice(0, 8).join(', ')}` : ''
+          ].filter(Boolean).join('. ');
+          const changeSummaryPa = [
+            newlyAddedItems.length ? `ਸ਼ਾਮਲ: ${newlyAddedItems.map((item) => item.name || 'ਸਮਾਨ').slice(0, 8).join(', ')}` : '',
+            updatedItems.length ? `ਬਦਲੇ: ${updatedItems.map((item) => item.name || 'ਸਮਾਨ').slice(0, 8).join(', ')}` : '',
+            removedItems.length ? `ਹਟਾਏ: ${removedItems.map((item) => item.name || 'ਸਮਾਨ').slice(0, 8).join(', ')}` : ''
+          ].filter(Boolean).join('। ');
+          queueOpenWaNotice({
+            type: 'langar',
+            key: `langar:${crypto.randomUUID()}`,
+            titleEn: 'Langar grocery needs updated',
+            titlePa: 'ਲੰਗਰ ਦੇ ਸਮਾਨ ਦੀ ਸੂਚੀ ਅੱਪਡੇਟ ਹੋਈ',
+            bodyEn: changeSummaryEn,
+            bodyPa: changeSummaryPa,
+            pathname: '/seva',
+            coalesceKey: 'langar-grocery-updates'
+          });
+        }
         newlyAddedItems.forEach((item) => {
           notifyAppUpdate({
             title: 'New Langar Item Requested',
@@ -7696,6 +7792,37 @@ const server = http.createServer(async (request, response) => {
           url: '/',
           tag: 'ssm-langar-item-removed'
         }));
+      }
+      if (resource === 'cms_home_content') {
+        const beforePage = { ...(previousSingleton || {}), langarItems: undefined };
+        const afterPage = { ...(body || {}), langarItems: undefined };
+        if (previousSingleton && stableJson(stripVolatile(beforePage)) !== stableJson(stripVolatile(afterPage))) {
+          queueOpenWaNotice({
+            type: 'page-content',
+            key: `${resource}:${crypto.createHash('sha256').update(stableJson(stripVolatile(afterPage))).digest('hex')}`,
+            titleEn: 'Homepage information updated',
+            titlePa: 'ਮੁੱਖ ਪੰਨੇ ਦੀ ਜਾਣਕਾਰੀ ਅੱਪਡੇਟ ਹੋਈ',
+            bodyEn: 'The public website information has been updated.',
+            bodyPa: 'ਵੈੱਬਸਾਈਟ ਉੱਤੇ ਜਨਤਕ ਜਾਣਕਾਰੀ ਅੱਪਡੇਟ ਕੀਤੀ ਗਈ ਹੈ।',
+            pathname: '/'
+          });
+        }
+      }
+      if (resource === 'cms_page_content' && previousSingleton) {
+        const changedPageKeys = Object.keys(body || {}).filter((pageKey) => stableJson(stripVolatile(previousSingleton?.[pageKey])) !== stableJson(stripVolatile(body?.[pageKey])));
+        if (changedPageKeys.length) {
+          const pageKey = changedPageKeys[0];
+          const pageName = pageKey.replace(/[-_]/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+          queueOpenWaNotice({
+            type: 'page-content',
+            key: `cms-page:${pageKey}:${crypto.createHash('sha256').update(stableJson(body?.[pageKey])).digest('hex')}`,
+            titleEn: `${pageName} page updated`,
+            titlePa: 'ਵੈੱਬਸਾਈਟ ਪੰਨੇ ਦੀ ਜਾਣਕਾਰੀ ਅੱਪਡੇਟ ਹੋਈ',
+            bodyEn: `Public information on the ${pageName} page has been saved.`,
+            bodyPa: `${pageName} ਪੰਨੇ ਦੀ ਜਨਤਕ ਜਾਣਕਾਰੀ ਸੰਭਾਲੀ ਗਈ ਹੈ।`,
+            pathname: `/${pageKey}`
+          });
+        }
       }
       await appendAuditLog(request, {
         action: 'content.singleton.update',
@@ -7928,6 +8055,15 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (requestUrl.pathname === '/api/notifications/openwa/status' && request.method === 'GET') {
+    try {
+      sendJson(response, 200, { ok: true, data: await openWaNotifications.getStatus() });
+    } catch (error) {
+      sendJson(response, 503, { ok: false, message: 'OpenWA notification status is unavailable.' });
+    }
+    return;
+  }
+
   if (requestUrl.pathname === '/api/push/subscribe' && request.method === 'POST') {
     try {
       const body = await parseJsonObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
@@ -8083,19 +8219,33 @@ const server = http.createServer(async (request, response) => {
       body.date = date;
       await assertNoScheduleOverlap(body, { kind: 'event' });
       const data = await eventsDb.createEvent(body);
-      await triggerSocialAutomation({
-        type: 'event.created',
-        payload: {
-          title: data?.title || body?.title,
-          summary: data?.description || body?.description || 'New community event has been added.',
-          date: data?.date || body?.date,
-          location: data?.location || body?.location || '',
-          coverImageUrl: data?.coverImageUrl || body?.coverImageUrl || body?.imageUrl || '',
-          link: `${newsletterPublicBaseUrl || volunteerReminderBaseUrl || process.env.APP_URL || 'https://example.com'}/events`,
-          whatsappNumber: process.env.WHATSAPP_GROUP_NUMBER || '',
-          hashtags: ['SinghSabha', 'Community', 'Event']
-        }
-      });
+      if (data?.active !== false && data?.isActive !== false) {
+        await triggerSocialAutomation({
+          type: 'event.created',
+          payload: {
+            title: data?.title || body?.title,
+            summary: data?.description || body?.description || 'New community event has been added.',
+            date: data?.date || body?.date,
+            location: data?.location || body?.location || '',
+            coverImageUrl: data?.coverImageUrl || body?.coverImageUrl || body?.imageUrl || '',
+            link: `${newsletterPublicBaseUrl || volunteerReminderBaseUrl || process.env.APP_URL || 'https://example.com'}/events`,
+            whatsappNumber: process.env.WHATSAPP_GROUP_NUMBER || '',
+            skipWhatsApp: true,
+            hashtags: ['SinghSabha', 'Community', 'Event']
+          }
+        });
+      }
+      if (data?.active !== false && data?.isActive !== false) {
+        queueOpenWaNotice({
+          type: 'event',
+          key: `event:${data.id}:created:${stableJson(data)}`,
+          titleEn: 'New community event',
+          titlePa: 'ਸੰਗਤ ਲਈ ਨਵਾਂ ਸਮਾਗਮ',
+          bodyEn: `${data.title || body.title}${data.date ? ` — ${data.date}` : ''}${data.location ? `, ${data.location}` : ''}`,
+          bodyPa: `${data.title || body.title}${data.date ? ` — ${data.date}` : ''}${data.location ? `, ${data.location}` : ''}`,
+          pathname: '/events'
+        });
+      }
       notifyAppUpdate({
         title: 'New Event Added',
         body: `${String(getRequestActor(request).name || '').trim() || 'A Gurdwara team member'} added ${data?.title || body?.title}, scheduled for ${data?.date || body?.date}${data?.location || body?.location ? ` at ${data?.location || body?.location}` : ''}.`,
@@ -8225,6 +8375,19 @@ const server = http.createServer(async (request, response) => {
       await assertNoScheduleOverlap(validatedEvent, { kind: 'event', excludeId: id });
       const data = await eventsDb.updateEvent(id, body);
       const changedEventFields = Object.keys(body).filter((field) => JSON.stringify(existingEvent?.[field]) !== JSON.stringify(data?.[field]));
+      const wasEventVisible = existingEvent?.active !== false && existingEvent?.isActive !== false;
+      const isEventVisible = data?.active !== false && data?.isActive !== false;
+      if (changedEventFields.length && isEventVisible && (!wasEventVisible || changedEventFields.some((field) => field !== 'active' && field !== 'isActive'))) {
+        queueOpenWaNotice({
+          type: 'event',
+          key: `event:${id}:updated:${crypto.createHash('sha256').update(stableJson(data)).digest('hex')}`,
+          titleEn: wasEventVisible ? 'Community event updated' : 'Community event published',
+          titlePa: wasEventVisible ? 'ਸਮਾਗਮ ਦੀ ਜਾਣਕਾਰੀ ਅੱਪਡੇਟ ਹੋਈ' : 'ਸਮਾਗਮ ਪ੍ਰਕਾਸ਼ਿਤ ਹੋਇਆ',
+          bodyEn: `${data?.title || existingEvent?.title || 'Community event'}${data?.date ? ` — ${data.date}` : ''}${data?.location ? `, ${data.location}` : ''}`,
+          bodyPa: `${data?.title || existingEvent?.title || 'ਸਮਾਗਮ'}${data?.date ? ` — ${data.date}` : ''}${data?.location ? `, ${data.location}` : ''}`,
+          pathname: '/events'
+        });
+      }
       if (changedEventFields.length) {
         notifyAppUpdate({
           title: data?.active === false ? 'Event Cancelled' : 'Event Updated',
@@ -9534,6 +9697,14 @@ const bootstrap = async () => {
   const bookingConfiguredTime = `${String(bookingReminderSendTime.hour).padStart(2, '0')}:${String(bookingReminderSendTime.minute).padStart(2, '0')}`;
   console.log(`Booking reminder scheduler set for ${bookingConfiguredTime} (${bookingReminderTimeZone}) daily at ${bookingReminderDays.join(', ')} day intervals.`);
   console.log(`Membership renewal scheduler set for ${bookingConfiguredTime} (${bookingReminderTimeZone}) daily at ${membershipReminderDays.join(', ')} day intervals.`);
+
+  if (eventsDb.hasDatabaseConnection) {
+    const openWaQueueTimer = setInterval(() => {
+      openWaNotifications.processQueue().catch((error) => logServerError(error, 'OpenWA notification worker failed'));
+    }, 5000);
+    if (typeof openWaQueueTimer.unref === 'function') openWaQueueTimer.unref();
+    openWaNotifications.processQueue().catch((error) => logServerError(error, 'Initial OpenWA notification worker failed'));
+  }
 
   // Check every minute, but only send once per day after the configured local send time.
   setInterval(() => {
