@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeftIcon, GiftIcon, MinusIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { GiftIcon, MinusIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../../context/AuthContext';
 import Seo from '../../components/common/Seo';
 import useSeoMeta from '../../hooks/useSeoMeta';
@@ -16,12 +16,13 @@ const LangarItemContributionPage = () => {
   const { branding, logoSrc } = useBranding();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [quantity, setQuantity] = useState(1);
+  const [quantities, setQuantities] = useState({});
+  const [submittedItems, setSubmittedItems] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notice, setNotice] = useState('');
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [anonymous, setAnonymous] = useState(false);
-  const meta = useSeoMeta('Make a Langar Contribution', 'Commit a requested Langar item to support the sangat.');
+  const meta = useSeoMeta('Make a Langar Contribution', 'Select one or more requested Langar items to support the sangat.');
 
   const { data: content } = useQuery({
     queryKey: ['langar-item-contribution-content'],
@@ -34,7 +35,37 @@ const LangarItemContributionPage = () => {
     refetchInterval: 12000
   });
 
-  const item = useMemo(() => (content?.langarItems || []).map(langarService.normalizeItem).find((entry) => String(entry.id) === String(itemId)) || null, [content, itemId]);
+  const itemNeeds = useMemo(() => {
+    const items = (content?.langarItems || []).map(langarService.normalizeItem);
+    return items.map((entry) => {
+      const pending = contributions
+        .filter((contribution) => String(contribution.itemId) === String(entry.id) && String(contribution.status).toLowerCase() === 'pending')
+        .reduce((sum, contribution) => sum + Number(contribution.quantity || 0), 0);
+      const remaining = Math.max(0, Number(entry.quantityRequired || 0) - Number(entry.quantityReceived || 0) - pending);
+      return { ...entry, remaining };
+    });
+  }, [content, contributions]);
+  const selectedItems = useMemo(() => itemNeeds
+    .filter((entry) => Number(quantities[entry.id] || 0) > 0)
+    .map((entry) => ({ ...entry, selectedQuantity: Math.min(Number(quantities[entry.id] || 0), entry.remaining) })), [itemNeeds, quantities]);
+
+  useEffect(() => {
+    if (!itemNeeds.length) return;
+    setQuantities((current) => {
+      const next = { ...current };
+      let changed = false;
+      itemNeeds.forEach((entry) => {
+        if (!Object.prototype.hasOwnProperty.call(next, entry.id)) {
+          next[entry.id] = String(entry.id) === String(itemId) && entry.remaining > 0 ? 1 : 0;
+          changed = true;
+        } else if (next[entry.id] > entry.remaining) {
+          next[entry.id] = entry.remaining;
+          changed = true;
+        }
+      });
+      return changed ? next : current;
+    });
+  }, [itemNeeds, itemId]);
   const openAllLangarNeeds = () => {
     try { window.sessionStorage.setItem('ssm_langar_reopen_board', '1'); } catch { /* Storage may be disabled. */ }
     queryClient.invalidateQueries({ queryKey: ['cms-home'] });
@@ -45,31 +76,33 @@ const LangarItemContributionPage = () => {
     window.close();
     window.setTimeout(() => navigate('/'), 150);
   };
-  const remaining = useMemo(() => {
-    if (!item) return 0;
-    const pending = contributions.filter((entry) => String(entry.itemId) === String(item.id) && String(entry.status).toLowerCase() === 'pending').reduce((sum, entry) => sum + Number(entry.quantity || 0), 0);
-    return Math.max(0, Number(item.quantityRequired || 0) - Number(item.quantityReceived || 0) - pending);
-  }, [contributions, item]);
-
-  const adjustQuantity = (delta) => setQuantity((current) => Math.min(remaining, Math.max(1, current + delta)));
+  const adjustQuantity = (entry, delta) => setQuantities((current) => ({
+    ...current,
+    [entry.id]: Math.min(entry.remaining, Math.max(0, Number(current[entry.id] || 0) + delta))
+  }));
+  const chooseSuggestedQuantity = (entry, amount) => setQuantities((current) => ({
+    ...current,
+    [entry.id]: Math.min(entry.remaining, Math.max(0, Number(amount) || 0))
+  }));
   const signIn = () => {
-    const next = `/langar-contribute?itemId=${encodeURIComponent(itemId)}`;
-    navigate(`/login?next=${encodeURIComponent(next)}`, { state: { from: { pathname: '/langar-contribute', search: `?itemId=${encodeURIComponent(itemId)}` } } });
+    const nextSearch = itemId ? `?itemId=${encodeURIComponent(itemId)}` : '';
+    const next = `/langar-contribute${nextSearch}`;
+    navigate(`/login?next=${encodeURIComponent(next)}`, { state: { from: { pathname: '/langar-contribute', search: nextSearch } } });
   };
   const submitCommitment = async () => {
     if (!isAuthenticated) {
       signIn();
       return;
     }
-    if (!item || remaining <= 0 || quantity > remaining) return;
+    if (!selectedItems.length) {
+      setNotice('Choose a quantity for at least one item.');
+      return;
+    }
     setIsSubmitting(true);
     setNotice('');
     try {
-      await langarService.createContribution({
-        itemId: item.id,
-        itemName: item.name,
-        quantity: Math.min(quantity, remaining),
-        unit: item.unit,
+      const createdItems = await langarService.createContributionBatch({
+        items: selectedItems.map((entry) => ({ itemId: entry.id, quantity: entry.selectedQuantity })),
         donorName: user?.name || 'Member',
         donorEmail: String(user?.email || '').toLowerCase(),
         donorAvatarUrl: user?.avatarUrl || user?.picture || user?.photoURL || '',
@@ -77,6 +110,7 @@ const LangarItemContributionPage = () => {
         expectedDeliveryDate: ''
       });
       await queryClient.invalidateQueries({ queryKey: [LANGAR_CONTRIBUTIONS_RESOURCE] });
+      setSubmittedItems(createdItems);
       setHasSubmitted(true);
     } catch (error) {
       setNotice(error?.message || 'Unable to record your commitment. Please try again.');
@@ -92,12 +126,13 @@ const LangarItemContributionPage = () => {
         <div className="mx-auto max-w-2xl overflow-hidden rounded-3xl border border-sky-100 bg-white shadow-2xl">
           <header className="flex items-center gap-4 bg-gradient-to-r from-brand-blue via-blue-700 to-brand-saffron p-5 text-white sm:p-7">
             <img src={logoSrc} alt={`${branding.organizationName} logo`} className="h-14 w-14 rounded-full border-2 border-brand-saffron object-cover" />
-            <div><p className="text-xs font-black uppercase tracking-[0.2em] text-blue-100">{branding.shortName}</p><h1 className="mt-1 font-heading text-3xl font-bold">{hasSubmitted ? 'Thank You for Your Seva' : 'Make a Contribution'}</h1><p className="mt-1 text-sm text-blue-50">{hasSubmitted ? 'Your Langar commitment has been recorded.' : 'Commit this requested item for Langar seva.'}</p></div>
+            <div><p className="text-xs font-black uppercase tracking-[0.2em] text-blue-100">{branding.shortName}</p><h1 className="mt-1 font-heading text-3xl font-bold">{hasSubmitted ? 'Thank You for Your Seva' : 'Choose Langar Needs'}</h1><p className="mt-1 text-sm text-blue-50">{hasSubmitted ? 'Your Langar commitments have been recorded.' : 'Select one or more items and quantities to support Langar seva.'}</p></div>
           </header>
           {hasSubmitted ? <div className="space-y-5 p-5 sm:p-7">
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-center">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
               <p className="font-heading text-2xl font-bold text-emerald-900">Waheguru Ji Ka Khalsa, Waheguru Ji Ki Fateh</p>
-              <p className="mt-2 text-sm leading-6 text-emerald-800">Thank you for committing {quantity} {item?.unit || 'items'} of {item?.name || 'a Langar need'}. Your generosity helps serve the sangat.</p>
+              <p className="mt-2 text-sm leading-6 text-emerald-800">Thank you for supporting the sangat. Your commitments have been recorded:</p>
+              <ul className="mt-4 divide-y divide-emerald-200 rounded-xl border border-emerald-200 bg-white text-left">{submittedItems.map((entry) => <li key={entry.id} className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm"><span className="font-bold text-emerald-950">{entry.itemName}</span><span className="shrink-0 font-extrabold text-emerald-800">{entry.quantity} {entry.unit}</span></li>)}</ul>
               <p className="mt-2 text-xs text-emerald-700">A confirmation email will be sent to {String(user?.email || 'your account email')} if email delivery is available.</p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -105,17 +140,29 @@ const LangarItemContributionPage = () => {
               <button type="button" onClick={closeContributionPage} className="min-h-12 rounded-xl border border-slate-300 bg-white px-5 py-3 font-bold text-slate-700 hover:bg-slate-50">Close page</button>
             </div>
           </div> : <div className="space-y-5 p-5 sm:p-7">
-            <Link to="/langar-board" className="inline-flex items-center gap-2 text-sm font-bold text-brand-blue hover:underline"><ArrowLeftIcon className="h-4 w-4" /> Back to Langar needs</Link>
-            {!item ? <div className="space-y-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900"><p>This Langar item is not available. You can still see and contribute to all current Langar needs.</p><button type="button" onClick={openAllLangarNeeds} className="min-h-11 rounded-xl bg-brand-saffron px-4 py-2 font-extrabold text-brand-navy">Open all Langar needs</button></div> : <>
-              <section className="flex items-center gap-4 rounded-2xl border border-sky-200 bg-sky-50 p-4">
-                <img src={item.imageUrl || logoSrc} alt="" className="h-20 w-20 rounded-xl object-cover" />
-                <div className="min-w-0 flex-1"><p className="font-heading text-2xl font-bold text-brand-navy">{item.name}</p><p className="text-sm font-semibold text-slate-600">{item.category || 'Langar need'} · {item.quantityRequired} {item.unit} required</p><p className="mt-1 text-sm font-bold text-brand-blue">{remaining} {item.unit} still available to commit</p></div>
+            {!itemNeeds.length ? <div className="space-y-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900"><p>There are no Langar needs available to commit right now.</p><button type="button" onClick={openAllLangarNeeds} className="min-h-11 rounded-xl bg-brand-saffron px-4 py-2 font-extrabold text-brand-navy">Back to Langar needs</button></div> : <>
+              <p className="text-sm leading-6 text-slate-600">Choose quantities for any items you can provide. You can select several items in one commitment.</p>
+              {itemId && !itemNeeds.some((entry) => String(entry.id) === String(itemId)) ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">The item from this QR code is no longer available; you can still select other current needs below.</div> : null}
+              <section className="max-h-[55vh] space-y-3 overflow-y-auto pr-1">
+                {itemNeeds.map((entry) => {
+                  const selectedQuantity = Number(quantities[entry.id] || 0);
+                  const available = entry.remaining > 0;
+                  const suggestedQuantities = entry.remaining > 10
+                    ? Array.from({ length: Math.ceil(entry.remaining / 20) }, (_, index) => Math.min((index + 1) * 20, entry.remaining))
+                    : [];
+                  return <article key={entry.id} className={`rounded-2xl border p-3 sm:p-4 ${selectedQuantity ? 'border-brand-blue/40 bg-sky-50' : 'border-slate-200 bg-white'}`}>
+                    <div className="flex items-center gap-3"><img src={entry.imageUrl || logoSrc} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover sm:h-16 sm:w-16" /><div className="min-w-0 flex-1"><h2 className="truncate font-heading text-lg font-bold text-brand-navy">{entry.name}</h2><p className="text-xs font-semibold text-slate-600">{entry.category || 'Langar need'} · {entry.remaining} {entry.unit} available</p></div></div>
+                    {suggestedQuantities.length ? <div className="mt-3"><p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Suggested quantities</p><div className="mt-1.5 flex flex-wrap gap-2">{suggestedQuantities.map((amount) => <button key={amount} type="button" onClick={() => chooseSuggestedQuantity(entry, amount)} aria-pressed={selectedQuantity === amount} className={`rounded-full border px-3 py-1.5 text-xs font-extrabold transition ${selectedQuantity === amount ? 'border-brand-blue bg-brand-blue text-white' : 'border-slate-300 bg-white text-brand-blue hover:border-brand-blue'}`}>{amount} {entry.unit}</button>)}</div></div> : null}
+                    <div className="mt-3 flex items-center justify-between gap-3"><span className="text-sm font-bold text-slate-700">{selectedQuantity ? `${selectedQuantity} ${entry.unit} selected` : 'Not selected'}</span><div className="flex items-center gap-2"><button type="button" onClick={() => adjustQuantity(entry, -1)} disabled={!available || selectedQuantity <= 0} aria-label={`Decrease ${entry.name}`} className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-700 disabled:opacity-40"><MinusIcon className="h-5 w-5" /></button><span className="min-w-8 text-center text-lg font-black text-brand-blue">{selectedQuantity}</span><button type="button" onClick={() => adjustQuantity(entry, 1)} disabled={!available || selectedQuantity >= entry.remaining} aria-label={`Increase ${entry.name}`} className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-700 disabled:opacity-40"><PlusIcon className="h-5 w-5" /></button></div></div>
+                    {!available ? <p className="mt-2 text-xs font-semibold text-emerald-800">Fully committed — thank you.</p> : null}
+                  </article>;
+                })}
               </section>
-              {remaining > 0 ? <section className="rounded-2xl border border-slate-200 p-4"><label className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Quantity to commit</label><div className="mt-2 flex items-center gap-3"><button type="button" onClick={() => adjustQuantity(-1)} disabled={quantity <= 1} aria-label="Decrease quantity" className="flex h-12 w-12 items-center justify-center rounded-xl border border-slate-300 text-slate-700 disabled:opacity-40"><MinusIcon className="h-5 w-5" /></button><div className="flex min-h-12 flex-1 items-center justify-center rounded-xl border border-slate-300 text-xl font-black text-brand-blue">{quantity} {item.unit}</div><button type="button" onClick={() => adjustQuantity(1)} disabled={quantity >= remaining} aria-label="Increase quantity" className="flex h-12 w-12 items-center justify-center rounded-xl border border-slate-300 text-slate-700 disabled:opacity-40"><PlusIcon className="h-5 w-5" /></button></div><p className="mt-2 text-xs text-slate-500">Maximum commitment: {remaining} {item.unit}</p></section> : <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900">This item is fully committed. Thank you for supporting the sangat.</div>}
               <label className="flex items-center gap-3 rounded-xl bg-slate-50 p-3 text-sm font-semibold text-slate-700"><input type="checkbox" checked={anonymous} onChange={(event) => setAnonymous(event.target.checked)} className="h-4 w-4" /> Keep my name anonymous</label>
               {notice && !hasSubmitted ? <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-900">{notice}</p> : null}
-              {isAuthenticated ? <p className="text-xs text-slate-500">Contributing as {user?.name || user?.email}</p> : <p className="text-sm text-slate-600">Sign in is required to commit this item. You’ll return here after signing in.</p>}
-              <button type="button" onClick={() => void submitCommitment()} disabled={!item || remaining <= 0 || isSubmitting} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand-saffron px-5 py-3 font-extrabold text-brand-navy shadow-lg hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"><GiftIcon className="h-5 w-5" />{isSubmitting ? 'Recording commitment…' : isAuthenticated ? 'Make Commitment' : 'Sign in to contribute'}</button>
+              {selectedItems.length ? <p className="text-sm font-bold text-brand-blue">{selectedItems.length} item{selectedItems.length === 1 ? '' : 's'} selected · {selectedItems.reduce((sum, entry) => sum + entry.selectedQuantity, 0)} total units</p> : null}
+              {isAuthenticated ? <p className="text-xs text-slate-500">Contributing as {user?.name || user?.email}</p> : <p className="text-sm text-slate-600">Sign in is required to commit these items. You’ll return here after signing in.</p>}
+              <button type="button" onClick={() => void submitCommitment()} disabled={!selectedItems.length || isSubmitting} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand-saffron px-5 py-3 font-extrabold text-brand-navy shadow-lg hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"><GiftIcon className="h-5 w-5" />{isSubmitting ? 'Recording commitments…' : isAuthenticated ? `Commit ${selectedItems.length || ''} ${selectedItems.length === 1 ? 'item' : 'items'}` : 'Sign in to contribute'}</button>
             </>}
           </div>}
         </div>

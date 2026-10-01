@@ -89,6 +89,10 @@ const langarService = {
     createdAt: new Date().toISOString(),
     status: 'pending'
   }))),
+  createContributionBatch: async (payload) => {
+    const response = await apiClient.post('/langar-contributions/batch', payload);
+    return serviceResponse((response.data?.data || []).map(normalizeContribution));
+  },
   deleteContribution: async (id) => serviceResponse(await contentApiService.remove(LANGAR_CONTRIBUTIONS_RESOURCE, id)),
   normalizeItem
 };

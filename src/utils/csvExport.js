@@ -682,6 +682,8 @@ export const createBookingRevenuePdfBlob = async ({ organizationName, bookings =
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
+  const tableWidth = 605;
+  const tableSideMargin = (pageWidth - tableWidth) / 2;
   const logoDataUrl = await loadLogoDataUrl();
   const generatedOn = new Date().toLocaleString();
   const rows = getBookingRevenueReportRows(bookings);
@@ -714,9 +716,10 @@ export const createBookingRevenuePdfBlob = async ({ organizationName, bookings =
     startY: 150,
     head: [BOOKING_REVENUE_HEADERS],
     body: rows,
-    styles: { fontSize: 7, cellPadding: 4, overflow: 'linebreak', valign: 'middle' },
-    headStyles: { fillColor: LOGO_BLUE_RGB, textColor: 255, fontStyle: 'bold', fontSize: 7 },
-    columnStyles: { 0: { cellWidth: 68 }, 1: { cellWidth: 68 }, 2: { cellWidth: 88 }, 3: { cellWidth: 90 }, 4: { cellWidth: 112 }, 5: { cellWidth: 72 }, 6: { cellWidth: 82 }, 7: { cellWidth: 74 }, 8: { cellWidth: 100 }, 9: { cellWidth: 68, halign: 'right' }, 10: { cellWidth: 72 } },
+    tableWidth,
+    styles: { fontSize: 6.5, cellPadding: 3, overflow: 'linebreak', valign: 'middle' },
+    headStyles: { fillColor: LOGO_BLUE_RGB, textColor: 255, fontStyle: 'bold', fontSize: 6.5 },
+    columnStyles: { 0: { cellWidth: 52 }, 1: { cellWidth: 52 }, 2: { cellWidth: 65 }, 3: { cellWidth: 65 }, 4: { cellWidth: 68 }, 5: { cellWidth: 52 }, 6: { cellWidth: 60 }, 7: { cellWidth: 50 }, 8: { cellWidth: 60 }, 9: { cellWidth: 48, halign: 'right' }, 10: { cellWidth: 45 } },
     didDrawPage: () => {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
@@ -725,7 +728,7 @@ export const createBookingRevenuePdfBlob = async ({ organizationName, bookings =
       doc.text(`Page ${doc.internal.getCurrentPageInfo().pageNumber}`, pageWidth - 34, pageHeight - 18, { align: 'right' });
     },
     theme: 'grid',
-    margin: { left: 34, right: 34, bottom: 34 }
+    margin: { left: tableSideMargin, right: tableSideMargin, bottom: 34 }
   });
   return doc.output('blob');
 };
