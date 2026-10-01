@@ -7064,6 +7064,59 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (requestUrl.pathname === '/api/langar-contributions/batch' && request.method === 'POST') {
+    try {
+      const body = await parseAndValidateGenericObjectBody(request, { maxBytes: maxJsonBodyBytes, allowEmpty: false });
+      const actor = getRequestActor(request);
+      const actorEmail = String(actor.email || '').trim().toLowerCase();
+      const donorEmail = String(body.donorEmail || '').trim().toLowerCase();
+      assertInput(Boolean(actorEmail && donorEmail && actorEmail === donorEmail), 'Please sign in before making Langar commitments.', 401);
+      assertInput(Array.isArray(body.items) && body.items.length > 0 && body.items.length <= 50, 'Select between 1 and 50 Langar items.');
+      assertInput(body.items.every((item) => Number.isSafeInteger(Number(item.quantity)) && Number(item.quantity) > 0), 'Each selected quantity must be a positive whole number.');
+
+      const { data, content } = await eventsDb.createLangarContributionBatch({
+        items: body.items,
+        donorName: String(body.donorName || actor.name || 'Member').trim(),
+        donorEmail: actorEmail,
+        donorAvatarUrl: String(body.donorAvatarUrl || ''),
+        anonymous: Boolean(body.anonymous),
+        expectedDeliveryDate: String(body.expectedDeliveryDate || '')
+      });
+
+      if (data.length) {
+        notifyAppUpdate({
+          title: 'New Langar Commitments',
+          body: `${body.anonymous ? 'A sangat member' : actor.name || 'A sangat member'} committed to ${data.length} Langar item${data.length === 1 ? '' : 's'}.`,
+          url: '/',
+          tag: 'ssm-langar-commitment'
+        });
+
+        const rows = data.map((entry) => `<tr><td style="padding:9px;border:1px solid #dbe5f0">${escapeHtml(entry.itemName)}</td><td style="padding:9px;border:1px solid #dbe5f0">${escapeHtml(`${entry.quantity} ${entry.unit}`)}</td></tr>`).join('');
+        const listText = data.map((entry) => `- ${entry.itemName}: ${entry.quantity} ${entry.unit}`).join('\n');
+        try {
+          await sendViaConfiguredMailTransport({
+            from: localMailFromAddress,
+            toList: [actorEmail],
+            subject: `Langar seva commitment confirmation (${data.length} items)`,
+            textBody: `Waheguru Ji Ka Khalsa, Waheguru Ji Ki Fateh\n\n${body.anonymous ? 'Sangat member' : body.donorName || actor.name || 'Sangat member'}, thank you for your Langar seva. Your commitments have been recorded:\n\n${listText}\n\nThank you for supporting the sangat.`,
+            htmlBody: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#17345f"><h2 style="color:#0b4ea2">Langar commitments confirmed</h2><p>Waheguru Ji Ka Khalsa, Waheguru Ji Ki Fateh</p><p>Thank you for your Langar seva. We recorded these commitments:</p><table style="border-collapse:collapse;width:100%;margin:20px 0"><thead><tr><th style="padding:9px;border:1px solid #dbe5f0;text-align:left">Item</th><th style="padding:9px;border:1px solid #dbe5f0;text-align:left">Quantity</th></tr></thead><tbody>${rows}</tbody></table><p>Thank you for supporting the sangat.</p></div>`
+          });
+        } catch (emailError) {
+          console.warn('Langar batch confirmation email was not sent:', emailError.message || emailError);
+        }
+      }
+
+      const remainingByItemId = Object.fromEntries((content?.langarItems || []).map((item) => {
+        const committed = data.filter((entry) => String(entry.itemId) === String(item.id)).reduce((sum, entry) => sum + entry.quantity, 0);
+        return [String(item.id), Math.max(0, Number(item.quantityRequired || 0) - Number(item.quantityReceived || 0) - committed)];
+      }));
+      sendJson(response, 200, { ok: true, data, remainingByItemId });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to save Langar commitments.' });
+    }
+    return;
+  }
+
   const contentResourceMatch = requestUrl.pathname.match(/^\/api\/content\/([a-z0-9_-]+)$/i);
   if (contentResourceMatch && request.method === 'GET') {
     try {

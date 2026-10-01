@@ -1981,6 +1981,85 @@ const createItem = async (resource, payload) => {
   return result.rows?.[0]?.payload || nextPayload;
 };
 
+const createLangarContributionBatch = async ({ items, donorName, donorEmail, donorAvatarUrl, anonymous, expectedDeliveryDate }) => {
+  if (!pool) throw new Error('Database is not configured.');
+  const client = await pool.connect();
+  const created = [];
+  let content = null;
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      `INSERT INTO app_singletons(resource, payload) VALUES ('cms_home_content', '{}'::jsonb) ON CONFLICT (resource) DO NOTHING`
+    );
+    const singletonResult = await client.query(
+      `SELECT payload FROM app_singletons WHERE resource = 'cms_home_content' FOR UPDATE`
+    );
+    content = singletonResult.rows[0]?.payload || {};
+    const currentItems = Array.isArray(content.langarItems) ? content.langarItems : [];
+    const contributionResult = await client.query(
+      `SELECT payload FROM app_items WHERE resource = 'langar_contributions'`
+    );
+    const previousContributions = contributionResult.rows.map((row) => row.payload || {});
+    const selectedIds = new Set();
+    const normalized = items.map((selection) => {
+      const id = String(selection.itemId || '').trim();
+      const quantity = Number(selection.quantity);
+      if (!id || selectedIds.has(id) || !Number.isSafeInteger(quantity) || quantity <= 0) {
+        throw Object.assign(new Error('Each selected Langar item must be unique and have a positive whole quantity.'), { status: 400 });
+      }
+      selectedIds.add(id);
+      const item = currentItems.find((entry) => String(entry?.id || '') === id);
+      if (!item) throw Object.assign(new Error('A selected Langar item is no longer available.'), { status: 409 });
+      const pending = previousContributions
+        .filter((entry) => String(entry.itemId || '') === id && String(entry.status || 'pending').toLowerCase() === 'pending')
+        .reduce((sum, entry) => sum + Math.max(0, Number(entry.quantity || 0)), 0);
+      const remaining = Math.max(0, Number(item.quantityRequired || 0) - Number(item.quantityReceived || 0) - pending);
+      if (remaining < 1 || quantity > remaining) {
+        throw Object.assign(new Error(`${item.name || 'A selected item'} has only ${remaining} ${item.unit || 'items'} remaining.`), { status: 409 });
+      }
+      return { item, id, quantity, unit: String(item.unit || 'items') };
+    });
+
+    for (const selection of normalized) {
+      const id = `langar-contribution-${require('crypto').randomUUID()}`;
+      const record = {
+        id,
+        itemId: selection.id,
+        itemName: String(selection.item.name || 'Langar item'),
+        quantity: selection.quantity,
+        unit: selection.unit,
+        donorName: String(donorName || 'Member'),
+        donorEmail: String(donorEmail || '').toLowerCase(),
+        donorAvatarUrl: String(donorAvatarUrl || ''),
+        anonymous: Boolean(anonymous),
+        expectedDeliveryDate: String(expectedDeliveryDate || ''),
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      };
+      await client.query(
+        `INSERT INTO app_items(resource, id, payload, created_at, updated_at) VALUES ('langar_contributions', $1, $2::jsonb, NOW(), NOW())`,
+        [id, JSON.stringify(record)]
+      );
+      created.push(record);
+    }
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  for (const record of created) {
+    try {
+      await mirrorItemResource('langar_contributions', record);
+    } catch (error) {
+      console.error('Langar batch contribution mirror sync failed:', error.message || error);
+    }
+  }
+  return { data: created, content };
+};
+
 const updateItem = async (resource, id, payload) => {
   if (!pool) {
     throw new Error('Database is not configured.');
@@ -3561,6 +3640,7 @@ module.exports = {
   listItems,
   searchPublicContent,
   createItem,
+  createLangarContributionBatch,
   updateItem,
   removeItem,
   listQuizBankFiles,

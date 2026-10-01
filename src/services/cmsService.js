@@ -1,6 +1,5 @@
 import { serviceResponse } from './serviceResponse';
 import contentApiService from './contentApiService';
-import apiClient from './apiClient';
 
 const HOME_CONTENT_RESOURCE = 'cms_home_content';
 const PAGE_CONTENT_RESOURCE = 'cms_page_content';
@@ -25,25 +24,6 @@ const resolveLangarStatusLabel = (item = {}) => {
   }
 
   return 'Required Soon';
-};
-
-const notifyLangarItemChange = async (action, item = {}) => {
-  const resolvedAction = String(action || 'updated').trim().toLowerCase();
-  const itemName = String(item?.name || '').trim() || 'Grocery item';
-  const category = String(item?.category || 'Grocery').trim() || 'Grocery';
-  const status = item?.needed === true ? 'Needed' : (item?.stockStatus === 'stock_available' ? 'Available' : 'Updated');
-
-  try {
-    await apiClient.post('/social/langar-item-update', {
-      action: resolvedAction,
-      itemName,
-      category,
-      status,
-      link: `${window.location.origin || ''}/seva`
-    });
-  } catch (error) {
-    console.warn('[cmsService] Langar WhatsApp notification failed.', error);
-  }
 };
 
 const defaultSchedule = {
@@ -684,21 +664,16 @@ const cmsService = {
       langarItems: [nextItem, ...current.langarItems]
     };
 
-    const saved = serviceResponse(normalizeContent(await persistContent(nextValue)).langarItems);
-    await notifyLangarItemChange('created', nextItem);
-    return saved;
+    return serviceResponse(normalizeContent(await persistContent(nextValue)).langarItems);
   },
   removeLangarItem: async (id) => {
     const current = await readHomeContent();
-    const removedItem = current.langarItems.find((item) => item.id === id) || {};
     const nextValue = {
       ...current,
       langarItems: current.langarItems.filter((item) => item.id !== id)
     };
 
-    const saved = serviceResponse(normalizeContent(await persistContent(nextValue)).langarItems);
-    await notifyLangarItemChange('removed', removedItem);
-    return saved;
+    return serviceResponse(normalizeContent(await persistContent(nextValue)).langarItems);
   },
   updateLangarItem: async (id, payload) => {
     const current = await readHomeContent();
@@ -710,9 +685,7 @@ const cmsService = {
       ))
     };
 
-    const saved = serviceResponse(normalizeContent(await persistContent(nextValue)).langarItems);
-    await notifyLangarItemChange('updated', updatedItem);
-    return saved;
+    return serviceResponse(normalizeContent(await persistContent(nextValue)).langarItems);
   },
   updateSchedule: async (schedule) => {
     const current = await readHomeContent();

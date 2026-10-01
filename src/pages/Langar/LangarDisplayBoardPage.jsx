@@ -19,7 +19,6 @@ const formatReceivedDate = (receivedAt) => {
 const previewItems = [
   { id: 'preview-ginger', name: 'Ginger', category: 'Grocery', quantityRequired: 20, quantityReceived: 8, unit: 'lb' },
   { id: 'preview-atta', name: 'Atta', category: 'Grocery', quantityRequired: 30, quantityReceived: 12, unit: 'kg' },
-  { id: 'preview-plates', name: 'Disposable Plates', category: 'Supplies', quantityRequired: 100, quantityReceived: 40, unit: 'units' },
   { id: 'preview-tomatoes', name: 'Tomatoes', category: 'Grocery', quantityRequired: 30, quantityReceived: 18, unit: 'kg' },
   { id: 'preview-onions', name: 'Onions', category: 'Grocery', quantityRequired: 50, quantityReceived: 20, unit: 'kg' },
   { id: 'preview-rice', name: 'Basmati Rice', category: 'Grocery', quantityRequired: 40, quantityReceived: 10, unit: 'kg' },
@@ -35,10 +34,10 @@ const previewItems = [
 ];
 
 const Donut = ({ value }) => (
-  <div className="relative h-32 w-32 shrink-0 rounded-full" style={{ background: `conic-gradient(#f5a623 ${value * 3.6}deg, rgba(255,255,255,.14) 0deg)` }}>
-    <div className="absolute inset-3 flex flex-col items-center justify-center rounded-full bg-[#071b3b] px-1 text-center">
-      <strong className="block text-3xl font-black leading-none text-white">{value}%</strong>
-      <span className="mt-0.5 block text-[9px] font-bold uppercase leading-none tracking-[0.14em] text-cyan-100">complete</span>
+  <div className="relative h-36 w-36 shrink-0 rounded-full p-2 sm:h-44 sm:w-44" style={{ background: `conic-gradient(#f5a623 ${value * 3.6}deg, rgba(255,255,255,.14) 0deg)` }}>
+    <div className="flex h-full w-full flex-col items-center justify-center rounded-full bg-[#071b3b] text-center">
+      <strong className="block text-4xl font-black leading-none text-white sm:text-5xl">{value}%</strong>
+      <span className="mt-1 block text-[10px] font-bold uppercase leading-none tracking-[0.14em] text-cyan-100 sm:text-xs">complete</span>
     </div>
   </div>
 );
@@ -52,8 +51,14 @@ const LangarDisplayBoardPage = () => {
   const [tickerGroupCount, setTickerGroupCount] = useState(2);
   const [tickerDuration, setTickerDuration] = useState(24);
   const [tickerDistance, setTickerDistance] = useState(0);
+  const [itemPage, setItemPage] = useState(0);
+  const [itemPageCount, setItemPageCount] = useState(1);
+  const [itemPageDuration, setItemPageDuration] = useState(14);
   const tickerViewportRef = useRef(null);
   const tickerGroupRef = useRef(null);
+  const itemViewportRef = useRef(null);
+  const itemTrackRef = useRef(null);
+  const itemPageHeightRef = useRef(0);
 
   const { data: homeContent } = useQuery({
     queryKey: ['langar-display-board-content'],
@@ -74,7 +79,7 @@ const LangarDisplayBoardPage = () => {
     const sourceItems = searchParams.get('sample') === '1' ? previewItems : (homeContent?.langarItems || []);
     return sourceItems.map(langarService.normalizeItem).filter((item) => item.needed !== false || toNumber(item.quantityReceived) < toNumber(item.quantityRequired));
   }, [homeContent, searchParams]);
-  const displayedItems = useMemo(() => items.slice(0, 12), [items]);
+  const displayedItems = items;
   const receivedTotal = useMemo(() => items.reduce((sum, item) => sum + Math.min(toNumber(item.quantityReceived), toNumber(item.quantityRequired)), 0), [items]);
   const requiredTotal = useMemo(() => items.reduce((sum, item) => sum + toNumber(item.quantityRequired), 0), [items]);
   const committedByItem = useMemo(() => contributions.reduce((totals, contribution) => {
@@ -86,9 +91,11 @@ const LangarDisplayBoardPage = () => {
   const completion = requiredTotal ? Math.min(100, Math.round((receivedTotal / requiredTotal) * 100)) : 0;
   const receivedContributions = useMemo(() => contributions.filter((entry) => entry.status === 'received'), [contributions]);
   const contributorCount = useMemo(() => new Set(receivedContributions.map((entry) => entry.anonymous ? `anonymous-${entry.id}` : entry.donorEmail || entry.donorName)).size, [receivedContributions]);
-  const tickerItems = useMemo(() => {
-    return [...receivedContributions].sort((a, b) => new Date(b.receivedAt || b.updatedAt || b.createdAt || 0) - new Date(a.receivedAt || a.updatedAt || a.createdAt || 0));
-  }, [receivedContributions]);
+  const tickerItems = useMemo(() => (
+    contributions
+      .filter((entry) => ['pending', 'received'].includes(String(entry.status || 'pending').toLowerCase()))
+      .sort((a, b) => new Date(b.receivedAt || b.updatedAt || b.createdAt || 0) - new Date(a.receivedAt || a.updatedAt || a.createdAt || 0))
+  ), [contributions]);
 
   useEffect(() => {
     const viewport = tickerViewportRef.current;
@@ -110,6 +117,52 @@ const LangarDisplayBoardPage = () => {
   }, [tickerItems]);
 
   useEffect(() => {
+    const viewport = itemViewportRef.current;
+    const track = itemTrackRef.current;
+    if (!viewport || !track) return undefined;
+    let animationFrame = 0;
+    const measure = () => {
+      const firstCard = track.querySelector('[data-langar-board-card]');
+      if (!firstCard) {
+        setItemPageCount(1);
+        setItemPage(0);
+        return;
+      }
+      const cardHeight = firstCard.getBoundingClientRect().height;
+      const columns = Math.max(1, window.getComputedStyle(track).gridTemplateColumns.split(' ').length);
+      const gap = Number.parseFloat(window.getComputedStyle(track).rowGap) || 0;
+      const cardStep = cardHeight + gap;
+      const rowsPerPage = Math.max(1, Math.floor((viewport.clientHeight + gap) / cardStep));
+      const itemsPerPage = rowsPerPage * columns;
+      const pageCount = Math.max(1, Math.ceil(displayedItems.length / itemsPerPage));
+      itemPageHeightRef.current = rowsPerPage * cardStep;
+      setItemPageCount(pageCount);
+      setItemPage((current) => Math.min(current, pageCount - 1));
+      setItemPageDuration(Math.max(6, Math.min(10, rowsPerPage * 2)));
+    };
+    const scheduleMeasure = () => {
+      window.cancelAnimationFrame(animationFrame);
+      animationFrame = window.requestAnimationFrame(measure);
+    };
+    scheduleMeasure();
+    const observer = new ResizeObserver(scheduleMeasure);
+    observer.observe(viewport);
+    if (track.firstElementChild) observer.observe(track.firstElementChild);
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      observer.disconnect();
+    };
+  }, [displayedItems.length]);
+
+  useEffect(() => {
+    if (itemPageCount <= 1) return undefined;
+    const timer = window.setInterval(() => {
+      setItemPage((current) => (current + 1) % itemPageCount);
+    }, itemPageDuration * 1000);
+    return () => window.clearInterval(timer);
+  }, [itemPageCount, itemPageDuration, searchParams]);
+
+  useEffect(() => {
     const handleFullscreen = () => setIsBrowserFullscreen(Boolean(document.fullscreenElement));
     document.addEventListener('fullscreenchange', handleFullscreen);
     return () => document.removeEventListener('fullscreenchange', handleFullscreen);
@@ -129,7 +182,7 @@ const LangarDisplayBoardPage = () => {
     };
   }, [queryClient, searchParams]);
 
-  const contributionUrl = useMemo(() => new URL('/?openLangar=1', window.location.origin).toString(), []);
+  const contributionUrl = useMemo(() => new URL('/langar-contribute', window.location.origin).toString(), []);
   const toggleFullscreen = async () => {
     if (document.fullscreenElement) await document.exitFullscreen?.();
     else await document.documentElement.requestFullscreen?.();
@@ -151,40 +204,45 @@ const LangarDisplayBoardPage = () => {
             <button type="button" onClick={() => void toggleFullscreen()} className="rounded-lg border border-white/25 bg-white/10 px-3 py-2 text-xs font-bold text-white">{isBrowserFullscreen ? 'Exit' : 'Fullscreen'}</button>
           </header>
 
-          <div ref={tickerViewportRef} className="mt-2 w-full max-w-full shrink-0 overflow-hidden border-y border-white/15 py-2">
+          <div ref={tickerViewportRef} className="mt-2 w-full max-w-full shrink-0 overflow-hidden border-y border-white/15 py-2.5">
             {tickerItems.length ? <div className="langar-board-ticker" style={{ '--ticker-group-count': tickerGroupCount, '--ticker-duration': `${tickerDuration}s`, '--ticker-distance': `${tickerDistance}px` }}>
               {Array.from({ length: tickerGroupCount }, (_, groupIndex) => <div key={`ticker-group-${groupIndex}`} ref={groupIndex === 0 ? tickerGroupRef : undefined} className="langar-board-ticker-group" aria-hidden={groupIndex > 0}>
                 {tickerItems.map((entry, index) => {
+                  const isReceived = String(entry.status || '').toLowerCase() === 'received';
                   const receivedDate = entry.receivedAt || entry.updatedAt || entry.createdAt;
-                  return <span key={`${groupIndex}-${entry.id}-${index}`} className="flex-none whitespace-nowrap rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold"><span className="text-brand-saffron">{displayName(entry)}</span> contributed {entry.quantity} {entry.unit} of {entry.itemName}{formatReceivedDate(receivedDate) ? <span className="ml-2 text-cyan-100">· received {formatReceivedDate(receivedDate)}</span> : null}</span>;
+                  return <span key={`${groupIndex}-${entry.id}-${index}`} className="flex-none whitespace-nowrap rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-bold sm:text-base"><span className="text-brand-saffron">{displayName(entry)}</span> {isReceived ? 'provided' : 'committed to'} {entry.quantity} {entry.unit} of {entry.itemName}{isReceived && formatReceivedDate(receivedDate) ? <span className="ml-2 text-cyan-100">· received {formatReceivedDate(receivedDate)}</span> : !isReceived ? <span className="ml-2 text-amber-200">· not yet delivered</span> : null}</span>;
                 })}
               </div>)}
-            </div> : <p className="text-center text-xs font-semibold text-slate-300">Contributions will appear here as the sangat helps.</p>}
+            </div> : <p className="text-center text-sm font-semibold text-slate-300">Contributions will appear here as the sangat helps.</p>}
           </div>
 
-          <section className="mt-2 shrink-0 rounded-3xl border border-white/15 bg-white/10 px-3 py-5 shadow-2xl backdrop-blur sm:px-4 sm:py-6">
-            <div className="grid items-center gap-3 lg:grid-cols-[minmax(240px,1fr)_minmax(360px,1.3fr)_minmax(280px,1fr)]">
-              <div className="flex items-center gap-3"><Donut value={completion} /><div className="min-w-0"><p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-100">Overall completion</p><p className="mt-1 font-heading text-3xl font-bold">{receivedTotal} <span className="text-lg text-cyan-100">of {requiredTotal} units</span></p><p className="mt-1 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-200"><UserGroupIcon className="h-4 w-4 text-brand-saffron" /> {contributorCount} contributors</p></div></div>
-              <div className="grid grid-cols-2 gap-2"><div className="rounded-xl border border-white/15 bg-white/10 px-3 py-2"><p className="text-xl font-black text-white">{items.length}</p><p className="text-[9px] font-bold uppercase tracking-wide text-cyan-100">Open items</p></div><div className="rounded-xl border border-white/15 bg-white/10 px-3 py-2"><p className="text-xl font-black text-white">{receivedTotal}</p><p className="text-[9px] font-bold uppercase tracking-wide text-cyan-100">Units received</p></div><div className="rounded-xl border border-white/15 bg-white/10 px-3 py-2"><p className="text-xl font-black text-white">{requiredTotal - receivedTotal}</p><p className="text-[9px] font-bold uppercase tracking-wide text-cyan-100">Units remaining</p></div><div className="rounded-xl border border-brand-saffron/30 bg-brand-saffron/10 px-3 py-2"><p className="text-xl font-black text-brand-saffron">{receivedContributions.length}</p><p className="text-[9px] font-bold uppercase tracking-wide text-amber-100">Completed sevas</p></div></div>
-              <div className="hidden w-fit items-center justify-self-end gap-3 rounded-2xl border border-brand-saffron/35 bg-white p-3 sm:flex"><QRCodeSVG value={contributionUrl} size={132} level="M" marginSize={1} fgColor="#071b3b" bgColor="#ffffff" className="h-28 w-28 shrink-0" aria-label="Scan to contribute to Langar" /><div className="w-[8rem] text-slate-900"><p className="text-xs font-black uppercase tracking-[0.16em] text-brand-blue">Scan to help</p><p className="mt-1 text-xs font-bold">Bring supplies or order delivery.</p><p className="mt-1 text-[11px] text-slate-500">Sign in required.</p></div></div>
-            </div>
-            <div className="mt-3 flex items-center gap-3 rounded-xl border border-brand-saffron/30 bg-brand-saffron/10 p-3 sm:hidden"><QRCodeSVG value={contributionUrl} size={104} level="M" marginSize={1} fgColor="#071b3b" bgColor="#ffffff" className="h-24 w-24 shrink-0 rounded-lg bg-white p-1" aria-label="Scan to contribute to Langar" /><div><p className="text-xs font-black uppercase tracking-[0.16em] text-brand-saffron">Scan to help</p><p className="mt-1 text-sm font-bold">Bring supplies or order delivery.</p><p className="mt-1 text-xs text-cyan-100">Sign in required.</p></div></div>
-          </section>
+          <main className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[minmax(250px,30%)_minmax(0,70%)]">
+            <section className="flex min-h-0 flex-col items-center justify-center gap-3 overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-b from-[#12386d] to-[#071b3b] p-4 text-center shadow-2xl sm:p-5">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-100 sm:text-sm">Overall completion</p>
+              <div className="flex w-full items-center justify-center gap-6 sm:gap-8">
+                <Donut value={completion} />
+                <div className="flex aspect-square w-36 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-brand-saffron/35 bg-white p-1.5 text-center text-slate-900 shadow-lg sm:w-40"><QRCodeSVG value={contributionUrl} size={144} level="M" marginSize={1} fgColor="#071b3b" bgColor="#ffffff" className="h-auto w-full shrink-0" aria-label="Scan to contribute to Langar" /><p className="text-[10px] font-black uppercase tracking-[0.08em] text-brand-blue">Scan to help</p></div>
+              </div>
+              <div><p className="font-heading text-2xl font-bold sm:text-3xl">{receivedTotal} <span className="text-base text-cyan-100 sm:text-lg">of {requiredTotal} units</span></p><p className="mt-1 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-200"><UserGroupIcon className="h-4 w-4 text-brand-saffron" /> {contributorCount} contributors</p></div>
+              <div className="flex w-full flex-col gap-2"><div className="rounded-xl border border-white/15 bg-white/10 px-3 py-2"><p className="text-2xl font-black text-white">{items.length}</p><p className="text-[9px] font-bold uppercase tracking-wide text-cyan-100">Open items</p></div><div className="rounded-xl border border-white/15 bg-white/10 px-3 py-2"><p className="text-2xl font-black text-white">{requiredTotal - receivedTotal}</p><p className="text-[9px] font-bold uppercase tracking-wide text-cyan-100">Units remaining</p></div><div className="rounded-xl border border-white/15 bg-white/10 px-3 py-2"><p className="text-xl font-black text-white">{receivedTotal}</p><p className="text-[9px] font-bold uppercase tracking-wide text-cyan-100">Units received</p></div><div className="rounded-xl border border-brand-saffron/30 bg-brand-saffron/10 px-3 py-2"><p className="text-xl font-black text-brand-saffron">{receivedContributions.length}</p><p className="text-[9px] font-bold uppercase tracking-wide text-amber-100">Completed sevas</p></div></div>
+            </section>
 
-          <main className="mt-3 min-h-0 flex-1">
-            <div className="flex items-center justify-between"><h2 className="font-heading text-2xl font-bold">Current needs</h2><span className="rounded-full border border-brand-saffron/50 bg-brand-saffron/10 px-3 py-1 text-xs font-bold text-brand-saffron">Live</span></div>
-            <div className="mt-2 grid min-h-0 grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
-            {displayedItems.map((item) => {
+            <section className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-white/15 bg-white/5 p-3 shadow-2xl sm:p-4">
+              <div ref={itemViewportRef} className="min-h-0 flex-1 overflow-hidden px-1 pb-1">
+                <div ref={itemTrackRef} className="grid auto-rows-[176px] grid-cols-1 gap-4 md:grid-cols-2" style={{ transform: `translateY(-${itemPage * itemPageHeightRef.current}px)`, transition: 'transform 1000ms ease-in-out' }}>
+            {[...displayedItems, ...(itemPageCount > 1 ? displayedItems : [])].map((item, cardIndex) => {
               const required = toNumber(item.quantityRequired);
               const received = Math.min(toNumber(item.quantityReceived), required);
               const committed = Math.min(toNumber(committedByItem[String(item.id)]), Math.max(0, required - received));
               const committedPercent = required ? Math.min(100, Math.round((committed / required) * 100)) : 0;
               const receivedPercent = required ? Math.min(100, Math.round((received / required) * 100)) : 0;
-              const itemUrl = new URL(`/langar-contribute?itemId=${encodeURIComponent(item.id)}`, window.location.origin).toString();
-              return <article key={item.id} className="grid min-h-[150px] grid-cols-[5rem_minmax(0,1fr)_auto] items-start gap-3 rounded-xl border border-white/15 bg-white/10 p-3"><img src={imageFallback(item)} alt="" className="mt-0.5 h-20 w-20 shrink-0 rounded-lg object-cover" /><div className="min-w-0 px-2"><h3 className="truncate text-base font-extrabold">{item.name}</h3><p className="text-[11px] font-semibold text-cyan-100">{item.category} · {required} {item.unit} needed</p><div className="mt-2 border-t border-white/25 pt-2"><div className="space-y-2"><div><div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-extrabold leading-tight"><span className="text-cyan-100">Committed</span><span className="text-white">{committed} / {required} {item.unit}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-slate-950/60"><div className="h-full rounded-full bg-gradient-to-r from-sky-500 to-cyan-300" style={{ width: `${committedPercent}%` }} /></div></div><div><div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-extrabold leading-tight"><span className="text-amber-100">Received</span><span className="text-white">{received} / {required} {item.unit}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-slate-950/60"><div className="h-full rounded-full bg-gradient-to-r from-amber-500 to-emerald-300" style={{ width: `${receivedPercent}%` }} /></div></div></div></div></div><div className="flex shrink-0 flex-col items-center gap-1 rounded-lg bg-white p-1.5 text-center"><QRCodeSVG value={itemUrl} size={68} level="M" marginSize={1} fgColor="#071b3b" bgColor="#ffffff" aria-label={`Scan to donate ${item.name}`} /><span className="text-[8px] font-black uppercase leading-tight tracking-wide text-brand-blue">Donate this item<br />Scan this</span></div></article>;
+              return <article data-langar-board-card key={`${cardIndex}-${item.id}`} aria-hidden={cardIndex >= displayedItems.length} className="grid h-full w-full grid-cols-[7.5rem_minmax(0,1fr)] items-stretch gap-5 rounded-xl border border-white/15 bg-white/10 px-5 py-4"><img src={imageFallback(item)} alt="" className="h-[7.5rem] w-[7.5rem] rounded-lg object-cover" /><div className="min-w-0 self-start pt-1 pr-4"><div className="flex min-w-0 items-baseline justify-between gap-2"><h3 className="min-w-0 truncate font-heading text-3xl font-black leading-none text-brand-saffron sm:text-4xl">{item.name}</h3><p className="shrink-0 text-right text-xs font-bold text-cyan-100 sm:text-sm">{item.category} · {required} {item.unit} needed</p></div><div className="mt-2 w-full border-t border-white/25" /><div className="mt-3 space-y-3"><div><div className="mb-1 flex w-[85%] items-center justify-between gap-2 text-xs font-extrabold leading-tight"><span className="shrink-0 text-cyan-100">Committed</span><span className="truncate text-white">{committed} / {required} {item.unit}</span></div><div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-950/60"><div className="h-full rounded-full bg-gradient-to-r from-sky-500 to-cyan-300" style={{ width: `${committedPercent}%` }} /></div></div><div><div className="mb-1 flex w-[85%] items-center justify-between gap-2 text-xs font-extrabold leading-tight"><span className="shrink-0 text-amber-100">Received</span><span className="truncate text-white">{received} / {required} {item.unit}</span></div><div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-950/60"><div className="h-full rounded-full bg-gradient-to-r from-amber-500 to-emerald-300" style={{ width: `${receivedPercent}%` }} /></div></div></div></div></article>;
             })}
-            </div>
+                </div>
+              </div>
+              {itemPageCount > 1 ? <p className="mt-1 shrink-0 text-right text-[10px] font-semibold text-cyan-100">Items continue automatically · {itemPage + 1}/{itemPageCount}</p> : null}
             {!items.length ? <p className="rounded-2xl bg-white/10 p-6 text-center text-slate-200">The Langar team has no open needs right now.</p> : null}
+            </section>
           </main>
 
         </div>

@@ -32,6 +32,16 @@ const clearGoogleOAuthCallbackHash = () => {
   }
 };
 
+const getStoredPostLoginPath = () => {
+  try {
+    return window.sessionStorage.getItem('ssm_post_login_next')
+      || window.localStorage.getItem('ssm_post_login_next')
+      || '';
+  } catch {
+    return '';
+  }
+};
+
 const getApprovalMessage = (user, role) => {
   if (FULL_ACCESS_ROLES.has(String(role || ''))) {
     return '';
@@ -55,7 +65,12 @@ const getApprovalMessage = (user, role) => {
 
 const resolvePostLoginPath = (candidatePath, role) => {
   const normalizedCandidate = String(candidatePath || '').trim();
-  const safeCandidate = normalizedCandidate && normalizedCandidate !== '/login' && normalizedCandidate.startsWith('/') ? normalizedCandidate : '';
+  const safeCandidate = normalizedCandidate.startsWith('/')
+    && !normalizedCandidate.startsWith('//')
+    && !normalizedCandidate.includes('\\')
+    && normalizedCandidate !== '/login'
+    ? normalizedCandidate
+    : '';
   if (safeCandidate.startsWith('/admin') && !role) {
     return '/';
   }
@@ -113,7 +128,7 @@ const LoginPage = () => {
     }
   }, []);
 
-  const preferredPath = fromPath || nextPath;
+  const preferredPath = fromPath || nextPath || getStoredPostLoginPath();
   const effectivePreferredPath = preferredPath;
 
   const persistAuthIntent = useCallback((intent, loginMode = '') => {
@@ -132,8 +147,16 @@ const LoginPage = () => {
   }, [effectivePreferredPath]);
 
   const consumeAuthIntent = (hashParams) => {
-    const fromState = hashParams.get('state');
-    const authIntentFromState = fromState === 'signup' || fromState === 'signin' ? fromState : '';
+    const fromState = hashParams.get('state') || '';
+    const [stateIntent, ...statePathParts] = fromState.split('|');
+    const statePath = statePathParts.join('|');
+    const safeStatePath = statePath.startsWith('/')
+      && !statePath.startsWith('//')
+      && !statePath.includes('\\')
+      && statePath !== '/login'
+      ? statePath
+      : '';
+    const authIntentFromState = stateIntent === 'signup' || stateIntent === 'signin' ? stateIntent : '';
 
     let intent = '';
     let loginMode = '';
@@ -156,10 +179,10 @@ const LoginPage = () => {
       // Ignore storage errors and use defaults.
     }
 
-      return {
+    return {
       authIntent: authIntentFromState || (intent === 'signup' ? 'signup' : 'signin'),
       recoveredIsJoinMode: loginMode === 'join',
-      recoveredPreferredPath: postLoginNext || '',
+      recoveredPreferredPath: safeStatePath || postLoginNext || '',
       recoveredRequestedRole: signupRole || 'Member'
     };
   };
@@ -210,11 +233,11 @@ const LoginPage = () => {
 
     const timeoutId = window.setTimeout(() => {
       setNotice('');
-      navigate('/', { replace: true });
+      navigate(resolvePostLoginPath(effectivePreferredPath, user?.role), { replace: true });
     }, 3500);
 
     return () => window.clearTimeout(timeoutId);
-  }, [navigate, notice]);
+  }, [effectivePreferredPath, navigate, notice, user?.role]);
 
   useEffect(() => {
     let cancelled = false;
@@ -339,7 +362,10 @@ const LoginPage = () => {
           return;
         }
 
-        parsedOAuthUrl.searchParams.set('state', intent);
+        const oauthState = effectivePreferredPath
+          ? `${intent}|${effectivePreferredPath}`
+          : intent;
+        parsedOAuthUrl.searchParams.set('state', oauthState);
         persistAuthIntent(intent, modeParam === 'join' ? 'join' : '');
         window.location.assign(parsedOAuthUrl.toString());
         return;
