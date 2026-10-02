@@ -128,28 +128,29 @@ const LangarItemContributionPage = () => {
   return (
     <>
       <Seo {...meta} />
-      <main className="min-h-screen bg-gradient-to-br from-brand-cream via-white to-blue-50 px-4 py-8 text-slate-900 sm:px-8">
-        <div className="mx-auto max-w-2xl overflow-hidden rounded-3xl border border-sky-100 bg-white shadow-2xl">
+      <main className="min-h-screen overflow-y-auto bg-gradient-to-br from-brand-cream via-white to-blue-50 px-4 py-8 text-slate-900 sm:px-8">
+        <div className="relative mx-auto max-w-2xl overflow-hidden rounded-3xl border border-sky-100 bg-white shadow-2xl">
           <header className="flex items-center gap-4 bg-gradient-to-r from-brand-blue via-blue-700 to-brand-saffron p-5 text-white sm:p-7">
             <img src={logoSrc} alt={`${branding.organizationName} logo`} className="h-14 w-14 rounded-full border-2 border-brand-saffron object-cover" />
-            <div><p className="text-xs font-black uppercase tracking-[0.2em] text-blue-100">{branding.shortName}</p><h1 className="mt-1 font-heading text-3xl font-bold">{hasSubmitted ? 'Thank You for Your Seva' : 'Choose Langar Needs'}</h1><p className="mt-1 text-sm text-blue-50">{hasSubmitted ? 'Your Langar commitments have been recorded.' : 'Select one or more items and quantities to support Langar seva.'}</p></div>
+            <div className="min-w-0 flex-1"><p className="text-xs font-black uppercase tracking-[0.2em] text-blue-100">{branding.shortName}</p><h1 className="mt-1 font-heading text-3xl font-bold">{hasSubmitted ? 'Thank You for Your Seva' : 'Choose Langar Needs'}</h1><p className="mt-1 text-sm text-blue-50">{hasSubmitted ? 'Your Langar commitments have been recorded.' : 'Select one or more items and quantities to support Langar seva.'}</p></div>
+            {isAuthenticated ? <p className="shrink-0 text-right text-xs font-bold text-white sm:text-sm">Welcome<br /><span className="text-brand-saffron">{user?.name || user?.email}</span></p> : null}
           </header>
           {hasSubmitted ? <div className="space-y-5 p-5 sm:p-7">
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
               <p className="font-heading text-2xl font-bold text-emerald-900">Waheguru Ji Ka Khalsa, Waheguru Ji Ki Fateh</p>
               <p className="mt-2 text-sm leading-6 text-emerald-800">Thank you for supporting the sangat. Your commitments have been recorded:</p>
-              <ul className="mt-4 divide-y divide-emerald-200 rounded-xl border border-emerald-200 bg-white text-left">{submittedItems.map((entry) => <li key={entry.id} className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm"><span className="font-bold text-emerald-950">{entry.itemName}</span><span className="shrink-0 font-extrabold text-emerald-800">{entry.quantity} {entry.unit}</span></li>)}</ul>
+              <ul className="mt-4 space-y-2 pl-5 text-left text-sm text-emerald-950">{submittedItems.map((entry) => <li key={entry.id} className="list-disc pl-1"><span className="font-bold">{entry.itemName}</span> <span className="font-extrabold text-emerald-800">— {entry.quantity} {entry.unit}</span></li>)}</ul>
               <p className="mt-2 text-xs text-emerald-700">A confirmation email will be sent to {String(user?.email || 'your account email')} if email delivery is available.</p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3">
               <button type="button" onClick={openAllLangarNeeds} className="min-h-12 rounded-xl bg-brand-saffron px-5 py-3 font-extrabold text-brand-navy shadow-lg hover:bg-amber-400">Donate more</button>
-              <button type="button" onClick={closeContributionPage} className="min-h-12 rounded-xl border border-slate-300 bg-white px-5 py-3 font-bold text-slate-700 hover:bg-slate-50">Close page</button>
+              <button type="button" onClick={closeContributionPage} className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-5 py-3 font-bold text-slate-700 hover:bg-slate-50">Close page</button>
             </div>
           </div> : <div className="space-y-5 p-5 sm:p-7">
             {!itemNeeds.length ? <div className="space-y-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900"><p>There are no Langar needs available to commit right now.</p><button type="button" onClick={openAllLangarNeeds} className="min-h-11 rounded-xl bg-brand-saffron px-4 py-2 font-extrabold text-brand-navy">Back to Langar needs</button></div> : <>
               <p className="text-sm leading-6 text-slate-600">Choose quantities for any items you can provide. You can select several items in one commitment.</p>
               {itemId && !itemNeeds.some((entry) => String(entry.id) === String(itemId)) ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">The item from this QR code is no longer available; you can still select other current needs below.</div> : null}
-              <section className="max-h-[55vh] space-y-3 overflow-y-auto pr-1">
+              <section className="space-y-3 pr-1">
                 {itemNeeds.map((entry) => {
                   const selectedQuantity = Number(quantities[entry.id] || 0);
                   const available = entry.remaining > 0;
@@ -171,6 +172,9 @@ const LangarItemContributionPage = () => {
               <button type="button" onClick={() => void submitCommitment()} disabled={!selectedItems.length || isSubmitting} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand-saffron px-5 py-3 font-extrabold text-brand-navy shadow-lg hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"><GiftIcon className="h-5 w-5" />{isSubmitting ? 'Recording commitments…' : isAuthenticated ? `Commit ${selectedItems.length || ''} ${selectedItems.length === 1 ? 'item' : 'items'}` : 'Sign in to contribute'}</button>
             </>}
           </div>}
+          {!hasSubmitted && !isAuthenticated ? <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/45 p-5 backdrop-blur-sm">
+            <button type="button" onClick={signIn} className="min-h-14 rounded-2xl bg-brand-saffron px-8 py-4 text-base font-black text-brand-navy shadow-2xl ring-4 ring-white/80 hover:bg-amber-400">Sign in to contribute</button>
+          </div> : null}
         </div>
       </main>
     </>
