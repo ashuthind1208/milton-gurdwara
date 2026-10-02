@@ -87,6 +87,12 @@ const LangarItemContributionPage = () => {
   const signIn = () => {
     const nextSearch = itemId ? `?itemId=${encodeURIComponent(itemId)}` : '';
     const next = `/langar-contribute${nextSearch}`;
+    try {
+      window.sessionStorage.setItem('ssm_post_login_next', next);
+      window.localStorage.setItem('ssm_post_login_next', next);
+    } catch {
+      // LoginPage also receives the return path through the router state/query.
+    }
     navigate(`/login?next=${encodeURIComponent(next)}`, { state: { from: { pathname: '/langar-contribute', search: nextSearch } } });
   };
   const submitCommitment = async () => {
