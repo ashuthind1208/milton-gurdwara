@@ -107,7 +107,7 @@ const LangarItemContributionPage = () => {
     setIsSubmitting(true);
     setNotice('');
     try {
-      const createdItems = await langarService.createContributionBatch({
+      const response = await langarService.createContributionBatch({
         items: selectedItems.map((entry) => ({ itemId: entry.id, quantity: entry.selectedQuantity })),
         donorName: user?.name || 'Member',
         donorEmail: String(user?.email || '').toLowerCase(),
@@ -116,7 +116,7 @@ const LangarItemContributionPage = () => {
         expectedDeliveryDate: ''
       });
       await queryClient.invalidateQueries({ queryKey: [LANGAR_CONTRIBUTIONS_RESOURCE] });
-      setSubmittedItems(createdItems);
+      setSubmittedItems(Array.isArray(response?.data) ? response.data : []);
       setHasSubmitted(true);
     } catch (error) {
       setNotice(error?.message || 'Unable to record your commitment. Please try again.');
@@ -130,10 +130,10 @@ const LangarItemContributionPage = () => {
       <Seo {...meta} />
       <main className="min-h-screen overflow-y-auto bg-gradient-to-br from-brand-cream via-white to-blue-50 px-4 py-8 text-slate-900 sm:px-8">
         <div className="relative mx-auto max-w-2xl overflow-hidden rounded-3xl border border-sky-100 bg-white shadow-2xl">
-          <header className="flex items-center gap-4 bg-gradient-to-r from-brand-blue via-blue-700 to-brand-saffron p-5 text-white sm:p-7">
+          <header className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-3 bg-gradient-to-r from-brand-blue via-blue-700 to-brand-saffron p-5 text-white sm:p-7">
             <img src={logoSrc} alt={`${branding.organizationName} logo`} className="h-14 w-14 rounded-full border-2 border-brand-saffron object-cover" />
-            <div className="min-w-0 flex-1"><p className="text-xs font-black uppercase tracking-[0.2em] text-blue-100">{branding.shortName}</p><h1 className="mt-1 font-heading text-3xl font-bold">{hasSubmitted ? 'Thank You for Your Seva' : 'Choose Langar Needs'}</h1><p className="mt-1 text-sm text-blue-50">{hasSubmitted ? 'Your Langar commitments have been recorded.' : 'Select one or more items and quantities to support Langar seva.'}</p></div>
-            {isAuthenticated ? <p className="shrink-0 text-right text-xs font-bold text-white sm:text-sm">Welcome<br /><span className="text-brand-saffron">{user?.name || user?.email}</span></p> : null}
+            <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue-100 sm:text-xs">{branding.shortName}</p><h1 className="mt-1 font-heading text-2xl font-bold leading-tight sm:text-3xl">{hasSubmitted ? 'Thank You for Your Seva' : 'Choose Langar Needs'}</h1><p className="mt-1 text-xs leading-5 text-blue-50 sm:text-sm">{hasSubmitted ? 'Your Langar commitments have been recorded.' : 'Select one or more items and quantities to support Langar seva.'}</p></div>
+            {isAuthenticated ? <p className="col-start-2 justify-self-end text-right text-xs font-bold leading-4 text-white sm:text-sm">Welcome <span className="text-brand-saffron">{user?.name || user?.email}</span></p> : null}
           </header>
           {hasSubmitted ? <div className="space-y-5 p-5 sm:p-7">
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
