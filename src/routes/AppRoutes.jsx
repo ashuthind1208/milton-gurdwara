@@ -22,6 +22,7 @@ const LangarDisplayBoardPage = lazy(() => import('../pages/Langar/LangarDisplayB
 const LangarItemContributionPage = lazy(() => import('../pages/Langar/LangarItemContributionPage'));
 const DailyScheduleDisplayBoardPage = lazy(() => import('../pages/Schedule/DailyScheduleDisplayBoardPage'));
 const LedBoardLauncherPage = lazy(() => import('../pages/Boards/LedBoardLauncherPage'));
+const LedAnnouncementsBoardPage = lazy(() => import('../pages/Boards/LedAnnouncementsBoardPage'));
 const AskGranthiBoardPage = lazy(() => import('../pages/AskGranthi/AskGranthiBoardPage'));
 const AskGranthiQuestionPage = lazy(() => import('../pages/AskGranthi/AskGranthiQuestionPage'));
 const DonationSuccessPage = lazy(() => import('../pages/Donation/DonationSuccessPage'));
@@ -49,6 +50,7 @@ const AdminVideosPage = lazy(() => import('../admin/Videos/AdminVideosPage'));
 const AdminStreamingPage = lazy(() => import('../admin/Streaming/AdminStreamingPage'));
 const AdminAdvertisementsPage = lazy(() => import('../admin/Advertisements/AdminAdvertisementsPage'));
 const AdminSponsorsPage = lazy(() => import('../admin/Sponsors/AdminSponsorsPage'));
+const AdminLedAnnouncementsPage = lazy(() => import('../admin/LedAnnouncements/AdminLedAnnouncementsPage'));
 const AdminEventsPage = lazy(() => import('../admin/Events/AdminEventsPage'));
 const AdminBookingsPage = lazy(() => import('../admin/Bookings/AdminBookingsPage'));
 const AdminBookingDutiesPage = lazy(() => import('../admin/BookingDuties/AdminBookingDutiesPage'));
@@ -99,6 +101,7 @@ const AppRoutes = () => {
         <Route path="/langar-contribute" element={<LangarItemContributionPage />} />
         <Route path="/daily-schedule-board" element={<DailyScheduleDisplayBoardPage />} />
         <Route path="/led-boards" element={<LedBoardLauncherPage />} />
+        <Route path="/special-events-board" element={<LedAnnouncementsBoardPage />} />
         <Route path="/ask-a-granthi" element={<AskGranthiBoardPage />} />
         <Route path="/ask-a-granthi/question" element={<AskGranthiQuestionPage />} />
 
@@ -121,6 +124,7 @@ const AppRoutes = () => {
             <Route path="/admin/streaming" element={<AdminStreamingPage />} />
             <Route path="/admin/advertisements" element={<AdminAdvertisementsPage />} />
             <Route path="/admin/sponsors" element={<AdminSponsorsPage />} />
+            <Route path="/admin/led-announcements" element={<AdminLedAnnouncementsPage />} />
             <Route path="/admin/seva-opportunities" element={<AdminSevaOpportunitiesPage />} />
             <Route path="/admin/events" element={<AdminEventsPage />} />
             <Route path="/admin/bookings" element={<AdminBookingsPage />} />

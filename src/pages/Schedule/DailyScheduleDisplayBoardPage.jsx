@@ -125,8 +125,8 @@ const DailyScheduleDisplayBoardPage = () => {
               <h1 className="mt-1 font-heading text-4xl font-bold leading-none sm:text-5xl xl:text-6xl">Daily Schedule</h1>
               <p className="mt-2 text-base font-medium text-white sm:text-lg">Gurbani · Seva · Sangat</p>
             </div>
-            <div className="hidden shrink-0 items-center gap-5 sm:flex"><div className="text-right drop-shadow-[0_2px_6px_rgba(0,0,0,.95)]"><p className="text-lg font-extrabold text-white xl:text-xl">{formatDualDate(todayKey)}</p><p className="mt-1 text-3xl font-black tabular-nums text-amber-200 xl:text-4xl">{now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</p></div><button type="button" onClick={() => void toggleFullscreen()} className="rounded-lg border border-white/50 bg-[#082c58]/85 px-4 py-3 text-sm font-bold text-white shadow-lg backdrop-blur">{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</button></div>
-            <button type="button" onClick={() => void toggleFullscreen()} className="absolute right-0 top-0 rounded-lg border border-white/25 bg-black/25 px-3 py-2 text-xs font-bold text-white sm:hidden">{isFullscreen ? 'Exit' : 'Fullscreen'}</button>
+            <div className="hidden shrink-0 items-center gap-5 sm:flex"><div className="text-right drop-shadow-[0_2px_6px_rgba(0,0,0,.95)]"><p className="text-lg font-extrabold text-white xl:text-xl">{formatDualDate(todayKey)}</p><p className="mt-1 text-3xl font-black tabular-nums text-amber-200 xl:text-4xl">{now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</p></div><button type="button" data-board-control onClick={() => void toggleFullscreen()} className="rounded-lg border border-white/50 bg-[#082c58]/85 px-4 py-3 text-sm font-bold text-white shadow-lg backdrop-blur">{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</button></div>
+            <button type="button" data-board-control onClick={() => void toggleFullscreen()} className="absolute right-0 top-0 rounded-lg border border-white/25 bg-black/25 px-3 py-2 text-xs font-bold text-white sm:hidden">{isFullscreen ? 'Exit' : 'Fullscreen'}</button>
           </div>
         </header>
 

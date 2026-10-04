@@ -6,6 +6,15 @@
 
 @import './styles/theme.css';
 
+/* Boards loaded by the LED slideshow (?embed=1) hide their own fullscreen/admin controls and the cursor. */
+html.board-embed {
+  cursor: none;
+}
+
+html.board-embed [data-board-control] {
+  display: none !important;
+}
+
 @layer base {
   html,
   body,

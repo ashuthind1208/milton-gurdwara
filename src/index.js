@@ -29,6 +29,10 @@ const preserveGoogleOAuthCallback = () => {
 
 preserveGoogleOAuthCallback();
 
+if (new URLSearchParams(window.location.search).get('embed') === '1') {
+  document.documentElement.classList.add('board-embed');
+}
+
 const migrateLegacyHashRoute = () => {
   const hashValue = window.location.hash || '';
   if (!hashValue.startsWith('#/')) {
