@@ -319,7 +319,7 @@ const EventCalendarBoardPage = () => {
                 <p className="text-xl font-semibold text-white xl:text-3xl">{format(monthStart, 'MMMM yyyy')}</p>
                 <p className="text-xs text-slate-300 xl:text-base">Gregorian · ਨਾਨਕਸ਼ਾਹੀ</p>
               </div>
-              <button type="button" onClick={() => void toggleFullscreen()} className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-white/15 bg-white/5 text-white hover:bg-white/10" aria-label={isBrowserFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} title={isBrowserFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
+              <button type="button" data-board-control onClick={() => void toggleFullscreen()} className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-white/15 bg-white/5 text-white hover:bg-white/10" aria-label={isBrowserFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} title={isBrowserFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
                 <ArrowsPointingOutIcon className="h-5 w-5" />
               </button>
             </div>

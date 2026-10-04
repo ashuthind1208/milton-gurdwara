@@ -180,8 +180,8 @@ const AskGranthiBoardPage = () => {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {!isFullscreen ? <Link to="/admin/ask-granthi" className="flex h-[3vw] min-h-9 items-center justify-center border border-white/30 bg-white/10 px-3 text-[clamp(10px,.7vw,14px)] font-bold text-white hover:bg-white/20">Back to Admin</Link> : null}
-                <button type="button" onClick={enterFullscreen} className="flex h-[3vw] min-h-9 w-[3vw] min-w-9 items-center justify-center border border-white/30 bg-white/10" aria-label="Toggle fullscreen">
+                {!isFullscreen ? <Link to="/admin/ask-granthi" data-board-control className="flex h-[3vw] min-h-9 items-center justify-center border border-white/30 bg-white/10 px-3 text-[clamp(10px,.7vw,14px)] font-bold text-white hover:bg-white/20">Back to Admin</Link> : null}
+                <button type="button" data-board-control onClick={enterFullscreen} className="flex h-[3vw] min-h-9 w-[3vw] min-w-9 items-center justify-center border border-white/30 bg-white/10" aria-label="Toggle fullscreen">
                   <ArrowsPointingOutIcon className="h-1/2 w-1/2" />
                 </button>
               </div>

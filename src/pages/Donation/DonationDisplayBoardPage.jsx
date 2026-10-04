@@ -72,6 +72,7 @@ const DonationDisplayBoardPage = () => {
   const { branding, logoSrc } = useBranding();
   const location = useLocation();
   const params = useMemo(() => new URLSearchParams(location.search || ''), [location.search]);
+  const isEmbedded = params.get('embed') === '1';
   const fullscreen = useMemo(() => params.get('fullscreen') === '1', [params]);
   const projectorFromQuery = useMemo(() => params.get('projector') === '1', [params]);
   const [isBrowserFullscreen, setIsBrowserFullscreen] = useState(Boolean(document.fullscreenElement));
@@ -677,7 +678,7 @@ const DonationDisplayBoardPage = () => {
           </div>
         ) : null}
 
-        <main style={burnInDriftStyle} className={`relative z-10 mx-auto flex h-full w-full max-w-[1500px] flex-col p-3 sm:p-4 lg:p-5 ${isPresentationFullscreen ? 'pt-3' : 'pt-8'}`}>
+        <main style={burnInDriftStyle} className={`relative z-10 mx-auto flex h-full w-full ${isEmbedded ? 'max-w-none' : 'max-w-[1500px]'} flex-col p-3 sm:p-4 lg:p-5 ${isPresentationFullscreen ? 'pt-3' : 'pt-8'}`}>
           <header className="mb-1 border-b border-white/10 pb-1.5">
             {anyFeedErrored && hasFallbackData ? (
               <div className="mb-2 rounded-lg border border-amber-300/30 bg-amber-300/10 px-3 py-1.5 text-[11px] font-semibold text-amber-100">

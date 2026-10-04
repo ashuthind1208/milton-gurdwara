@@ -201,7 +201,7 @@ const LangarDisplayBoardPage = () => {
               <h1 className="mt-1 font-heading text-3xl font-bold leading-tight sm:text-4xl">Langar Needs</h1>
               <p className="mt-2 text-xs text-cyan-100 sm:text-sm">Help stock the kitchen for the sangat</p>
             </div>
-            <button type="button" onClick={() => void toggleFullscreen()} className="rounded-lg border border-white/25 bg-white/10 px-3 py-2 text-xs font-bold text-white">{isBrowserFullscreen ? 'Exit' : 'Fullscreen'}</button>
+            <button type="button" data-board-control onClick={() => void toggleFullscreen()} className="rounded-lg border border-white/25 bg-white/10 px-3 py-2 text-xs font-bold text-white">{isBrowserFullscreen ? 'Exit' : 'Fullscreen'}</button>
           </header>
 
           <div ref={tickerViewportRef} className="mt-2 w-full max-w-full shrink-0 overflow-hidden border-y border-white/15 py-2.5">
