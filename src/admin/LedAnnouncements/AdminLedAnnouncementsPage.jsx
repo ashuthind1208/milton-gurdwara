@@ -152,23 +152,23 @@ const AdminLedAnnouncementsPage = () => {
   }, [setHeaderAction]);
 
   return (
-    <div className="space-y-6">
+    <div className="admin-led-announcements w-full min-w-0 max-w-full space-y-6 overflow-x-clip">
       <h1 className="sr-only">LED Announcements</h1>
 
       <LedBoardControlCard />
 
-      <Card>
+      <Card className="w-full min-w-0 max-w-full">
         <div>
           <h2 className="font-heading text-xl font-semibold">LED Announcements</h2>
           <p className="mt-1 text-sm text-slate-600">Special event photos and formatted notices for the Special Events LED board. Only Active announcements appear on screen.</p>
         </div>
 
-        <div className="mt-4 grid gap-2 md:grid-cols-3">
-          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:col-span-2">Search
-            <input type="search" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Search title, subtitle, or location" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case text-slate-700 outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20" />
+        <div className="mt-4 grid min-w-0 gap-2 md:grid-cols-3">
+          <label className="min-w-0 text-xs font-semibold uppercase tracking-wide text-slate-500 md:col-span-2">Search
+            <input type="search" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Search title, subtitle, or location" className="mt-1 block w-full min-w-0 rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case text-slate-700 outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20" />
           </label>
-          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case text-slate-700 outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20">
+          <label className="min-w-0 text-xs font-semibold uppercase tracking-wide text-slate-500">Status
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="mt-1 block w-full min-w-0 rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case text-slate-700 outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20">
               <option value="all">All</option>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
@@ -176,8 +176,8 @@ const AdminLedAnnouncementsPage = () => {
           </label>
         </div>
 
-        <div className="mt-4 overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
+        <div className="mt-4 w-full min-w-0 max-w-full overflow-x-auto">
+          <table className="w-full min-w-0 divide-y divide-slate-200 text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-3 py-2">Announcement</th>
@@ -246,15 +246,15 @@ const AdminLedAnnouncementsPage = () => {
       </Card>
 
       {modalState.open ? (
-        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6">
-          <div className="mx-auto flex min-h-full items-center justify-center">
-            <div className="w-full max-w-5xl rounded-xl bg-white p-5 shadow-xl">
+        <div className="fixed inset-0 z-[95] overflow-x-hidden overflow-y-auto bg-slate-900/45 px-2 py-4 sm:px-4 sm:py-6">
+          <div className="mx-auto flex min-h-full w-full min-w-0 items-center justify-center">
+            <div className="w-full min-w-0 max-w-5xl rounded-xl bg-white p-3 shadow-xl sm:p-5">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="font-heading text-xl font-semibold">{modalState.mode === 'create' ? 'Add Announcement' : modalState.mode === 'edit' ? 'Edit Announcement' : 'View Announcement'}</h3>
                 <button type="button" onClick={closeModal} className="rounded-md border border-slate-300 px-2 py-1 text-sm">Close</button>
               </div>
 
-              <form className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-x-6" onSubmit={form.handleSubmit(onSubmit)}>
+              <form className="mt-4 grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-x-6" onSubmit={form.handleSubmit(onSubmit)}>
                 <div className="lg:col-span-2"><StatusAlert type={status.type} message={status.message} /></div>
 
                 <div className="grid content-start gap-3">

@@ -89,7 +89,7 @@ const LedBoardControlCard = () => {
   const cycleSeconds = slides.reduce((total, slide) => total + slide.durationSeconds, 0);
 
   return (
-    <Card>
+    <Card className="w-full min-w-0 max-w-full">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-heading text-xl font-semibold">LED Board Slideshow</h2>
@@ -107,7 +107,7 @@ const LedBoardControlCard = () => {
         </p>
       </div>
 
-      <ul className="mt-3 grid gap-2 md:grid-cols-2">
+      <ul className="mt-3 grid w-full min-w-0 gap-2 md:grid-cols-2">
         {LED_BOARDS.map((board) => {
           const Icon = board.icon;
           const enabled = settings.enabled[board.key];
@@ -117,16 +117,16 @@ const LedBoardControlCard = () => {
               ? 'Not posted for today yet; skipped until it is'
               : board.hasOwnDuration ? `${board.description} Shown for ${formatDuration(settings.hukamnamaSeconds)}.` : board.description;
           return (
-            <li key={board.key} className={`rounded-lg border border-slate-200 px-3 py-2.5 ${board.key === 'hukamnama' ? 'md:col-span-2' : ''}`}>
-              <div className={`flex items-center gap-2.5 ${board.key === 'hukamnama' ? 'flex-nowrap' : 'flex-wrap'}`}>
-                <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border ${board.accent}`}><Icon className="h-5 w-5" /></span>
-                <div className="min-w-0 flex-1 basis-40">
+            <li key={board.key} className={`min-w-0 rounded-lg border border-slate-200 px-3 py-2.5 ${board.key === 'hukamnama' ? 'md:col-span-2' : ''}`}>
+              <div className={board.key === 'hukamnama' ? 'grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2.5 lg:grid-cols-[auto_minmax(0,1fr)_auto_auto_auto]' : 'flex min-w-0 flex-wrap items-center gap-2.5'}>
+                <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border ${board.key === 'hukamnama' ? 'col-start-1 row-start-1' : ''} ${board.accent}`}><Icon className="h-5 w-5" /></span>
+                <div className={`min-w-0 ${board.key === 'hukamnama' ? 'col-start-2 row-start-1' : 'flex-1 basis-40'}`}>
                   <p className="truncate text-sm font-semibold text-slate-800">{board.title}</p>
                   <p className="truncate text-xs text-slate-500" title={note}>{note}</p>
                 </div>
-                {board.key === 'hukamnama' ? <SecondsControl id="led-hukamnama-seconds" label="Hukamnama slide duration in seconds" value={settings.hukamnamaSeconds} min={HUKAMNAMA_MIN_SECONDS} max={HUKAMNAMA_MAX_SECONDS} presets={HUKAMNAMA_PRESETS} onCommit={commitHukamnamaSeconds} compact /> : null}
-                <a href={board.path} target="_blank" rel="noreferrer" className="shrink-0 rounded-md border border-slate-300 p-1.5 text-slate-600 hover:bg-slate-50" title={`Open ${board.title}`} aria-label={`Open ${board.title}`}><ArrowTopRightOnSquareIcon className="h-4 w-4" /></a>
-                <button type="button" role="switch" aria-checked={enabled} aria-label={`${board.title} ${enabled ? 'active' : 'inactive'}`} onClick={() => toggleBoard(board.key)} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition ${enabled ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                {board.key === 'hukamnama' ? <div className="col-span-4 col-start-1 row-start-2 min-w-0 lg:col-span-1 lg:col-start-3 lg:row-start-1"><SecondsControl id="led-hukamnama-seconds" label="Hukamnama slide duration in seconds" value={settings.hukamnamaSeconds} min={HUKAMNAMA_MIN_SECONDS} max={HUKAMNAMA_MAX_SECONDS} presets={HUKAMNAMA_PRESETS} onCommit={commitHukamnamaSeconds} compact /></div> : null}
+                <a href={board.path} target="_blank" rel="noreferrer" className={`shrink-0 rounded-md border border-slate-300 p-1.5 text-slate-600 hover:bg-slate-50 ${board.key === 'hukamnama' ? 'col-start-3 row-start-1 lg:col-start-4' : ''}`} title={`Open ${board.title}`} aria-label={`Open ${board.title}`}><ArrowTopRightOnSquareIcon className="h-4 w-4" /></a>
+                <button type="button" role="switch" aria-checked={enabled} aria-label={`${board.title} ${enabled ? 'active' : 'inactive'}`} onClick={() => toggleBoard(board.key)} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition ${enabled ? 'bg-emerald-500' : 'bg-slate-300'} ${board.key === 'hukamnama' ? 'col-start-4 row-start-1 lg:col-start-5' : ''}`}>
                   <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
                 </button>
               </div>
