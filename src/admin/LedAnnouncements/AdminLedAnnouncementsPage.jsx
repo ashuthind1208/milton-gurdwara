@@ -8,6 +8,7 @@ import Button from '../../components/ui/Button';
 import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton';
 import StatusAlert from '../../components/common/StatusAlert';
 import LedAnnouncementSlide from '../../components/boards/LedAnnouncementSlide';
+import LedBoardControlCard from './LedBoardControlCard';
 import ledAnnouncementService, { isAnnouncementLive, toLocalDateKey } from '../../services/ledAnnouncementService';
 import uploadService from '../../services/uploadService';
 
@@ -153,6 +154,8 @@ const AdminLedAnnouncementsPage = () => {
   return (
     <div className="space-y-6">
       <h1 className="sr-only">LED Announcements</h1>
+
+      <LedBoardControlCard />
 
       <Card>
         <div>

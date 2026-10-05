@@ -4,7 +4,8 @@ import LedAnnouncementSlide from './LedAnnouncementSlide';
 
 const CONTROLS_HIDE_DELAY_MS = 3000;
 
-const LedSlideshow = ({ slides, intervalSeconds, onExit }) => {
+// kiosk: the unattended LED screen; no on-screen controls and no way to exit.
+const LedSlideshow = ({ slides, intervalSeconds, onExit, kiosk = false }) => {
   const containerRef = useRef(null);
   const enteredFullscreenRef = useRef(false);
   const hideTimerRef = useRef(null);
@@ -40,7 +41,7 @@ const LedSlideshow = ({ slides, intervalSeconds, onExit }) => {
   useEffect(() => {
     const container = containerRef.current;
     const onFullscreenChange = () => {
-      if (!document.fullscreenElement && enteredFullscreenRef.current) onExitRef.current();
+      if (!kiosk && !document.fullscreenElement && enteredFullscreenRef.current) onExitRef.current();
     };
     document.addEventListener('fullscreenchange', onFullscreenChange);
     container?.requestFullscreen?.()
@@ -52,18 +53,18 @@ const LedSlideshow = ({ slides, intervalSeconds, onExit }) => {
       document.removeEventListener('fullscreenchange', onFullscreenChange);
       if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
     };
-  }, []);
+  }, [kiosk]);
 
   useEffect(() => {
     const onKeyDown = (event) => {
       if (event.key === 'ArrowRight') { goTo(1); revealControls(); }
       else if (event.key === 'ArrowLeft') { goTo(-1); revealControls(); }
       else if (event.key === ' ') { event.preventDefault(); setPaused((value) => !value); revealControls(); }
-      else if (event.key === 'Escape') onExitRef.current();
+      else if (event.key === 'Escape' && !kiosk) onExitRef.current();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [goTo, revealControls]);
+  }, [goTo, revealControls, kiosk]);
 
   const mountedSlides = useMemo(() => {
     if (!count) return [];
@@ -74,7 +75,7 @@ const LedSlideshow = ({ slides, intervalSeconds, onExit }) => {
   const controlButton = 'flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-brand-saffron';
 
   return (
-    <div ref={containerRef} className={`fixed inset-0 z-[300] overflow-hidden bg-black text-white ${controlsVisible ? '' : 'cursor-none'}`} role="dialog" aria-label="LED board slideshow">
+    <div ref={containerRef} className={`fixed inset-0 z-[300] overflow-hidden bg-black text-white ${controlsVisible && !kiosk ? '' : 'cursor-none'}`} role="dialog" aria-label="LED board slideshow">
       {mountedSlides.map(({ slide, isCurrent }) => (
         <div key={slide.key} className="absolute inset-0 transition-opacity duration-700" style={{ opacity: isCurrent ? 1 : 0, zIndex: isCurrent ? 20 : 10 }} aria-hidden={!isCurrent}>
           {slide.kind === 'announcement'
@@ -84,8 +85,9 @@ const LedSlideshow = ({ slides, intervalSeconds, onExit }) => {
       ))}
 
       {/* Covers the iframes so pointer and keyboard input stay with the slideshow controls. */}
-      <div className="absolute inset-0 z-30" onMouseMove={revealControls} onClick={revealControls} />
+      <div className="absolute inset-0 z-30" onMouseMove={revealControls} onClick={() => { revealControls(); if (kiosk && !document.fullscreenElement) containerRef.current?.requestFullscreen?.().catch(() => {}); }} />
 
+      {kiosk ? null : <>
       <div className={`pointer-events-none absolute inset-x-0 top-0 z-40 flex items-start justify-between gap-3 bg-gradient-to-b from-black/70 to-transparent p-4 transition-opacity duration-300 ${controlsVisible ? 'opacity-100' : 'opacity-0'}`}>
         <p className="rounded-full bg-black/50 px-4 py-2 text-sm font-bold">{current + 1} / {count} · {currentSlide?.label}</p>
         <button type="button" onClick={onExit} className={`${controlButton} ${controlsVisible ? 'pointer-events-auto' : 'pointer-events-none'}`} aria-label="Exit slideshow" title="Exit slideshow (Esc)"><XMarkIcon className="h-6 w-6" /></button>
@@ -102,6 +104,7 @@ const LedSlideshow = ({ slides, intervalSeconds, onExit }) => {
           <div key={current} className="h-full bg-brand-saffron" style={{ animation: `led-slideshow-progress ${intervalSeconds}s linear forwards` }} />
         </div>
       ) : null}
+      </>}
       <style>{'@keyframes led-slideshow-progress { from { width: 0%; } to { width: 100%; } }'}</style>
     </div>
   );
