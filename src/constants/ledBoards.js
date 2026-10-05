@@ -1,0 +1,29 @@
+import { CalendarDaysIcon, GiftIcon, MegaphoneIcon, QueueListIcon, SparklesIcon, Squares2X2Icon } from '@heroicons/react/24/outline';
+
+export const LED_BOARDS = [
+  { key: 'donation', title: 'Donation Board', description: 'Live campaigns, progress, donors, and donation QR code.', path: '/donation-board', embedParams: { fullscreen: '1' }, icon: GiftIcon, accent: 'border-amber-300 bg-amber-50 text-amber-800' },
+  { key: 'events', title: 'Events Calendar Board', description: 'Upcoming events, Nanakshahi dates, and registration activity.', path: '/event-calendar-board', icon: CalendarDaysIcon, accent: 'border-sky-300 bg-sky-50 text-sky-800' },
+  { key: 'langar', title: 'Langar Needs Board', description: 'Current grocery needs, progress, contributors, and QR code.', path: '/langar-board', icon: QueueListIcon, accent: 'border-emerald-300 bg-emerald-50 text-emerald-800' },
+  { key: 'schedule', title: 'Daily Schedule Board', description: 'Today\'s activities with the ongoing program highlighted.', path: '/daily-schedule-board', icon: Squares2X2Icon, accent: 'border-blue-300 bg-blue-50 text-blue-800' },
+  { key: 'granthi', title: 'Ask a Granthi Board', description: 'A public question screen for the sangat.', path: '/ask-a-granthi?screen=welcome', icon: SparklesIcon, accent: 'border-violet-300 bg-violet-50 text-violet-800' },
+  { key: 'special', title: 'Special Events Board', description: 'Event photos and formatted announcements managed below.', path: '/special-events-board', icon: MegaphoneIcon, accent: 'border-rose-300 bg-rose-50 text-rose-800', isAnnouncementBoard: true }
+];
+
+export const MIN_INTERVAL_SECONDS = 3;
+export const MAX_INTERVAL_SECONDS = 600;
+export const DEFAULT_INTERVAL_SECONDS = 15;
+export const INTERVAL_PRESETS = [10, 15, 30, 60];
+
+export const toEmbedSrc = (board) => {
+  const url = new URL(board.path, window.location.origin);
+  url.searchParams.set('embed', '1');
+  Object.entries(board.embedParams || {}).forEach(([name, value]) => url.searchParams.set(name, value));
+  return `${url.pathname}${url.search}`;
+};
+
+// Builds the slide list the LED screen plays: enabled boards in order, with one slide per live announcement.
+export const buildLedSlides = (settings, liveAnnouncements) => LED_BOARDS
+  .filter((board) => settings.enabled[board.key])
+  .flatMap((board) => (board.isAnnouncementBoard
+    ? liveAnnouncements.map((announcement) => ({ key: `announcement:${announcement.id}`, kind: 'announcement', label: `Special Event · ${announcement.title || 'Announcement'}`, announcement }))
+    : [{ key: `board:${board.key}`, kind: 'board', label: board.title, src: toEmbedSrc(board) }]));
