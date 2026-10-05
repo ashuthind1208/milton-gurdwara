@@ -18,6 +18,7 @@ const LedSlideshow = ({ slides, intervalSeconds, onExit, kiosk = false }) => {
   const count = slides.length;
   const current = count ? index % count : 0;
   const currentSlide = slides[current];
+  const slideSeconds = currentSlide?.durationSeconds || intervalSeconds;
 
   const goTo = useCallback((offset) => setIndex((value) => (count ? (value + offset + count) % count : 0)), [count]);
 
@@ -29,9 +30,9 @@ const LedSlideshow = ({ slides, intervalSeconds, onExit, kiosk = false }) => {
 
   useEffect(() => {
     if (paused || count < 2) return undefined;
-    const timer = window.setTimeout(() => goTo(1), intervalSeconds * 1000);
+    const timer = window.setTimeout(() => goTo(1), slideSeconds * 1000);
     return () => window.clearTimeout(timer);
-  }, [paused, count, intervalSeconds, current, goTo]);
+  }, [paused, count, slideSeconds, current, goTo]);
 
   useEffect(() => {
     revealControls();
@@ -98,13 +99,13 @@ const LedSlideshow = ({ slides, intervalSeconds, onExit, kiosk = false }) => {
         <button type="button" onClick={() => setPaused((value) => !value)} className={controlButton} aria-label={paused ? 'Resume slideshow' : 'Pause slideshow'} title={paused ? 'Resume (Space)' : 'Pause (Space)'}>{paused ? <PlayIcon className="h-5 w-5" /> : <PauseIcon className="h-5 w-5" />}</button>
         <button type="button" onClick={() => goTo(1)} className={controlButton} aria-label="Next slide" title="Next (Right arrow)"><ForwardIcon className="h-5 w-5" /></button>
       </div>
+      </>}
 
       {!paused && count > 1 ? (
         <div className="absolute inset-x-0 bottom-0 z-50 h-1 bg-white/10">
-          <div key={current} className="h-full bg-brand-saffron" style={{ animation: `led-slideshow-progress ${intervalSeconds}s linear forwards` }} />
+          <div key={`${current}-${slideSeconds}`} className="h-full bg-brand-saffron" style={{ animation: `led-slideshow-progress ${slideSeconds}s linear forwards` }} />
         </div>
       ) : null}
-      </>}
       <style>{'@keyframes led-slideshow-progress { from { width: 0%; } to { width: 100%; } }'}</style>
     </div>
   );

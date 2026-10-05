@@ -1,15 +1,18 @@
 import contentApiService from './contentApiService';
 import { serviceResponse } from './serviceResponse';
-import { DEFAULT_INTERVAL_SECONDS, LED_BOARDS, MAX_INTERVAL_SECONDS, MIN_INTERVAL_SECONDS } from '../constants/ledBoards';
+import { DEFAULT_HUKAMNAMA_SECONDS, DEFAULT_INTERVAL_SECONDS, HUKAMNAMA_MAX_SECONDS, HUKAMNAMA_MIN_SECONDS, LED_BOARDS, MAX_INTERVAL_SECONDS, MIN_INTERVAL_SECONDS } from '../constants/ledBoards';
 
 const RESOURCE = 'led_board_settings';
 
 export const clampInterval = (value) => Math.min(MAX_INTERVAL_SECONDS, Math.max(MIN_INTERVAL_SECONDS, Math.round(Number(value) || DEFAULT_INTERVAL_SECONDS)));
 
+export const clampHukamnamaSeconds = (value) => Math.min(HUKAMNAMA_MAX_SECONDS, Math.max(HUKAMNAMA_MIN_SECONDS, Math.round(Number(value) || DEFAULT_HUKAMNAMA_SECONDS)));
+
 // Boards missing from saved settings default to on, so a newly added board shows up without extra setup.
 export const normalizeSettings = (raw = {}) => ({
   enabled: Object.fromEntries(LED_BOARDS.map((board) => [board.key, typeof raw?.enabled?.[board.key] === 'boolean' ? raw.enabled[board.key] : true])),
   intervalSeconds: clampInterval(raw?.intervalSeconds),
+  hukamnamaSeconds: clampHukamnamaSeconds(raw?.hukamnamaSeconds),
   updatedAt: String(raw?.updatedAt || '')
 });
 

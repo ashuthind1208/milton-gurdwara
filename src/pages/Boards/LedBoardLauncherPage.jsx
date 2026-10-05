@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import Seo from '../../components/common/Seo';
 import LedSlideshow from '../../components/boards/LedSlideshow';
 import useSeoMeta from '../../hooks/useSeoMeta';
+import useDailyHukamnama from '../../hooks/useDailyHukamnama';
 import ledAnnouncementService, { isAnnouncementLive } from '../../services/ledAnnouncementService';
 import ledBoardSettingsService from '../../services/ledBoardSettingsService';
 import { buildLedSlides } from '../../constants/ledBoards';
@@ -28,9 +29,11 @@ const LedBoardLauncherPage = () => {
     refetchIntervalInBackground: true
   });
 
+  const { hasHukamnama } = useDailyHukamnama();
+
   const slides = useMemo(
-    () => (settings ? buildLedSlides(settings, announcements.filter((entry) => isAnnouncementLive(entry))) : []),
-    [settings, announcements]
+    () => (settings ? buildLedSlides(settings, { liveAnnouncements: announcements.filter((entry) => isAnnouncementLive(entry)), hasHukamnama }) : []),
+    [settings, announcements, hasHukamnama]
   );
 
   return (
