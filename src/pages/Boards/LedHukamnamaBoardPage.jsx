@@ -5,39 +5,19 @@ import useDailyHukamnama from '../../hooks/useDailyHukamnama';
 import { useBranding } from '../../context/BrandingContext';
 
 const MIN_FONT_PX = 9;
-const MAX_FONT_PX = 56;
-const BOTTOM_CLEARANCE_PX = 24;
+const MAX_FONT_PX = 64;
+const BOTTOM_CLEARANCE_PX = 28;
+const VERSE_GAP_EM = 0.7;
 
-const getBalancedSplitIndex = (lines) => {
-  if (lines.length < 2) return lines.length;
-  const weights = lines.map((line) => 1 + Number(Boolean(line.translationPunjabi)) + Number(Boolean(line.translationEnglish)));
-  const total = weights.reduce((sum, weight) => sum + weight, 0);
-  let running = 0;
-  let splitIndex = 1;
-  let smallestDifference = Infinity;
-  weights.slice(0, -1).forEach((weight, index) => {
-    running += weight;
-    const difference = Math.abs(total - running * 2);
-    if (difference < smallestDifference) {
-      smallestDifference = difference;
-      splitIndex = index + 1;
-    }
-  });
-  return splitIndex;
-};
-
-// Picks the largest text size that keeps both balanced columns inside the screen bounds.
+// One text size for the whole page: the largest where both balanced columns fit the screen height with room at the bottom.
 const fitToBox = (box, content) => {
-  [...content.querySelectorAll('[data-hukamnama-verse]')].forEach((verse) => { verse.style.marginBottom = '.6em'; });
+  const verses = [...content.querySelectorAll('[data-hukamnama-verse]')];
+  verses.forEach((verse) => { verse.style.marginBottom = `${VERSE_GAP_EM}em`; });
+  const limit = box.clientHeight - BOTTOM_CLEARANCE_PX;
   const fits = (size) => {
     content.style.fontSize = `${size}px`;
-    [...content.querySelectorAll('p')].forEach((line) => line.style.removeProperty('font-size'));
-    const fitsHeight = [...content.children].every((column) => {
-      if (!column.children.length) return true;
-      const usedHeight = column.lastElementChild.getBoundingClientRect().bottom - column.firstElementChild.getBoundingClientRect().top;
-      return usedHeight <= box.clientHeight - BOTTOM_CLEARANCE_PX;
-    });
-    return fitsHeight;
+    const gurmukhiFits = [...content.querySelectorAll('[data-hukamnama-gurmukhi]')].every((line) => line.scrollWidth <= line.clientWidth + 1);
+    return gurmukhiFits && content.getBoundingClientRect().height <= limit;
   };
   let low = MIN_FONT_PX;
   let high = MAX_FONT_PX;
@@ -47,32 +27,23 @@ const fitToBox = (box, content) => {
     else high = mid - 1;
   }
   content.style.fontSize = `${low}px`;
-  [...content.querySelectorAll('p')].forEach((line) => {
-    const availableWidth = line.clientWidth - 6;
-    if (line.scrollWidth > availableWidth && availableWidth > 0) {
-      const fittedFontSize = Number.parseFloat(getComputedStyle(line).fontSize) * (availableWidth / line.scrollWidth);
-      line.style.fontSize = `${fittedFontSize}px`;
-    }
-  });
 
-  const columns = [...content.children];
-  const measurements = columns.map((column) => {
-    const verses = [...column.children];
-    if (!verses.length) return { column, verses, height: 0, gaps: 0 };
-    return {
-      column,
-      verses,
-      height: verses.at(-1).getBoundingClientRect().bottom - verses[0].getBoundingClientRect().top,
-      gaps: Math.max(0, verses.length - 1)
-    };
+  // Spread the shorter column's spare height across its verse gaps so both columns end together.
+  const columns = new Map();
+  verses.forEach((verse) => {
+    const left = Math.round(verse.getBoundingClientRect().left);
+    columns.set(left, [...(columns.get(left) || []), verse]);
   });
-  if (measurements.length === 2 && measurements.every((column) => column.gaps > 0)) {
-    const difference = measurements[0].height - measurements[1].height;
-    if (Math.abs(difference) >= 1) {
-      const shorter = measurements[difference < 0 ? 0 : 1];
-      const adjustment = Math.abs(difference) / shorter.gaps;
-      shorter.verses.slice(0, -1).forEach((verse) => { verse.style.marginBottom = `calc(.6em + ${adjustment}px)`; });
-    }
+  const measured = [...columns.values()].map((column) => ({
+    column,
+    height: column.at(-1).getBoundingClientRect().bottom - column[0].getBoundingClientRect().top
+  }));
+  if (measured.length === 2 && measured.every(({ column }) => column.length > 1)) {
+    const [first, second] = measured;
+    const shorter = first.height < second.height ? first : second;
+    const spare = Math.abs(first.height - second.height);
+    const extraPerGap = (spare * 0.95) / (shorter.column.length - 1);
+    shorter.column.slice(0, -1).forEach((verse) => { verse.style.marginBottom = `calc(${VERSE_GAP_EM}em + ${extraPerGap}px)`; });
   }
 };
 
@@ -82,8 +53,6 @@ const LedHukamnamaBoardPage = () => {
   const { entry, lines, hasHukamnama } = useDailyHukamnama();
   const boxRef = useRef(null);
   const contentRef = useRef(null);
-  const splitIndex = getBalancedSplitIndex(lines);
-  const columns = [lines.slice(0, splitIndex), lines.slice(splitIndex)];
 
   useLayoutEffect(() => {
     const box = boxRef.current;
@@ -95,7 +64,7 @@ const LedHukamnamaBoardPage = () => {
     observer.observe(box);
     document.fonts?.ready.then(fit);
     return () => observer.disconnect();
-  }, [lines, hasHukamnama, splitIndex]);
+  }, [lines, hasHukamnama]);
 
   const pills = [
     entry?.ang ? `Ang ${entry.ang}` : '',
@@ -106,8 +75,9 @@ const LedHukamnamaBoardPage = () => {
   return (
     <>
       <Seo {...meta} />
-      <div className="flex h-screen w-full flex-col overflow-hidden bg-gradient-to-br from-[#06142f] via-[#0b2a5b] to-[#06142f] px-8 py-5 text-white">
-        <header className="flex shrink-0 items-center gap-4 border-b border-white/20 pb-3">
+      <div className="relative flex h-screen w-full flex-col overflow-hidden bg-gradient-to-br from-[#06142f] via-[#0b2a5b] to-[#06142f] px-8 py-5 text-white">
+        <img src={logoSrc} alt="" aria-hidden="true" className="pointer-events-none absolute bottom-4 right-6 z-0 h-48 w-48 rounded-full border border-brand-saffron/30 object-cover opacity-20" />
+        <header className="relative z-10 flex shrink-0 items-center gap-4 border-b border-white/20 pb-3">
           <img src={logoSrc} alt={`${branding.organizationName} logo`} className="h-14 w-14 rounded-full border-2 border-brand-saffron object-cover" />
           <div className="min-w-[15rem] flex-1">
             <h1 className="whitespace-nowrap font-heading text-[clamp(1.125rem,2vw,2rem)] font-bold leading-tight">Daily Hukamnama</h1>
@@ -118,18 +88,14 @@ const LedHukamnamaBoardPage = () => {
           </div>
         </header>
 
-        <div ref={boxRef} className="mt-4 min-h-0 flex-1 overflow-hidden">
+        <div ref={boxRef} className="relative z-10 mt-4 min-h-0 flex-1 overflow-hidden">
           {hasHukamnama ? (
-            <div ref={contentRef} className="grid h-full grid-cols-2" style={{ columnGap: '3em', backgroundImage: 'linear-gradient(to right, transparent calc(50% - .5px), rgba(255,255,255,.15) calc(50% - .5px), rgba(255,255,255,.15) calc(50% + .5px), transparent calc(50% + .5px))' }}>
-              {columns.map((column, columnIndex) => (
-                <div key={`column-${columnIndex}`} className="min-w-0" style={{ paddingRight: columnIndex === 0 ? '1.5em' : 0, paddingLeft: columnIndex === 1 ? '1.5em' : 0 }}>
-                  {column.map((line, columnLineIndex) => (
-                    <div key={line.id} data-hukamnama-verse={columnIndex === 0 ? columnLineIndex : splitIndex + columnLineIndex} style={{ marginBottom: '.6em' }}>
-                      <p className="font-gurmukhi font-bold leading-snug text-white" style={{ whiteSpace: 'nowrap' }}>{line.gurmukhi}</p>
-                      {line.translationPunjabi ? <p className="font-gurmukhi text-[0.68em] font-semibold leading-snug text-amber-300" style={{ marginTop: '.15em', whiteSpace: 'nowrap' }}>Punjabi: {line.translationPunjabi}</p> : null}
-                      {line.translationEnglish ? <p className="text-[0.68em] font-semibold leading-snug text-cyan-100" style={{ marginTop: '.1em', marginBottom: '.3em', whiteSpace: 'nowrap' }}>English: {line.translationEnglish}</p> : null}
-                    </div>
-                  ))}
+            <div ref={contentRef} style={{ columnCount: 2, columnGap: '3em', columnRule: '1px solid rgba(255,255,255,.15)' }}>
+              {lines.map((line) => (
+                <div key={line.id} data-hukamnama-verse style={{ breakInside: 'avoid' }}>
+                  <p data-hukamnama-gurmukhi className="font-gurmukhi font-bold leading-snug text-white" style={{ whiteSpace: 'nowrap' }}>{line.gurmukhi}</p>
+                  {line.translationPunjabi ? <p className="font-gurmukhi text-[0.8em] font-semibold leading-snug text-amber-300" style={{ marginTop: '.15em' }}>Punjabi: {line.translationPunjabi}</p> : null}
+                  {line.translationEnglish ? <p className="text-[0.8em] font-semibold leading-snug text-cyan-100" style={{ marginTop: '.1em' }}>English: {line.translationEnglish}</p> : null}
                 </div>
               ))}
             </div>
