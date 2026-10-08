@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import PublicLayout from '../layouts/PublicLayout';
 import AdminLayout from '../layouts/AdminLayout';
 import ProtectedRoute from './ProtectedRoute';
+import AutoReloadOnNewBuild from '../components/boards/AutoReloadOnNewBuild';
 import { userRoles } from '../constants/siteConfig';
 
 const HomePage = lazy(() => import('../pages/Home/HomePage'));
@@ -70,6 +71,7 @@ const SUPER_ADMIN_ONLY_ROLES = [userRoles.SUPER_ADMIN];
 const AppRoutes = () => {
   return (
     <Suspense fallback={<LoadingFallback />}>
+      <AutoReloadOnNewBuild />
       <Routes>
         <Route element={<PublicLayout />}>
           <Route path="/" element={<HomePage />} />
