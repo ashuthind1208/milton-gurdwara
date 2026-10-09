@@ -10,6 +10,26 @@ export const LED_BOARDS = [
   { key: 'special', title: 'Special Events Board', description: 'Event photos and formatted announcements managed below.', path: '/special-events-board', icon: MegaphoneIcon, accent: 'border-rose-300 bg-rose-50 text-rose-800', isAnnouncementBoard: true }
 ];
 
+export const LED_SCREENS = [
+  { id: 'main', label: 'Main Hall' },
+  { id: 'darbar', label: 'Darbar Hall' },
+  { id: 'langar', label: 'Langar Hall' },
+  { id: 'lobby', label: 'Lobby' }
+];
+
+export const SCREEN_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,29}$/;
+export const MAX_CUSTOM_SCREENS = 20;
+
+export const slugifyScreenId = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30);
+
+// Built-in screens plus any custom ones saved in the LED settings.
+export const getLedScreens = (settings) => [...LED_SCREENS, ...(settings?.customScreens || [])];
+
+export const readScreenId = (value) => {
+  const id = String(value || 'main').trim().toLowerCase();
+  return SCREEN_ID_PATTERN.test(id) ? id : 'main';
+};
+
 export const MIN_INTERVAL_SECONDS = 3;
 export const MAX_INTERVAL_SECONDS = 600;
 export const DEFAULT_INTERVAL_SECONDS = 15;
@@ -30,8 +50,14 @@ export const toEmbedSrc = (board) => {
 
 // Builds the slide list the LED screen plays: enabled boards in order, with one slide per live announcement.
 // Boards with nothing to show (no announcements, no hukamnama posted yet) are skipped.
-export const buildLedSlides = (settings, { liveAnnouncements = [], hasHukamnama = false } = {}) => LED_BOARDS
+export const buildLedSlides = (settings, { liveAnnouncements = [], hasHukamnama = false, screenId = 'main', festivalSlides = [] } = {}) => {
+  const selectedKeys = settings.screenPlaylists?.[screenId] || LED_BOARDS.filter((board) => settings.enabled[board.key]).map((board) => board.key);
+  const orderedBoards = selectedKeys.map((key) => LED_BOARDS.find((board) => board.key === key)).filter(Boolean);
+  const slides = orderedBoards
   .filter((board) => settings.enabled[board.key] && (board.key !== 'hukamnama' || hasHukamnama))
   .flatMap((board) => (board.isAnnouncementBoard
     ? liveAnnouncements.map((announcement) => ({ key: `announcement:${announcement.id}`, kind: 'announcement', label: `Special Event · ${announcement.title || 'Announcement'}`, announcement, durationSeconds: settings.intervalSeconds }))
     : [{ key: `board:${board.key}`, kind: 'board', label: board.title, src: toEmbedSrc(board), durationSeconds: board.hasOwnDuration ? settings.hukamnamaSeconds : settings.intervalSeconds }]));
+  if (settings.festivalBannersEnabled !== false) slides.push(...festivalSlides);
+  return slides;
+};

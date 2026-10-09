@@ -5,7 +5,7 @@ import LedAnnouncementSlide from './LedAnnouncementSlide';
 const CONTROLS_HIDE_DELAY_MS = 3000;
 
 // kiosk: the unattended LED screen; no on-screen controls and no way to exit.
-const LedSlideshow = ({ slides, intervalSeconds, onExit, kiosk = false }) => {
+const LedSlideshow = ({ slides, intervalSeconds, onExit, kiosk = false, onCurrentSlideChange }) => {
   const containerRef = useRef(null);
   const enteredFullscreenRef = useRef(false);
   const hideTimerRef = useRef(null);
@@ -19,6 +19,8 @@ const LedSlideshow = ({ slides, intervalSeconds, onExit, kiosk = false }) => {
   const current = count ? index % count : 0;
   const currentSlide = slides[current];
   const slideSeconds = currentSlide?.durationSeconds || intervalSeconds;
+
+  useEffect(() => { onCurrentSlideChange?.(currentSlide?.label || 'Idle'); }, [currentSlide?.key, currentSlide?.label, onCurrentSlideChange]);
 
   const goTo = useCallback((offset) => setIndex((value) => (count ? (value + offset + count) % count : 0)), [count]);
 

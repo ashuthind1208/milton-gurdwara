@@ -9,7 +9,10 @@ import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton
 import StatusAlert from '../../components/common/StatusAlert';
 import LedAnnouncementSlide from '../../components/boards/LedAnnouncementSlide';
 import LedBoardControlCard from './LedBoardControlCard';
+import LedScreenOperationsCard from './LedScreenOperationsCard';
 import ledAnnouncementService, { isAnnouncementLive, toLocalDateKey } from '../../services/ledAnnouncementService';
+import { getLedScreens } from '../../constants/ledBoards';
+import ledBoardSettingsService from '../../services/ledBoardSettingsService';
 import uploadService from '../../services/uploadService';
 
 const PAGE_SIZE = 10;
@@ -22,6 +25,10 @@ const emptyFormValues = {
   eventDate: '',
   location: '',
   displayUntil: '',
+  startsAt: '',
+  endsAt: '',
+  weekdays: [],
+  screenIds: [],
   active: true
 };
 
@@ -49,6 +56,11 @@ const AdminLedAnnouncementsPage = () => {
   const { data: announcements = [] } = useQuery({
     queryKey: ['led-board-announcements'],
     queryFn: () => ledAnnouncementService.getAnnouncements().then((response) => response.data)
+  });
+
+  const { data: ledSettings } = useQuery({
+    queryKey: ['led-board-settings'],
+    queryFn: () => ledBoardSettingsService.getSettings().then((response) => response.data)
   });
 
   const selectedAnnouncement = useMemo(
@@ -96,6 +108,10 @@ const AdminLedAnnouncementsPage = () => {
       eventDate: announcement.eventDate,
       location: announcement.location,
       displayUntil: announcement.displayUntil,
+      startsAt: announcement.startsAt,
+      endsAt: announcement.endsAt,
+      weekdays: announcement.weekdays,
+      screenIds: announcement.screenIds,
       active: announcement.active
     } : emptyFormValues);
     setStatus({ type: 'success', message: '' });
@@ -104,6 +120,10 @@ const AdminLedAnnouncementsPage = () => {
 
   const onSubmit = (values) => {
     const isImage = values.type === 'image';
+    if (values.startsAt && values.endsAt && new Date(values.endsAt).getTime() <= new Date(values.startsAt).getTime()) {
+      setStatus({ type: 'error', message: 'The schedule end must be later than the start.' });
+      return;
+    }
     if (isImage && !String(values.imageUrl || '').trim()) {
       setStatus({ type: 'error', message: 'Upload an image or paste an image URL for an image announcement.' });
       return;
@@ -117,6 +137,10 @@ const AdminLedAnnouncementsPage = () => {
       eventDate: values.eventDate || '',
       location: String(values.location || '').trim(),
       displayUntil: values.displayUntil || '',
+      startsAt: values.startsAt || '',
+      endsAt: values.endsAt || '',
+      weekdays: (values.weekdays || []).map(Number),
+      screenIds: values.screenIds || [],
       active: Boolean(values.active)
     };
     if (modalState.mode === 'create') createMutation.mutate(payload);
@@ -151,11 +175,13 @@ const AdminLedAnnouncementsPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setHeaderAction]);
 
+
   return (
     <div className="admin-led-announcements w-full min-w-0 max-w-full space-y-6 overflow-x-clip">
       <h1 className="sr-only">LED Announcements</h1>
 
       <LedBoardControlCard />
+      <LedScreenOperationsCard />
 
       <Card className="w-full min-w-0 max-w-full">
         <div>
@@ -310,6 +336,32 @@ const AdminLedAnnouncementsPage = () => {
                     <input disabled={isViewMode} {...form.register('location')} maxLength={160} className={inputClass} placeholder="e.g. Main Darbar Hall" />
                   </label>
                 </div>
+
+                <fieldset disabled={isViewMode} className="rounded-lg border border-slate-200 p-3">
+                  <legend className="px-1 text-sm font-semibold text-slate-700">Schedule and screens</legend>
+                  <p className="text-xs text-slate-500">Optional local-time window. Choose weekdays to repeat; leave empty to show on any day. An end time before the start will keep this slide hidden.</p>
+                  <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                    <label className="text-sm">Start date and time<input type="datetime-local" {...form.register('startsAt')} className={inputClass} /></label>
+                    <label className="text-sm">End date and time<input type="datetime-local" {...form.register('endsAt')} className={inputClass} /></label>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-x-3 gap-y-2">
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
+                      <label key={day} className="flex items-center gap-1.5 text-xs text-slate-700"><input type="checkbox" value={index} checked={(watched.weekdays || []).map(Number).includes(index)} onChange={(event) => {
+                        const selected = (watched.weekdays || []).map(Number);
+                        form.setValue('weekdays', event.target.checked ? [...new Set([...selected, index])].sort() : selected.filter((value) => value !== index), { shouldDirty: true });
+                      }} />{day}</label>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-xs font-semibold text-slate-600">Show on these screens (none selected means all screens)</p>
+                  <div className="mt-1 flex flex-wrap gap-x-4 gap-y-2">
+                    {getLedScreens(ledSettings).map((screen) => (
+                      <label key={screen.id} className="flex items-center gap-1.5 text-xs text-slate-700"><input type="checkbox" checked={(watched.screenIds || []).includes(screen.id)} onChange={(event) => {
+                        const selected = watched.screenIds || [];
+                        form.setValue('screenIds', event.target.checked ? [...new Set([...selected, screen.id])] : selected.filter((value) => value !== screen.id), { shouldDirty: true });
+                      }} />{screen.label}</label>
+                    ))}
+                  </div>
+                </fieldset>
 
                 {selectedAnnouncement ? (
                   <div className="grid gap-3 sm:grid-cols-2">

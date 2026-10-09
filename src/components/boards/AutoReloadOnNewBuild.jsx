@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
 const CHECK_INTERVAL_MS = 5 * 60 * 1000;
-const BOARD_PATHS = ['/led-boards', '/donation-board', '/event-calendar-board', '/langar-board', '/daily-schedule-board', '/special-events-board', '/hukamnama-board', '/ask-a-granthi'];
+const BOARD_PATHS = ['/led-boards', '/donation-board', '/event-calendar-board', '/langar-board', '/daily-schedule-board', '/special-events-board', '/hukamnama-board', '/recitation-board', '/ask-a-granthi'];
 const MAIN_BUNDLE_PATTERN = /\/static\/js\/main\.[\w-]+\.js/;
 
 const loadedBundle = () => document.querySelector('script[src*="/static/js/main."]')?.getAttribute('src')?.match(MAIN_BUNDLE_PATTERN)?.[0] || '';

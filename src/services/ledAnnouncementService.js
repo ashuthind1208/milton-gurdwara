@@ -20,6 +20,10 @@ export const normalizeAnnouncement = (entry = {}) => ({
   eventDate: String(entry.eventDate || '').slice(0, 10),
   location: String(entry.location || '').trim(),
   displayUntil: String(entry.displayUntil || '').slice(0, 10),
+  startsAt: String(entry.startsAt || ''),
+  endsAt: String(entry.endsAt || ''),
+  weekdays: Array.isArray(entry.weekdays) ? [...new Set(entry.weekdays.map(Number).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6))] : [],
+  screenIds: Array.isArray(entry.screenIds) ? [...new Set(entry.screenIds.map((screen) => String(screen).trim().toLowerCase()).filter(Boolean))] : [],
   active: typeof entry.active === 'boolean' ? entry.active : true,
   createdAt: String(entry.createdAt || ''),
   updatedAt: String(entry.updatedAt || '')
@@ -30,8 +34,17 @@ export const isAnnouncementLive = (announcement, today = toLocalDateKey()) => {
   if (!announcement?.active) return false;
   const hasContent = announcement.type === 'image' ? Boolean(announcement.imageUrl) : Boolean(announcement.title);
   if (!hasContent) return false;
-  return !announcement.displayUntil || announcement.displayUntil >= today;
+  if (announcement.displayUntil && announcement.displayUntil < today) return false;
+  const now = new Date();
+  const start = announcement.startsAt ? new Date(announcement.startsAt) : null;
+  const end = announcement.endsAt ? new Date(announcement.endsAt) : null;
+  if (start && !Number.isNaN(start.getTime()) && start > now) return false;
+  if (end && !Number.isNaN(end.getTime()) && end < now) return false;
+  if (Array.isArray(announcement.weekdays) && announcement.weekdays.length && !announcement.weekdays.includes(now.getDay())) return false;
+  return true;
 };
+
+export const isAnnouncementForScreen = (announcement, screenId) => !announcement?.screenIds?.length || announcement.screenIds.includes(String(screenId || 'main').toLowerCase());
 
 const ledAnnouncementService = {
   getAnnouncements: async () => {
