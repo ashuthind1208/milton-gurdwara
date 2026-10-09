@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { ArrowDownTrayIcon, ShareIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useBranding } from '../../context/BrandingContext';
 
@@ -17,6 +18,7 @@ const isInstalled = () => (typeof window.matchMedia === 'function'
 
 const AppInstallPrompt = () => {
   const { branding, logoSrc } = useBranding();
+  const { pathname } = useLocation();
   const [installEvent, setInstallEvent] = useState(null);
   const [showIosHelp, setShowIosHelp] = useState(false);
   const [dismissed, setDismissed] = useState(() => {
@@ -43,7 +45,7 @@ const AppInstallPrompt = () => {
     };
   }, []);
 
-  if (dismissed || isInstalled() || (!ios && !installEvent)) {
+  if (dismissed || isInstalled() || (!ios && !installEvent) || pathname.startsWith('/follow') || pathname.startsWith('/granthi-remote')) {
     return null;
   }
 

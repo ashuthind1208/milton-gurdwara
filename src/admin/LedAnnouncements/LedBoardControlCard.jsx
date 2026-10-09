@@ -4,9 +4,9 @@ import { ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
 import Card from '../../components/ui/Card';
 import StatusAlert from '../../components/common/StatusAlert';
 import useDailyHukamnama from '../../hooks/useDailyHukamnama';
-import ledAnnouncementService, { isAnnouncementLive } from '../../services/ledAnnouncementService';
+import ledAnnouncementService, { isAnnouncementForScreen, isAnnouncementLive } from '../../services/ledAnnouncementService';
 import ledBoardSettingsService, { clampHukamnamaSeconds, clampInterval } from '../../services/ledBoardSettingsService';
-import { HUKAMNAMA_MAX_SECONDS, HUKAMNAMA_MIN_SECONDS, HUKAMNAMA_PRESETS, INTERVAL_PRESETS, LED_BOARDS, MAX_INTERVAL_SECONDS, MIN_INTERVAL_SECONDS, buildLedSlides } from '../../constants/ledBoards';
+import { HUKAMNAMA_MAX_SECONDS, HUKAMNAMA_MIN_SECONDS, HUKAMNAMA_PRESETS, INTERVAL_PRESETS, LED_BOARDS, MAX_CUSTOM_SCREENS, MAX_INTERVAL_SECONDS, MIN_INTERVAL_SECONDS, buildLedSlides, getLedScreens, slugifyScreenId } from '../../constants/ledBoards';
 
 const SETTINGS_QUERY_KEY = ['led-board-settings'];
 
@@ -37,6 +37,9 @@ const SecondsControl = ({ id, label, value, min, max, presets, onCommit, compact
 const LedBoardControlCard = () => {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState({ type: 'success', message: '' });
+  const [selectedScreen, setSelectedScreen] = useState('main');
+  const [addingScreen, setAddingScreen] = useState(false);
+  const [newScreenName, setNewScreenName] = useState('');
 
   const { data: settings } = useQuery({
     queryKey: SETTINGS_QUERY_KEY,
@@ -47,7 +50,7 @@ const LedBoardControlCard = () => {
     queryFn: () => ledAnnouncementService.getAnnouncements().then((response) => response.data)
   });
   const { hasHukamnama } = useDailyHukamnama();
-  const liveAnnouncements = useMemo(() => announcements.filter((entry) => isAnnouncementLive(entry)), [announcements]);
+  const liveAnnouncements = useMemo(() => announcements.filter((entry) => isAnnouncementLive(entry) && isAnnouncementForScreen(entry, 'main')), [announcements]);
 
   // Changes save immediately and optimistically; the LED screen picks them up on its next refresh.
   const saveMutation = useMutation({
@@ -86,6 +89,43 @@ const LedBoardControlCard = () => {
     if (next !== settings.hukamnamaSeconds) save({ hukamnamaSeconds: next });
   };
 
+  const setScreenPlaylist = (screenId, keys) => {
+    const current = queryClient.getQueryData(SETTINGS_QUERY_KEY) || settings;
+    const screenPlaylists = { ...(current.screenPlaylists || {}) };
+    screenPlaylists[screenId] = [...new Set(keys)];
+    save({ screenPlaylists });
+  };
+
+  const screens = getLedScreens(settings);
+  const selectedScreenInfo = screens.find((screen) => screen.id === selectedScreen) || screens[0];
+  const isCustomScreen = (settings.customScreens || []).some((screen) => screen.id === selectedScreen);
+
+  const addScreen = (event) => {
+    event.preventDefault();
+    const label = newScreenName.trim().slice(0, 60);
+    const id = slugifyScreenId(label);
+    if (!id) { setStatus({ type: 'error', message: 'Enter a name using letters or numbers.' }); return; }
+    if (screens.some((screen) => screen.id === id)) { setStatus({ type: 'error', message: `A screen called "${id}" already exists.` }); return; }
+    if ((settings.customScreens || []).length >= MAX_CUSTOM_SCREENS) { setStatus({ type: 'error', message: `You can add up to ${MAX_CUSTOM_SCREENS} custom screens.` }); return; }
+    const current = queryClient.getQueryData(SETTINGS_QUERY_KEY) || settings;
+    save({ customScreens: [...(current.customScreens || []), { id, label }] });
+    setSelectedScreen(id);
+    setAddingScreen(false);
+    setNewScreenName('');
+  };
+
+  const removeScreen = () => {
+    if (!window.confirm(`Remove the "${selectedScreenInfo.label}" screen and its playlist?`)) return;
+    const current = queryClient.getQueryData(SETTINGS_QUERY_KEY) || settings;
+    const screenPlaylists = { ...(current.screenPlaylists || {}) };
+    delete screenPlaylists[selectedScreen];
+    save({ customScreens: (current.customScreens || []).filter((screen) => screen.id !== selectedScreen), screenPlaylists });
+    setSelectedScreen('main');
+  };
+
+  const selectedPlaylist = settings.screenPlaylists?.[selectedScreen]
+    || LED_BOARDS.filter((board) => settings.enabled[board.key]).map((board) => board.key);
+
   const cycleSeconds = slides.reduce((total, slide) => total + slide.durationSeconds, 0);
 
   return (
@@ -95,7 +135,7 @@ const LedBoardControlCard = () => {
           <h2 className="font-heading text-xl font-semibold">LED Board Slideshow</h2>
           <p className="mt-1 text-sm text-slate-600">Choose which boards the LED screen plays and how long each stays on screen. Changes apply automatically; nothing needs to be restarted.</p>
         </div>
-        <a href="/led-boards" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-brand-blue/30 px-3 py-2 text-sm font-semibold text-brand-blue hover:bg-blue-50"><ArrowTopRightOnSquareIcon className="h-4 w-4" /> Open LED screen</a>
+        <a href={`/led-boards?screen=${selectedScreen}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-brand-blue/30 px-3 py-2 text-sm font-semibold text-brand-blue hover:bg-blue-50"><ArrowTopRightOnSquareIcon className="h-4 w-4" /> Open {selectedScreenInfo.label}</a>
       </div>
 
       <div className="mt-3"><StatusAlert type={status.type} message={status.message} /></div>
@@ -134,6 +174,45 @@ const LedBoardControlCard = () => {
           );
         })}
       </ul>
+
+      <div className="mt-5 rounded-xl border border-slate-200 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><h3 className="font-semibold text-slate-900">Per-screen playlists</h3><p className="text-xs text-slate-500">Each physical screen opens its own address, e.g. /led-boards?screen=darbar. Pick a screen below, or choose Custom to add your own. Unconfigured screens use the global playlist.</p></div>
+          <select aria-label="Select LED screen" value={addingScreen ? '__custom__' : selectedScreen} onChange={(event) => { if (event.target.value === '__custom__') setAddingScreen(true); else { setAddingScreen(false); setSelectedScreen(event.target.value); } }} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            {screens.map((screen) => <option key={screen.id} value={screen.id}>{screen.label}</option>)}
+            <option value="__custom__">Custom screen…</option>
+          </select>
+        </div>
+        {addingScreen ? (
+          <form onSubmit={addScreen} className="mt-3 flex flex-wrap items-end gap-2 rounded-lg bg-slate-50 p-3">
+            <label className="text-xs font-semibold text-slate-600">Screen name<input value={newScreenName} onChange={(event) => setNewScreenName(event.target.value)} maxLength={60} placeholder="e.g. Youth Room" className="mt-1 block w-56 rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal" /></label>
+            <button type="submit" disabled={!slugifyScreenId(newScreenName)} className="rounded-lg bg-brand-blue px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Add screen</button>
+            <button type="button" onClick={() => { setAddingScreen(false); setNewScreenName(''); }} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Cancel</button>
+            {slugifyScreenId(newScreenName) ? <p className="w-full text-xs text-slate-500">Its screen address will be /led-boards?screen={slugifyScreenId(newScreenName)}</p> : null}
+          </form>
+        ) : null}
+        <p className="mt-3 text-xs text-slate-500">Address for this screen: <span className="font-semibold text-slate-700">/led-boards?screen={selectedScreen}</span></p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {LED_BOARDS.map((board) => (
+            <label key={board.key} className="flex items-center gap-2 rounded-lg border border-slate-200 p-2 text-sm text-slate-700">
+              <input type="checkbox" checked={selectedPlaylist.includes(board.key)} disabled={!settings.enabled[board.key]} onChange={(event) => setScreenPlaylist(selectedScreen, event.target.checked ? [...selectedPlaylist, board.key] : selectedPlaylist.filter((key) => key !== board.key))} />
+              {board.title}{!settings.enabled[board.key] ? <span className="text-xs text-slate-400">(globally off)</span> : null}
+            </label>
+          ))}
+        </div>
+        <button type="button" onClick={() => {
+          const current = queryClient.getQueryData(SETTINGS_QUERY_KEY) || settings;
+          const screenPlaylists = { ...(current.screenPlaylists || {}) };
+          delete screenPlaylists[selectedScreen];
+          save({ screenPlaylists });
+        }} className="mt-3 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700">Use global playlist</button>
+        {isCustomScreen ? <button type="button" onClick={removeScreen} className="ml-2 mt-3 rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700">Remove this screen</button> : null}
+      </div>
+
+      <label className="mt-4 flex items-start gap-3 rounded-lg border border-slate-200 p-3 text-sm">
+        <input type="checkbox" className="mt-1" checked={settings.festivalBannersEnabled !== false} onChange={(event) => save({ festivalBannersEnabled: event.target.checked })} />
+        <span><span className="block font-semibold text-slate-800">Auto-show Gurpurab and Sangrand banners</span><span className="text-xs text-slate-500">Uses the configured Nanakshahi holidays feed. A feed outage does not affect other LED slides.</span></span>
+      </label>
     </Card>
   );
 };

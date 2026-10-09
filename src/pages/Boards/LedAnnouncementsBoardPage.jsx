@@ -5,8 +5,10 @@ import { ArrowsPointingOutIcon } from '@heroicons/react/24/outline';
 import Seo from '../../components/common/Seo';
 import LedAnnouncementSlide from '../../components/boards/LedAnnouncementSlide';
 import useSeoMeta from '../../hooks/useSeoMeta';
-import ledAnnouncementService, { isAnnouncementLive } from '../../services/ledAnnouncementService';
+import ledAnnouncementService, { isAnnouncementForScreen, isAnnouncementLive } from '../../services/ledAnnouncementService';
+import useLedScreenHeartbeat from '../../hooks/useLedScreenHeartbeat';
 import { useBranding } from '../../context/BrandingContext';
+import { readScreenId } from '../../constants/ledBoards';
 
 const DEFAULT_INTERVAL_SECONDS = 12;
 
@@ -14,6 +16,7 @@ const LedAnnouncementsBoardPage = () => {
   const { branding, logoSrc } = useBranding();
   const meta = useSeoMeta('Special Events Board', 'Special announcements and event photos for the Gurdwara LED display.');
   const [searchParams] = useSearchParams();
+  const screenId = readScreenId(searchParams.get('screen'));
   const intervalSeconds = Math.min(600, Math.max(3, Number(searchParams.get('interval')) || DEFAULT_INTERVAL_SECONDS));
   const [index, setIndex] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
@@ -26,9 +29,10 @@ const LedAnnouncementsBoardPage = () => {
     refetchOnWindowFocus: true
   });
 
-  const liveAnnouncements = useMemo(() => announcements.filter((entry) => isAnnouncementLive(entry)), [announcements]);
+  const liveAnnouncements = useMemo(() => announcements.filter((entry) => isAnnouncementLive(entry) && isAnnouncementForScreen(entry, screenId)), [announcements, screenId]);
   const slideCount = liveAnnouncements.length;
   const current = slideCount ? liveAnnouncements[index % slideCount] : null;
+  useLedScreenHeartbeat(screenId, current?.title || 'Special Events Board');
 
   useEffect(() => {
     if (slideCount < 2) return undefined;

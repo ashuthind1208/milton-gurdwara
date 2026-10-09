@@ -80,6 +80,9 @@ loadEnvFile(path.join(workspaceRoot, '.env.local'));
 
 const eventsDb = require('./db/adapter');
 const pushNotifications = require('./pushNotifications');
+const { createRecitationService } = require('./recitation');
+const { createSocialPostingService } = require('./socialPosting');
+const { createLedScreenService } = require('./ledScreenService');
 const langarBoardEventClients = new Set();
 
 const API_VERSION = '2026-07-27.phase2';
@@ -1727,6 +1730,10 @@ const enforceRateLimit = async (request, response, requestUrl) => {
 
   const method = String(request.method || 'GET').toUpperCase();
   const pathname = String(requestUrl?.pathname || '/');
+  // Many phones on the Gurdwara Wi-Fi share one public IP; these reads are cached in memory and must not be throttled.
+  if (method === 'GET' && (pathname === '/api/recitation/state' || pathname === '/api/recitation/text')) {
+    return true;
+  }
   const now = Date.now();
   const clientIp = resolveClientIp(request) || 'unknown-ip';
   const actorEmail = String(request.headers['x-actor-email'] || '').trim().toLowerCase();
@@ -6071,8 +6078,33 @@ const resolveYouTubeLiveVideo = async (source) => {
   };
 };
 
+const recitationService = createRecitationService({ eventsDb, sendJson, parseJsonObjectBody, assertInput });
+const socialPostingService = createSocialPostingService({
+  eventsDb,
+  sendJson,
+  parseJsonObjectBody,
+  assertInput,
+  isAdmin: canManageDonations,
+  getActorName: (request) => getRequestActor(request).name,
+  uploadsDir,
+  publicBaseUrl: newsletterPublicBaseUrl,
+  timeZone: String(process.env.SOCIAL_CARDS_TIME_ZONE || volunteerReminderTimeZone || 'America/Toronto').trim(),
+  organizationName: String(process.env.SOCIAL_ORGANIZATION_NAME || 'Gurdwara Singh Sabha Milton').trim()
+});
+const ledScreenService = createLedScreenService({
+  eventsDb,
+  sendJson,
+  parseJsonObjectBody,
+  assertInput,
+  isAdmin: canManageDonations
+});
+
 const server = http.createServer(async (request, response) => {
   const requestUrl = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
+
+  if (recitationService.handleLive(request, response, requestUrl)) {
+    return;
+  }
 
   if (requestUrl.pathname === '/api/live/langar' && request.method === 'GET') {
     response.writeHead(200, {
@@ -6099,6 +6131,18 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === 'OPTIONS') {
     sendJson(response, 204, {});
+    return;
+  }
+
+  if (await recitationService.handleApi(request, response, requestUrl)) {
+    return;
+  }
+
+  if (await socialPostingService.handleApi(request, response, requestUrl)) {
+    return;
+  }
+
+  if (await ledScreenService.handleApi(request, response, requestUrl)) {
     return;
   }
 
@@ -7117,6 +7161,18 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  const contentGuardMatch = requestUrl.pathname.match(/^\/api\/content(?:-single)?\/([a-z0-9_-]+)/i);
+  if (contentGuardMatch && recitationService.isProtectedResource(contentGuardMatch[1])) {
+    sendJson(response, 404, { ok: false, message: 'Not found.' });
+    return;
+  }
+
+  const ledContentMutationMatch = requestUrl.pathname.match(/^\/api\/content(?:-single)?\/(led_board_announcements|led_board_settings)(?:\/|$)/i);
+  if (ledContentMutationMatch && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method) && !ledScreenService.authorize(request)) {
+    sendJson(response, 403, { ok: false, message: 'Admin access is required to change LED content.' });
+    return;
+  }
+
   const contentResourceMatch = requestUrl.pathname.match(/^\/api\/content\/([a-z0-9_-]+)$/i);
   if (contentResourceMatch && request.method === 'GET') {
     try {
@@ -8083,19 +8139,24 @@ const server = http.createServer(async (request, response) => {
       body.date = date;
       await assertNoScheduleOverlap(body, { kind: 'event' });
       const data = await eventsDb.createEvent(body);
-      await triggerSocialAutomation({
-        type: 'event.created',
-        payload: {
-          title: data?.title || body?.title,
-          summary: data?.description || body?.description || 'New community event has been added.',
-          date: data?.date || body?.date,
-          location: data?.location || body?.location || '',
-          coverImageUrl: data?.coverImageUrl || body?.coverImageUrl || body?.imageUrl || '',
-          link: `${newsletterPublicBaseUrl || volunteerReminderBaseUrl || process.env.APP_URL || 'https://example.com'}/events`,
-          whatsappNumber: process.env.WHATSAPP_GROUP_NUMBER || '',
-          hashtags: ['SinghSabha', 'Community', 'Event']
-        }
-      });
+      if (data?.active !== false && data?.isActive !== false) {
+        socialPostingService.onEventCreated(data).catch((error) => logServerError(error, 'Event poster auto-post failed'));
+      }
+      if (!(await socialPostingService.shouldReplaceLegacyEventPost())) {
+        await triggerSocialAutomation({
+          type: 'event.created',
+          payload: {
+            title: data?.title || body?.title,
+            summary: data?.description || body?.description || 'New community event has been added.',
+            date: data?.date || body?.date,
+            location: data?.location || body?.location || '',
+            coverImageUrl: data?.coverImageUrl || body?.coverImageUrl || body?.imageUrl || '',
+            link: `${newsletterPublicBaseUrl || volunteerReminderBaseUrl || process.env.APP_URL || 'https://example.com'}/events`,
+            whatsappNumber: process.env.WHATSAPP_GROUP_NUMBER || '',
+            hashtags: ['SinghSabha', 'Community', 'Event']
+          }
+        });
+      }
       notifyAppUpdate({
         title: 'New Event Added',
         body: `${String(getRequestActor(request).name || '').trim() || 'A Gurdwara team member'} added ${data?.title || body?.title}, scheduled for ${data?.date || body?.date}${data?.location || body?.location ? ` at ${data?.location || body?.location}` : ''}.`,
@@ -9534,6 +9595,13 @@ const bootstrap = async () => {
   const bookingConfiguredTime = `${String(bookingReminderSendTime.hour).padStart(2, '0')}:${String(bookingReminderSendTime.minute).padStart(2, '0')}`;
   console.log(`Booking reminder scheduler set for ${bookingConfiguredTime} (${bookingReminderTimeZone}) daily at ${bookingReminderDays.join(', ')} day intervals.`);
   console.log(`Membership renewal scheduler set for ${bookingConfiguredTime} (${bookingReminderTimeZone}) daily at ${membershipReminderDays.join(', ')} day intervals.`);
+
+  if (eventsDb.hasDatabaseConnection) {
+    const socialCardsTimer = setInterval(() => {
+      socialPostingService.runScheduledSweep().catch((error) => logServerError(error, 'Social card sweep failed'));
+    }, 60 * 1000);
+    if (typeof socialCardsTimer.unref === 'function') socialCardsTimer.unref();
+  }
 
   // Check every minute, but only send once per day after the configured local send time.
   setInterval(() => {

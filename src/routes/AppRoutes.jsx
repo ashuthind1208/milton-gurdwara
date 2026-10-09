@@ -1,5 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import LedEmergencyGuard from '../components/boards/LedEmergencyGuard';
 import PublicLayout from '../layouts/PublicLayout';
 import AdminLayout from '../layouts/AdminLayout';
 import ProtectedRoute from './ProtectedRoute';
@@ -25,6 +26,9 @@ const DailyScheduleDisplayBoardPage = lazy(() => import('../pages/Schedule/Daily
 const LedBoardLauncherPage = lazy(() => import('../pages/Boards/LedBoardLauncherPage'));
 const LedAnnouncementsBoardPage = lazy(() => import('../pages/Boards/LedAnnouncementsBoardPage'));
 const LedHukamnamaBoardPage = lazy(() => import('../pages/Boards/LedHukamnamaBoardPage'));
+const RecitationLedBoardPage = lazy(() => import('../pages/Recitation/RecitationLedBoardPage'));
+const RecitationFollowPage = lazy(() => import('../pages/Recitation/RecitationFollowPage'));
+const GranthiRemotePage = lazy(() => import('../pages/Recitation/GranthiRemotePage'));
 const AskGranthiBoardPage = lazy(() => import('../pages/AskGranthi/AskGranthiBoardPage'));
 const AskGranthiQuestionPage = lazy(() => import('../pages/AskGranthi/AskGranthiQuestionPage'));
 const DonationSuccessPage = lazy(() => import('../pages/Donation/DonationSuccessPage'));
@@ -53,6 +57,8 @@ const AdminStreamingPage = lazy(() => import('../admin/Streaming/AdminStreamingP
 const AdminAdvertisementsPage = lazy(() => import('../admin/Advertisements/AdminAdvertisementsPage'));
 const AdminSponsorsPage = lazy(() => import('../admin/Sponsors/AdminSponsorsPage'));
 const AdminLedAnnouncementsPage = lazy(() => import('../admin/LedAnnouncements/AdminLedAnnouncementsPage'));
+const AdminRecitationsPage = lazy(() => import('../admin/Recitations/AdminRecitationsPage'));
+const AdminSocialPostsPage = lazy(() => import('../admin/SocialPosts/AdminSocialPostsPage'));
 const AdminEventsPage = lazy(() => import('../admin/Events/AdminEventsPage'));
 const AdminBookingsPage = lazy(() => import('../admin/Bookings/AdminBookingsPage'));
 const AdminBookingDutiesPage = lazy(() => import('../admin/BookingDuties/AdminBookingDutiesPage'));
@@ -98,15 +104,19 @@ const AppRoutes = () => {
 
         <Route path="/donationsuccess" element={<DonationSuccessPage />} />
 
-        <Route path="/donation-board" element={<DonationDisplayBoardPage />} />
-        <Route path="/event-calendar-board" element={<EventCalendarBoardPage />} />
-        <Route path="/langar-board" element={<LangarDisplayBoardPage />} />
+        <Route path="/donation-board" element={<LedEmergencyGuard><DonationDisplayBoardPage /></LedEmergencyGuard>} />
+        <Route path="/event-calendar-board" element={<LedEmergencyGuard><EventCalendarBoardPage /></LedEmergencyGuard>} />
+        <Route path="/langar-board" element={<LedEmergencyGuard><LangarDisplayBoardPage /></LedEmergencyGuard>} />
         <Route path="/langar-contribute" element={<LangarItemContributionPage />} />
-        <Route path="/daily-schedule-board" element={<DailyScheduleDisplayBoardPage />} />
-        <Route path="/led-boards" element={<LedBoardLauncherPage />} />
-        <Route path="/special-events-board" element={<LedAnnouncementsBoardPage />} />
-        <Route path="/hukamnama-board" element={<LedHukamnamaBoardPage />} />
-        <Route path="/ask-a-granthi" element={<AskGranthiBoardPage />} />
+        <Route path="/daily-schedule-board" element={<LedEmergencyGuard><DailyScheduleDisplayBoardPage /></LedEmergencyGuard>} />
+        <Route path="/led-boards" element={<LedEmergencyGuard><LedBoardLauncherPage /></LedEmergencyGuard>} />
+        <Route path="/special-events-board" element={<LedEmergencyGuard><LedAnnouncementsBoardPage /></LedEmergencyGuard>} />
+        <Route path="/hukamnama-board" element={<LedEmergencyGuard><LedHukamnamaBoardPage /></LedEmergencyGuard>} />
+        <Route path="/recitation-board" element={<LedEmergencyGuard><RecitationLedBoardPage /></LedEmergencyGuard>} />
+        <Route path="/follow" element={<RecitationFollowPage />} />
+        <Route path="/follow/:sessionId" element={<RecitationFollowPage />} />
+        <Route path="/granthi-remote" element={<GranthiRemotePage />} />
+        <Route path="/ask-a-granthi" element={<LedEmergencyGuard><AskGranthiBoardPage /></LedEmergencyGuard>} />
         <Route path="/ask-a-granthi/question" element={<AskGranthiQuestionPage />} />
 
         <Route element={<ProtectedRoute allowedRoles={LIMITED_ADMIN_ROLES} />}>
@@ -129,6 +139,8 @@ const AppRoutes = () => {
             <Route path="/admin/advertisements" element={<AdminAdvertisementsPage />} />
             <Route path="/admin/sponsors" element={<AdminSponsorsPage />} />
             <Route path="/admin/led-announcements" element={<AdminLedAnnouncementsPage />} />
+            <Route path="/admin/recitations" element={<AdminRecitationsPage />} />
+            <Route path="/admin/social-posts" element={<AdminSocialPostsPage />} />
             <Route path="/admin/seva-opportunities" element={<AdminSevaOpportunitiesPage />} />
             <Route path="/admin/events" element={<AdminEventsPage />} />
             <Route path="/admin/bookings" element={<AdminBookingsPage />} />
