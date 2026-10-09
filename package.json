@@ -23,7 +23,7 @@
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "mysql2": "^3.23.3",
-    "nodemailer": "^7.0.13",
+    "nodemailer": "^10.0.16",
     "pg": "^8.22.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.7",
