@@ -51,7 +51,7 @@ const DailyScheduleDisplayBoardPage = () => {
   const { data: content } = useQuery({
     queryKey: ['daily-schedule-display-board-content'],
     queryFn: () => cmsService.getHomeContent().then((response) => response.data),
-    refetchInterval: 10000,
+    refetchInterval: 5000,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true
   });

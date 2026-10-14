@@ -77,13 +77,13 @@ const EventCalendarBoardPage = () => {
   const { data: advertisementsResponse = [] } = useQuery({
     queryKey: ['advertisements'],
     queryFn: () => advertisementService.getAds().then((response) => response.data),
-    refetchInterval: 30000,
+    refetchInterval: 5000,
     refetchOnWindowFocus: true
   });
   const { data: sponsorsResponse = [] } = useQuery({
     queryKey: ['sponsors'],
     queryFn: () => sponsorService.getSponsors().then((response) => response.data),
-    refetchInterval: 30000,
+    refetchInterval: 5000,
     refetchOnWindowFocus: true
   });
 

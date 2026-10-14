@@ -10,16 +10,17 @@ const HUKAMNAMA_RESOURCE = 'hukamnama_ssm_hukamnama_entries';
 const GRAPH_BASE = 'https://graph.facebook.com/v20.0';
 const MAX_LOG_ITEMS = 200;
 const RENDER_CACHE_LIMIT = 16;
-const IMAGE_FETCH_TIMEOUT_MS = 10000;
-const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 const NAMING_HEADING_TYPES = new Set([1, 2]);
+const HUKAMNAMA_MODES = new Set(['off', 'onSave', 'scheduled']);
 
 const DEFAULT_SETTINGS = {
-  hukamnamaAuto: false,
+  hukamnamaMode: 'off',
   hukamnamaTime: '07:00',
   eventAuto: false,
   instagram: true,
   facebook: true,
+  whatsapp: false,
+  whatsappGroup: false,
   dryRun: true
 };
 
@@ -31,11 +32,13 @@ const isTime = (value) => /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value || ''));
 const normalizeSettings = (input = {}) => {
   const merged = { ...DEFAULT_SETTINGS, ...(input || {}) };
   return {
-    hukamnamaAuto: merged.hukamnamaAuto === true,
+    hukamnamaMode: HUKAMNAMA_MODES.has(input?.hukamnamaMode) ? input.hukamnamaMode : (input?.hukamnamaAuto === true ? 'onSave' : 'off'),
     hukamnamaTime: isTime(merged.hukamnamaTime) ? merged.hukamnamaTime : DEFAULT_SETTINGS.hukamnamaTime,
     eventAuto: merged.eventAuto === true,
     instagram: merged.instagram !== false,
     facebook: merged.facebook !== false,
+    whatsapp: merged.whatsapp === true,
+    whatsappGroup: merged.whatsappGroup === true,
     dryRun: merged.dryRun !== false
   };
 };
@@ -57,20 +60,26 @@ const toWallClock = (value, timeZone) => {
 
 const wallToUtcDate = (wall) => new Date(Date.UTC(wall.year, wall.month - 1, wall.day, wall.hour ?? 0, wall.minute ?? 0));
 
-const formatEventWhen = (startValue, endValue, timeZone) => {
+// Date and time are kept apart so the poster can put the time on its own line.
+const formatEventParts = (startValue, endValue, timeZone) => {
   const start = toWallClock(startValue, timeZone);
-  if (!start) return '';
+  if (!start) return { date: '', time: '' };
   const end = toWallClock(endValue, timeZone);
   const dayFormat = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   const timeFormat = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', hour: 'numeric', minute: '2-digit' });
   const startDay = dayFormat.format(wallToUtcDate(start));
   const hasStartTime = start.hour !== null && !(start.hour === 0 && start.minute === 0);
-  if (!hasStartTime) return startDay;
+  if (!hasStartTime) return { date: startDay, time: '' };
   const sameDay = end && end.year === start.year && end.month === start.month && end.day === start.day;
   const startTime = timeFormat.format(wallToUtcDate(start));
-  if (!end || end.hour === null) return `${startDay} • ${startTime}`;
-  if (sameDay) return `${startDay} • ${startTime} – ${timeFormat.format(wallToUtcDate(end))}`;
-  return `${startDay} ${startTime} – ${dayFormat.format(wallToUtcDate(end))} ${timeFormat.format(wallToUtcDate(end))}`;
+  if (!end || end.hour === null) return { date: startDay, time: startTime };
+  if (sameDay) return { date: startDay, time: `${startTime} – ${timeFormat.format(wallToUtcDate(end))}` };
+  return { date: `${startDay} – ${dayFormat.format(wallToUtcDate(end))}`, time: `${startTime} – ${timeFormat.format(wallToUtcDate(end))}` };
+};
+
+const formatEventWhen = (startValue, endValue, timeZone) => {
+  const { date, time } = formatEventParts(startValue, endValue, timeZone);
+  return [date, time].filter(Boolean).join(' • ');
 };
 
 const formatDateLabel = (dateKey) => {
@@ -87,10 +96,12 @@ const isPrivateHost = (hostname = '') => {
   return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
 };
 
-const pickCoverUrl = (mediaUrl = '') => String(mediaUrl || '')
-  .split(/[\n,;|]+/)
+const pickCoverUrls = (...sources) => sources
+  .flatMap((source) => String(source || '').split(/[\n,;|]+/))
   .map((entry) => entry.trim())
-  .find((entry) => entry && !/\.(mp4|mov|webm|m4v|avi)(\?|$)/i.test(entry) && !/youtu\.?be/i.test(entry)) || '';
+  .filter((entry, index, all) => entry && all.indexOf(entry) === index && !/\.(mp4|mov|webm|m4v|avi)(\?|$)/i.test(entry) && !/youtu\.?be/i.test(entry));
+
+const pickCoverUrl = (mediaUrl = '') => pickCoverUrls(mediaUrl)[0] || '';
 
 const createSocialPostingService = ({
   eventsDb,
@@ -105,15 +116,31 @@ const createSocialPostingService = ({
   organizationName = 'Gurdwara Singh Sabha Milton',
   env = process.env,
   http = axios,
-  fetchImpl = (typeof fetch === 'function' ? fetch : null),
   logger = console,
   now = () => new Date()
 }) => {
   const baseUrl = String(publicBaseUrl || '').trim().replace(/\/$/, '');
   const websiteLabel = baseUrl.replace(/^https?:\/\//, '');
   const pageToken = readText(env.META_PAGE_ACCESS_TOKEN);
+  const metaAppId = readText(env.META_APP_ID);
+  const metaAppSecret = readText(env.META_APP_SECRET);
   const instagramAccountId = readText(env.INSTAGRAM_BUSINESS_ACCOUNT_ID);
   const facebookPageId = readText(env.FACEBOOK_PAGE_ID);
+  const whatsappToken = readText(env.META_WA_ACCESS_TOKEN);
+  const whatsappPhoneNumberId = readText(env.META_WA_PHONE_NUMBER_ID);
+  const whatsappRecipientType = readText(env.SOCIAL_WHATSAPP_RECIPIENT_TYPE).toLowerCase() === 'group' ? 'group' : 'individual';
+  const configuredGroupId = readText(env.SOCIAL_WHATSAPP_GROUP_ID);
+  const isRegularGroupJid = /@g\.us$/i.test(configuredGroupId);
+  const whatsappRecipient = whatsappRecipientType === 'group'
+    ? (isRegularGroupJid ? '' : configuredGroupId)
+    : (readText(env.SOCIAL_WHATSAPP_TO) || readText(env.WHATSAPP_GROUP_NUMBER));
+  const groupGatewayUrl = readText(env.OPENWA_URL).replace(/\/+$/, '').replace(/\/api$/i, '');
+  const groupGatewayKey = readText(env.OPENWA_API_KEY);
+  const groupGatewaySession = readText(env.OPENWA_SESSION_ID);
+  const groupChatId = isRegularGroupJid ? configuredGroupId : readText(env.WA_GROUP_ID);
+  const configuredWhatsAppVersion = readText(env.WHATSAPP_GRAPH_API_VERSION);
+  const whatsappGraphVersion = /^v\d+\.\d+$/.test(configuredWhatsAppVersion) ? configuredWhatsAppVersion : 'v25.0';
+  const whatsappGraphBase = `https://graph.facebook.com/${whatsappGraphVersion}`;
   const postingEnabled = String(env.ENABLE_SOCIAL_CARDS || 'false').trim().toLowerCase() === 'true';
   const renderCache = new Map();
   let sweepRunning = false;
@@ -122,10 +149,45 @@ const createSocialPostingService = ({
     postingEnabled,
     instagramConfigured: Boolean(pageToken && instagramAccountId),
     facebookConfigured: Boolean(pageToken && facebookPageId),
+    whatsappConfigured: Boolean(whatsappToken && whatsappPhoneNumberId && whatsappRecipient),
+    whatsappGroupConfigured: Boolean(groupGatewayUrl && groupGatewayKey && groupGatewaySession && /@g\.us$/i.test(groupChatId)),
     publicBaseUrl: baseUrl,
     publicUrlIsHttps: /^https:\/\//i.test(baseUrl),
     timeZone
   });
+
+  const inspectMetaToken = async (token) => {
+    if (!token) return { configured: false, valid: false, reason: 'Token is not configured.' };
+    if (!metaAppId || !metaAppSecret) return { configured: true, valid: null, reason: 'Set META_APP_ID and META_APP_SECRET to inspect token validity.' };
+    try {
+      const response = await http.get('https://graph.facebook.com/v25.0/debug_token', {
+        params: { input_token: token, access_token: `${metaAppId}|${metaAppSecret}` },
+        timeout: 15000
+      });
+      const details = response?.data?.data || {};
+      return {
+        configured: true,
+        valid: details.is_valid === true,
+        type: readText(details.type),
+        expiresAt: Number(details.expires_at) > 0 ? new Date(Number(details.expires_at) * 1000).toISOString() : null,
+        neverExpires: Number(details.expires_at) === 0,
+        dataAccessExpiresAt: Number(details.data_access_expires_at) > 0 ? new Date(Number(details.data_access_expires_at) * 1000).toISOString() : null,
+        scopes: Array.isArray(details.scopes) ? details.scopes : [],
+        reason: details.is_valid === true ? '' : 'Meta reports this token is invalid or expired.'
+      };
+    } catch (error) {
+      const apiError = error?.response?.data?.error || {};
+      return { configured: true, valid: false, reason: String(apiError.message || 'Meta token check failed. Check app ID, app secret, and network access.').slice(0, 220) };
+    }
+  };
+
+  const getMetaTokenStatus = async () => {
+    const [page, whatsapp] = await Promise.all([
+      inspectMetaToken(pageToken),
+      inspectMetaToken(whatsappToken)
+    ]);
+    return { page, whatsapp };
+  };
 
   const getSettings = async () => normalizeSettings(await eventsDb.getSingleton(SETTINGS_RESOURCE, null));
 
@@ -212,29 +274,6 @@ const createSocialPostingService = ({
   };
 
   // ---- Events -------------------------------------------------------------------------------------------------
-  const loadCoverImage = async (mediaUrl) => {
-    const url = pickCoverUrl(mediaUrl);
-    if (!url) return null;
-    try {
-      if (url.startsWith('/api/uploads/')) {
-        const segments = url.slice('/api/uploads/'.length).split('/').map((segment) => decodeURIComponent(segment).replace(/[^A-Za-z0-9._-]/g, '_')).filter(Boolean);
-        const filePath = path.resolve(uploadsDir, ...segments);
-        if (!filePath.startsWith(`${path.resolve(uploadsDir)}${path.sep}`) || !fs.existsSync(filePath)) return null;
-        return await require('@napi-rs/canvas').loadImage(filePath);
-      }
-      const parsed = new URL(url);
-      if (!/^https?:$/.test(parsed.protocol) || isPrivateHost(parsed.hostname) || !fetchImpl) return null;
-      const response = await fetchImpl(url, { signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS), redirect: 'error' });
-      if (!response.ok) return null;
-      const buffer = Buffer.from(await response.arrayBuffer());
-      if (buffer.length === 0 || buffer.length > MAX_IMAGE_BYTES) return null;
-      return await require('@napi-rs/canvas').loadImage(buffer);
-    } catch (error) {
-      logger.warn?.('Social poster could not load the event image', error?.message || error);
-      return null;
-    }
-  };
-
   const buildEventCaption = (event, when) => [
     readText(event.title),
     [when, readText(event.location)].filter(Boolean).join('\n'),
@@ -252,16 +291,17 @@ const createSocialPostingService = ({
 
   const prepareEventFromRecord = async (event) => {
     const when = formatEventWhen(event.date, event.endDate, timeZone);
+    const parts = formatEventParts(event.date, event.endDate, timeZone);
     const input = {
       title: readText(event.title),
-      when,
+      whenDate: parts.date,
+      whenTime: parts.time,
       where: readText(event.location),
       description: readText(event.description),
       organizationName,
       websiteLabel: websiteLabel ? `${websiteLabel}/events` : ''
     };
-    const cover = await loadCoverImage(event.mediaUrl || event.coverImageUrl || event.imageUrl);
-    const rendered = await cards.renderEventPoster({ ...input, coverImage: cover });
+    const rendered = await cards.renderEventPoster(input);
     return {
       kind: 'event',
       refKey: `event:${event.id}`,
@@ -291,9 +331,58 @@ const createSocialPostingService = ({
     return published?.data?.id || creationId;
   };
 
-  const postToFacebook = async (imageUrl, caption) => {
-    const posted = await http.post(`${GRAPH_BASE}/${facebookPageId}/photos`, { url: imageUrl, caption, access_token: pageToken });
+  // Page posts need a Page token. If the configured token is a user token, the Page endpoint hands back the matching Page token.
+  let facebookPageToken = '';
+  const resolveFacebookToken = async () => {
+    if (facebookPageToken) return facebookPageToken;
+    try {
+      const found = await http.get(`${GRAPH_BASE}/${facebookPageId}`, { params: { fields: 'access_token', access_token: pageToken } });
+      facebookPageToken = found?.data?.access_token || pageToken;
+    } catch {
+      facebookPageToken = pageToken;
+    }
+    return facebookPageToken;
+  };
+
+  // Uploading the file itself means Facebook posts work without a public image address (only Instagram needs one).
+  const postToFacebook = async (buffer, caption) => {
+    const form = new FormData();
+    form.append('source', new Blob([buffer], { type: 'image/jpeg' }), 'card.jpg');
+    form.append('caption', caption);
+    form.append('access_token', await resolveFacebookToken());
+    const posted = await http.post(`${GRAPH_BASE}/${facebookPageId}/photos`, form);
     return posted?.data?.post_id || posted?.data?.id || '';
+  };
+
+  // Meta Cloud API first uploads the JPEG, then sends it as an image message.
+  const postToWhatsApp = async (buffer, caption) => {
+    const media = new FormData();
+    media.append('messaging_product', 'whatsapp');
+    media.append('file', new Blob([buffer], { type: 'image/jpeg' }), 'card.jpg');
+    const uploaded = await http.post(`${whatsappGraphBase}/${whatsappPhoneNumberId}/media`, media, {
+      headers: { Authorization: `Bearer ${whatsappToken}` }, timeout: 30000, maxBodyLength: Infinity
+    });
+    const mediaId = uploaded?.data?.id;
+    if (!mediaId) throw new Error('Meta WhatsApp API did not return an uploaded media ID.');
+    const sent = await http.post(`${whatsappGraphBase}/${whatsappPhoneNumberId}/messages`, {
+      messaging_product: 'whatsapp',
+      recipient_type: whatsappRecipientType,
+      to: whatsappRecipient,
+      type: 'image',
+      image: { id: mediaId, caption: String(caption || '').slice(0, 1024) }
+    }, { headers: { Authorization: `Bearer ${whatsappToken}`, 'Content-Type': 'application/json' }, timeout: 30000 });
+    return sent?.data?.messages?.[0]?.id || sent?.data?.id || '';
+  };
+
+  // Unofficial path: the OpenWA gateway posts into an existing WhatsApp group, which Meta's Cloud API cannot do.
+  const postToWhatsAppGroup = async (buffer, caption) => {
+    const sent = await http.post(`${groupGatewayUrl}/api/sessions/${encodeURIComponent(groupGatewaySession)}/messages/send-image`, {
+      chatId: groupChatId,
+      base64: buffer.toString('base64'),
+      mimetype: 'image/jpeg',
+      caption: String(caption || '').slice(0, 1000)
+    }, { headers: { 'X-API-Key': groupGatewayKey, 'Content-Type': 'application/json' }, timeout: 30000, maxBodyLength: Infinity });
+    return sent?.data?.id || sent?.data?.messageId || sent?.data?.data?.id || '';
   };
 
   const describeError = (error) => {
@@ -314,7 +403,9 @@ const createSocialPostingService = ({
   const publishPrepared = async (prepared, { mode, settings, dryRun, platforms, actor = '' }) => {
     const wanted = {
       instagram: platforms?.instagram ?? settings.instagram,
-      facebook: platforms?.facebook ?? settings.facebook
+      facebook: platforms?.facebook ?? settings.facebook,
+      whatsapp: platforms?.whatsapp ?? settings.whatsapp,
+      whatsappGroup: platforms?.whatsappGroup ?? settings.whatsappGroup
     };
     const live = dryRun === undefined ? !settings.dryRun : !dryRun;
     const imageUrlPath = saveImage(prepared.buffer);
@@ -322,16 +413,18 @@ const createSocialPostingService = ({
     const results = [];
     if (live && !postingEnabled) {
       results.push({ platform: 'all', status: 'failed', message: 'Set ENABLE_SOCIAL_CARDS=true on the server before enabling live posting.' });
-    } else if (live && !status().publicUrlIsHttps) {
-      results.push({ platform: 'all', status: 'failed', message: 'PUBLIC_SITE_URL must be a public https address so Meta can download the image.' });
     } else {
-      for (const platform of ['instagram', 'facebook']) {
+      for (const platform of ['instagram', 'facebook', 'whatsapp', 'whatsappGroup']) {
         if (!wanted[platform]) continue;
-        const configured = platform === 'instagram' ? status().instagramConfigured : status().facebookConfigured;
+        const configured = status()[`${platform}Configured`];
         if (!live) { results.push({ platform, status: 'dry-run', message: configured ? 'Ready to post.' : 'Not configured yet.' }); continue; }
         if (!configured) { results.push({ platform, status: 'skipped', message: 'Not configured on the server.' }); continue; }
+        if (platform === 'instagram' && !status().publicUrlIsHttps) { results.push({ platform, status: 'failed', message: 'PUBLIC_SITE_URL must be a public https address so Instagram can download the image.' }); continue; }
         try {
-          const id = platform === 'instagram' ? await postToInstagram(imageUrl, prepared.caption) : await postToFacebook(imageUrl, prepared.caption);
+          const id = platform === 'instagram' ? await postToInstagram(imageUrl, prepared.caption)
+            : platform === 'facebook' ? await postToFacebook(prepared.buffer, prepared.caption)
+              : platform === 'whatsapp' ? await postToWhatsApp(prepared.buffer, prepared.caption)
+                : await postToWhatsAppGroup(prepared.buffer, prepared.caption);
           results.push({ platform, status: 'posted', externalId: String(id || '') });
         } catch (error) {
           logger.error?.(`Social ${platform} post failed`, error?.response?.data || error?.message || error);
@@ -357,14 +450,14 @@ const createSocialPostingService = ({
     });
   };
 
-  const alreadyAutoPosted = async (refKey) => (await eventsDb.listItems(LOG_RESOURCE)).some((item) => item.refKey === refKey && item.mode === 'auto');
+  const alreadyAutoPosted = async (refKey) => (await eventsDb.listItems(LOG_RESOURCE)).some((item) => item.refKey === refKey && item.mode === 'auto' && item.status !== 'dry-run');
 
   const runScheduledSweep = async () => {
     if (sweepRunning || !eventsDb.hasDatabaseConnection) return null;
     sweepRunning = true;
     try {
       const settings = await getSettings();
-      if (!settings.hukamnamaAuto) return null;
+      if (settings.hukamnamaMode !== 'scheduled') return null;
       const [hour, minute] = settings.hukamnamaTime.split(':').map(Number);
       if (minutesNow() < hour * 60 + minute) return null;
       const dateKey = todayKey();
@@ -394,6 +487,32 @@ const createSocialPostingService = ({
     }
   };
 
+  // Called when the Granthi saves a Hukamnama; only today's is posted now, an earlier-saved one waits for the scheduled time.
+  const onHukamnamaSaved = async (dateKey) => {
+    try {
+      const settings = await getSettings();
+      if (settings.hukamnamaMode !== 'onSave' || dateKey !== todayKey()) return null;
+      if (!(await findHukamnama(dateKey)) || await alreadyAutoPosted(`hukamnama:${dateKey}`)) return null;
+      return await publishPrepared(await prepareHukamnama({ date: dateKey }), { mode: 'auto', settings });
+    } catch (error) {
+      logger.error?.('Hukamnama post on save failed', error?.message || error);
+      return null;
+    }
+  };
+
+  // Re-sends only the platforms that did not succeed the first time.
+  const retryPost = async (logId, actor) => {
+    const original = (await eventsDb.listItems(LOG_RESOURCE)).find((item) => item.id === logId);
+    assertInput(original, 'That post record was not found.', 404);
+    const failedPlatforms = (original.results || []).filter((item) => ['failed', 'skipped'].includes(item.status) && item.platform !== 'all').map((item) => item.platform);
+    assertInput(['failed', 'partial', 'skipped'].includes(original.status), 'Only unsuccessful posts can be retried.');
+    const [kind, id] = String(original.refKey || '').split(/:(.+)/);
+    const prepared = kind === 'event' ? await prepareEvent(id) : await prepareHukamnama({ date: id });
+    const settings = await getSettings();
+    const platforms = failedPlatforms.length ? { instagram: failedPlatforms.includes('instagram'), facebook: failedPlatforms.includes('facebook'), whatsapp: failedPlatforms.includes('whatsapp'), whatsappGroup: failedPlatforms.includes('whatsappGroup') } : undefined;
+    return publishPrepared(prepared, { mode: 'retry', settings, dryRun: false, platforms, actor });
+  };
+
   const shouldReplaceLegacyEventPost = async () => {
     try {
       return (await getSettings()).eventAuto === true;
@@ -407,7 +526,7 @@ const createSocialPostingService = ({
     response.writeHead(200, {
       'Content-Type': 'image/jpeg',
       'Content-Length': buffer.length,
-      'Cache-Control': 'public, max-age=300',
+      'Cache-Control': 'no-store, max-age=0',
       'X-Content-Type-Options': 'nosniff'
     });
     response.end(buffer);
@@ -437,6 +556,10 @@ const createSocialPostingService = ({
         sendJson(response, 200, { ok: true, data: { settings: await getSettings(), status: status() } });
         return true;
       }
+      if (method === 'POST' && route === '/api/social/meta-token-status') {
+        sendJson(response, 200, { ok: true, data: await getMetaTokenStatus() });
+        return true;
+      }
       if (method === 'PUT' && route === '/api/social/settings') {
         const body = await parseJsonObjectBody(request, { maxBytes: 2048, allowEmpty: false });
         const settings = normalizeSettings(body);
@@ -447,6 +570,11 @@ const createSocialPostingService = ({
       if (method === 'GET' && route === '/api/social/log') {
         const items = (await eventsDb.listItems(LOG_RESOURCE)).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))).slice(0, 50);
         sendJson(response, 200, { ok: true, data: items });
+        return true;
+      }
+      if (method === 'POST' && route === '/api/social/retry') {
+        const body = await parseJsonObjectBody(request, { maxBytes: 1024, allowEmpty: false });
+        sendJson(response, 200, { ok: true, data: await retryPost(String(body.id || ''), getActorName(request)) });
         return true;
       }
       if (method === 'POST' && route === '/api/social/post') {
@@ -473,7 +601,7 @@ const createSocialPostingService = ({
     }
   };
 
-  return { handleApi, runScheduledSweep, onEventCreated, shouldReplaceLegacyEventPost, status };
+  return { handleApi, runScheduledSweep, onEventCreated, onHukamnamaSaved, shouldReplaceLegacyEventPost, status };
 };
 
 module.exports = {
@@ -481,8 +609,10 @@ module.exports = {
   LOG_RESOURCE,
   SETTINGS_RESOURCE,
   createSocialPostingService,
+  formatEventParts,
   formatEventWhen,
   isPrivateHost,
   normalizeSettings,
-  pickCoverUrl
+  pickCoverUrl,
+  pickCoverUrls
 };

@@ -24,7 +24,7 @@ const LedAnnouncementsBoardPage = () => {
   const { data: announcements = [] } = useQuery({
     queryKey: ['led-board-announcements'],
     queryFn: () => ledAnnouncementService.getAnnouncements().then((response) => response.data),
-    refetchInterval: 20000,
+    refetchInterval: 5000,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true
   });

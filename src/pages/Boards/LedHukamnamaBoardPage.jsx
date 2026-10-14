@@ -50,7 +50,7 @@ const fitToBox = (box, content) => {
 const LedHukamnamaBoardPage = () => {
   const { branding, logoSrc } = useBranding();
   const meta = useSeoMeta('Daily Hukamnama Board', 'Today\'s hukamnama with translation for the Gurdwara LED display.');
-  const { entry, lines, hasHukamnama } = useDailyHukamnama();
+  const { entry, lines, hasHukamnama } = useDailyHukamnama({ refetchInterval: 5000 });
   const boxRef = useRef(null);
   const contentRef = useRef(null);
 

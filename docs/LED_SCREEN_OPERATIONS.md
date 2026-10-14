@@ -35,5 +35,5 @@ The frontend uses `REACT_APP_GURPURAB_HOLIDAYS_API_URL` at build time when provi
 2. Ensure production `UPLOAD_DIR` remains persistent if social cards are enabled. Existing event image URLs continue to use the site's upload endpoint.
 3. Restart the Node.js server so the new `/api/led/override`, `/api/led/heartbeat`, and `/api/led/screens/health` endpoints are loaded.
 4. Restart the server, open the LED admin, and set screen-specific playlists as desired. Add `?screen=...` to each physical screen's URL.
-5. After deploy, manually reload each existing kiosk once. Thereafter announcements/settings refresh in-page; the override refreshes every five seconds and board settings refresh about every 15 seconds.
+5. After deploy, manually reload each existing kiosk once. Thereafter announcements/settings refresh in-page; the override, board settings and announcements all refresh about every five seconds.
 6. Verify each physical screen appears in Screen health, then test an emergency override for a short period and clear it.

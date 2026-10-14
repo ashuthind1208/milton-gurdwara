@@ -4,7 +4,7 @@ import hukamnamaService from '../services/hukamnamaService';
 import { toLocalDateKey } from '../services/ledAnnouncementService';
 
 // Today's hukamnama, following the date so a screen left on for days moves to the next day by itself.
-const useDailyHukamnama = () => {
+const useDailyHukamnama = ({ refetchInterval = 300000 } = {}) => {
   const [dateKey, setDateKey] = useState(() => toLocalDateKey());
 
   useEffect(() => {
@@ -15,7 +15,7 @@ const useDailyHukamnama = () => {
   const { data, isLoading } = useQuery({
     queryKey: ['daily-hukamnama', dateKey],
     queryFn: () => hukamnamaService.getDailyHukamnama(dateKey).then((response) => response.data),
-    refetchInterval: 300000,
+    refetchInterval,
     refetchIntervalInBackground: true
   });
 

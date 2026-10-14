@@ -25,13 +25,13 @@ const LedBoardLauncherPage = () => {
   const { data: settings } = useQuery({
     queryKey: ['led-board-settings'],
     queryFn: () => ledBoardSettingsService.getSettings().then((response) => response.data),
-    refetchInterval: 15000,
+    refetchInterval: 5000,
     refetchIntervalInBackground: true
   });
   const { data: announcements = [] } = useQuery({
     queryKey: ['led-board-announcements'],
     queryFn: () => ledAnnouncementService.getAnnouncements().then((response) => response.data),
-    refetchInterval: 20000,
+    refetchInterval: 5000,
     refetchIntervalInBackground: true
   });
 
@@ -42,7 +42,7 @@ const LedBoardLauncherPage = () => {
     retry: 1
   });
 
-  const { hasHukamnama } = useDailyHukamnama();
+  const { hasHukamnama } = useDailyHukamnama({ refetchInterval: 5000 });
   const screenLabel = getLedScreens(settings).find((screen) => screen.id === screenId)?.label;
 
   useLedScreenHeartbeat(screenId, currentSlide, screenLabel);
