@@ -655,6 +655,14 @@ const seedUsers = [
 ];
 
 const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
+const whatsappWebhookHandler = createWhatsAppWebhookHandler({
+  verifyToken: process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || '',
+  appSecret: process.env.META_APP_SECRET || '',
+  onEvent: (event) => console.info('WhatsApp webhook received', {
+    object: event?.object || '',
+    entryCount: Array.isArray(event?.entry) ? event.entry.length : 0
+  })
+});
 
 const publicServerErrorMessage = 'An unexpected error occurred. Please try again later.';
 
@@ -6102,6 +6110,10 @@ const ledScreenService = createLedScreenService({
 const server = http.createServer(async (request, response) => {
   const requestUrl = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
 
+  if (await whatsappWebhookHandler(request, response, requestUrl)) {
+    return;
+  }
+
   if (recitationService.handleLive(request, response, requestUrl)) {
     return;
   }
@@ -7672,6 +7684,12 @@ const server = http.createServer(async (request, response) => {
         ? await eventsDb.getSingleton(resource, null)
         : null;
       const data = await eventsDb.setSingleton(resource, body);
+      if (resource === 'hukamnama_ssm_hukamnama_entries') {
+        const savedToday = toDateKeyFromParts(getDatePartsInTimeZone(new Date(), String(process.env.SOCIAL_CARDS_TIME_ZONE || volunteerReminderTimeZone || 'America/Toronto').trim()));
+        if (body?.[savedToday] && JSON.stringify(body[savedToday]) !== JSON.stringify(previousSingleton?.[savedToday])) {
+          socialPostingService.onHukamnamaSaved(savedToday).catch((error) => logServerError(error, 'Hukamnama social post failed'));
+        }
+      }
       if (resource === 'hukamnama_ssm_hukamnama_entries') {
         const previousEntries = previousSingleton || {};
         const allDateKeys = new Set([...Object.keys(previousEntries), ...Object.keys(body || {})]);

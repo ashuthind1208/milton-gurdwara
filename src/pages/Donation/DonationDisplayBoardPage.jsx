@@ -138,7 +138,7 @@ const DonationDisplayBoardPage = () => {
   } = useQuery({
     queryKey: ['advertisements'],
     queryFn: () => advertisementService.getAds().then((res) => res.data),
-    refetchInterval: 30000,
+    refetchInterval: 5000,
     refetchOnWindowFocus: true
   });
 
@@ -148,7 +148,7 @@ const DonationDisplayBoardPage = () => {
   } = useQuery({
     queryKey: ['sponsors'],
     queryFn: () => sponsorService.getSponsors().then((res) => res.data),
-    refetchInterval: 30000,
+    refetchInterval: 5000,
     refetchOnWindowFocus: true
   });
 

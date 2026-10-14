@@ -65,7 +65,7 @@ const LedBoardControlCard = () => {
       if (context?.previous) queryClient.setQueryData(SETTINGS_QUERY_KEY, context.previous);
       setStatus({ type: 'error', message: error.message || 'Unable to save the LED board settings.' });
     },
-    onSuccess: () => setStatus({ type: 'success', message: 'Saved. The LED screen updates within about 15 seconds.' })
+    onSuccess: () => setStatus({ type: 'success', message: 'Saved. The LED screen updates within about 5 seconds.' })
   });
 
   const slides = useMemo(

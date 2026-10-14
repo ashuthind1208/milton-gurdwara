@@ -63,14 +63,14 @@ const LangarDisplayBoardPage = () => {
   const { data: homeContent } = useQuery({
     queryKey: ['langar-display-board-content'],
     queryFn: () => cmsService.getHomeContent().then((response) => response.data),
-    refetchInterval: 10000,
+    refetchInterval: 5000,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true
   });
   const { data: contributions = [] } = useQuery({
     queryKey: [LANGAR_CONTRIBUTIONS_RESOURCE, 'display-board'],
     queryFn: () => langarService.getContributions().then((response) => response.data),
-    refetchInterval: 10000,
+    refetchInterval: 5000,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true
   });

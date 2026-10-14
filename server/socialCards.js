@@ -71,7 +71,8 @@ const fitWrapped = (ctx, { text, fontFamily, weight = '', maxWidth, maxHeight, m
   return { size: minSize, lines, lineHeight, truncated: all.length > fitting };
 };
 
-const drawLines = (ctx, { lines, size, lineHeight }, { x, y, align = 'center', color }) => {
+const drawLines = (ctx, { lines, size, lineHeight }, { x, y, align = 'center', color, fontFamily, weight = '' }) => {
+  if (fontFamily) ctx.font = `${weight} ${size}px ${fontFamily}`.trim();
   ctx.textAlign = align;
   ctx.textBaseline = 'top';
   ctx.fillStyle = color;
@@ -128,7 +129,17 @@ const drawLogo = (ctx, logo, centerX, centerY, radius) => {
   ctx.stroke();
 };
 
+const drawSeparator = (ctx, y, width = WIDTH - 120) => {
+  ctx.beginPath();
+  ctx.moveTo((WIDTH - width) / 2, y);
+  ctx.lineTo((WIDTH + width) / 2, y);
+  ctx.strokeStyle = 'rgba(245, 166, 35, 0.75)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+};
+
 const drawFooter = (ctx, { organizationName, websiteLabel }) => {
+  drawSeparator(ctx, 1204);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.fillStyle = GOLD;
@@ -181,96 +192,87 @@ const renderHukamnamaCard = async ({ lines = [], ang = '', raag = '', writer = '
   ctx.fillStyle = 'rgba(214, 235, 255, 0.9)';
   ctx.font = `30px ${LATIN_REGULAR}`;
   ctx.fillText(cleanText(dateLabel), WIDTH / 2, 275);
-  drawPills(ctx, [ang ? `Ang ${ang}` : '', raag ? cleanText(raag) : '', writer ? cleanText(writer) : ''], WIDTH / 2, 328);
+  drawPills(ctx, [ang ? `Ang ${ang}` : '', raag ? cleanText(raag) : '', writer ? cleanText(writer) : ''], WIDTH / 2, 348);
+  drawSeparator(ctx, 417);
 
+  const gurmukhiTop = 455;
+  const gurmukhiAreaHeight = 450;
   const usable = lines.filter((line) => cleanText(line.gurmukhi));
   let used = Math.min(usable.length, 8);
   let gurmukhi;
   let english;
   while (used >= 1) {
     const chosen = usable.slice(0, used);
-    gurmukhi = fitWrapped(ctx, { text: chosen.map((line) => line.gurmukhi).join(' '), fontFamily: GURMUKHI, maxWidth: 900, maxHeight: 470, maxSize: 66, minSize: 34, lineHeight: 1.4 });
+    gurmukhi = fitWrapped(ctx, { text: chosen.map((line) => line.gurmukhi).join(' '), fontFamily: GURMUKHI, maxWidth: 900, maxHeight: gurmukhiAreaHeight, maxSize: 66, minSize: 34, lineHeight: 1.4 });
     if (!gurmukhi.truncated) break;
     used -= 1;
   }
   used = Math.max(1, used);
   const chosenLines = usable.slice(0, used);
-  gurmukhi ||= fitWrapped(ctx, { text: cleanText(chosenLines.map((line) => line.gurmukhi).join(' ')), fontFamily: GURMUKHI, maxWidth: 900, maxHeight: 470, maxSize: 66, minSize: 34, lineHeight: 1.4 });
-  const gurmukhiHeight = drawLines(ctx, gurmukhi, { x: WIDTH / 2, y: 410 + Math.max(0, (470 - gurmukhi.lines.length * gurmukhi.size * gurmukhi.lineHeight) / 2), color: '#ffffff' });
-
-  const dividerY = 410 + 470 + 30;
-  ctx.strokeStyle = GOLD;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(WIDTH / 2 - 90, dividerY);
-  ctx.lineTo(WIDTH / 2 + 90, dividerY);
-  ctx.stroke();
+  gurmukhi ||= fitWrapped(ctx, { text: cleanText(chosenLines.map((line) => line.gurmukhi).join(' ')), fontFamily: GURMUKHI, maxWidth: 900, maxHeight: gurmukhiAreaHeight, maxSize: 66, minSize: 34, lineHeight: 1.4 });
+  const gurmukhiHeight = drawLines(ctx, gurmukhi, { x: WIDTH / 2, y: gurmukhiTop, color: '#ffffff' });
 
   const meaning = chosenLines.map((line) => cleanText(line.translationEnglish)).filter(Boolean).join(' ');
   if (meaning) {
     english = fitWrapped(ctx, { text: meaning, fontFamily: LATIN_REGULAR, maxWidth: 880, maxHeight: 230, maxSize: 34, minSize: 24, lineHeight: 1.35, maxLines: 6 });
-    drawLines(ctx, english, { x: WIDTH / 2, y: dividerY + 28, color: '#d9f2ff' });
+    drawLines(ctx, english, { x: WIDTH / 2, y: gurmukhiTop + gurmukhiHeight + 30, color: '#d9f2ff' });
   }
 
   drawFooter(ctx, { organizationName, websiteLabel });
   return { buffer: toJpeg(canvas), linesShown: used, gurmukhiHeight };
 };
 
-const coverFit = (ctx, image, x, y, width, height) => {
-  const scale = Math.max(width / image.width, height / image.height);
-  const drawWidth = image.width * scale;
-  const drawHeight = image.height * scale;
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(x, y, width, height);
-  ctx.clip();
-  ctx.drawImage(image, x + (width - drawWidth) / 2, y + (height - drawHeight) / 2, drawWidth, drawHeight);
-  ctx.restore();
-};
-
-// Event poster: title, when and where, with the event photo on top when there is one (4:5).
-const renderEventPoster = async ({ title = '', when = '', where = '', description = '', coverImage = null, organizationName = 'Gurdwara Singh Sabha Milton', websiteLabel = '' }) => {
+// Event posters keep a plain gradient background so event photos cannot reduce text contrast.
+const renderEventPoster = async ({ title = '', whenDate = '', whenTime = '', where = '', description = '', organizationName = 'Gurdwara Singh Sabha Milton', websiteLabel = '' }) => {
   ensureFonts();
   const canvas = createCanvas(WIDTH, HEIGHT);
   const ctx = canvas.getContext('2d');
   drawBackground(ctx);
-
-  let top = 90;
-  if (coverImage) {
-    const coverHeight = 560;
-    coverFit(ctx, coverImage, 28, 28, WIDTH - 56, coverHeight);
-    const fade = ctx.createLinearGradient(0, coverHeight - 220, 0, coverHeight + 28);
-    fade.addColorStop(0, 'rgba(6, 20, 47, 0)');
-    fade.addColorStop(1, 'rgba(6, 20, 47, 1)');
-    ctx.fillStyle = fade;
-    ctx.fillRect(28, coverHeight - 220, WIDTH - 56, 248);
-    drawLogo(ctx, await loadLogo(), 128, 128, 56);
-    top = 610;
-  } else {
-    drawLogo(ctx, await loadLogo(), WIDTH / 2, 150, 76);
-    top = 270;
-  }
+  drawLogo(ctx, await loadLogo(), WIDTH / 2, 150, 76);
+  const top = 240;
 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.fillStyle = GOLD;
-  ctx.font = `34px ${LATIN}`;
+  ctx.font = `40px ${LATIN}`;
   ctx.fillText('UPCOMING EVENT', WIDTH / 2, top);
+  drawSeparator(ctx, top + 66);
 
-  const titleBox = fitWrapped(ctx, { text: title, fontFamily: LATIN, maxWidth: 900, maxHeight: coverImage ? 210 : 340, maxSize: coverImage ? 76 : 92, minSize: 44, lineHeight: 1.18, maxLines: 3 });
-  const titleHeight = drawLines(ctx, titleBox, { x: WIDTH / 2, y: top + 56, color: '#ffffff' });
+  const titleBox = fitWrapped(ctx, { text: title, fontFamily: LATIN, weight: '700', maxWidth: 930, maxHeight: 390, maxSize: 116, minSize: 56, lineHeight: 1.12, maxLines: 3 });
+  const blockHeight = (block) => block.lines.length * block.size * block.lineHeight;
+  const detailBlocks = [[whenDate, '#ffffff', 48, LATIN_REGULAR], [whenTime, '#ffd27a', 46, LATIN_REGULAR], [where, '#bfe6ff', 42, LATIN_REGULAR]]
+    .filter(([text]) => cleanText(text))
+    .map(([text, color, size, family]) => ({
+      color,
+      block: fitWrapped(ctx, { text, fontFamily: family, maxWidth: 930, maxHeight: size * 1.25 * 2, maxSize: size, minSize: 32, lineHeight: 1.2, maxLines: 2 })
+    }));
+  const detailHeight = detailBlocks.reduce((height, item) => height + blockHeight(item.block), 0) + Math.max(0, detailBlocks.length - 1) * 6;
+  const contentTop = top + 112;
+  const contentBottom = 1174;
+  const availableHeight = contentBottom - contentTop;
+  const titleHeight = blockHeight(titleBox);
+  const fixedHeight = titleHeight + (detailBlocks.length ? 26 + detailHeight : 0);
+  const descriptionText = cleanText(description);
+  const descriptionGap = descriptionText ? 16 : 0;
+  const descriptionRoom = availableHeight - fixedHeight - descriptionGap;
+  const descriptionLines = Math.min(5, Math.floor(descriptionRoom / (30 * 1.25)));
+  const descriptionBlock = descriptionText && descriptionLines > 0
+    ? fitWrapped(ctx, { text: descriptionText, fontFamily: LATIN_REGULAR, maxWidth: 900, maxHeight: descriptionRoom, maxSize: 42, minSize: 30, lineHeight: 1.25, maxLines: descriptionLines })
+    : null;
+  const descriptionHeight = descriptionBlock ? blockHeight(descriptionBlock) : 0;
+  const totalHeight = fixedHeight + (descriptionBlock ? descriptionGap + descriptionHeight : 0);
+  let y = contentTop + Math.max(0, (availableHeight - totalHeight) / 2);
 
-  let y = top + 56 + titleHeight + 24;
-  const detailLines = [[when, '#ffffff', 38, LATIN_REGULAR], [where, '#bfe6ff', 34, LATIN_REGULAR]].filter(([text]) => cleanText(text));
-  detailLines.forEach(([text, color, size, family]) => {
-    const block = fitWrapped(ctx, { text, fontFamily: family, maxWidth: 900, maxHeight: size * 1.35 * 2, maxSize: size, minSize: 26, lineHeight: 1.3, maxLines: 2 });
-    y += drawLines(ctx, block, { x: WIDTH / 2, y, color }) + 10;
+  drawLines(ctx, titleBox, { x: WIDTH / 2, y, color: '#ffffff', fontFamily: LATIN, weight: '700' });
+  y += titleHeight;
+  if (detailBlocks.length) y += 26;
+  detailBlocks.forEach(({ block, color }, index) => {
+    drawLines(ctx, block, { x: WIDTH / 2, y, color, fontFamily: LATIN_REGULAR });
+    y += blockHeight(block) + (index < detailBlocks.length - 1 ? 12 : 0);
   });
-
-  const room = 1210 - y - 20;
-  if (cleanText(description) && room > 70) {
-    const block = fitWrapped(ctx, { text: description, fontFamily: LATIN_REGULAR, maxWidth: 860, maxHeight: room, maxSize: 30, minSize: 24, lineHeight: 1.35, maxLines: 5 });
-    drawLines(ctx, block, { x: WIDTH / 2, y: y + 14, color: 'rgba(214, 235, 255, 0.9)' });
+  if (descriptionBlock) {
+    y += descriptionGap;
+    drawLines(ctx, descriptionBlock, { x: WIDTH / 2, y, color: 'rgba(214, 235, 255, 0.9)', fontFamily: LATIN_REGULAR });
   }
 
   drawFooter(ctx, { organizationName, websiteLabel });
