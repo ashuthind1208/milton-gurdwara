@@ -90,6 +90,7 @@ const pushNotifications = require('./pushNotifications');
 const { createRecitationService } = require('./recitation');
 const { createSocialPostingService } = require('./socialPosting');
 const { createLedScreenService } = require('./ledScreenService');
+const { createWhatsAppWebhookHandler } = require('./whatsappWebhook');
 const openWaNotifications = createOpenWaNotifications({ db: eventsDb });
 const langarBoardEventClients = new Set();
 
