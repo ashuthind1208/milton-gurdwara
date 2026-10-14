@@ -22,6 +22,7 @@ import {
   BarElement,
   CategoryScale,
   Chart as ChartJS,
+  Filler,
   Legend,
   LineElement,
   LinearScale,
@@ -43,7 +44,7 @@ import phase2Service from '../../services/phase2Service';
 import { formatCurrency } from '../../utils/formatters';
 import { useAuth } from '../../context/AuthContext';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Filler, Tooltip, Legend);
 
 const TREND_RANGE_OPTIONS = [
   { value: '7d', label: '7D', unit: 'day', amount: 7, heading: 'Last 7 days' },
