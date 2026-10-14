@@ -83,6 +83,7 @@ const pushNotifications = require('./pushNotifications');
 const { createRecitationService } = require('./recitation');
 const { createSocialPostingService } = require('./socialPosting');
 const { createLedScreenService } = require('./ledScreenService');
+const { createWhatsAppWebhookHandler } = require('./whatsappWebhook');
 const langarBoardEventClients = new Set();
 
 const API_VERSION = '2026-07-27.phase2';
