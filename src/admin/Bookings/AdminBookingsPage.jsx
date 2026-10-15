@@ -686,6 +686,20 @@ const AdminBookingsPage = () => {
     }));
   };
 
+  const updateRequesterAddress = (value) => {
+    const address = String(value || '');
+    const hasAddress = Boolean(address.trim());
+    setBookingModal((current) => ({
+      ...current,
+      booking: {
+        ...current.booking,
+        requesterAddress: address,
+        bookingVenueType: hasAddress ? 'residence' : 'gurdwara',
+        bookingLocation: hasAddress ? address : 'Gurdwara Singh Sabha Milton, 7035 Sixth Line, Milton, ON'
+      }
+    }));
+  };
+
   const getBookingItems = (booking = {}) => {
     if (Array.isArray(booking.itemizedItems) && booking.itemizedItems.length) return booking.itemizedItems;
     if (bookingModal.mode === 'create' && Array.isArray(booking.itemizedItems)) return [];
@@ -1219,6 +1233,7 @@ const AdminBookingsPage = () => {
                   </div>
                 </div>
                 <div className="mt-3 grid content-start gap-3 sm:grid-cols-4">
+                    <label className="text-sm font-semibold text-slate-700 sm:col-span-4">Booking occasion<input disabled={bookingModal.mode === 'view'} value={bookingModal.booking.occasionType || ''} onChange={(event) => updateBookingDraft('occasionType', event.target.value)} placeholder="For example: Wedding, memorial" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label>
                     {[
                       ['date', 'From Date', 'date'],
                       ['toDate', 'To Date', 'date'],
@@ -1228,12 +1243,6 @@ const AdminBookingsPage = () => {
                       <label key={field} className="min-w-0 text-sm font-semibold text-slate-700">{label} <span className="text-rose-600">*</span>{type === 'time' ? <select required disabled={bookingModal.mode === 'view'} value={bookingModal.booking[field] || ''} onChange={(event) => updateBookingDraft(field, event.target.value)} className="mt-1 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 disabled:bg-slate-100"><option value="">Select time</option>{BOOKING_TIME_OPTIONS.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}</select> : <input required type={type} disabled={bookingModal.mode === 'view'} value={bookingModal.booking[field] || ''} min={field === 'toDate' ? bookingModal.booking.date || undefined : undefined} onChange={(event) => updateBookingDraft(field, event.target.value)} className="mt-1 w-full min-w-0 rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" />}</label>
                     ))}
                     {bookingUsesFullDaySchedule ? <p className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800 sm:col-span-4">Akhand Path is scheduled for the full selected date range; time fields are not applicable.</p> : null}
-                    <div className="grid gap-3 sm:col-span-2 sm:grid-cols-2">
-                      <label className="text-sm font-semibold text-slate-700">Venue <span className="text-rose-600">*</span><select required disabled={bookingModal.mode === 'view'} value={bookingModal.booking.bookingVenueType || (isGurdwaraLocation(bookingModal.booking.bookingLocation) ? 'gurdwara' : 'residence')} onChange={(event) => updateBookingDraft('bookingVenueType', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 disabled:bg-slate-100"><option value="gurdwara">At Gurdwara</option><option value="residence">At Residence</option></select></label>
-                      <label className="text-sm font-semibold text-slate-700">Private venue / address <span className="text-rose-600">*</span><input required disabled={bookingModal.mode === 'view'} value={bookingModal.booking.bookingLocation || ''} onChange={(event) => updateBookingDraft('bookingLocation', event.target.value)} placeholder={bookingModal.booking.bookingVenueType === 'residence' ? 'Residence address' : 'Gurdwara location'} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label>
-                      <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 sm:col-span-2"><input type="checkbox" disabled={bookingModal.mode === 'view'} checked={bookingModal.booking.hidePublicLocation !== false} onChange={(event) => updateBookingDraft('hidePublicLocation', event.target.checked)} className="h-4 w-4 accent-brand-blue" />Keep exact venue details private on public calendars</label>
-                    </div>
-                    <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Booking occasion<input disabled={bookingModal.mode === 'view'} value={bookingModal.booking.occasionType || ''} onChange={(event) => updateBookingDraft('occasionType', event.target.value)} placeholder="For example: Wedding, memorial" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label>
                 </div>
               </section>
               <div className="grid items-start gap-4 lg:grid-cols-[1.25fr_0.75fr]">
@@ -1269,7 +1278,8 @@ const AdminBookingsPage = () => {
                   ].map(([field, label, type]) => (
                     <label key={field} className="text-sm font-semibold text-slate-700">{label}<input type={type} disabled={bookingModal.mode === 'view'} value={bookingModal.booking[field] || ''} onChange={(event) => updateBookingDraft(field, event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label>
                   ))}
-                  {!isGurdwaraLocation(bookingModal.booking.bookingLocation) ? <label className="text-sm font-semibold text-slate-700">Event address <span className="text-rose-600">*</span><input required type="text" disabled={bookingModal.mode === 'view'} value={bookingModal.booking.requesterAddress || ''} onChange={(event) => updateBookingDraft('requesterAddress', event.target.value)} placeholder="Enter the off-site venue address" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label> : null}
+                  <label className="text-sm font-semibold text-slate-700">Address (leave blank if at the Gurdwara)<input type="text" disabled={bookingModal.mode === 'view'} value={bookingModal.booking.requesterAddress || ''} onChange={(event) => updateRequesterAddress(event.target.value)} placeholder="Residence address" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label>
+                  <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700"><input type="checkbox" disabled={bookingModal.mode === 'view'} checked={bookingModal.booking.hidePublicLocation !== false} onChange={(event) => updateBookingDraft('hidePublicLocation', event.target.checked)} className="h-4 w-4 accent-brand-blue" />Keep exact venue details private on public calendars</label>
                 </div>
               </section>
 
