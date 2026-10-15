@@ -1232,23 +1232,23 @@ const AdminBookingsPage = () => {
                     ) : null}
                   </div>
                 </div>
-                <div className="mt-3 grid content-start gap-3 sm:grid-cols-4">
-                    <label className="text-sm font-semibold text-slate-700 sm:col-span-4">Booking occasion<input disabled={bookingModal.mode === 'view'} value={bookingModal.booking.occasionType || ''} onChange={(event) => updateBookingDraft('occasionType', event.target.value)} placeholder="For example: Wedding, memorial" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label>
+                <div className="mt-3 grid min-w-0 grid-cols-2 content-start gap-3 sm:grid-cols-4">
+                    <label className="text-sm font-semibold text-slate-700 col-span-2 min-w-0 sm:col-span-4">Booking occasion<input disabled={bookingModal.mode === 'view'} value={bookingModal.booking.occasionType || ''} onChange={(event) => updateBookingDraft('occasionType', event.target.value)} placeholder="For example: Wedding, memorial" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" /></label>
                     {[
                       ['date', 'From Date', 'date'],
                       ['toDate', 'To Date', 'date'],
                       ['startTime', 'Start Time', 'time'],
                       ['endTime', 'End Time', 'time']
                     ].filter(([field]) => !(bookingUsesFullDaySchedule && ['startTime', 'endTime'].includes(field))).map(([field, label, type]) => (
-                      <label key={field} className="min-w-0 text-sm font-semibold text-slate-700">{label} <span className="text-rose-600">*</span>{type === 'time' ? <select required disabled={bookingModal.mode === 'view'} value={bookingModal.booking[field] || ''} onChange={(event) => updateBookingDraft(field, event.target.value)} className="mt-1 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 disabled:bg-slate-100"><option value="">Select time</option>{BOOKING_TIME_OPTIONS.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}</select> : <input required type={type} disabled={bookingModal.mode === 'view'} value={bookingModal.booking[field] || ''} min={field === 'toDate' ? bookingModal.booking.date || undefined : undefined} onChange={(event) => updateBookingDraft(field, event.target.value)} className="mt-1 w-full min-w-0 rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" />}</label>
+                      <label key={field} className="min-w-0 text-sm font-semibold text-slate-700">{label} <span className="text-rose-600">*</span>{type === 'time' ? <select required disabled={bookingModal.mode === 'view'} value={bookingModal.booking[field] || ''} onChange={(event) => updateBookingDraft(field, event.target.value)} className="mt-1 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 disabled:bg-slate-100"><option value="">Select time</option>{BOOKING_TIME_OPTIONS.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}</select> : <input required type={type} disabled={bookingModal.mode === 'view'} value={bookingModal.booking[field] || ''} min={field === 'toDate' ? bookingModal.booking.date || undefined : undefined} onChange={(event) => updateBookingDraft(field, event.target.value)} className="mt-1 block w-full min-w-0 max-w-full appearance-none rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100" />}</label>
                     ))}
-                    {bookingUsesFullDaySchedule ? <p className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800 sm:col-span-4">Akhand Path is scheduled for the full selected date range; time fields are not applicable.</p> : null}
+                    {bookingUsesFullDaySchedule ? <p className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800 col-span-2 sm:col-span-4">Akhand Path is scheduled for the full selected date range; time fields are not applicable.</p> : null}
                 </div>
               </section>
-              <div className="grid items-start gap-4 lg:grid-cols-[1.25fr_0.75fr]">
-              <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1.25fr_0.75fr]">
+              <section className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                 <div className="border-b border-slate-100 px-4 py-3"><h4 className="font-heading text-lg font-bold text-slate-900">Booking items</h4><p className="mt-0.5 text-xs text-slate-500">Choose services and assign a performer to each.</p></div>
-                {bookingModal.mode !== 'view' ? <div className="max-h-72 divide-y divide-slate-100 overflow-y-auto px-3">{sortBookingCategories(categories.filter((category) => category.active !== false)).map((category) => {
+                {bookingModal.mode !== 'view' ? <div className="divide-y divide-slate-100 px-3">{sortBookingCategories(categories.filter((category) => category.active !== false)).map((category) => {
                   const selected = getBookingItems(bookingModal.booking).some((item) => String(item.categoryId) === String(category.id));
                   const selectedItem = getBookingItems(bookingModal.booking).find((item) => String(item.categoryId) === String(category.id));
                   const dutyAssignment = getDutyAssignmentsForBooking(bookingModal.booking).find((assignment) => String(assignment.bookingItemCategoryId) === String(category.id));
@@ -1262,14 +1262,14 @@ const AdminBookingsPage = () => {
                     <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold leading-tight">{selectedItem?.name || category.name}</span>{selected ? <span className="mt-1 flex flex-wrap items-center gap-x-1 text-xs leading-tight"><span className={`italic ${dutyAssignment?.name ? 'font-normal text-violet-700' : 'font-medium text-amber-700'}`}>{dutyAssignment?.name ? `by ${dutyAssignment.name}` : 'Performer not assigned'}</span><button type="button" onClick={() => openDutyAssignmentsModal(bookingModal.booking)} className="ml-1 rounded px-1 font-semibold text-brand-blue underline decoration-dotted underline-offset-2 hover:bg-blue-100">Change</button></span> : category.description ? <span className="block truncate text-xs text-slate-500">{category.description}</span> : null}</span>
                     <span className="shrink-0 text-sm font-semibold">${Number(selectedItem?.amount ?? category.feeAmount ?? 0).toFixed(2)}</span>
                   </div>;
-                })}</div> : <div className="max-h-52 divide-y divide-slate-100 overflow-y-auto px-4">{getReceiptDisplayItems(bookingModal.booking).map((item, index) => {
+                })}</div> : <div className="divide-y divide-slate-100 px-4">{getReceiptDisplayItems(bookingModal.booking).map((item, index) => {
                   const assignment = getDutyAssignmentsForBooking(bookingModal.booking).find((entry) => String(entry.bookingItemCategoryId) === String(item.categoryId));
                   return <div key={`${item.categoryId}-${index}`} className="flex items-center justify-between gap-3 py-2"><span className="min-w-0"><span className="block text-sm font-semibold text-slate-800">{item.name}</span>{assignment?.name ? <span className="mt-0.5 block text-xs italic text-violet-700">by {assignment.name}</span> : null}</span><span className="shrink-0 text-xs font-semibold text-slate-700">${Number(item.amount || 0).toFixed(2)}</span></div>;
                 })}{!getBookingItems(bookingModal.booking).length ? <p className="py-3 text-xs text-slate-500">No booking items were recorded.</p> : null}</div>}
                 {bookingModal.mode !== 'view' && !getBookingItems(bookingModal.booking).length ? <p className="border-t border-slate-100 px-4 py-2 text-xs text-slate-500">Select at least one service.</p> : null}
               </section>
-              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3"><div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-brand-blue">Booker information</p><h4 className="mt-1 font-heading text-base font-bold text-slate-900">Contact details</h4><p className="mt-1 whitespace-nowrap text-[11px] leading-tight text-slate-500">Who should we contact about this booking?</p></div><span className="shrink-0 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-800">Required</span></div>
+              <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3"><div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-brand-blue">Booker information</p><h4 className="mt-1 font-heading text-base font-bold text-slate-900">Contact details</h4><p className="mt-1 text-[11px] sm:whitespace-nowrap leading-tight text-slate-500">Who should we contact about this booking?</p></div><span className="shrink-0 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-800">Required</span></div>
                 <div className="mt-4 grid gap-3">
                   {[
                     ['requesterName', 'Name', 'text'],
