@@ -7720,7 +7720,7 @@ const server = http.createServer(async (request, response) => {
         const bookingChanged = hasBookingNotificationChange(existingBooking || {}, mergedBooking);
         const dutyAssigneeChanged = String(existingBooking?.dutyAssigneeId || '') !== String(mergedBooking.dutyAssigneeId || '')
           || String(existingBooking?.dutyAssigneeEmail || '').toLowerCase() !== String(mergedBooking.dutyAssigneeEmail || '').toLowerCase()
-          || stableJson(existingBooking?.dutyAssignees || []) !== stableJson(mergedBooking.dutyAssignees || []);
+          || JSON.stringify(existingBooking?.dutyAssignees || []) !== JSON.stringify(mergedBooking.dutyAssignees || []);
         if (bookingChanged) {
           const refundReleased = String(existingBooking?.refundStatus || '').trim().toLowerCase() !== 'processed'
             && String(mergedBooking.refundStatus || '').trim().toLowerCase() === 'processed';
