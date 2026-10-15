@@ -124,7 +124,7 @@ const StatusPill = ({ isReceived, onToggle, disabled }) => (
   </button>
 );
 
-const DropdownField = ({ label, value, options, onSelectChange, onAddCustomOption, placeholder, addOptionLabel, className = 'w-32' }) => {
+const DropdownField = ({ label, value, options, onSelectChange, onAddCustomOption, placeholder, addOptionLabel, className = 'w-32', disabled = false }) => {
   const [addingCustom, setAddingCustom] = useState(false);
   const [draft, setDraft] = useState('');
 
@@ -154,12 +154,13 @@ const DropdownField = ({ label, value, options, onSelectChange, onAddCustomOptio
         </div>
       ) : (
         <select
+          disabled={disabled}
           value={value}
           onChange={(event) => {
             if (event.target.value === ADD_CUSTOM_VALUE) { setAddingCustom(true); return; }
             onSelectChange(event.target.value);
           }}
-          className={inputClass}
+          className={`${inputClass} disabled:bg-slate-100`}
         >
           {options.map((option) => <option key={option} value={option}>{option}</option>)}
           <option value={ADD_CUSTOM_VALUE}>{addOptionLabel}</option>
@@ -173,6 +174,10 @@ const AdminLangarPage = () => {
   const { setHeaderAction } = useOutletContext();
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
+  const [walkInOpen, setWalkInOpen] = useState(false);
+  const [walkInDraft, setWalkInDraft] = useState({ itemId: '', itemName: '', category: 'Grocery', brand: '', quantity: '1', unit: 'items', donorName: '', receivedOn: new Date().toISOString().slice(0, 10), expiryDate: '', imageUrl: '' });
+  const [walkInImageLookupPending, setWalkInImageLookupPending] = useState(false);
+  const [walkInImageOptions, setWalkInImageOptions] = useState([]);
   const [viewItem, setViewItem] = useState(null);
   const [viewContributorsPage, setViewContributorsPage] = useState(1);
   const [editingItem, setEditingItem] = useState(null);
@@ -220,6 +225,17 @@ const AdminLangarPage = () => {
       setOptions(options);
     } finally {
       setPending(false);
+    }
+  };
+  const lookupWalkInImage = async (name) => {
+    const trimmed = String(name || '').trim();
+    if (!trimmed) return;
+    setWalkInDraft((current) => ({ ...current, imageUrl: '' }));
+    setWalkInImageLookupPending(true);
+    try {
+      setWalkInImageOptions([...new Set((await searchGroceryImages(trimmed)).filter(Boolean))].slice(0, 10));
+    } finally {
+      setWalkInImageLookupPending(false);
     }
   };
   const unitOptions = useMemo(() => [...new Set([...LANGAR_UNIT_OPTIONS, ...customUnits])], [customUnits]);
@@ -378,6 +394,59 @@ const AdminLangarPage = () => {
       queryClient.invalidateQueries({ queryKey: ['cms-home'] });
       setEditImageOptions([]);
       setEditingItem(null);
+    }
+  });
+
+  const walkInReceiptMutation = useMutation({
+    mutationFn: async (draft) => {
+      const quantity = Number(draft.quantity || 0);
+      if (!(quantity > 0)) throw new Error('Enter a quantity greater than zero.');
+      const receivedAt = new Date().toISOString();
+      const receipt = {
+        id: `walk-in-${Date.now()}`,
+        quantity,
+        unit: draft.unit || 'items',
+        donorName: String(draft.donorName || '').trim(),
+        receivedAt: draft.receivedOn ? new Date(`${draft.receivedOn}T12:00:00`).toISOString() : receivedAt,
+        expiryDate: String(draft.expiryDate || '').trim(),
+        imageUrl: String(draft.imageUrl || '').trim()
+      };
+      const existing = langarItems.find((item) => String(item.id) === String(draft.itemId));
+      if (existing) {
+        const quantityReceived = Number(existing.quantityReceived || 0) + quantity;
+        const quantityRequired = Number(existing.quantityRequired || 0);
+        return cmsService.updateLangarItem(existing.id, {
+          ...existing,
+          quantityReceived,
+          imageUrl: receipt.imageUrl || existing.imageUrl,
+          needed: quantityReceived < quantityRequired,
+          stockStatus: quantityReceived < quantityRequired ? 'required_soon' : 'stock_available',
+          walkInReceipts: [...(Array.isArray(existing.walkInReceipts) ? existing.walkInReceipts : []), receipt]
+        });
+      }
+      const itemName = String(draft.itemName || '').trim();
+      if (!itemName) throw new Error('Enter the name of the unlisted grocery item.');
+      if (!receipt.imageUrl) throw new Error('Select an image for the grocery item.');
+      return cmsService.addLangarItem({
+        name: itemName,
+        category: String(draft.category || 'Grocery').trim(),
+        brand: String(draft.brand || '').trim(),
+        addedOn: draft.receivedOn || receivedAt.slice(0, 10),
+        expiryDate: receipt.expiryDate,
+        quantityRequired: 0,
+        quantityReceived: quantity,
+        needed: false,
+        stockStatus: 'stock_available',
+        unit: draft.unit || 'items',
+        imageUrl: receipt.imageUrl,
+        walkInReceipts: [receipt]
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cms-home'] });
+      setWalkInOpen(false);
+      setWalkInDraft({ itemId: '', itemName: '', category: 'Grocery', brand: '', quantity: '1', unit: 'items', donorName: '', receivedOn: new Date().toISOString().slice(0, 10), expiryDate: '', imageUrl: '' });
+      setWalkInImageOptions([]);
     }
   });
 
@@ -611,6 +680,10 @@ const AdminLangarPage = () => {
       </Card>
 
       <Card>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3">
+          <div><p className="text-sm font-bold text-emerald-900">Unplanned grocery drop-off?</p><p className="text-xs text-emerald-800">Record items brought in without a prior commitment. Stock is updated directly—no donor commitment is created.</p></div>
+          <Button type="button" onClick={() => { setWalkInDraft({ itemId: '', itemName: '', category: 'Grocery', brand: '', quantity: '1', unit: 'items', donorName: '', receivedOn: new Date().toISOString().slice(0, 10), expiryDate: '', imageUrl: '' }); setWalkInImageOptions([]); setWalkInImageLookupPending(false); setWalkInOpen(true); }} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-800">Record Walk-in Arrival</Button>
+        </div>
         <div className="mb-4 grid gap-2 md:grid-cols-4">
           <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:col-span-2">
             Search
@@ -764,6 +837,60 @@ const AdminLangarPage = () => {
         ) : null}
       </Card>
 
+      {walkInOpen ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-4" onClick={() => setWalkInOpen(false)}>
+          <form className="w-full max-w-lg rounded-2xl bg-white shadow-2xl" onSubmit={(event) => { event.preventDefault(); walkInReceiptMutation.mutate(walkInDraft); }} onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between rounded-t-2xl bg-gradient-to-r from-emerald-700 to-teal-700 px-5 py-4 text-white"><div><p className="text-xs font-bold uppercase tracking-wide text-emerald-100">Inventory only · no commitment</p><h3 className="font-heading text-xl font-semibold">Record Grocery Arrival</h3></div><button type="button" onClick={() => setWalkInOpen(false)} className="rounded-full border border-white/40 p-1.5 hover:bg-white/10" aria-label="Close arrival dialog"><XMarkIcon className="h-4 w-4" /></button></div>
+            <div className="max-h-[calc(100vh-9rem)] space-y-4 overflow-y-auto p-5">
+              {walkInReceiptMutation.error ? <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{walkInReceiptMutation.error.message}</p> : null}
+              <label className={labelClass}>Match a listed need (optional)
+                <select value={walkInDraft.itemId} onChange={(event) => {
+                  const item = langarItems.find((entry) => String(entry.id) === event.target.value);
+                  const imageUrl = item?.imageUrl || '';
+                  setWalkInDraft((current) => ({ ...current, itemId: event.target.value, itemName: item?.name || '', category: item?.category || current.category, brand: item?.brand || '', unit: item?.unit || current.unit, imageUrl }));
+                  setWalkInImageOptions(imageUrl ? [imageUrl] : []);
+                  setWalkInImageLookupPending(false);
+                  if (item && !imageUrl) lookupWalkInImage(item.name);
+                }} className={inputClass}>
+                  <option value="">Unlisted item / create inventory record</option>
+                  {langarItems.map((item) => <option key={item.id} value={item.id}>{item.name} · {Number(item.quantityReceived || 0)} received / {Number(item.quantityRequired || 0)} needed</option>)}
+                </select>
+              </label>
+              {walkInDraft.itemId ? <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">This arrival increases the selected item’s received stock. Arrival details and donor name are stored separately from online commitments.</p> : null}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className={labelClass}>Item name<input required disabled={Boolean(walkInDraft.itemId)} value={walkInDraft.itemName} onChange={(event) => setWalkInDraft((current) => ({ ...current, itemName: event.target.value, imageUrl: '' }))} onBlur={(event) => { if (!walkInDraft.itemId && event.target.value.trim()) lookupWalkInImage(event.target.value); }} placeholder="e.g. Rice" className={`${inputClass} disabled:bg-slate-100`} /></label>
+                <label className={labelClass}>Category<select disabled={Boolean(walkInDraft.itemId)} value={walkInDraft.category} onChange={(event) => setWalkInDraft((current) => ({ ...current, category: event.target.value }))} className={`${inputClass} disabled:bg-slate-100`}>{categoryFormOptions.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
+              </div>
+              <div className="flex items-start gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
+                <img src={walkInDraft.imageUrl || resolveGroceryImage(walkInDraft.itemName) || undefined} alt="Selected grocery" className="h-16 w-16 shrink-0 rounded-lg border border-slate-200 bg-white object-cover" onError={(event) => { event.currentTarget.style.visibility = 'hidden'; }} onLoad={(event) => { event.currentTarget.style.visibility = 'visible'; }} />
+                <div className="min-w-0 flex-1"><p className="text-xs text-slate-600">{walkInImageLookupPending ? 'Looking up grocery images…' : walkInImageOptions.length ? 'Choose an image for this item.' : 'Enter the item name, then choose an image.'}</p>
+                  {walkInImageOptions.length ? <div className="mt-2 grid grid-cols-5 gap-1.5">{walkInImageOptions.map((imageUrl, index) => <button key={`${imageUrl}-${index}`} type="button" onClick={() => setWalkInDraft((current) => ({ ...current, imageUrl }))} className={`overflow-hidden rounded-md border-2 ${walkInDraft.imageUrl === imageUrl ? 'border-brand-blue ring-2 ring-brand-blue/20' : 'border-slate-200'}`} aria-label={`Select grocery image ${index + 1}`}><img src={imageUrl} alt="" className="h-11 w-full object-cover" /></button>)}</div> : null}
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {!walkInDraft.itemId ? <label className={labelClass}>Brand (optional)<input value={walkInDraft.brand} onChange={(event) => setWalkInDraft((current) => ({ ...current, brand: event.target.value }))} placeholder="e.g. Any brand" className={inputClass} /></label> : null}
+                <label className={labelClass}>Donated by (optional)<input value={walkInDraft.donorName} onChange={(event) => setWalkInDraft((current) => ({ ...current, donorName: event.target.value }))} placeholder="Name for internal records" className={inputClass} /></label>
+                <label className={labelClass}>Quantity received<input type="number" min="0.01" step="0.01" required value={walkInDraft.quantity} onChange={(event) => setWalkInDraft((current) => ({ ...current, quantity: event.target.value }))} className={inputClass} /></label>
+                <DropdownField
+                  label="Unit"
+                  className="w-full"
+                  value={walkInDraft.unit}
+                  options={[...new Set([...unitOptions, walkInDraft.unit].filter(Boolean))]}
+                  onSelectChange={(unit) => setWalkInDraft((current) => ({ ...current, unit }))}
+                  onAddCustomOption={(unit) => addCustomUnit(unit, { setValue: (value) => setWalkInDraft((current) => ({ ...current, unit: value })) })}
+                  placeholder="e.g. bags"
+                  addOptionLabel="+ Add custom unit…"
+                  disabled={Boolean(walkInDraft.itemId)}
+                />
+                <label className={labelClass}>Received date<input type="date" required value={walkInDraft.receivedOn} onChange={(event) => setWalkInDraft((current) => ({ ...current, receivedOn: event.target.value }))} className={inputClass} /></label>
+                <label className={labelClass}>Expiry date (optional)<input type="date" value={walkInDraft.expiryDate} onChange={(event) => setWalkInDraft((current) => ({ ...current, expiryDate: event.target.value }))} className={inputClass} /></label>
+              </div>
+              <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><Button type="button" variant="ghost" onClick={() => setWalkInOpen(false)}>Cancel</Button><Button type="submit" disabled={walkInReceiptMutation.isPending || walkInImageLookupPending || !walkInDraft.imageUrl} className="bg-emerald-700 text-white hover:bg-emerald-800">{walkInReceiptMutation.isPending ? 'Recording…' : 'Record Arrival'}</Button></div>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
       {createOpen ? (
         <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-4 py-6">
           <div className="mx-auto flex min-h-full items-center justify-center">
@@ -877,6 +1004,7 @@ const AdminLangarPage = () => {
                       <span className="shrink-0 text-xs font-bold uppercase tracking-wide text-brand-blue">Quantity</span>
                       <span className="truncate text-sm text-slate-800">{Number(viewItem.quantityReceived || 0)} / {Number(viewItem.quantityRequired || 0)} {viewItem.unit || 'items'}</span>
                     </div>
+                    {(viewItem.walkInReceipts || []).length > 0 ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2"><p className="text-xs font-bold uppercase tracking-wide text-emerald-800">Walk-in arrivals · no online commitment</p><div className="mt-2 space-y-2">{[...viewItem.walkInReceipts].reverse().map((receipt) => <div key={receipt.id} className="rounded-lg border border-emerald-100 bg-white/80 p-2"><p className="text-sm font-semibold text-emerald-950">{receipt.quantity} {receipt.unit || viewItem.unit || 'items'}{receipt.donorName ? ` · Donated by ${receipt.donorName}` : ' · Donor not recorded'}</p><p className="mt-0.5 text-[11px] text-emerald-800">Received {receipt.receivedAt ? formatShortDate(receipt.receivedAt) : '-'}{receipt.expiryDate ? ` · Expires ${receipt.expiryDate}` : ''}</p></div>)}</div></div> : null}
                     <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2">
                       <span className="shrink-0 text-xs font-bold uppercase tracking-wide text-brand-blue">Status</span>
                       <span className="truncate text-sm font-bold text-brand-saffron">{resolveStatusPreview(viewItem)}</span>

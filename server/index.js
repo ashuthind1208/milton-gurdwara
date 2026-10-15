@@ -2514,6 +2514,118 @@ const getRequestActor = (request) => {
   const name = String(request.headers['x-actor-name'] || '').trim();
   return { email, role, name };
 };
+const canManageAdminPage = async (request, pagePath) => {
+  const actor = getRequestActor(request);
+  const actorEmail = String(actor.email || '').trim().toLowerCase();
+  if (!actorEmail) return false;
+  const [users, roleDefinitions] = await Promise.all([
+    eventsDb.listItems('users'),
+    eventsDb.getSingleton('admin_roles', [])
+  ]);
+  const user = (Array.isArray(users) ? users : []).find((entry) => String(entry.email || '').trim().toLowerCase() === actorEmail);
+  if (!user || user.isActive === false || String(user.approvalStatus || 'approved').trim().toLowerCase() !== 'approved') return false;
+  const role = String(user.role || '').trim().toLowerCase();
+  if (actor.role && String(actor.role).trim().toLowerCase() !== role) return false;
+  if (['admin', 'super admin'].includes(role)) return true;
+  return (Array.isArray(roleDefinitions) ? roleDefinitions : []).some((entry) => (
+    String(entry?.name || '').trim().toLowerCase() === role
+    && Array.isArray(entry?.adminPageAccess)
+    && entry.adminPageAccess.includes(pagePath)
+  ));
+};
+
+const getBookingVenueType = (booking = {}) => {
+  const explicit = String(booking.bookingVenueType || '').trim().toLowerCase();
+  if (['gurdwara', 'residence'].includes(explicit)) return explicit;
+  const location = String(booking.bookingLocation || booking.location || '').trim();
+  if (!location) return 'gurdwara';
+  return /gurdwara|7035\s+sixth\s+line/i.test(location)
+    ? 'gurdwara'
+    : 'residence';
+};
+
+const buildPublicBookingProjection = (booking = {}, categories = []) => {
+  const categoryOrder = new Map((Array.isArray(categories) ? categories : []).map((entry, index) => [
+    String(entry.id || ''), Number.isFinite(Number(entry.sortOrder)) ? Number(entry.sortOrder) : index + 1
+  ]));
+  const requestedItems = [...(Array.isArray(booking.itemizedItems) ? booking.itemizedItems : [])]
+    .sort((first, second) => (categoryOrder.get(String(first.categoryId || '')) ?? Number.MAX_SAFE_INTEGER)
+      - (categoryOrder.get(String(second.categoryId || '')) ?? Number.MAX_SAFE_INTEGER))
+    .map((item) => String(item.name || '').trim())
+    .filter(Boolean);
+  const categoryName = requestedItems.length
+    ? requestedItems.join(', ')
+    : String(booking.categoryName || '').trim() || 'Programme Booking';
+  const publicVenue = getBookingVenueType(booking) === 'gurdwara' ? 'At Gurdwara' : 'At Residence';
+  const hideLocation = booking.hidePublicLocation !== false;
+  return {
+    id: String(booking.id || ''),
+    categoryId: String(booking.categoryId || ''),
+    categoryName,
+    title: categoryName,
+    date: String(booking.date || ''),
+    toDate: String(booking.toDate || booking.date || ''),
+    startTime: String(booking.startTime || ''),
+    endTime: String(booking.endTime || ''),
+    status: String(booking.status || 'pending').trim().toLowerCase(),
+    color: String(booking.color || ''),
+    bookingVenueType: getBookingVenueType(booking),
+    bookingLocation: hideLocation ? publicVenue : String(booking.bookingLocation || publicVenue).trim()
+  };
+};
+
+const projectBookingsForRequest = async (request, bookings = []) => {
+  const actor = getRequestActor(request);
+  const actorEmail = String(actor.email || '').trim().toLowerCase();
+  if (!actorEmail) {
+    const storedCategories = await eventsDb.getSingleton('booking_categories', {});
+    const categories = Array.isArray(storedCategories) ? storedCategories : storedCategories?.categories || [];
+    return bookings.map((booking) => buildPublicBookingProjection(booking, categories));
+  }
+
+  const [users, roleDefinitions, storedCategories] = await Promise.all([
+    eventsDb.listItems('users'),
+    eventsDb.getSingleton('admin_roles', []),
+    eventsDb.getSingleton('booking_categories', {})
+  ]);
+  const user = (Array.isArray(users) ? users : []).find((entry) => String(entry.email || '').trim().toLowerCase() === actorEmail);
+  const role = String(user?.role || '').trim().toLowerCase();
+  const isActive = Boolean(user) && user.isActive !== false
+    && String(user.approvalStatus || 'approved').trim().toLowerCase() === 'approved';
+  const dutyPath = '/admin/booking-duties';
+  const bookingManagementPath = '/admin/bookings';
+  const roles = Array.isArray(roleDefinitions) ? roleDefinitions : [];
+  const roleCanAccess = (path) => roles.some((definition) => (
+    String(definition?.name || '').trim().toLowerCase() === role
+    && Array.isArray(definition?.adminPageAccess)
+    && definition.adminPageAccess.includes(path)
+  ));
+  const isFullAdmin = isActive && (
+    ['admin', 'super admin'].includes(role)
+    || roleCanAccess(bookingManagementPath)
+    || (Array.isArray(user?.adminPageAccess) && user.adminPageAccess.includes(bookingManagementPath))
+  );
+  const assignedDutyRoles = new Set(roles
+    .filter((entry) => Array.isArray(entry?.adminPageAccess) && entry.adminPageAccess.includes(dutyPath))
+    .map((entry) => String(entry.name || '').trim().toLowerCase()));
+  const hasDutyAccess = isActive && assignedDutyRoles.has(role);
+  const categories = Array.isArray(storedCategories) ? storedCategories : storedCategories?.categories || [];
+  if (isFullAdmin) return bookings;
+
+  return bookings.map((booking) => {
+    const isRequester = String(booking.requesterEmail || '').trim().toLowerCase() === actorEmail
+      || String(booking.bookedByEmail || '').trim().toLowerCase() === actorEmail;
+    const matchesAssignee = (Array.isArray(booking.dutyAssignees) ? booking.dutyAssignees : []).some((assignee) => (
+      String(assignee.userId || '').trim() === String(user?.id || '')
+      || String(assignee.email || '').trim().toLowerCase() === actorEmail
+    )) || String(booking.dutyAssigneeId || '').trim() === String(user?.id || '')
+      || String(booking.dutyAssigneeEmail || '').trim().toLowerCase() === actorEmail;
+    return (isActive && (isRequester || (hasDutyAccess && matchesAssignee)))
+      ? booking
+      : buildPublicBookingProjection(booking, categories);
+  });
+};
+
 
 const canManageDonations = (request) => {
   const role = String(getRequestActor(request).role || '').trim().toLowerCase();
@@ -3910,13 +4022,25 @@ const normalizeBookingForNotification = (entry = {}) => ({
   dutyAssigneeId: String(entry.dutyAssigneeId || '').trim(),
   dutyAssigneeName: String(entry.dutyAssigneeName || '').trim(),
   dutyAssigneeEmail: String(entry.dutyAssigneeEmail || '').trim().toLowerCase(),
-  categoryName: String(entry.categoryName || entry.title || 'Booking').trim(),
+  dutyAssignees: (Array.isArray(entry.dutyAssignees) ? entry.dutyAssignees : []).map((assignee) => ({
+    userId: String(assignee?.userId || '').trim(),
+    name: String(assignee?.name || '').trim(),
+    email: String(assignee?.email || '').trim().toLowerCase(),
+    dutyType: String(assignee?.dutyType || '').trim(),
+    bookingItemCategoryId: String(assignee?.bookingItemCategoryId || '').trim(),
+    dutyCategoryId: String(assignee?.dutyCategoryId || '').trim()
+  })),
+  categoryName: [...new Set((Array.isArray(entry.itemizedItems) ? entry.itemizedItems : [])
+    .map((item) => String(item?.name || '').trim())
+    .filter(Boolean))].join(', ') || String(entry.categoryName || entry.title || 'Booking').trim(),
   occasionType: String(entry.occasionType || '').trim(),
   createdByName: String(entry.createdByName || entry.bookedByName || '').trim(),
   date: String(entry.date || '').trim(),
   toDate: String(entry.toDate || entry.date || '').trim(),
   startTime: String(entry.startTime || '').trim(),
   endTime: String(entry.endTime || '').trim(),
+  bookingVenueType: getBookingVenueType(entry),
+  hidePublicLocation: entry.hidePublicLocation === true,
   bookingLocation: String(entry.bookingLocation || entry.location || 'Gurdwara Singh Sabha Milton, 7035 Sixth Line, Milton, ON').trim(),
   status: String(entry.status || '').trim().toLowerCase() === 'completed'
     ? 'confirmed'
@@ -3936,8 +4060,14 @@ const normalizeBookingForNotification = (entry = {}) => ({
 
 const buildBookingDutyBriefingEmail = ({ recipient, bookings, role, daysRemaining = null }) => {
   const rows = bookings.map((booking) => {
+    const assignments = normalized.dutyAssignees.filter((entry) => (
+      (String(entry.userId || '').trim() && String(entry.userId).trim() === String(recipient.id || '').trim())
+      || (String(entry.email || '').trim() && String(entry.email).trim().toLowerCase() === String(recipient.email || '').trim().toLowerCase())
+    ));
+    const dutyType = [...new Set(assignments.map((entry) => String(entry.dutyType || '').trim()).filter(Boolean))].join(', ');
     const normalized = normalizeBookingForNotification(booking);
     return {
+      dutyType,
       ...normalized,
       dateLabel: normalized.toDate && normalized.toDate !== normalized.date ? `${normalized.date} to ${normalized.toDate}` : normalized.date,
       requesterPhone: String(booking.requesterPhone || '').trim(),
@@ -3956,6 +4086,7 @@ const buildBookingDutyBriefingEmail = ({ recipient, bookings, role, daysRemainin
     isReminder ? `This confirmed booking is scheduled in ${reminderLabel}:` : `The following confirmed booking${rows.length === 1 ? '' : 's'} require attention:`,
     '',
     ...rows.flatMap((booking) => [
+      booking.dutyType ? `Your responsibilities: ${booking.dutyType}` : '',
       `${booking.categoryName} - ${booking.dateLabel}`,
       `Time: ${booking.startTime || 'TBD'}${booking.endTime ? ` - ${booking.endTime}` : ''}`,
       `Location: ${booking.bookingLocation}`,
@@ -3970,7 +4101,7 @@ const buildBookingDutyBriefingEmail = ({ recipient, bookings, role, daysRemainin
   const htmlRows = rows.map((booking) => `
     <div style="margin:0 0 14px;border:1px solid #d7e3f3;border-radius:10px;overflow:hidden;">
       <div style="background:#eef5ff;padding:11px 13px;font-weight:800;color:#0a4d9f;">${escapeHtml(booking.categoryName)} · ${escapeHtml(booking.dateLabel)}</div>
-      <div style="padding:12px 13px;line-height:1.7;color:#334155;"><strong>Time:</strong> ${escapeHtml(booking.startTime || 'TBD')}${booking.endTime ? ` - ${escapeHtml(booking.endTime)}` : ''}<br/><strong>Location:</strong> ${escapeHtml(booking.bookingLocation)}<br/><strong>Contact:</strong> ${escapeHtml(booking.requesterName)} · ${escapeHtml(booking.requesterEmail || '-')} · ${escapeHtml(booking.requesterPhone || '-')}<br/>${booking.requesterAddress ? `<strong>Address:</strong> ${escapeHtml(booking.requesterAddress)}<br/>` : ''}${booking.notes ? `<strong>Notes:</strong> ${escapeHtml(booking.notes)}` : ''}</div>
+      <div style="padding:12px 13px;line-height:1.7;color:#334155;">${booking.dutyType ? `<strong>Your responsibilities:</strong> ${escapeHtml(booking.dutyType)}<br/>` : ''}<strong>Time:</strong> ${escapeHtml(booking.startTime || 'TBD')}${booking.endTime ? ` - ${escapeHtml(booking.endTime)}` : ''}<br/><strong>Location:</strong> ${escapeHtml(booking.bookingLocation)}<br/><strong>Contact:</strong> ${escapeHtml(booking.requesterName)} · ${escapeHtml(booking.requesterEmail || '-')} · ${escapeHtml(booking.requesterPhone || '-')}<br/>${booking.requesterAddress ? `<strong>Address:</strong> ${escapeHtml(booking.requesterAddress)}<br/>` : ''}${booking.notes ? `<strong>Notes:</strong> ${escapeHtml(booking.notes)}` : ''}</div>
     </div>`).join('');
   const html = `<div style="background:#f5f8fc;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;"><div style="max-width:720px;margin:auto;background:white;border:1px solid #dbe7f6;border-radius:14px;overflow:hidden;"><div style="padding:18px 22px;background:#0a4d9f;color:white;"><div style="font-size:12px;font-weight:700;text-transform:uppercase;">${escapeHtml(volunteerReminderSiteName)}</div><div style="margin-top:4px;font-size:21px;font-weight:800;">${isReminder ? `Booking Duty Reminder · ${escapeHtml(reminderLabel)}` : 'Booking Duty Briefing'}</div></div><div style="padding:22px;"><p style="font-size:16px;font-weight:700;">Dear ${escapeHtml(recipient.name || role)},</p><p style="color:#475569;line-height:1.7;">${isReminder ? `This confirmed booking is scheduled in ${escapeHtml(reminderLabel)}.` : `The following confirmed booking${rows.length === 1 ? '' : 's'} require attention.`}</p>${htmlRows}<p style="color:#64748b;font-size:12px;">Please sign in to the Booking Duties page for full details.</p></div></div></div>`;
   return { subject, text, html };
@@ -3989,8 +4120,7 @@ const resolveBookingDutyRecipients = async () => {
   const recipients = (Array.isArray(users) ? users : []).filter((user) => {
     const role = String(user.role || '').trim();
     const normalizedRole = role.toLowerCase();
-    const hasDutyAccess = dutyRoles.has(normalizedRole)
-      || (Array.isArray(user.adminPageAccess) && user.adminPageAccess.includes(dutyPath));
+    const hasDutyAccess = dutyRoles.has(normalizedRole);
     return !['admin', 'super admin'].includes(normalizedRole)
       && hasDutyAccess
       && user.isActive !== false
@@ -4001,6 +4131,11 @@ const resolveBookingDutyRecipients = async () => {
   return { recipients, roleLabel };
 };
 
+  const assignees = Array.isArray(booking?.dutyAssignees) ? booking.dutyAssignees : [];
+  if (assignees.some((assignee) => (
+    (String(assignee.userId || '').trim() && String(recipient?.id || '').trim() === String(assignee.userId).trim())
+    || (String(assignee.email || '').trim() && String(recipient?.email || '').trim().toLowerCase() === String(assignee.email).trim().toLowerCase())
+  ))) return true;
 const isRecipientAssignedToBooking = (recipient, booking) => {
   const assigneeId = String(booking?.dutyAssigneeId || '').trim();
   const assigneeEmail = String(booking?.dutyAssigneeEmail || '').trim().toLowerCase();
@@ -4009,16 +4144,36 @@ const isRecipientAssignedToBooking = (recipient, booking) => {
 };
 
 const enforceEligibleBookingDutyAssignee = async (booking = {}) => {
-  const assigneeId = String(booking.dutyAssigneeId || '').trim();
-  if (!assigneeId) return booking;
+  const requestedAssignees = Array.isArray(booking.dutyAssignees) && booking.dutyAssignees.length
+    ? booking.dutyAssignees
+    : booking.dutyAssigneeId ? [{
+      userId: booking.dutyAssigneeId,
+      name: booking.dutyAssigneeName,
+      email: booking.dutyAssigneeEmail,
+      dutyType: ''
+    }] : [];
+  if (!requestedAssignees.length) return { ...booking, dutyAssignees: [] };
   const { recipients } = await resolveBookingDutyRecipients();
-  const assignee = recipients.find((recipient) => String(recipient.id || '').trim() === assigneeId);
-  assertInput(Boolean(assignee), 'Duty performer must be an active user with access to Booking Duties.');
+  const dutyAssignees = requestedAssignees.map((requested) => {
+    const assigneeId = String(requested?.userId || requested?.id || '').trim();
+    const assignee = recipients.find((recipient) => String(recipient.id || '').trim() === assigneeId);
+    assertInput(Boolean(assignee), 'Every duty performer must be an active user with access to Booking Duties.');
+    return {
+      userId: assigneeId,
+      name: String(assignee.name || assignee.email || '').trim(),
+      email: String(assignee.email || '').trim().toLowerCase(),
+      dutyType: String(requested?.dutyType || '').trim().slice(0, 80),
+      bookingItemCategoryId: String(requested?.bookingItemCategoryId || '').trim(),
+      dutyCategoryId: String(requested?.dutyCategoryId || '').trim()
+    };
+  });
+  const firstAssignee = dutyAssignees[0];
   return {
     ...booking,
-    dutyAssigneeId: assigneeId,
-    dutyAssigneeName: String(assignee.name || assignee.email || '').trim(),
-    dutyAssigneeEmail: String(assignee.email || '').trim().toLowerCase()
+    dutyAssignees,
+    dutyAssigneeId: firstAssignee.userId,
+    dutyAssigneeName: firstAssignee.name,
+    dutyAssigneeEmail: firstAssignee.email
   };
 };
 
@@ -4071,7 +4226,26 @@ const parseScheduleDateTime = (dateValue, timeValue = '') => {
 };
 
 const isAkhandPathBooking = (entry = {}) => (
-  /akhand\s*(paath|path)/i.test(`${entry.categoryName || ''} ${entry.title || ''}`)
+  /akhand\s*(paath|path)/i.test([
+    entry.categoryName,
+    entry.title,
+    ...(Array.isArray(entry.itemizedItems) ? entry.itemizedItems.map((item) => item?.name) : [])
+  ].filter(Boolean).join(' '))
+);
+
+const isJathaBooking = (entry = {}) => /kirtan|dhadhi\s*jatha|dhadi\s*jatha/i.test([
+  entry.categoryName,
+  entry.title,
+  ...(Array.isArray(entry.itemizedItems) ? entry.itemizedItems.map((item) => item?.name) : [])
+].filter(Boolean).join(' ')) && !isAkhandPathBooking(entry);
+
+const isFinalDayJathaPair = (first = {}, second = {}) => (
+  (isAkhandPathBooking(first) && isJathaBooking(second)
+    && String(second.date || '').slice(0, 10) === String(first.toDate || first.date || '').slice(0, 10)
+    && String(second.toDate || second.endDate || second.date || '').slice(0, 10) === String(first.toDate || first.date || '').slice(0, 10))
+  || (isAkhandPathBooking(second) && isJathaBooking(first)
+    && String(first.date || '').slice(0, 10) === String(second.toDate || second.date || '').slice(0, 10)
+    && String(first.toDate || first.endDate || first.date || '').slice(0, 10) === String(second.toDate || second.date || '').slice(0, 10))
 );
 
 const getScheduleIntervals = (entry = {}, kind = 'booking') => {
@@ -4150,29 +4324,45 @@ const assertNoScheduleOverlap = async (candidate, { kind = 'booking', excludeId 
     eventsDb.getEvents()
   ]);
   const conflicts = [];
-  const candidateAssigneeId = String(candidate.dutyAssigneeId || '').trim();
-  const candidateAssigneeEmail = String(candidate.dutyAssigneeEmail || '').trim().toLowerCase();
+  const dutyConflicts = [];
+  const candidateAssignees = [
+    ...(Array.isArray(candidate.dutyAssignees) ? candidate.dutyAssignees : []),
+    ...(candidate.dutyAssigneeId ? [{ userId: candidate.dutyAssigneeId, email: candidate.dutyAssigneeEmail, name: candidate.dutyAssigneeName }] : [])
+  ];
   for (const booking of Array.isArray(bookings) ? bookings : []) {
     if (kind === 'booking' && String(booking.id || '') === String(excludeId || '')) continue;
     if (String(booking.status || '').trim().toLowerCase() === 'cancelled') continue;
     if (schedulesOverlap(candidateIntervals, getScheduleIntervals(booking, 'booking'))) {
-      const bookingAssigneeId = String(booking.dutyAssigneeId || '').trim();
-      const bookingAssigneeEmail = String(booking.dutyAssigneeEmail || '').trim().toLowerCase();
-      const sameDutyPerformer = (candidateAssigneeId && candidateAssigneeId === bookingAssigneeId)
-        || (candidateAssigneeEmail && candidateAssigneeEmail === bookingAssigneeEmail);
-      conflicts.push(sameDutyPerformer
-        ? `${String(candidate.dutyAssigneeName || booking.dutyAssigneeName || 'The selected duty performer').trim()} is already assigned to ${String(booking.categoryName || booking.title || 'another booking').trim()}`
-        : String(booking.categoryName || booking.title || 'booking').trim());
+      const bookingAssignees = [
+        ...(Array.isArray(booking.dutyAssignees) ? booking.dutyAssignees : []),
+        ...(booking.dutyAssigneeId ? [{ userId: booking.dutyAssigneeId, email: booking.dutyAssigneeEmail, name: booking.dutyAssigneeName }] : [])
+      ];
+      const sharedAssignee = candidateAssignees.find((candidateAssignee) => bookingAssignees.some((bookingAssignee) => (
+        (String(candidateAssignee.userId || '').trim() && String(candidateAssignee.userId).trim() === String(bookingAssignee.userId || '').trim())
+        || (String(candidateAssignee.email || '').trim() && String(candidateAssignee.email).trim().toLowerCase() === String(bookingAssignee.email || '').trim().toLowerCase())
+      )));
+      if (isFinalDayJathaPair(candidate, booking) && !sharedAssignee) continue;
+      if (sharedAssignee) {
+        dutyConflicts.push(`${String(sharedAssignee.name || 'The selected duty performer').trim()} is already assigned to ${String(booking.categoryName || booking.title || 'another booking').trim()}`);
+      } else {
+        conflicts.push(isAkhandPathBooking(candidate)
+          ? `Akhand Path reserves the selected dates as full days and overlaps ${String(booking.categoryName || booking.title || 'another booking').trim()}. Only Kirtan or Dhadhi Jatha can be scheduled on its final day.`
+          : isAkhandPathBooking(booking)
+            ? `Akhand Path reserves ${String(booking.date || '').slice(0, 10)}${booking.toDate && booking.toDate !== booking.date ? ` through ${String(booking.toDate).slice(0, 10)}` : ''} as full days. Only Kirtan or Dhadhi Jatha can be scheduled on its final day.`
+            : String(booking.categoryName || booking.title || 'booking').trim());
+      }
     }
   }
   for (const event of Array.isArray(events) ? events : []) {
     if (kind === 'event' && String(event.id || '') === String(excludeId || '')) continue;
     if (event.active === false || event.isActive === false) continue;
+      if (isFinalDayJathaPair(candidate, event)) continue;
     if (schedulesOverlap(candidateIntervals, getScheduleIntervals(event, 'event'))) {
       conflicts.push(String(event.title || 'event').trim());
     }
   }
-  assertInput(conflicts.length === 0, `This schedule overlaps with ${conflicts[0]}. Choose a different date or time.`, 409);
+  const conflictMessage = dutyConflicts[0] || conflicts[0];
+  assertInput(!conflictMessage, `This schedule overlaps with ${conflictMessage}. Choose a different date or time.`, 409);
 };
 
 const shouldDelayBookingEmailUntilPayment = (booking = {}) => {
@@ -4426,7 +4616,7 @@ const sendBookingNotificationEmail = async (booking, options = {}) => {
   }
 };
 
-  const bookingNotificationFields = ['status', 'paymentStatus', 'paymentMethod', 'date', 'toDate', 'startTime', 'endTime', 'bookingLocation', 'categoryName', 'occasionType', 'requesterName', 'dutyAssigneeId', 'dutyAssigneeEmail', 'receiptNumber', 'refundStatus', 'refundAmount', 'refundMethod', 'refundReference', 'refundDate', 'refundNotes'];
+  const bookingNotificationFields = ['status', 'paymentStatus', 'paymentMethod', 'date', 'toDate', 'startTime', 'endTime', 'bookingLocation', 'bookingVenueType', 'hidePublicLocation', 'categoryName', 'itemizedItems', 'amount', 'title', 'occasionType', 'requesterName', 'dutyAssigneeId', 'dutyAssigneeEmail', 'dutyAssignees', 'receiptNumber', 'refundStatus', 'refundAmount', 'refundMethod', 'refundReference', 'refundDate', 'refundNotes'];
 const hasBookingNotificationChange = (existing = {}, updated = {}) => bookingNotificationFields.some(
   (field) => String(existing?.[field] ?? '') !== String(updated?.[field] ?? '')
 );
@@ -7225,6 +7415,23 @@ const server = http.createServer(async (request, response) => {
     sendJson(response, 403, { ok: false, message: 'Admin access is required to change LED content.' });
     return;
   }
+  if (requestUrl.pathname === '/api/bookings/public' && request.method === 'GET') {
+    try {
+      const [bookings, storedCategories] = await Promise.all([
+        eventsDb.listItems('bookings'),
+        eventsDb.getSingleton('booking_categories', {})
+      ]);
+      const categories = Array.isArray(storedCategories) ? storedCategories : storedCategories?.categories || [];
+      const data = (Array.isArray(bookings) ? bookings : [])
+        .filter((booking) => String(booking.status || '').trim().toLowerCase() !== 'cancelled')
+        .map((booking) => buildPublicBookingProjection(enforceBookingPaymentStatus(booking), categories));
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, 500, { ok: false, message: error.message || 'Unable to fetch public booking calendar.' });
+    }
+    return;
+  }
+
 
   const contentResourceMatch = requestUrl.pathname.match(/^\/api\/content\/([a-z0-9_-]+)$/i);
   if (contentResourceMatch && request.method === 'GET') {
@@ -7238,6 +7445,7 @@ const server = http.createServer(async (request, response) => {
             return booking;
           }
           return eventsDb.updateItem('bookings', booking.id, normalized);
+        data = await projectBookingsForRequest(request, data);
         }));
       }
       if (resource === 'users') {
@@ -7273,6 +7481,7 @@ const server = http.createServer(async (request, response) => {
         const homeContentForQuantity = await eventsDb.getSingleton('cms_home_content', null);
         const matchedItem = Array.isArray(homeContentForQuantity?.langarItems)
           ? homeContentForQuantity.langarItems.find((item) => String(item?.id || '') === String(body.itemId || ''))
+        assertInput(Boolean(matchedItem), 'This Langar item is no longer available. Please refresh the list and choose an active item.', 400);
           : null;
         if (matchedItem) {
           const existingContributions = await eventsDb.listItems(resource);
@@ -7562,7 +7771,8 @@ const server = http.createServer(async (request, response) => {
         const mergedBooking = { ...(existingBooking || {}), ...(data || {}), ...(validatedBody || {}), id: String(id) };
         const bookingChanged = hasBookingNotificationChange(existingBooking || {}, mergedBooking);
         const dutyAssigneeChanged = String(existingBooking?.dutyAssigneeId || '') !== String(mergedBooking.dutyAssigneeId || '')
-          || String(existingBooking?.dutyAssigneeEmail || '').toLowerCase() !== String(mergedBooking.dutyAssigneeEmail || '').toLowerCase();
+          || String(existingBooking?.dutyAssigneeEmail || '').toLowerCase() !== String(mergedBooking.dutyAssigneeEmail || '').toLowerCase()
+          || stableJson(existingBooking?.dutyAssignees || []) !== stableJson(mergedBooking.dutyAssignees || []);
         if (bookingChanged) {
           const refundReleased = String(existingBooking?.refundStatus || '').trim().toLowerCase() !== 'processed'
             && String(mergedBooking.refundStatus || '').trim().toLowerCase() === 'processed';
@@ -7574,7 +7784,7 @@ const server = http.createServer(async (request, response) => {
           notifyAppUpdate({
             title: dutyAssigneeChanged ? 'Booking Duty Assignment Changed' : refundReleased ? 'Booking Refund Released' : 'Booking Updated',
             body: dutyAssigneeChanged
-              ? `${mergedBooking.categoryName || 'A booking'} on ${mergedBooking.date || 'an upcoming date'} is assigned to ${mergedBooking.dutyAssigneeName || 'a different duty performer'}${bookingChanged ? `; booking status is ${mergedBooking.status || 'pending'}${mergedBooking.paymentStatus ? ` and payment is ${mergedBooking.paymentStatus}` : ''}` : ''}.`
+              ? `${mergedBooking.categoryName || 'A booking'} on ${mergedBooking.date || 'an upcoming date'} is assigned to ${(Array.isArray(mergedBooking.dutyAssignees) && mergedBooking.dutyAssignees.length ? mergedBooking.dutyAssignees.map((entry) => `${entry.name || entry.email || 'performer'}${entry.dutyType ? ` (${entry.dutyType})` : ''}`).join(', ') : mergedBooking.dutyAssigneeName) || 'a different duty performer'}${bookingChanged ? `; booking status is ${mergedBooking.status || 'pending'}${mergedBooking.paymentStatus ? ` and payment is ${mergedBooking.paymentStatus}` : ''}` : ''}.`
               : `${mergedBooking.categoryName || 'A booking'} for ${mergedBooking.requesterName || 'a sangat member'} on ${mergedBooking.date || 'an upcoming date'} was updated (${mergedBooking.status || 'status pending'}${mergedBooking.paymentStatus ? `, payment ${mergedBooking.paymentStatus}` : ''}).`,
             url: '/admin/booking-duties',
             tag: dutyAssigneeChanged ? 'ssm-booking-duty-assignment' : 'ssm-booking-updated'
@@ -7729,7 +7939,16 @@ const server = http.createServer(async (request, response) => {
   if (contentSingleMatch && request.method === 'GET') {
     try {
       const resource = String(contentSingleMatch[1]).toLowerCase();
-      const data = await eventsDb.getSingleton(resource, null);
+      let data = await eventsDb.getSingleton(resource, null);
+      if (resource === 'cms_home_content' && data && !await canManageAdminPage(request, '/admin/langar')) {
+        data = {
+          ...data,
+          langarItems: (Array.isArray(data.langarItems) ? data.langarItems : []).map((item) => {
+            const { walkInReceipts, ...publicItem } = item || {};
+            return publicItem;
+          })
+        };
+      }
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
       sendJson(response, 500, { ok: false, message: error.message || 'Unable to fetch singleton content.' });

@@ -466,6 +466,15 @@ const normalizeContent = (content) => {
     customStatusLabel: item.customStatusLabel || '',
     quantityRequired: Math.max(0, Number(item.quantityRequired ?? 0)),
     quantityReceived: Math.max(0, Number(item.quantityReceived ?? 0)),
+    walkInReceipts: Array.isArray(item.walkInReceipts) ? item.walkInReceipts.map((receipt) => ({
+      id: String(receipt?.id || ''),
+      quantity: Math.max(0, Number(receipt?.quantity || 0)),
+      unit: String(receipt?.unit || item.unit || 'items'),
+      donorName: String(receipt?.donorName || '').trim(),
+      receivedAt: String(receipt?.receivedAt || '').trim(),
+      expiryDate: String(receipt?.expiryDate || '').trim(),
+      imageUrl: String(receipt?.imageUrl || '').trim()
+    })) : [],
     unit: item.unit || 'items',
     imageUrl: item.imageUrl || '',
     updatedAt: item.updatedAt || '',
@@ -655,6 +664,7 @@ const cmsService = {
       customStatusLabel: payload.customStatusLabel || '',
       quantityRequired: Math.max(0, Number(payload.quantityRequired || 0)),
       quantityReceived: Math.max(0, Number(payload.quantityReceived || 0)),
+      walkInReceipts: Array.isArray(payload.walkInReceipts) ? payload.walkInReceipts : [],
       unit: payload.unit || 'items',
       imageUrl: payload.imageUrl || '',
       updatedAt: new Date().toISOString()

@@ -85,6 +85,8 @@ const initialForm = {
   startTime: '',
   endTime: '',
   bookingLocation: 'Gurdwara Singh Sabha Milton, 7035 Sixth Line, Milton, ON',
+  bookingVenueType: 'gurdwara',
+  hidePublicLocation: true,
   bookingForDifferentPerson: false,
   requesterName: '',
   requesterEmail: '',
@@ -115,7 +117,7 @@ const BookingsPage = () => {
 
   const { data: bookings = [] } = useQuery({
     queryKey: ['bookings'],
-    queryFn: () => bookingService.getBookings().then((res) => res.data)
+    queryFn: () => bookingService.getPublicBookings().then((res) => res.data)
   });
 
   const { data: categories = [] } = useQuery({
@@ -134,7 +136,8 @@ const BookingsPage = () => {
   });
 
   const activeCategories = useMemo(
-    () => (Array.isArray(categories) ? categories : []).filter((entry) => entry.active !== false),
+    () => (Array.isArray(categories) ? categories : []).filter((entry) => entry.active !== false)
+      .sort((first, second) => Number(first.sortOrder || 0) - Number(second.sortOrder || 0)),
     [categories]
   );
 
@@ -153,14 +156,23 @@ const BookingsPage = () => {
         const category = categoryById.get(entry.categoryId);
         const booking = { ...entry, categoryName: category?.name || entry.categoryName };
         const fullDay = isAkhandPathBooking(booking);
+        const orderedItemNames = [...(Array.isArray(entry.itemizedItems) ? entry.itemizedItems : [])]
+          .sort((first, second) => (
+            (activeCategories.findIndex((candidate) => String(candidate.id) === String(first.categoryId)))
+            - (activeCategories.findIndex((candidate) => String(candidate.id) === String(second.categoryId)))
+          ))
+          .map((item) => String(item.name || '').trim())
+          .filter(Boolean);
+        const calendarTitle = orderedItemNames.length ? orderedItemNames.join(', ') : entry.title || category?.name || entry.categoryName || 'Booking';
         return expandDateRange(entry.date, entry.toDate || entry.date).map((date) => ({
           id: `booking-${entry.id}-${date}`,
           kind: 'booking',
-          title: category?.name || entry.categoryName || 'Booking',
+          title: calendarTitle,
           date,
           startTime: fullDay ? '00:00' : entry.startTime,
           endTime: fullDay ? '24:00' : entry.endTime,
-          color: category?.color || '#1d4ed8'
+          color: category?.color || '#1d4ed8',
+          location: entry.bookingLocation || ''
         }));
       });
 
@@ -181,7 +193,7 @@ const BookingsPage = () => {
     });
 
     return [...bookingEntries, ...eventEntries];
-  }, [bookings, categoryById, events]);
+  }, [activeCategories, bookings, categoryById, events]);
 
   const selectedDateKey = toDateKey(calendarDate);
 
@@ -323,6 +335,7 @@ const BookingsPage = () => {
 
       const created = await bookingService.createBooking({
         ...payload,
+        bookedByEmail: String(user?.email || '').trim().toLowerCase(),
         title: category?.name || 'Booking',
         categoryName: category?.name || 'Other',
         color: category?.color || '#1d4ed8',
@@ -727,9 +740,19 @@ const BookingsPage = () => {
             </select>
           </label>
 
-          <label className="text-sm font-semibold text-slate-700 md:col-span-2">
-            Booking Location
-            <input value={form.bookingLocation} onChange={handleField('bookingLocation')} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" required />
+          <label className="text-sm font-semibold text-slate-700">
+            Venue
+            <select value={form.bookingVenueType} onChange={handleField('bookingVenueType')} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" required>
+              <option value="gurdwara">At Gurdwara</option><option value="residence">At Residence</option>
+            </select>
+          </label>
+          <label className="text-sm font-semibold text-slate-700">
+            Private venue address
+            <input value={form.bookingLocation} onChange={handleField('bookingLocation')} placeholder={form.bookingVenueType === 'residence' ? 'Enter the residence address' : 'Gurdwara address'} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" required />
+          </label>
+          <label className="md:col-span-2 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+            <input type="checkbox" checked={form.hidePublicLocation !== false} onChange={handleField('hidePublicLocation')} className="h-4 w-4 accent-brand-blue" />
+            Keep exact venue details private on public calendars
           </label>
             </div>
           </section>
@@ -832,6 +855,7 @@ const BookingsPage = () => {
             <div className="space-y-3 p-5 text-sm text-slate-700" style={{ backgroundColor: `${selectedCalendarItem.color}0D` }}>
               <p className="flex items-center justify-between gap-4 border-b border-slate-200 pb-3"><span className="font-bold text-slate-900">Date</span><span>{selectedCalendarItem.date || '-'}</span></p>
               <p className="flex items-center justify-between gap-4 border-b border-slate-200 pb-3"><span className="font-bold text-slate-900">Time</span><span>{selectedCalendarItem.startTime || '-'} - {selectedCalendarItem.endTime || '-'}</span></p>
+              {selectedCalendarItem.kind === 'booking' ? <p className="flex items-center justify-between gap-4 border-b border-slate-200 pb-3"><span className="font-bold text-slate-900">Location</span><span>{selectedCalendarItem.location || 'At Gurdwara'}</span></p> : null}
               <p className="flex items-center justify-between gap-4"><span className="font-bold text-slate-900">Type</span><span className="rounded-full px-3 py-1 text-xs font-bold text-white" style={{ backgroundColor: selectedCalendarItem.color }}>{selectedCalendarItem.kind === 'event' ? 'Event' : 'Booking'}</span></p>
             </div>
           </div>

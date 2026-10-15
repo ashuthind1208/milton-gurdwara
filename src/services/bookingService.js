@@ -25,6 +25,12 @@ const DEFAULT_CATEGORIES = [
 
 const STATUS_VALUES = new Set(['pending', 'confirmed', 'cancelled']);
 const PAYMENT_STATUS_VALUES = new Set(['pending', 'paid', 'partial', 'refunded']);
+const getBookingItemsLabel = (booking = {}) => {
+  const itemNames = (Array.isArray(booking.itemizedItems) ? booking.itemizedItems : [])
+    .map((item) => String(item?.name || '').trim())
+    .filter(Boolean);
+  return [...new Set(itemNames)].join(', ') || String(booking.categoryName || booking.title || 'Booking').trim();
+};
 
 const normalizeBooking = (record = {}, index = 0) => {
   const paymentStatus = String(record.paymentStatus || 'pending').trim().toLowerCase();
@@ -47,13 +53,26 @@ const normalizeBooking = (record = {}, index = 0) => {
     startTime: String(record.startTime || '').trim(),
     endTime: String(record.endTime || '').trim(),
     bookingLocation: String(record.bookingLocation || record.location || 'Gurdwara Singh Sabha Milton, 7035 Sixth Line, Milton, ON').trim(),
+    bookingVenueType: ['gurdwara', 'residence'].includes(String(record.bookingVenueType || '').trim().toLowerCase())
+      ? String(record.bookingVenueType).trim().toLowerCase()
+      : (/gurdwara|7035\s+sixth\s+line/i.test(String(record.bookingLocation || record.location || '')) ? 'gurdwara' : 'residence'),
+    hidePublicLocation: record.hidePublicLocation !== false,
     requesterName: String(record.requesterName || '').trim(),
     requesterEmail: String(record.requesterEmail || '').trim().toLowerCase(),
+    bookedByEmail: String(record.bookedByEmail || '').trim().toLowerCase(),
     requesterPhone: String(record.requesterPhone || '').trim(),
     requesterAddress: String(record.requesterAddress || '').trim(),
     dutyAssigneeId: String(record.dutyAssigneeId || '').trim(),
     dutyAssigneeName: String(record.dutyAssigneeName || '').trim(),
     dutyAssigneeEmail: String(record.dutyAssigneeEmail || '').trim().toLowerCase(),
+    dutyAssignees: (Array.isArray(record.dutyAssignees) ? record.dutyAssignees : []).map((assignee) => ({
+      userId: String(assignee?.userId || '').trim(),
+      name: String(assignee?.name || '').trim(),
+      email: String(assignee?.email || '').trim().toLowerCase(),
+      dutyType: String(assignee?.dutyType || '').trim(),
+      bookingItemCategoryId: String(assignee?.bookingItemCategoryId || '').trim(),
+      dutyCategoryId: String(assignee?.dutyCategoryId || '').trim()
+    })),
     bookingForDifferentPerson: record.bookingForDifferentPerson === true,
     notes: String(record.notes || '').trim(),
     status: STATUS_VALUES.has(status) ? status : 'pending',
@@ -83,6 +102,7 @@ const normalizeBooking = (record = {}, index = 0) => {
 
 const normalizeCategory = (entry = {}, index = 0) => ({
   id: String(entry.id || `booking-category-${Date.now()}-${index}`).trim(),
+  sortOrder: entry.sortOrder !== undefined && Number.isFinite(Number(entry.sortOrder)) ? Number(entry.sortOrder) : index + 1,
   name: String(entry.name || '').trim(),
   description: String(entry.description || '').trim(),
   color: String(entry.color || '#0a4d9f').trim() || '#0a4d9f',
@@ -138,6 +158,11 @@ const bookingService = {
   getBookings: async () => {
     const rows = await contentApiService.list(BOOKINGS_RESOURCE);
     return serviceResponse((rows || []).map((entry, index) => normalizeBooking(entry, index)));
+  },
+
+  getPublicBookings: async () => {
+    const response = await apiClient.get('/bookings/public');
+    return serviceResponse((response.data?.data || []).map((entry, index) => normalizeBooking(entry, index)));
   },
 
   createBooking: async (payload = {}) => {
@@ -247,6 +272,7 @@ const bookingService = {
   }),
 
   sendBookingConfirmationEmail: async (booking = {}) => {
+    const bookingItemsLabel = getBookingItemsLabel(booking);
     const targetEmail = String(booking.requesterEmail || '').trim().toLowerCase();
     if (!targetEmail) {
       return serviceResponse({ sent: false, reason: 'missing_email' });
@@ -260,7 +286,7 @@ const bookingService = {
 
     const attachment = await buildReceiptAttachment(booking);
     const details = [
-      ['Booking Type', booking.categoryName || '-'],
+      ['Booking Type', bookingItemsLabel || '-'],
       ['Date and Time', `${booking.date || '-'}, ${booking.startTime || '-'} - ${booking.endTime || '-'}`],
       ['Location', booking.bookingLocation || '-'],
       ['Booking Status', toDisplayLabel(booking.status)],
@@ -286,8 +312,8 @@ const bookingService = {
       type: 'booking_confirmation',
       to: targetEmail,
       name: booking.requesterName || 'Member',
-      subject: `Booking Confirmation - ${booking.categoryName || 'Booking'}`,
-      text: `Booking confirmed for ${booking.categoryName || 'Booking'} on ${booking.date || '-'} (${booking.startTime || '-'} - ${booking.endTime || '-'})`,
+      subject: `Booking Confirmation - ${bookingItemsLabel}`,
+      text: `Booking confirmed for ${bookingItemsLabel} on ${booking.date || '-'} (${booking.startTime || '-'} - ${booking.endTime || '-'})`,
       html: detailsHtml,
       bodyHtml: detailsHtml,
       content: detailsHtml,
