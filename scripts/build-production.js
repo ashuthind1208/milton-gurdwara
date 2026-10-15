@@ -42,6 +42,22 @@ if (unsupportedKeys.length > 0 || sensitiveKeys.length > 0 || localValues.length
   process.exit(1);
 }
 
+const backendStartupFiles = [
+  'server.js',
+  path.join('scripts', 'start-production.js'),
+  path.join('server', 'index.js')
+];
+for (const startupFile of backendStartupFiles) {
+  const check = spawnSync(process.execPath, ['--check', path.join(workspaceRoot, startupFile)], {
+    cwd: workspaceRoot,
+    stdio: 'inherit'
+  });
+  if (check.error || check.status !== 0) {
+    console.error(`Backend startup syntax check failed: ${startupFile}`);
+    process.exit(1);
+  }
+}
+
 const inheritedEnv = Object.fromEntries(
   Object.entries(process.env).filter(([key]) => !key.startsWith('REACT_APP_'))
 );

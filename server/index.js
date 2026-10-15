@@ -4029,15 +4029,15 @@ const normalizeBookingForNotification = (entry = {}) => ({
 
 const buildBookingDutyBriefingEmail = ({ recipient, bookings, role, daysRemaining = null }) => {
   const rows = bookings.map((booking) => {
+    const normalized = normalizeBookingForNotification(booking);
     const assignments = normalized.dutyAssignees.filter((entry) => (
       (String(entry.userId || '').trim() && String(entry.userId).trim() === String(recipient.id || '').trim())
       || (String(entry.email || '').trim() && String(entry.email).trim().toLowerCase() === String(recipient.email || '').trim().toLowerCase())
     ));
     const dutyType = [...new Set(assignments.map((entry) => String(entry.dutyType || '').trim()).filter(Boolean))].join(', ');
-    const normalized = normalizeBookingForNotification(booking);
     return {
-      dutyType,
       ...normalized,
+      dutyType,
       dateLabel: normalized.toDate && normalized.toDate !== normalized.date ? `${normalized.date} to ${normalized.toDate}` : normalized.date,
       requesterPhone: String(booking.requesterPhone || '').trim(),
       requesterAddress: String(booking.requesterAddress || '').trim(),
@@ -4100,12 +4100,12 @@ const resolveBookingDutyRecipients = async () => {
   return { recipients, roleLabel };
 };
 
+const isRecipientAssignedToBooking = (recipient, booking) => {
   const assignees = Array.isArray(booking?.dutyAssignees) ? booking.dutyAssignees : [];
   if (assignees.some((assignee) => (
     (String(assignee.userId || '').trim() && String(recipient?.id || '').trim() === String(assignee.userId).trim())
     || (String(assignee.email || '').trim() && String(recipient?.email || '').trim().toLowerCase() === String(assignee.email).trim().toLowerCase())
   ))) return true;
-const isRecipientAssignedToBooking = (recipient, booking) => {
   const assigneeId = String(booking?.dutyAssigneeId || '').trim();
   const assigneeEmail = String(booking?.dutyAssigneeEmail || '').trim().toLowerCase();
   if (assigneeId) return String(recipient?.id || '').trim() === assigneeId;
@@ -4325,8 +4325,8 @@ const assertNoScheduleOverlap = async (candidate, { kind = 'booking', excludeId 
   for (const event of Array.isArray(events) ? events : []) {
     if (kind === 'event' && String(event.id || '') === String(excludeId || '')) continue;
     if (event.active === false || event.isActive === false) continue;
-      if (isFinalDayJathaPair(candidate, event)) continue;
     if (schedulesOverlap(candidateIntervals, getScheduleIntervals(event, 'event'))) {
+      if (isFinalDayJathaPair(candidate, event)) continue;
       conflicts.push(String(event.title || 'event').trim());
     }
   }
@@ -7405,8 +7405,8 @@ const server = http.createServer(async (request, response) => {
             return booking;
           }
           return eventsDb.updateItem('bookings', booking.id, normalized);
-        data = await projectBookingsForRequest(request, data);
         }));
+        data = await projectBookingsForRequest(request, data);
       }
       if (resource === 'users') {
         data = await Promise.all(data.map(async (user) => {
@@ -7441,8 +7441,8 @@ const server = http.createServer(async (request, response) => {
         const homeContentForQuantity = await eventsDb.getSingleton('cms_home_content', null);
         const matchedItem = Array.isArray(homeContentForQuantity?.langarItems)
           ? homeContentForQuantity.langarItems.find((item) => String(item?.id || '') === String(body.itemId || ''))
-        assertInput(Boolean(matchedItem), 'This Langar item is no longer available. Please refresh the list and choose an active item.', 400);
           : null;
+        assertInput(Boolean(matchedItem), 'This Langar item is no longer available. Please refresh the list and choose an active item.', 400);
         if (matchedItem) {
           const existingContributions = await eventsDb.listItems(resource);
           const pendingQuantity = existingContributions
