@@ -565,7 +565,7 @@ const Navbar = () => {
   });
   const { data: publicCalendarBookings = [] } = useQuery({
     queryKey: ['navbar-public-calendar-bookings'],
-    queryFn: () => bookingService.getBookings().then((res) => res.data),
+    queryFn: () => bookingService.getPublicBookings().then((res) => res.data),
     staleTime: 60 * 1000,
     refetchInterval: 5 * 60 * 1000,
     placeholderData: (previousData) => previousData

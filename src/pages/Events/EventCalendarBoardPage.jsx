@@ -68,7 +68,7 @@ const EventCalendarBoardPage = () => {
   });
   const { data: bookingsResponse = [], isError: bookingsErrored } = useQuery({
     queryKey: ['event-calendar-board-bookings'],
-    queryFn: () => bookingService.getBookings().then((response) => response.data),
+    queryFn: () => bookingService.getPublicBookings().then((response) => response.data),
     refetchInterval: 5000,
     refetchIntervalInBackground: true,
     refetchOnMount: 'always',
@@ -125,13 +125,14 @@ const EventCalendarBoardPage = () => {
     .filter((event) => event?.active !== false)
     .map((event) => ({ ...event, itemType: 'event' }))
     .sort((left, right) => new Date(left.date || 0).getTime() - new Date(right.date || 0).getTime()), [events]);
-  const confirmedBookings = useMemo(() => bookings
-    .filter((booking) => booking?.status === 'confirmed' && booking?.date)
+  const scheduledBookings = useMemo(() => bookings
+    .filter((booking) => !['cancelled', 'rejected'].includes(String(booking?.status || '').trim().toLowerCase()) && booking?.date)
     .flatMap((booking) => expandDateRange(booking.date, booking.toDate || booking.date).map((date) => ({
         ...booking,
         id: `${booking.id}-${date}`,
         sourceBookingId: booking.id,
         itemType: 'booking',
+        bookingStatus: String(booking.status || 'pending').trim().toLowerCase(),
         title: booking.title || booking.categoryName || 'Gurdwara Booking',
         category: 'Booking',
         date,
@@ -140,8 +141,8 @@ const EventCalendarBoardPage = () => {
       })))
     .filter((booking) => !Number.isNaN(booking.dateTime.getTime()))
     .sort((left, right) => left.dateTime.getTime() - right.dateTime.getTime()), [bookings, branding.organizationName]);
-  const calendarItems = useMemo(() => [...activeEvents, ...confirmedBookings]
-    .sort((left, right) => new Date(left.dateTime || left.date || 0).getTime() - new Date(right.dateTime || right.date || 0).getTime()), [activeEvents, confirmedBookings]);
+  const calendarItems = useMemo(() => [...activeEvents, ...scheduledBookings]
+    .sort((left, right) => new Date(left.dateTime || left.date || 0).getTime() - new Date(right.dateTime || right.date || 0).getTime()), [activeEvents, scheduledBookings]);
   const visibleCalendarItems = useMemo(() => {
     const todayKey = toLocalDateKey(now);
     return calendarItems.filter((item) => item.itemType !== 'event' || toLocalDateKey(item.date) >= todayKey);
@@ -206,7 +207,7 @@ const EventCalendarBoardPage = () => {
       .filter((registrant) => registrant?.status !== 'cancelled' && toLocalDateKey(registrant?.createdAt) === todayKey)
       .length, 0);
   }, [activeEvents, now]);
-  const monthBookings = useMemo(() => confirmedBookings.filter((booking) => isSameMonth(booking.dateTime, monthStart)), [confirmedBookings, monthStart]);
+  const monthBookings = useMemo(() => scheduledBookings.filter((booking) => isSameMonth(booking.dateTime, monthStart)), [scheduledBookings, monthStart]);
   const monthScheduleItems = useMemo(() => visibleCalendarItems.filter((item) => {
     const itemDate = new Date(item.dateTime || item.date || 0);
     return !Number.isNaN(itemDate.getTime()) && isSameMonth(itemDate, monthStart);
@@ -434,7 +435,7 @@ const EventCalendarBoardPage = () => {
                               <div key={`${item.itemType}-${item.id}-${groupIndex}-${itemIndex}`} className={`min-h-[104px] overflow-hidden rounded-md border bg-slate-950/45 px-3 py-3 ${item.itemType === 'booking' ? 'border-rose-300/45' : 'border-cyan-300/35'} ${hasPassed ? 'opacity-65' : ''}`}>
                                 <div className="flex min-w-0 items-start justify-between gap-2">
                                   <p className="line-clamp-2 text-sm font-bold leading-snug text-white xl:text-base">{item.title}</p>
-                                  <span className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${item.itemType === 'booking' ? 'bg-rose-300/20 text-rose-100' : 'bg-cyan-300/20 text-cyan-100'}`}>{item.itemType}</span>
+                                  <span className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${item.itemType === 'booking' ? item.bookingStatus === 'confirmed' ? 'bg-rose-300/20 text-rose-100' : 'bg-amber-300/20 text-amber-100' : 'bg-cyan-300/20 text-cyan-100'}`}>{item.itemType === 'booking' ? 'Booking' : item.itemType}</span>
                                 </div>
                                 <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-slate-200"><CalendarDaysIcon className="h-4 w-4 shrink-0" /> {format(itemDate, 'EEEE, MMM d')} · {format(itemDate, 'h:mm a')}</p>
                                 <p className="mt-1 flex items-center gap-1.5 truncate text-xs text-slate-400"><MapPinIcon className="h-4 w-4 shrink-0" /> {item.location || branding.organizationName}</p>
@@ -468,7 +469,7 @@ const EventCalendarBoardPage = () => {
           ) : null}
 
           <footer className="mt-1 flex shrink-0 items-center justify-between text-[9px] text-slate-500">
-            <span>{eventsErrored || bookingsErrored ? 'Showing last synced calendar data' : `Live events and bookings · ${monthBookings.length} confirmed booking${monthBookings.length === 1 ? '' : 's'} this month`}</span>
+            <span>{eventsErrored || bookingsErrored ? 'Showing last synced calendar data' : `Live events and bookings · ${monthBookings.length} booking${monthBookings.length === 1 ? '' : 's'} this month`}</span>
             <span>{format(now, 'EEEE, MMMM d · h:mm a')}</span>
           </footer>
         </main>
