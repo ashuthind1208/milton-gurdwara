@@ -8,6 +8,7 @@ import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import AdminHeaderActionButton from '../../components/ui/AdminHeaderActionButton';
 import hukamnamaService from '../../services/hukamnamaService';
+import AdminHukamnamaLedSettings from './AdminHukamnamaLedSettings';
 
 const toDateKey = (value = new Date()) => {
   if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -204,7 +205,6 @@ const AdminHukamnamaPage = () => {
     && previewData.selectedShabadLines?.length
     ? { ...selectedShabadOption, lines: previewData.selectedShabadLines }
     : selectedShabadOption;
-
   useEffect(() => {
     setHeaderAction(<AdminHeaderActionButton label="Add Hukamnama" onClick={openAddModal} />);
 
@@ -241,6 +241,8 @@ const AdminHukamnamaPage = () => {
           </div>
         </Card>
       </div>
+
+      <AdminHukamnamaLedSettings entry={selectedDateArchive?.entry || { ang: 692 }} lines={selectedDateArchive?.entry ? hukamnamaService.getSelectedShabadLines(selectedDateArchive.entry) : []} />
 
       {addModalOpen ? (
         <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-900/45 px-3 py-3 sm:px-4 sm:py-6">
@@ -329,6 +331,7 @@ const AdminHukamnamaPage = () => {
           </div>
         </div>
       ) : null}
+
     </div>
   );
 };
