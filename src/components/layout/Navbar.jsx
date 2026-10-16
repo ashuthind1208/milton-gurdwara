@@ -1796,8 +1796,8 @@ const Navbar = () => {
   const whatsAppJoinLink = String(phase2ChannelsConfig?.whatsAppJoinLink || '').trim();
   const hasWhatsAppGroup = phase2ChannelsConfig?.whatsAppOptInEnabled === true && /^https?:\/\//i.test(whatsAppJoinLink);
   const socialLinks = [
-    { label: 'Facebook', url: siteConfig.social.facebook, color: '#1877F2', icon: FacebookIcon },
-    { label: 'Instagram', url: siteConfig.social.instagram, color: '#E4405F', icon: InstagramIcon }
+    { label: 'Facebook', url: branding.facebookUrl || siteConfig.social.facebook, color: '#1877F2', icon: FacebookIcon },
+    { label: 'Instagram', url: branding.instagramUrl || siteConfig.social.instagram, color: '#E4405F', icon: InstagramIcon }
   ];
 
   const openStreamModal = (id) => {
@@ -2448,15 +2448,15 @@ const Navbar = () => {
   }, [isInlineSearchExpanded]);
 
   return (
-    <header className={`${isHomePage ? 'fixed inset-x-0' : 'sticky'} top-0 z-50 ${isHomeOverlayMode ? 'bg-transparent shadow-none ring-0 backdrop-blur-0' : 'bg-slate-950/95 shadow-[0_10px_26px_-10px_rgba(2,6,23,0.65)] ring-1 ring-slate-700/80 backdrop-blur-md'} transition-all duration-300 ${isCompact ? 'pb-1' : ''}`}>
-      <div className="hidden border-b border-white/20 bg-[#0a1a33] px-4 py-0.5 text-xs text-blue-50 xl:block">
+    <header className={`${isHomePage ? 'fixed inset-x-0' : 'sticky'} top-0 z-50 ${isHomeOverlayMode ? 'bg-transparent shadow-none ring-0 backdrop-blur-0' : 'bg-brand-navy/95 shadow-[0_10px_26px_-10px_rgba(2,6,23,0.65)] ring-1 ring-brand-saffron/30 backdrop-blur-md'} transition-all duration-300 ${isCompact ? 'pb-1' : ''}`}>
+      <div className="hidden border-b border-brand-saffron/30 bg-[color:var(--theme-darker,#0a1a33)] px-4 py-0.5 text-xs text-white/90 xl:block">
         <div className="mx-auto flex max-w-7xl items-center justify-between md:px-2">
           <div className="flex items-center gap-2">
             <p>{siteConfig.contact.address}</p>
             {hasWhatsAppGroup || socialLinks.length > 0 ? (
               <>
                 <div className="flex items-center gap-2" aria-label="Social media links">
-                  <span className="text-blue-200">|</span>
+                  <span className="text-brand-saffron/70">|</span>
                   {hasWhatsAppGroup ? (
                     <div className="group relative" onMouseEnter={openWhatsAppPopover} onMouseLeave={closeWhatsAppPopoverWithDelay} onFocus={openWhatsAppPopover} onBlur={closeWhatsAppPopoverWithDelay}>
                     <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#25D366] text-white shadow-sm transition group-hover:scale-105" aria-label="WhatsApp Sangat group">
@@ -2788,7 +2788,7 @@ const Navbar = () => {
             <img
               src={logoSrc}
               alt={`${branding.organizationName} logo`}
-              className="h-[7.7rem] w-[7.7rem] rounded-full border-2 border-brand-saffron object-cover shadow-[0_4px_16px_rgba(245,166,35,0.25)]"
+              className="brand-logo h-[7.7rem] w-[7.7rem] rounded-full border-2 border-brand-saffron object-cover shadow-[0_4px_16px_rgba(245,166,35,0.25)]"
             />
           </Link>
 
@@ -2803,7 +2803,7 @@ const Navbar = () => {
             <img
               src={logoSrc}
               alt={`${branding.organizationName} logo`}
-              className="h-[4.5rem] w-[4.5rem] rounded-full border-2 border-brand-saffron object-cover shadow-[0_4px_16px_rgba(245,166,35,0.25)]"
+              className="brand-logo h-[4.5rem] w-[4.5rem] rounded-full border-2 border-brand-saffron object-cover shadow-[0_4px_16px_rgba(245,166,35,0.25)]"
             />
           </Link>
 
@@ -2907,7 +2907,7 @@ const Navbar = () => {
               <img
                 src={logoSrc}
                 alt={`${branding.organizationName} logo`}
-                className="mt-1.5 h-[3.55rem] w-[3.55rem] rounded-full border border-brand-saffron object-cover"
+                className="brand-logo mt-1.5 h-[3.55rem] w-[3.55rem] rounded-full border border-brand-saffron object-cover"
               />
             </Link>
           </div>
@@ -3447,7 +3447,7 @@ const Navbar = () => {
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.26),transparent_44%)]" aria-hidden="true" />
                 <div className="relative flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <img src={logoSrc} alt={branding.organizationName} className="h-14 w-14 rounded-full border-2 border-white/70 bg-white object-cover" />
+                    <img src={logoSrc} alt={branding.organizationName} className="brand-logo h-14 w-14 rounded-full border-2 border-white/70 bg-white object-cover" />
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/85">{branding.organizationName}</p>
                       <h3 className="mt-1 font-heading text-lg font-semibold">Membership Registration Form</h3>

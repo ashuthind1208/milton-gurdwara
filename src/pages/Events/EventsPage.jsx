@@ -17,6 +17,7 @@ import Button from '../../components/ui/Button';
 import cmsService from '../../services/cmsService';
 import advertisementService from '../../services/advertisementService';
 import { useAuth } from '../../context/AuthContext';
+import { useBranding } from '../../context/BrandingContext';
 import contentApiService from '../../services/contentApiService';
 import PhoneNumberRequiredNotice from '../../components/common/PhoneNumberRequiredNotice';
 import PhoneInput from '../../components/forms/PhoneInput';
@@ -43,6 +44,7 @@ const normalizePhoneToken = (value) => String(value || '').replace(/\D/g, '');
 const EVENTS_IDENTITY_SETTING_KEY = 'settings-events-allow-custom-name-email';
 
 const EventsPage = () => {
+  const { branding } = useBranding();
   const meta = useSeoMeta('Events', 'Event calendar, list view, filters, and RSVP registration for all programs.');
   const location = useLocation();
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -304,9 +306,9 @@ const EventsPage = () => {
   const calendarEventStyleGetter = (event) => {
     return {
       style: {
-        backgroundColor: '#0a4d9f',
-        borderColor: '#0a4d9f',
-        color: '#f5a623',
+        backgroundColor: branding.primaryColor,
+        borderColor: branding.primaryColor,
+        color: branding.accentColor,
         borderRadius: '10px',
         borderWidth: '1px',
         padding: '5px 8px',

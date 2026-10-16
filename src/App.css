@@ -9,32 +9,32 @@
 }
 
 [role='dialog'][aria-label='Help us stock the kitchen'] aside h3 {
-  margin: -1rem -1rem 1rem;
-  border-bottom: 0;
-  border-radius: 0.75rem 0.75rem 0 0;
-  background: linear-gradient(100deg, rgb(3 35 82), rgb(37 99 235));
-  padding: 0.9rem 1rem;
-  color: white;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
 }
 
 [role='dialog'][aria-label='Help us stock the kitchen'] aside {
-  background: #ffffff;
+  background: transparent;
   margin-top: 0;
 }
 
 [role='dialog'][aria-label='Help us stock the kitchen'] section {
-  border: 1px solid rgb(186 230 253);
+  border-color: color-mix(in srgb, var(--brand-blue) 30%, transparent);
   border-radius: 0.75rem;
-  padding: 1rem;
+  padding: 0;
 }
 
-[role='dialog'][aria-label='Help us stock the kitchen'] section > h3 {
-  margin: -1rem -1rem 1rem;
-  border-bottom: 0;
-  border-radius: 0.75rem 0.75rem 0 0;
-  background: linear-gradient(100deg, rgb(3 35 82), rgb(37 99 235));
-  padding: 0.9rem 1rem;
-  color: white;
+[role='dialog'][aria-label='Help us stock the kitchen'] section h3 {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
 }
 
 @media (min-width: 1024px) {

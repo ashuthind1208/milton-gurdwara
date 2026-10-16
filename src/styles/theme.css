@@ -27,7 +27,7 @@
 }
 
 .ticker-shell-home {
-  background: linear-gradient(110deg, #0a1a33 0%, #0d2244 50%, #0a1a33 100%);
+  background: linear-gradient(110deg, var(--theme-darker, #0a1a33) 0%, var(--theme-dark, #0d2244) 50%, var(--theme-darker, #0a1a33) 100%);
   box-shadow: 0 4px 16px rgba(2, 6, 23, 0.4);
   animation: none;
 }
@@ -39,7 +39,7 @@
   left: 0;
   right: 0;
   height: 1px;
-  background: rgba(10, 77, 159, 0.2);
+  background: rgb(var(--brand-blue-rgb, 10 77 159) / 0.2);
 }
 
 .ticker-shell::before {
@@ -74,9 +74,9 @@
 }
 
 .ticker-item-home:nth-child(odd) {
-  border-color: rgba(245, 166, 35, 0.55);
+  border-color: rgb(var(--brand-saffron-rgb, 245 166 35) / 0.55);
   background: linear-gradient(120deg, rgba(255, 255, 255, 0.12), rgba(255, 248, 220, 0.1));
-  color: #fff8e8;
+  color: rgb(var(--brand-cream-rgb, 255 248 232));
 }
 
 .ticker-item-home:nth-child(even) {
@@ -91,7 +91,7 @@
 }
 
 .ticker-item-home .h-1\.5 {
-  box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.3);
+  box-shadow: 0 0 0 3px rgb(var(--brand-saffron-rgb, 245 166 35) / 0.3);
 }
 
 .ticker-item-home .ticker-item-date {

@@ -261,46 +261,47 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-amber-300">Langar needs board</p>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-brand-saffron">Langar needs board</p>
                   <h2 className="mt-1 max-w-xl font-heading text-3xl font-bold leading-tight sm:text-4xl">Help stock the kitchen</h2>
-                  <p className="mt-2 max-w-md text-sm leading-5 text-blue-100">Support the Langar by bringing supplies or contributing to the items below.</p>
+                  <p className="mt-2 max-w-none whitespace-nowrap text-[clamp(9px,2vw,14px)] leading-5 text-blue-100">Support the Langar by bringing supplies or contributing to the items below.</p>
                   <hr className="mt-3 border-t border-white/20" />
-                  <p className="mt-2 pt-1 text-xs font-semibold text-amber-200">Last updated {lastUpdatedLabel}</p>
+                  <p className="mt-2 pt-1 text-xs font-semibold text-brand-saffron/80">Last updated {lastUpdatedLabel}</p>
                 </div>
-                <button type="button" onClick={() => setBoardOpen(false)} className="rounded-full border border-brand-saffron bg-brand-saffron p-2 text-slate-950 shadow-lg hover:bg-amber-400" aria-label="Close Langar needs board">
+                <button type="button" onClick={() => setBoardOpen(false)} className="rounded-full border border-brand-saffron bg-brand-saffron p-2 text-slate-950 shadow-lg transition hover:bg-brand-saffron/80" aria-label="Close Langar needs board">
                   <XMarkIcon className="h-5 w-5" />
                 </button>
               </div>
             </header>
 
-            <div className="grid grid-cols-2 gap-2 border-b border-slate-200 bg-white p-3 sm:grid-cols-4 sm:gap-3 sm:p-4">
-              <div className="flex items-center justify-center gap-3 rounded-xl border border-sky-100 px-3 py-3 shadow-sm sm:justify-start">
+            <div className="grid grid-cols-2 gap-2 border-b border-brand-blue/20 bg-brand-cream p-3 sm:grid-cols-4 sm:gap-3 sm:p-4">
+              <div className="flex items-center justify-center gap-3 rounded-xl border border-brand-blue/20 px-3 py-3 shadow-sm sm:justify-start" style={{ backgroundImage: 'linear-gradient(135deg, color-mix(in srgb, var(--brand-blue) 2%, white), color-mix(in srgb, var(--brand-saffron) 3%, white))' }}>
                 <Donut value={totals.progress} size="h-14 w-14 sm:h-16 sm:w-16" />
                 <div className="hidden min-w-0 sm:block">
                   <p className="text-sm font-extrabold text-brand-blue">Overall progress</p>
                   <p className="text-[10px] text-slate-500">Items partially covered</p>
                 </div>
               </div>
-              <div className="rounded-xl border border-sky-100 px-3 py-3 shadow-sm">
+              <div className="rounded-xl border border-brand-blue/20 px-3 py-3 shadow-sm" style={{ backgroundImage: 'linear-gradient(135deg, color-mix(in srgb, var(--brand-blue) 2%, white), color-mix(in srgb, var(--brand-saffron) 3%, white))' }}>
                 <p className="text-3xl font-black text-brand-blue">{activeItems.length}</p>
                 <p className="text-sm font-extrabold text-brand-blue">Items needed</p>
                 <p className="text-[10px] text-slate-500">of {activeItems.length} total</p>
               </div>
-              <div className="rounded-xl border border-sky-100 px-3 py-3 shadow-sm">
+              <div className="rounded-xl border border-brand-blue/20 px-3 py-3 shadow-sm" style={{ backgroundImage: 'linear-gradient(135deg, color-mix(in srgb, var(--brand-blue) 2%, white), color-mix(in srgb, var(--brand-saffron) 3%, white))' }}>
                 <p className="text-3xl font-black text-brand-blue">{totals.contributors}</p>
                 <p className="text-sm font-extrabold text-brand-blue">Contributors</p>
                 <p className="text-[10px] text-slate-500">from our Sangat</p>
               </div>
-              <div className="rounded-xl border border-sky-100 px-3 py-3 shadow-sm">
+              <div className="rounded-xl border border-brand-blue/20 px-3 py-3 shadow-sm" style={{ backgroundImage: 'linear-gradient(135deg, color-mix(in srgb, var(--brand-blue) 2%, white), color-mix(in srgb, var(--brand-saffron) 3%, white))' }}>
                 <p className="text-3xl font-black text-brand-blue">{totals.receivedThisWeek}</p>
                 <p className="text-sm font-extrabold text-brand-blue">Meals supported</p>
                 <p className="text-[10px] text-slate-500">so far this week</p>
               </div>
             </div>
 
-            <div className="grid items-start gap-5 p-4 sm:p-6 lg:grid-cols-[1.4fr_0.8fr]">
-              <section>
-                <h3 className="font-heading text-2xl font-bold text-slate-900 sm:text-3xl">Current Langar Needs</h3>
+            <div className="grid items-start gap-5 bg-brand-cream/50 p-4 sm:p-6 lg:grid-cols-[1.4fr_0.8fr]">
+              <section className="min-w-0 overflow-hidden rounded-xl border-b border-r border-brand-blue/30 border-l-2 border-l-brand-blue/55 shadow-sm" style={{ backgroundImage: 'linear-gradient(135deg, color-mix(in srgb, var(--brand-blue) 2%, white), color-mix(in srgb, var(--brand-saffron) 3%, white))' }}>
+                <div className="bg-brand-blue px-4 py-3 text-white sm:px-5"><h3 className="font-heading text-2xl font-bold text-white sm:text-3xl">Current Langar Needs</h3></div>
+                <div className="p-4 sm:p-5">
                 <div className="mt-2">
                   {visibleItems.map((item) => {
                     const required = Number(item.quantityRequired || 0);
@@ -308,10 +309,10 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
                     const receivedProgress = required ? Math.min(100, Math.round((received / required) * 100)) : 0;
                     const isFullyDone = required > 0 && remainingForItem(item) <= 0;
                     return (
-                      <article key={item.id} className="flex flex-wrap items-start gap-x-3 gap-y-2 border-b border-slate-200 py-4 sm:flex-nowrap sm:items-center">
+                      <article key={item.id} className="flex flex-wrap items-start gap-x-3 gap-y-2 border-b border-brand-saffron/35 py-4 sm:flex-nowrap sm:items-center">
                         <img src={imageForItem(item)} alt="" className="mt-1 h-12 w-12 shrink-0 rounded-lg object-cover sm:mt-0" />
                         <div className="min-w-0 flex-1 sm:min-w-[8rem] sm:flex-none">
-                          <h4 className="text-lg font-black leading-tight text-slate-900 sm:text-xl">{item.name}</h4>
+                          <h4 className="text-lg font-black leading-tight text-brand-navy sm:text-xl">{item.name}</h4>
                           <p className="truncate text-xs text-slate-500">{item.category} · {required} {item.unit} needed</p>
                         </div>
                         <div className="mt-1 flex w-20 shrink-0 items-center gap-1 sm:mt-0 sm:w-auto sm:flex-1 sm:gap-2">
@@ -324,7 +325,7 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
                           <button
                             type="button"
                             onClick={() => openContribution(item)}
-                            className="flex w-full items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-brand-blue px-2.5 py-1.5 text-[11px] font-bold text-white sm:ml-3 sm:w-auto sm:justify-start sm:px-3 sm:text-xs"
+                            className="flex w-full items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-[color:var(--theme-button,#0b4ea2)] px-2.5 py-1.5 text-[11px] font-bold text-white transition hover:bg-[color:var(--theme-button-hover,#f4a300)] sm:ml-3 sm:w-auto sm:justify-start sm:px-3 sm:text-xs"
                           >
                             <GiftIcon className="h-3.5 w-3.5" />Make contribution <ChevronRightIcon className="h-3.5 w-3.5" />
                           </button>
@@ -334,7 +335,7 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
                   })}
                 </div>
                 {totalItemPages > 1 ? (
-                  <div className="mt-4 flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                  <div className="mt-4 flex items-center justify-between rounded-lg border border-brand-blue/20 bg-brand-cream px-3 py-2">
                     <p className="text-xs font-semibold text-slate-500">Page {itemsPage} of {totalItemPages}</p>
                     <div className="flex gap-2">
                       <button type="button" disabled={itemsPage === 1} onClick={() => setItemsPage((page) => Math.max(1, page - 1))} className="rounded-md border border-slate-300 px-3 py-1 text-xs font-bold disabled:opacity-40">Previous</button>
@@ -342,25 +343,26 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
                     </div>
                   </div>
                 ) : null}
+                </div>
               </section>
 
-              <aside className="h-full rounded-xl border border-sky-100 bg-white p-4">
-                <h3 className="font-heading text-2xl font-bold text-slate-900">Recent Contributors</h3>
-                <hr className="mt-3 border-slate-200" />
+              <aside className="h-full overflow-hidden rounded-xl border border-brand-blue/40 shadow-sm" style={{ backgroundImage: 'linear-gradient(145deg, color-mix(in srgb, var(--brand-blue) 2%, white), color-mix(in srgb, var(--brand-saffron) 3%, white))' }}>
+                <div className="bg-brand-blue px-4 py-3 text-white"><h3 className="font-heading text-2xl font-bold text-white">Recent Contributors</h3></div>
+                <div className="p-4"><hr className="border-brand-saffron/50" />
                 <div className="mt-3">
                   {visibleContributions.map((entry) => (
-                    <div key={entry.id} className="flex items-center gap-3 border-b border-sky-100 py-2">
-                      <img src={avatarFor(entry)} alt="" className="h-10 w-10 rounded-full object-cover" />
+                    <div key={entry.id} className="flex items-center gap-3 border-b border-brand-saffron/35 py-2">
+                      <img src={avatarFor(entry)} alt="" className="brand-logo h-10 w-10 rounded-full border-2 border-brand-saffron/50 object-cover" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-bold text-slate-800">{entry.anonymous ? 'Anonymous' : entry.donorName}</p>
                         <p className="truncate text-xs text-brand-blue">{entry.itemName} · {entry.quantity} {entry.unit}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-[10px] font-bold text-sky-600">Submitted {formatSubmittedAt(entry.createdAt)}</p>
+                        <p className="text-[10px] font-bold text-brand-blue/75">Submitted {formatSubmittedAt(entry.createdAt)}</p>
                         {entry.status === 'received' ? (
                           <p className="text-[10px] font-bold text-emerald-600">Received {formatSubmittedAt(entry.receivedAt || entry.updatedAt || entry.createdAt)}</p>
                         ) : (
-                          <span className="mt-0.5 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">Pending</span>
+                          <span className="mt-0.5 inline-flex rounded-full bg-brand-saffron/20 px-2 py-0.5 text-[10px] font-bold text-brand-navy">Pending</span>
                         )}
                       </div>
                     </div>
@@ -376,6 +378,7 @@ const LangarNeedsBoardReference = ({ items = [], triggerOnly = false, navItem = 
                     </div>
                   </div>
                 ) : null}
+                </div>
               </aside>
             </div>
           </div>

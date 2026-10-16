@@ -34,7 +34,7 @@ const {
   normalizeQuestionKey,
   reuseGranthiAnswer,
 } = require('./askGranthiStore');
-const { getGurdwaraBranding, saveGurdwaraBranding } = require('./gurdwaraBrandingStore');
+const { getGurdwaraBranding, saveGurdwaraBranding, BRANDING_FONTS, BRANDING_CORNER_STYLES, BRANDING_THEME_KEYS } = require('./gurdwaraBrandingStore');
 const { resolveMembershipRenewal } = require('./membershipReminder');
 const { createOpenWaNotifications } = require('./openWaNotifications');
 const {
@@ -6426,11 +6426,66 @@ const server = http.createServer(async (request, response) => {
       assertInput(isSuperAdmin(request), 'Only Super Admins can change Gurdwara branding.', 403);
       assertInput(eventsDb.hasDatabaseConnection, 'Gurdwara branding is temporarily unavailable.', 503);
       const payload = await parseJsonObjectBody(request, { maxBytes: 32 * 1024, allowEmpty: false });
-      ensureNoUnknownKeys(payload, ['organizationName', 'shortName', 'logoUrl', 'primaryColor', 'accentColor', 'surfaceColor']);
+      ensureNoUnknownKeys(payload, ['organizationName', 'shortName', 'logoUrl', 'primaryColor', 'accentColor', 'surfaceColor', 'footerColor', 'textColor', 'savedThemes', 'buttonColor', 'buttonHoverColor', 'linkColor', 'linkHoverColor', 'tagline', 'faviconUrl', 'headingFont', 'bodyFont', 'cornerStyle', 'logoShape', 'address', 'phone', 'email', 'facebookUrl', 'instagramUrl', 'youtubeUrl']);
       const colorPattern = /^#[0-9a-f]{6}$/i;
       const logoUrl = readStringField(payload, 'logoUrl', { max: 1000 });
       assertInput(!logoUrl || /^(https?:\/\/|\/)/i.test(logoUrl), 'logoUrl must be an HTTPS URL or site-relative path.');
+      const faviconUrl = readStringField(payload, 'faviconUrl', { max: 1000 });
+      assertInput(!faviconUrl || /^(https?:\/\/|\/)/i.test(faviconUrl), 'faviconUrl must be an HTTPS URL or site-relative path.');
+      const readOptionalUrl = (key) => {
+        const value = readStringField(payload, key, { max: 500 });
+        assertInput(!value || /^https?:\/\//i.test(value), `${key} must start with http:// or https://.`);
+        return value;
+      };
+      const headingFont = readStringField(payload, 'headingFont', { max: 60 }) || 'Crimson Text';
+      const bodyFont = readStringField(payload, 'bodyFont', { max: 60 }) || 'Manrope';
+      const cornerStyle = readStringField(payload, 'cornerStyle', { max: 20 }) || 'soft';
+      assertInput(BRANDING_FONTS.includes(headingFont) && BRANDING_FONTS.includes(bodyFont), 'Choose a supported font.');
+      assertInput(BRANDING_CORNER_STYLES.includes(cornerStyle), 'Choose a supported corner style.');
+      const logoShape = readStringField(payload, 'logoShape', { max: 20 }) || 'circle';
+      assertInput(['circle', 'original'].includes(logoShape), 'Choose a supported logo shape.');
+      const email = readStringField(payload, 'email', { max: 160 });
+      assertInput(!email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), 'email has an invalid format.');
+      const savedThemesInput = payload.savedThemes == null ? [] : payload.savedThemes;
+      assertInput(Array.isArray(savedThemesInput) && savedThemesInput.length <= 12, 'savedThemes must be a list of at most 12 themes.');
+      const savedThemes = savedThemesInput.map((theme, index) => {
+        assertInput(theme && typeof theme === 'object' && theme.values && typeof theme.values === 'object', `savedThemes[${index}] is invalid.`);
+        const name = readStringField(theme, 'name', { required: true, min: 1, max: 60 });
+        const id = readStringField(theme, 'id', { required: true, max: 60, pattern: /^[a-z0-9-]+$/i });
+        const values = {};
+        BRANDING_THEME_KEYS.forEach((key) => {
+          const value = readStringField(theme.values, key, { max: 60 });
+          if (/Color$/.test(key)) {
+            assertInput(!value || colorPattern.test(value), `savedThemes[${index}].${key} must be a six-digit color.`);
+          } else if (key === 'cornerStyle') {
+            assertInput(!value || BRANDING_CORNER_STYLES.includes(value), `savedThemes[${index}].${key} is not supported.`);
+          } else {
+            assertInput(!value || BRANDING_FONTS.includes(value), `savedThemes[${index}].${key} is not supported.`);
+          }
+          values[key] = value;
+        });
+        return { id, name, values };
+      });
       const branding = {
+        savedThemes,
+        footerColor: readStringField(payload, 'footerColor', { pattern: colorPattern, max: 7 }),
+        textColor: readStringField(payload, 'textColor', { pattern: colorPattern, max: 7 }),
+        buttonColor: readStringField(payload, 'buttonColor', { pattern: colorPattern, max: 7 }),
+        buttonHoverColor: readStringField(payload, 'buttonHoverColor', { pattern: colorPattern, max: 7 }),
+        linkColor: readStringField(payload, 'linkColor', { pattern: colorPattern, max: 7 }),
+        linkHoverColor: readStringField(payload, 'linkHoverColor', { pattern: colorPattern, max: 7 }),
+        tagline: readStringField(payload, 'tagline', { max: 240 }),
+        faviconUrl,
+        headingFont,
+        bodyFont,
+        cornerStyle,
+        logoShape,
+        address: readStringField(payload, 'address', { max: 240 }),
+        phone: readStringField(payload, 'phone', { max: 40 }),
+        email,
+        facebookUrl: readOptionalUrl('facebookUrl'),
+        instagramUrl: readOptionalUrl('instagramUrl'),
+        youtubeUrl: readOptionalUrl('youtubeUrl'),
         organizationName: readStringField(payload, 'organizationName', { required: true, min: 2, max: 120 }),
         shortName: readStringField(payload, 'shortName', { required: true, min: 2, max: 80 }),
         logoUrl,

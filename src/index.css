@@ -24,7 +24,7 @@ html.board-embed [data-board-control] {
 
   body {
     margin: 0;
-    font-family: 'Manrope', sans-serif;
+    font-family: var(--font-body, 'Manrope'), sans-serif;
     letter-spacing: 0.01em;
     background: #ffffff;
     -webkit-font-smoothing: antialiased;
@@ -37,7 +37,7 @@ html.board-embed [data-board-control] {
   h4,
   h5,
   h6 {
-    font-family: 'Crimson Text', serif;
+    font-family: var(--font-heading, 'Crimson Text'), serif;
   }
 
   .form-validation-attempted input:not([type='hidden']):invalid,
@@ -52,6 +52,55 @@ html.board-embed [data-board-control] {
     font-family: 'Noto Sans Gurmukhi', sans-serif;
   }
 }
+
+html .brand-logo {
+  border: 0;
+  box-shadow: none;
+}
+
+html[data-logo-shape='original'] .brand-logo {
+  border-radius: 0;
+  background: transparent;
+  object-fit: contain;
+}
+
+html[data-corner-style='sharp'] .rounded-md,
+html[data-corner-style='sharp'] .rounded-lg,
+html[data-corner-style='sharp'] .rounded-xl,
+html[data-corner-style='sharp'] .rounded-2xl {
+  border-radius: 2px;
+}
+
+html[data-custom-button='true'] button.bg-brand-blue,
+html[data-custom-button='true'] a.bg-brand-blue { background-color: var(--brand-button); }
+html[data-custom-link='true'] a.text-brand-blue,
+html[data-custom-link='true'] a.text-blue-600,
+html[data-custom-link='true'] a.text-blue-700,
+html[data-custom-link='true'] a.text-blue-800 { color: var(--brand-link); }
+html[data-custom-link-hover='true'] a.text-brand-blue:hover,
+html[data-custom-link-hover='true'] a.text-blue-600:hover,
+html[data-custom-link-hover='true'] a.text-blue-700:hover,
+html[data-custom-link-hover='true'] a.text-blue-800:hover,
+html[data-custom-link-hover='true'] a.hover\:text-brand-blue:hover,
+html[data-custom-link-hover='true'] a.hover\:text-blue-700:hover { color: var(--brand-link-hover); }
+html[data-custom-hover='true'] .hover\:bg-blue-800:hover,
+html[data-custom-hover='true'] .hover\:bg-blue-700:hover,
+html[data-custom-hover='true'] .hover\:bg-brand-blue:hover,
+html[data-custom-hover='true'] .hover\:bg-brand-navy:hover { background-color: var(--brand-hover); }
+html[data-custom-text='true']:not(.dark) .text-slate-900,
+html[data-custom-text='true']:not(.dark) .text-slate-800,
+html[data-custom-text='true']:not(.dark) .text-slate-700 { color: var(--brand-text); }
+
+.react-calendar__tile--active,
+.react-calendar__tile--active:enabled:hover,
+.react-calendar__tile--active:enabled:focus { background: var(--brand-blue, #006edc); color: #fff; }
+.react-calendar__tile--now { background: color-mix(in srgb, var(--brand-saffron) 28%, white); }
+.react-calendar__tile:enabled:hover,
+.react-calendar__tile:enabled:focus,
+.react-calendar__navigation button:enabled:hover,
+.react-calendar__navigation button:enabled:focus { background-color: color-mix(in srgb, var(--brand-blue) 14%, white); }
+.react-calendar__tile--active:enabled:hover,
+.react-calendar__tile--active:enabled:focus { background-color: var(--brand-blue, #1087ff); }
 
 @layer utilities {
   .glass {
