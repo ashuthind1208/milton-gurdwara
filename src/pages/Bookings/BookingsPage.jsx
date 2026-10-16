@@ -6,6 +6,7 @@ import PageHero from '../../components/common/PageHero';
 import Seo from '../../components/common/Seo';
 import useSeoMeta from '../../hooks/useSeoMeta';
 import { useAuth } from '../../context/AuthContext';
+import { useBranding } from '../../context/BrandingContext';
 import bookingService from '../../services/bookingService';
 import eventService from '../../services/eventService';
 import donationService from '../../services/donationService';
@@ -30,8 +31,8 @@ const overlaps = (aStart, aEnd, bStart, bEnd) => {
   return aStart < bEnd && bStart < aEnd;
 };
 
-const toCategoryColor = (index) => {
-  const palette = ['#1d4ed8', '#0f766e', '#b45309', '#b91c1c', '#7c3aed', '#334155'];
+const toCategoryColor = (index, theme = {}) => {
+  const palette = [theme.primaryColor || '#1d4ed8', theme.accentColor || '#b45309', '#0f766e', '#b91c1c', '#7c3aed', '#334155'];
   return palette[index % palette.length];
 };
 
@@ -100,6 +101,7 @@ const initialForm = {
 };
 
 const BookingsPage = () => {
+  const { branding } = useBranding();
   const meta = useSeoMeta('Bookings', 'Book Akhand Path, Sehaj Path, Bhog, Antim Ardas, and more with availability checks.');
   const queryClient = useQueryClient();
   const { user, isAuthenticated } = useAuth();
@@ -144,10 +146,10 @@ const BookingsPage = () => {
   const categoryById = useMemo(() => {
     const map = new Map();
     activeCategories.forEach((entry, index) => {
-      map.set(entry.id, { ...entry, color: entry.color || toCategoryColor(index) });
+      map.set(entry.id, { ...entry, color: entry.color || toCategoryColor(index, branding) });
     });
     return map;
-  }, [activeCategories]);
+  }, [activeCategories, branding]);
 
   const calendarEntries = useMemo(() => {
     const bookingEntries = bookings
@@ -171,7 +173,7 @@ const BookingsPage = () => {
           date,
           startTime: fullDay ? '00:00' : entry.startTime,
           endTime: fullDay ? '24:00' : entry.endTime,
-          color: category?.color || '#1d4ed8',
+          color: category?.color || branding.primaryColor || '#1d4ed8',
           location: entry.bookingLocation || ''
         }));
       });
@@ -193,7 +195,7 @@ const BookingsPage = () => {
     });
 
     return [...bookingEntries, ...eventEntries];
-  }, [activeCategories, bookings, categoryById, events]);
+  }, [activeCategories, bookings, branding.primaryColor, categoryById, events]);
 
   const selectedDateKey = toDateKey(calendarDate);
 
@@ -338,7 +340,7 @@ const BookingsPage = () => {
         bookedByEmail: String(user?.email || '').trim().toLowerCase(),
         title: category?.name || 'Booking',
         categoryName: category?.name || 'Other',
-        color: category?.color || '#1d4ed8',
+        color: category?.color || branding.primaryColor || '#1d4ed8',
         status: 'pending',
         paymentStatus: 'pending',
         paymentMethod: payment?.paymentProvider || '',

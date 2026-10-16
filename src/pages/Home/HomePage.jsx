@@ -689,15 +689,15 @@ const HomePage = () => {
                 ) : null}
 
                 {eveningScheduleRows.length > 0 ? (
-                  <div className="min-w-0 max-w-full overflow-hidden rounded-lg border border-amber-200">
-                    <div className="border-b border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-amber-800">Evening</div>
+                  <div className="min-w-0 max-w-full overflow-hidden rounded-lg border border-brand-saffron/35">
+                    <div className="border-b border-brand-saffron/35 bg-brand-saffron/15 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-brand-navy">Evening</div>
                     <table className="schedule-mobile-table w-full table-fixed border-collapse text-left">
                       <tbody>
                         {eveningScheduleRows.map((item) => (
-                          <tr key={item.id} className={`schedule-mobile-row border-t border-amber-100 ${item.isCurrent ? 'animate-pulse bg-brand-blue/15' : item.isHighlighted ? 'bg-sky-50/40' : item.segment === 'special' ? 'bg-violet-50/35' : 'bg-amber-50/35'} ${item.isActive === false ? 'opacity-45' : ''}`}>
+                          <tr key={item.id} className={`schedule-mobile-row border-t border-brand-saffron/20 ${item.isCurrent ? 'animate-pulse bg-brand-blue/15' : item.isHighlighted ? 'bg-brand-saffron/20' : item.segment === 'special' ? 'bg-brand-saffron/10' : 'bg-brand-saffron/5'} ${item.isActive === false ? 'opacity-45' : ''}`}>
                             <td className="schedule-mobile-time-cell w-[132px] py-3 pr-3 pl-2 align-top md:w-[170px] md:pr-4">
                               <div className="flex items-start gap-3">
-                                <span className={`mt-1 inline-flex h-3 w-3 rounded-full ${item.isCurrent ? 'bg-green-500 shadow-[0_0_0_6px_rgba(34,197,94,0.18)]' : item.isHighlighted ? 'bg-brand-blue/80' : 'bg-slate-300'}`} />
+                                <span className={`mt-1 inline-flex h-3 w-3 rounded-full ${item.isCurrent ? 'bg-green-500 shadow-[0_0_0_6px_rgba(34,197,94,0.18)]' : item.isHighlighted ? 'bg-brand-blue/80' : 'bg-brand-saffron'}`} />
                                 <div className="min-w-0">
                                   <p className="whitespace-nowrap text-sm font-bold leading-snug text-slate-900">{item.timeEn || 'Time TBD'}</p>
                                   {item.timePa ? <p className="mt-1 whitespace-nowrap text-xs font-medium leading-snug text-slate-500">{item.timePa}</p> : null}

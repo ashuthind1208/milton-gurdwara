@@ -15,6 +15,14 @@ const newsletterDefaults = {
   email: ''
 };
 
+const getFooterForeground = (hexColor) => {
+  const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(hexColor || ''));
+  if (!match) return '#ffffff';
+  const channels = match.slice(1).map((channel) => parseInt(channel, 16) / 255);
+  const luminance = channels.map((channel) => (channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4));
+  return (0.2126 * luminance[0]) + (0.7152 * luminance[1]) + (0.0722 * luminance[2]) > 0.45 ? '#172033' : '#ffffff';
+};
+
 const FacebookIcon = () => (
   <svg viewBox="0 0 24 24" className={socialIconClass} aria-hidden="true">
     <path d="M13.6 22V13.3h2.9l.4-3.4h-3.3V7.8c0-1 .3-1.7 1.8-1.7H17V3.1c-.8-.1-1.6-.1-2.5-.1-2.5 0-4.1 1.5-4.1 4.4v2.5H7.6v3.4h2.8V22h3.2Z" fill="currentColor" />
@@ -39,6 +47,7 @@ const YouTubeIcon = () => (
 const Footer = () => {
   const { user, isAuthenticated } = useAuth();
   const { branding, logoSrc } = useBranding();
+  const footerForeground = getFooterForeground(branding.footerColor || branding.primaryColor);
   const [isNewsletterModalOpen, setIsNewsletterModalOpen] = useState(false);
   const [isTopicDropdownOpen, setIsTopicDropdownOpen] = useState(false);
   const [selectedTopics, setSelectedTopics] = useState([]);
@@ -132,33 +141,33 @@ const Footer = () => {
   };
 
   return (
-    <footer className="mt-16 border-t border-brand-blue/20 bg-gradient-to-br from-brand-cream via-amber-50 to-blue-50 dark:border-slate-800 dark:bg-slate-900">
+    <footer className="mt-16 border-t border-white/20 dark:border-slate-800" style={{ backgroundColor: branding.footerColor || branding.primaryColor || '#0B4EA2' }}>
       <div className="mx-auto max-w-4xl px-4 py-10 md:px-6">
         <div className="text-center">
           <div className="flex items-center justify-center gap-2">
-            <img src={logoSrc} alt={`${branding.shortName} logo`} className="h-8 w-8 rounded-full object-cover" />
-            <p className="font-heading text-lg font-semibold text-brand-blue">{branding.organizationName}</p>
+            <img src={logoSrc} alt={`${branding.shortName} logo`} className="brand-logo h-8 w-8 rounded-full object-cover" />
+            <p className="font-heading text-lg font-semibold" style={{ color: footerForeground }}>{branding.organizationName}</p>
           </div>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">A spiritually rooted and community focused digital platform for sangat services.</p>
-          <p className="mt-2 text-sm font-gurmukhi text-brand-navy dark:text-brand-cream">ਵਾਹਿਗੁਰੂ ਜੀ ਕਾ ਖਾਲਸਾ, ਵਾਹਿਗੁਰੂ ਜੀ ਕੀ ਫਤਿਹ</p>
+          <p className="mt-2 text-sm" style={{ color: footerForeground }}>{branding.tagline}</p>
+          <p className="mt-2 text-sm font-gurmukhi" style={{ color: footerForeground }}>ਵਾਹਿਗੁਰੂ ਜੀ ਕਾ ਖਾਲਸਾ, ਵਾਹਿਗੁਰੂ ਜੀ ਕੀ ਫਤਿਹ</p>
         </div>
 
         <div className="mt-6 text-center">
-          <p className="font-semibold text-slate-900 dark:text-white">Contact</p>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{siteConfig.contact.address}</p>
-          <p className="text-sm text-slate-600 dark:text-slate-300">{siteConfig.contact.phone}</p>
+          <p className="font-semibold" style={{ color: footerForeground }}>Contact</p>
+          <p className="mt-2 text-sm" style={{ color: footerForeground }}>{branding.address || siteConfig.contact.address}</p>
+          <p className="text-sm" style={{ color: footerForeground }}>{branding.phone || siteConfig.contact.phone}</p>
           <div className="mt-2 flex items-center justify-center gap-3 text-brand-blue dark:text-blue-200">
-            <a href={siteConfig.social.facebook} target="_blank" rel="noreferrer" aria-label="Facebook" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-brand-blue/20 bg-white/70 transition hover:-translate-y-0.5 hover:bg-white dark:border-blue-300/40 dark:bg-slate-800">
+            <a href={branding.facebookUrl || siteConfig.social.facebook} target="_blank" rel="noreferrer" aria-label="Facebook" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-brand-blue/20 bg-white/70 transition hover:-translate-y-0.5 hover:bg-white dark:border-blue-300/40 dark:bg-slate-800">
               <FacebookIcon />
             </a>
-            <a href={siteConfig.social.instagram} target="_blank" rel="noreferrer" aria-label="Instagram" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-brand-blue/20 bg-white/70 transition hover:-translate-y-0.5 hover:bg-white dark:border-blue-300/40 dark:bg-slate-800">
+            <a href={branding.instagramUrl || siteConfig.social.instagram} target="_blank" rel="noreferrer" aria-label="Instagram" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-brand-blue/20 bg-white/70 transition hover:-translate-y-0.5 hover:bg-white dark:border-blue-300/40 dark:bg-slate-800">
               <InstagramIcon />
             </a>
-            <a href={siteConfig.social.youtube} target="_blank" rel="noreferrer" aria-label="YouTube" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-brand-blue/20 bg-white/70 transition hover:-translate-y-0.5 hover:bg-white dark:border-blue-300/40 dark:bg-slate-800">
+            <a href={branding.youtubeUrl || siteConfig.social.youtube} target="_blank" rel="noreferrer" aria-label="YouTube" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-brand-blue/20 bg-white/70 transition hover:-translate-y-0.5 hover:bg-white dark:border-blue-300/40 dark:bg-slate-800">
               <YouTubeIcon />
             </a>
           </div>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{siteConfig.contact.email}</p>
+          <p className="mt-2 text-sm" style={{ color: footerForeground }}>{branding.email || siteConfig.contact.email}</p>
           <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
             <button
               type="button"
@@ -194,7 +203,7 @@ const Footer = () => {
                 >
                   <XMarkIcon className="h-4 w-4" />
                 </button>
-                <p className="whitespace-nowrap text-xs font-semibold uppercase tracking-[0.18em] text-white/85">Singh Sabha Milton Gurdwara</p>
+                <p className="whitespace-nowrap text-xs font-semibold uppercase tracking-[0.18em] text-white/85">{branding.organizationName}</p>
                 <h3 className="mt-1 whitespace-nowrap font-heading text-base font-extrabold sm:text-xl">Sign Up for Weekly Newsletter</h3>
                 <p className="mt-2 text-sm text-white/90">Choose one or more topics to personalize your newsletter delivery.</p>
               </div>

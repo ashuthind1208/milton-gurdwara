@@ -116,7 +116,7 @@ const HomeHeroBanner = ({ content, actions, topRightSlot, onSlideAction }) => {
             <button
               type="button"
               onClick={() => onSlideAction?.(activeSlide.primaryCtaPath)}
-              className="inline-flex items-center justify-center rounded-xl bg-brand-saffron px-5 py-2.5 font-medium text-slate-900 transition hover:bg-amber-400"
+              className="inline-flex items-center justify-center rounded-xl bg-[color:var(--theme-button,#0b4ea2)] px-5 py-2.5 font-medium text-white transition hover:bg-[color:var(--theme-button-hover,#f4a300)]"
             >
               {activeSlide.primaryCtaLabel}
             </button>
