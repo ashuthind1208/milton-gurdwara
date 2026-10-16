@@ -8017,6 +8017,9 @@ const server = http.createServer(async (request, response) => {
       if (resource === 'booking_duty_settings') {
         assertInput(canManageBookingDuties(request), 'Only Admin and Super Admin can assign booking duties.', 403);
       }
+      if (resource === 'hukamnama_led_template_settings') {
+        assertInput(await canManageAdminPage(request, '/admin/hukamnama'), 'Hukamnama admin access is required to change LED display settings.', 403);
+      }
       const body = await parseAndValidateGenericStructuredBody(request, { maxBytes: maxJsonBodyBytes });
       const actorName = String(getRequestActor(request).name || '').trim() || 'A Gurdwara team member';
       const previousSingleton = ['cms_home_content', 'cms_page_content', 'hukamnama_ssm_hukamnama_entries'].includes(resource)

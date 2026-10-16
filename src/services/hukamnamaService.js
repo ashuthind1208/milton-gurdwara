@@ -1,5 +1,6 @@
 import { serviceResponse } from './serviceResponse';
 import contentApiService from './contentApiService';
+import { DEFAULT_HUKAMNAMA_LED_SETTINGS, HUKAMNAMA_LED_TEMPLATE_RESOURCE, normalizeHukamnamaLedSettings } from '../constants/hukamnamaLedTemplates';
 
 const SETTINGS_KEY = 'ssm-hukamnama-settings';
 const CACHE_KEY = 'ssm-hukamnama-cache';
@@ -549,6 +550,15 @@ const runHistoryWriteSafely = async (action) => {
 };
 
 const hukamnamaService = {
+  getLedTemplateSettings: async () => {
+    const saved = await contentApiService.getSingleton(HUKAMNAMA_LED_TEMPLATE_RESOURCE, null);
+    return serviceResponse(normalizeHukamnamaLedSettings(saved || DEFAULT_HUKAMNAMA_LED_SETTINGS));
+  },
+  saveLedTemplateSettings: async (settings) => {
+    const normalized = normalizeHukamnamaLedSettings(settings);
+    const saved = await contentApiService.setSingleton(HUKAMNAMA_LED_TEMPLATE_RESOURCE, { ...normalized, updatedAt: new Date().toISOString() });
+    return serviceResponse(normalizeHukamnamaLedSettings(saved || normalized));
+  },
   getShabadOptions,
   getSelectedShabadLines,
   getReadAlongConfig: () => ({
