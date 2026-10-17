@@ -4,7 +4,7 @@ import Button from '../../components/ui/Button';
 import HukamnamaLedTemplate from '../../components/boards/HukamnamaLedTemplate';
 import { useBranding } from '../../context/BrandingContext';
 import hukamnamaService from '../../services/hukamnamaService';
-import { DEFAULT_HUKAMNAMA_LED_SETTINGS, HUKAMNAMA_LED_TEMPLATES, normalizeHukamnamaLedSettings } from '../../constants/hukamnamaLedTemplates';
+import { DEFAULT_HUKAMNAMA_LED_SETTINGS, HUKAMNAMA_LED_SETTINGS_SYNC_KEY, HUKAMNAMA_LED_TEMPLATES, normalizeHukamnamaLedSettings } from '../../constants/hukamnamaLedTemplates';
 
 const AdminHukamnamaLedSettings = ({ entry, lines = [] }) => {
   const queryClient = useQueryClient();
@@ -25,6 +25,11 @@ const AdminHukamnamaLedSettings = ({ entry, lines = [] }) => {
       const normalized = normalizeHukamnamaLedSettings(response.data);
       setSettings(normalized);
       queryClient.setQueryData(['hukamnama-led-template-settings'], normalized);
+      try {
+        localStorage.setItem(HUKAMNAMA_LED_SETTINGS_SYNC_KEY, String(Date.now()));
+      } catch {
+        // The LED board still picks up saved settings through its periodic refresh.
+      }
     }
   });
 
@@ -32,7 +37,7 @@ const AdminHukamnamaLedSettings = ({ entry, lines = [] }) => {
   const chooseTemplate = (templateId) => setSettings((current) => normalizeHukamnamaLedSettings({
     ...current,
     templateId,
-    ...(templateId === 'original-default'
+    ...(['original-default', 'original-paired-columns', 'single-column-translation'].includes(templateId)
       ? { titleEnglishColor: '#FFFFFF', titlePunjabiColor: '#F6D98B' }
       : { titleEnglishColor: '#15365B', titlePunjabiColor: '#15365B' })
   }));
@@ -51,8 +56,8 @@ const AdminHukamnamaLedSettings = ({ entry, lines = [] }) => {
             <div className="mt-2 grid gap-3 sm:grid-cols-2">
               {HUKAMNAMA_LED_TEMPLATES.map((template) => (
                 <button key={template.id} type="button" onClick={() => chooseTemplate(template.id)} aria-pressed={settings.templateId === template.id} className={`rounded-xl border p-2.5 text-left transition ${settings.templateId === template.id ? 'border-brand-blue bg-blue-50 ring-2 ring-brand-blue/20' : 'border-slate-200 bg-white hover:border-brand-blue/40'}`}>
-                  <span className={`mb-2 flex h-12 overflow-hidden rounded-md border p-1 ${template.id === 'original-default' ? 'border-slate-700 bg-slate-900' : 'border-amber-200 bg-amber-50'}`}>
-                    {template.id === 'ornate-tricolumn' ? <><i className="m-0.5 flex-1 rounded-sm border border-amber-400/70 bg-white/80"/><i className="m-0.5 flex-1 rounded-sm border border-amber-400/70 bg-blue-100/80"/><i className="m-0.5 flex-1 rounded-sm border border-amber-400/70 bg-white/80"/></> : <><i className="m-1 flex-1 rounded-sm border border-amber-400/60 bg-white/70"/><i className="m-1 flex-1 rounded-sm border border-amber-400/60 bg-blue-100/70"/></>}
+                  <span className={`mb-2 flex h-12 overflow-hidden rounded-md border p-1 ${['original-default', 'original-paired-columns', 'single-column-translation'].includes(template.id) ? 'border-slate-700 bg-slate-900' : 'border-amber-200 bg-amber-50'}`}>
+                    {template.id === 'ornate-tricolumn' ? <><i className="m-0.5 flex-1 rounded-sm border border-amber-400/70 bg-white/80"/><i className="m-0.5 flex-1 rounded-sm border border-amber-400/70 bg-blue-100/80"/><i className="m-0.5 flex-1 rounded-sm border border-amber-400/70 bg-white/80"/></> : template.id === 'original-paired-columns' ? <><i className="m-1 flex-1 rounded-sm border border-amber-400/50 bg-white/70"/><i className="m-1 flex-1 rounded-sm border border-amber-400/50 bg-white/70"/></> : template.id === 'single-column-translation' ? <i className="m-1 mx-auto w-1/2 rounded-sm border border-amber-300/70 bg-white/10"/> : <><i className="m-1 flex-1 rounded-sm border border-amber-400/60 bg-white/70"/><i className="m-1 flex-1 rounded-sm border border-amber-400/60 bg-blue-100/70"/></>}
                   </span>
                   <span className="block text-xs font-bold text-slate-800">{template.name}</span><span className="mt-0.5 block text-[10px] leading-snug text-slate-500">{template.description}</span>
                 </button>
