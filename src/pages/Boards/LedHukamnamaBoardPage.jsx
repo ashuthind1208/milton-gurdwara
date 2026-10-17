@@ -1,14 +1,15 @@
 import { useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Seo from '../../components/common/Seo';
 import useSeoMeta from '../../hooks/useSeoMeta';
 import useDailyHukamnama from '../../hooks/useDailyHukamnama';
 import { useBranding } from '../../context/BrandingContext';
 import hukamnamaService from '../../services/hukamnamaService';
 import HukamnamaLedTemplate from '../../components/boards/HukamnamaLedTemplate';
-import { DEFAULT_HUKAMNAMA_LED_SETTINGS, normalizeHukamnamaLedSettings } from '../../constants/hukamnamaLedTemplates';
+import { DEFAULT_HUKAMNAMA_LED_SETTINGS, HUKAMNAMA_LED_SETTINGS_SYNC_KEY, normalizeHukamnamaLedSettings } from '../../constants/hukamnamaLedTemplates';
 
 const LedHukamnamaBoardPage = () => {
+  const queryClient = useQueryClient();
   const { branding } = useBranding();
   const meta = useSeoMeta('Daily Hukamnama Board', 'Today\'s hukamnama with translation for the Gurdwara LED display.');
   const { entry, lines, hasHukamnama } = useDailyHukamnama({ refetchInterval: 5000 });
@@ -22,10 +23,20 @@ const LedHukamnamaBoardPage = () => {
       document.body.style.overflow = bodyOverflow;
     };
   }, []);
+  useEffect(() => {
+    const refreshSettings = (event) => {
+      if (event.key === HUKAMNAMA_LED_SETTINGS_SYNC_KEY) {
+        queryClient.invalidateQueries({ queryKey: ['hukamnama-led-template-settings'] });
+      }
+    };
+    window.addEventListener('storage', refreshSettings);
+    return () => window.removeEventListener('storage', refreshSettings);
+  }, [queryClient]);
   const { data: savedSettings } = useQuery({
     queryKey: ['hukamnama-led-template-settings'],
     queryFn: () => hukamnamaService.getLedTemplateSettings().then((response) => response.data),
-    refetchInterval: 30000,
+    refetchInterval: 5000,
+    refetchOnWindowFocus: true,
     retry: false
   });
   const settings = normalizeHukamnamaLedSettings(savedSettings || DEFAULT_HUKAMNAMA_LED_SETTINGS);
