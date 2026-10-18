@@ -1,13 +1,28 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createDonationSms, normalizeSmsPhone, zeffySmsConsent } = require('./donationSms');
+const { createDonationSms, normalizeSmsPhone, shouldSendReconciledZeffySms, zeffySmsConsent } = require('./donationSms');
 
 test('SMS phones and consent must be explicit', () => {
   assert.equal(normalizeSmsPhone('(905) 555-0123'), '+19055550123');
   assert.equal(normalizeSmsPhone('+44 7700 900123'), '');
   assert.equal(zeffySmsConsent({ buyer: { phone: '9055550123' } }), false);
   assert.equal(zeffySmsConsent({ custom_fields: { sms_consent: 'Yes' } }), true);
+  assert.equal(zeffySmsConsent({ customFields: [{ label: 'I agree to receive a text message acknowledgement', value: 'Yes, I agree' }] }), true);
+  assert.equal(zeffySmsConsent({ answers: [{ question: 'SMS consent', response: { value: 'I consent' } }] }), true);
+  assert.equal(zeffySmsConsent({ answers: [{ question: 'Text message opt-in', answer: 'I agree to receive donation updates' }] }), true);
   assert.equal(zeffySmsConsent({ answers: [{ label: 'Consent to donation SMS', answer: 'No' }] }), false);
+  assert.equal(zeffySmsConsent({ answers: [{ label: 'Consent to donation SMS', answer: 'I do not agree' }] }), false);
+  assert.equal(zeffySmsConsent({ custom_fields: [{ label: 'SMS updates', value: 'Yes' }] }), false);
+});
+
+test('reconciliation SMS is restricted to new verified payments from the last 24 hours', () => {
+  const now = Date.UTC(2026, 9, 18, 12, 0, 0);
+  const recentPayment = { created: Math.floor((now - 60 * 60 * 1000) / 1000) };
+  const oldPayment = { created: Math.floor((now - 25 * 60 * 60 * 1000) / 1000) };
+  assert.equal(shouldSendReconciledZeffySms({ payment: recentPayment, now }), true);
+  assert.equal(shouldSendReconciledZeffySms({ payment: recentPayment, alreadyPersisted: true, now }), false);
+  assert.equal(shouldSendReconciledZeffySms({ payment: oldPayment, now }), false);
+  assert.equal(shouldSendReconciledZeffySms({ payment: {}, now }), false);
 });
 
 test('send only paid opted-in donations, and claim each transaction once', async () => {
