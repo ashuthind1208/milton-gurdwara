@@ -628,13 +628,9 @@ const donationService = {
       source: 'admin-cash'
     };
 
-    const response = await fetchJson('/api/donations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(donationRecord)
-    });
+    const response = await apiClient.post('/donations', donationRecord);
 
-    return serviceResponse(normalizeDonation(response.data || donationRecord));
+    return serviceResponse(normalizeDonation(response.data?.data || donationRecord));
   },
 
   emailDonationInvoice: async ({
