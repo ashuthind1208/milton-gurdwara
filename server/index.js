@@ -6,7 +6,7 @@ const { spawn } = require('child_process');
 const { URL } = require('url');
 const Stripe = require('stripe');
 const crypto = require('crypto');
-const { createDonationSms, zeffySmsConsent } = require('./donationSms');
+const { createDonationSms, shouldSendReconciledZeffySms, zeffySmsConsent } = require('./donationSms');
 const { jsPDF } = require('jspdf');
 const autoTable = require('jspdf-autotable').default;
 const {
@@ -5702,11 +5702,22 @@ const reconcileZeffyDonations = async ({ force = false } = {}) => {
           }
           checked += 1;
           try {
-            const persistedDonation = await persistVerifiedZeffyPayment(payment, campaigns, configuration.campaign);
-            if (!existingTransactionIds.has(String(payment.id || '').trim())) {
+            const transactionId = String(payment.id || '').trim();
+            const isNewPayment = !existingTransactionIds.has(transactionId);
+            const sendRecentOptedInSms = shouldSendReconciledZeffySms({
+              payment,
+              alreadyPersisted: !isNewPayment
+            });
+            const persistedDonation = await persistVerifiedZeffyPayment(
+              payment,
+              campaigns,
+              configuration.campaign,
+              sendRecentOptedInSms
+            );
+            if (isNewPayment) {
               imported += 1;
             }
-            existingTransactionIds.add(String(payment.id || '').trim());
+            existingTransactionIds.add(transactionId);
             const campaignKey = persistedDonation.campaignId || persistedDonation.campaignName;
             touchedCampaigns.set(campaignKey, persistedDonation);
           } catch (error) {
@@ -6362,6 +6373,8 @@ const server = http.createServer(async (request, response) => {
       ok: true,
       stripeConfigured: Boolean(stripeSecretKey),
       webhookConfigured: Boolean(stripeWebhookSecret),
+      donationSmsConfigured: process.env.SMS_ENABLED === 'true'
+        && Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM_NUMBER),
       eventsDatabaseConfigured: eventsDb.hasDatabaseConnection,
       databaseEngine: eventsDb.engine,
       uploadStorageConfigured: Boolean(configuredUploadsDir),
@@ -9114,12 +9127,14 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (requestUrl.pathname === '/api/donations' && request.method === 'GET') {
-    await reconcilePaidPendingDonations();
-    try {
-      await reconcileZeffyDonations();
-    } catch (error) {
-      logServerError(error, '[donations] Zeffy reconciliation failed');
-    }
+    // Keep this user-facing list fast: both reconcilers perform external API calls.
+    // Never hold the request open for gateway outages or slow provider responses.
+    reconcileZeffyDonations().catch((error) => {
+      logServerError(error, '[donations] Background Zeffy reconciliation failed');
+    });
+    reconcilePaidPendingDonations().catch((error) => {
+      logServerError(error, '[donations] Background Stripe reconciliation failed');
+    });
     const data = (await readDonations()).sort((left, right) => {
       const l = new Date(left.createdAt || 0).getTime();
       const r = new Date(right.createdAt || 0).getTime();

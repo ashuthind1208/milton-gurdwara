@@ -22,6 +22,8 @@ export const logErrorDetails = (scope, error, extra = {}) => {
   // The UI should use the generic message returned by getGenericErrorMessage.
   console.error(`[${scope}]`, {
     message: error?.message || 'Unknown error',
+    method: error?.config?.method?.toUpperCase() || null,
+    url: error?.config?.url || null,
     stack: error?.stack || '',
     status: error?.response?.status || error?.status || null,
     responseData: error?.response?.data || null,
