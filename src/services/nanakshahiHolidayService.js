@@ -1,5 +1,9 @@
+import { registerNanakshahiMonthStarts } from '../utils/punjabiCalendar';
+
 const DEFAULT_GURPURAB_HOLIDAYS_API_URL = 'https://api.gurpurab.com/v1/holidays';
 const REQUEST_TIMEOUT_MS = 12000;
+const YEAR_CACHE_TTL_MS = 60 * 60 * 1000;
+const EMPTY_YEAR_CACHE_TTL_MS = 5 * 60 * 1000;
 const yearHolidayCache = new Map();
 
 const resolveApiBaseUrl = () => {
@@ -221,7 +225,7 @@ const getNanakshahiYearFromDate = (date = new Date()) => {
 
 const fetchYear = async (year) => {
   const cached = yearHolidayCache.get(year);
-  if (cached?.data) {
+  if (cached?.data && Date.now() - cached.fetchedAt < (cached.data.length ? YEAR_CACHE_TTL_MS : EMPTY_YEAR_CACHE_TTL_MS)) {
     return cached.data;
   }
   if (cached?.promise) {
@@ -238,8 +242,9 @@ const fetchYear = async (year) => {
 
   const payload = await response.json();
   const holidays = Array.isArray(payload?.holidays) ? payload.holidays : [];
+    registerNanakshahiMonthStarts(holidays);
     const mapped = holidays.map(mapHolidayToObservance).filter((entry) => entry.date);
-    yearHolidayCache.set(year, { data: mapped });
+    yearHolidayCache.set(year, { data: mapped, fetchedAt: Date.now() });
     return mapped;
   })();
 

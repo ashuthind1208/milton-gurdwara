@@ -1,3 +1,5 @@
+import { NANAKSHAHI_ANNUAL_MONTH_STARTS } from '../constants/nanakshahiMonthStarts';
+
 const NANAKSHAHI_MONTH_STARTS = [
   { name: 'Chet', namePa: 'ਚੇਤ', month: 3, day: 14 },
   { name: 'Vaisakh', namePa: 'ਵੈਸਾਖ', month: 4, day: 14 },
@@ -230,10 +232,10 @@ const buildCalendarLabelMetadata = (event, dateObj) => {
 
   const noteEn = hasAlternate
     ? `Primary display: ${primaryLabelEn}. Alternate reference: ${alternateLabelEn}.`
-    : 'Fixed Nanakshahi date aligns with available published calendar data.';
+    : 'Nanakshahi date uses published annual Sangrand dates where available.';
   const notePa = hasAlternate
     ? `ਮੁੱਖ ਮਿਤੀ: ${primaryLabelPa}। ਵਿਕਲਪਿਕ ਹਵਾਲਾ: ${alternateLabelPa}।`
-    : 'ਸਥਿਰ ਨਾਨਕਸ਼ਾਹੀ ਮਿਤੀ ਪ੍ਰਕਾਸ਼ਿਤ ਕੈਲੰਡਰ ਡਾਟਾ ਨਾਲ ਮਿਲਦੀ ਹੈ।';
+    : 'ਨਾਨਕਸ਼ਾਹੀ ਮਿਤੀ ਉਪਲਬਧ ਪ੍ਰਕਾਸ਼ਿਤ ਸਾਲਾਨਾ ਸੰਗਰਾਂਦ ਮਿਤੀਆਂ ਅਨੁਸਾਰ ਹੈ।';
 
   return {
     primaryLabelEn,
@@ -412,12 +414,36 @@ export const toGurmukhiNumber = (value) => String(value)
 const buildMonthStartCandidates = (year) => {
   const candidates = [];
   for (const monthInfo of NANAKSHAHI_MONTH_STARTS) {
+    const monthIndex = NANAKSHAHI_MONTH_STARTS.indexOf(monthInfo);
+    const calendarYear = monthInfo.month < 3 ? year - 1469 : year - 1468;
+    const annualDate = NANAKSHAHI_ANNUAL_MONTH_STARTS[calendarYear]?.[monthIndex];
     candidates.push({
       ...monthInfo,
-      date: new Date(year, monthInfo.month - 1, monthInfo.day)
+      date: annualDate ? parseAsLocalDate(annualDate) : new Date(year, monthInfo.month - 1, monthInfo.day)
     });
   }
   return candidates;
+};
+
+// Only accept a complete annual Sangrand set; do not infer month starts from
+// arbitrary festival dates, since movable observances may use another convention.
+export const registerNanakshahiMonthStarts = (holidays = []) => {
+  const years = new Map();
+  holidays.forEach((holiday) => {
+    const { year, month, day } = holiday?.nanakshahi || {};
+    const date = String(holiday?.gregorian || '');
+    if (holiday?.type !== 'sangrand' || Number(day) !== 1 || !Number.isInteger(year) || month < 1 || month > 12 || !ISO_DATE_ONLY_PATTERN.test(date)) return;
+    const starts = years.get(year) || [];
+    starts[month - 1] = date;
+    years.set(year, starts);
+  });
+  years.forEach((starts, year) => {
+    if (starts.filter(Boolean).length !== 12) return;
+    const timestamps = starts.map((date) => Date.parse(`${date}T00:00:00Z`));
+    if (timestamps.some((time, index) => !Number.isFinite(time) || (index > 0 && (time - timestamps[index - 1] < 28 * DAY_MS || time - timestamps[index - 1] > 33 * DAY_MS)))) return;
+    if (!starts[0].startsWith(`${year + 1468}-03-`)) return;
+    NANAKSHAHI_ANNUAL_MONTH_STARTS[year] = starts;
+  });
 };
 
 export const getNanakshahiDate = (inputDate = new Date()) => {
@@ -435,7 +461,9 @@ export const getNanakshahiDate = (inputDate = new Date()) => {
     }
   }
 
-  const daysSince = Math.floor((target.getTime() - start.date.getTime()) / DAY_MS);
+  // Compare civil dates, not elapsed local milliseconds (a DST day can be 23/25 hours).
+  const civilDay = (date) => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+  const daysSince = Math.round((civilDay(target) - civilDay(start.date)) / DAY_MS);
   const chetStartCurrentYear = new Date(target.getFullYear(), 2, 14);
   const nanakshahiYear = target >= chetStartCurrentYear ? target.getFullYear() - 1468 : target.getFullYear() - 1469;
 
@@ -526,7 +554,7 @@ export const getNanakshahiMonthCalendar = (inputDate = new Date(), observanceSou
   const cells = Array.from({ length: startWeekday }, () => null);
 
   for (let day = 1; day <= totalDays; day += 1) {
-    const gregorianDate = new Date(monthStart.date.getTime() + ((day - 1) * DAY_MS));
+    const gregorianDate = new Date(monthStart.date.getFullYear(), monthStart.date.getMonth(), monthStart.date.getDate() + day - 1);
     const dateKey = toDateKey(gregorianDate);
     const gregorianObservances = observancesByDate[dateKey] || [];
     const fallbackNanakshahiObservances = observancesByNanakshahiDay[day] || [];
