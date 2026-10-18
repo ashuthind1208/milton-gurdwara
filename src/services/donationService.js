@@ -593,7 +593,7 @@ const donationService = {
     return serviceResponse(normalizeDonation(response.data?.data || {}));
   },
 
-  addCashDonation: async ({ campaign, amount, receiptId, donorName = '', donorEmail = '', donorPhone = '', paidAt }) => {
+  addCashDonation: async ({ campaign, amount, receiptId, donorName = '', donorEmail = '', donorPhone = '', paidAt, smsConsent = false }) => {
     const normalizedAmount = Number(amount || 0);
     if (!campaign?.id) {
       throw new Error('Campaign is required.');
@@ -617,6 +617,7 @@ const donationService = {
       donorName: String(donorName || '').trim() || 'Walk-in Donor',
       donorEmail: String(donorEmail || '').trim(),
       phone: String(donorPhone || '').trim(),
+      smsConsent: smsConsent === true,
       amount: normalizedAmount,
       frequency: 'one-time',
       paymentProvider: 'CASH',

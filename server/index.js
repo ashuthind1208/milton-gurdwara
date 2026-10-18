@@ -6,6 +6,7 @@ const { spawn } = require('child_process');
 const { URL } = require('url');
 const Stripe = require('stripe');
 const crypto = require('crypto');
+const { createDonationSms, zeffySmsConsent } = require('./donationSms');
 const { jsPDF } = require('jspdf');
 const autoTable = require('jspdf-autotable').default;
 const {
@@ -5402,6 +5403,12 @@ const upsertDonation = async (record) => {
   return eventsDb.upsertDonation(record);
 };
 
+const acknowledgeDonationSms = (record, consent) => {
+  void createDonationSms({ db: eventsDb }).send(record, consent).catch(() => {
+    console.error('[donation-sms] Unable to record or send acknowledgement.');
+  });
+};
+
 const removeDonation = async (id) => {
   return eventsDb.removeDonation(id);
 };
@@ -5631,7 +5638,7 @@ const attachDonationReceiptToBooking = async (donationRecord = {}) => {
   return updated;
 };
 
-const persistVerifiedZeffyPayment = async (payment, campaigns = [], campaignOverride = null) => {
+const persistVerifiedZeffyPayment = async (payment, campaigns = [], campaignOverride = null, sendSms = false) => {
   const donationRecord = mapZeffyApiPayment(payment);
   const matchedCampaign = campaignOverride || resolveZeffyCampaign(donationRecord, campaigns);
   const correlatedPending = await resolvePendingDonationForReceipt({
@@ -5647,6 +5654,7 @@ const persistVerifiedZeffyPayment = async (payment, campaigns = [], campaignOver
     donorPhone: donationRecord.donorPhone || correlatedPending?.donorPhone || ''
   });
   await attachDonationReceiptToBooking(persistedDonation);
+  if (sendSms) acknowledgeDonationSms(persistedDonation, zeffySmsConsent(payment));
   return persistedDonation;
 };
 
@@ -9240,7 +9248,8 @@ const server = http.createServer(async (request, response) => {
       const persistedDonation = await persistVerifiedZeffyPayment(
         verifiedPayment,
         campaigns,
-        matchedConfiguration?.campaign || null
+        matchedConfiguration?.campaign || null,
+        true
       );
       await syncCampaignRaisedTotal({
         campaignId: persistedDonation.campaignId,
@@ -9305,7 +9314,7 @@ const server = http.createServer(async (request, response) => {
       ensureNoUnknownKeys(body, [
         'id', 'receiptId', 'sourcePendingId', 'campaignId', 'campaignName', 'donorName', 'donorEmail', 'amount',
         'frequency', 'paymentProvider', 'paymentStatus', 'gatewayTransactionId', 'stripeSessionId', 'stripeEventId',
-        'createdAt', 'emailSent', 'source', 'phone', 'address', 'donationPurpose', 'notes'
+        'createdAt', 'emailSent', 'source', 'phone', 'address', 'donationPurpose', 'notes', 'smsConsent'
       ]);
       readStringField(body, 'id', { max: 160, pattern: simpleIdPattern });
       readStringField(body, 'receiptId', { max: 160, pattern: simpleIdPattern });
@@ -9326,12 +9335,17 @@ const server = http.createServer(async (request, response) => {
         assertInput(!Number.isNaN(new Date(createdAt).getTime()), 'createdAt must be a valid ISO date string.');
       }
       readBooleanField(body, 'emailSent');
+      readBooleanField(body, 'smsConsent');
+      if (body.smsConsent === true) {
+        assertInput(canManageDonations(request), 'Donation admin access is required to request an SMS acknowledgement.', 403);
+      }
       readStringField(body, 'source', { max: 80 });
       readPhoneField(body, 'phone');
       readStringField(body, 'address', { max: 240 });
       readStringField(body, 'donationPurpose', { max: 240 });
       readStringField(body, 'notes', { max: 1000 });
       const data = await upsertDonation(body);
+      if (canManageDonations(request)) acknowledgeDonationSms(data, body.smsConsent === true);
       await syncCampaignRaisedTotal({ campaignId: data?.campaignId, campaignName: data?.campaignName });
       sendJson(response, 200, { ok: true, data });
     } catch (error) {
