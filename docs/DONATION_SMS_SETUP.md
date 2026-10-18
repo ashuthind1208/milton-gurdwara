@@ -12,7 +12,7 @@ Configure server-only environment variables (never REACT_APP variables):
 Complete Twilio sender registration/verification before enabling. Enable Twilio Advanced Opt-Out on the sender/Messaging Service as applicable; verify STOP suppression with a real test recipient before launch. The application does not bypass Twilio opt-out errors. Keep messages transactional and obtain express SMS consent. Carrier, number rental and per-segment charges apply.
 
 ## Manual donations
-The consent checkbox was removed from the admin form at the administrator's request. Normal form submissions therefore do not request SMS. An authorized admin API request can explicitly set smsConsent=true only after obtaining donor consent, and must include a North American donor phone number. Only PAID donations trigger an acknowledgement. Phone presence alone never grants consent.
+The admin form includes an unchecked-by-default "Consent to send the SMS" checkbox. Check it only after obtaining the donor's consent and enter a valid donor phone number. This passes smsConsent=true to the authorized admin endpoint. Only PAID donations trigger an acknowledgement. Phone presence alone never grants consent.
 
 ## Zeffy donation links and QR codes
 Clicking/scanning alone never sends SMS. Configure the existing Zeffy payment.completed webhook and API key. The server fetches the payment from Zeffy and requires succeeded status before sending.

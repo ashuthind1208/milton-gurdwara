@@ -84,6 +84,7 @@ const createCashDonationDefaults = () => ({
   donorName: '',
   donorEmail: '',
   donorPhone: '',
+  smsConsent: false,
   amount: 0,
   receiptId: createCashReceiptId(),
   paidAt: new Date().toISOString().slice(0, 10)
@@ -585,6 +586,7 @@ const AdminDonationsPage = () => {
         donorName: String(values.donorName || '').trim(),
         donorEmail: String(values.donorEmail || '').trim(),
         donorPhone: String(values.donorPhone || '').trim(),
+        smsConsent: values.smsConsent === true,
         paidAt: values.paidAt
       });
     },
@@ -1947,6 +1949,11 @@ const AdminDonationsPage = () => {
                 <label className="text-sm">Donor Phone (optional)
                   <PhoneInput {...cashDonationForm.register('donorPhone', { validate: (value) => !value || isTenDigitPhone(value) || TEN_DIGIT_PHONE_ERROR })} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-brand-blue" />
                 </label>
+                <label className="flex items-start gap-2 text-sm text-slate-700 sm:col-span-2">
+                  <input type="checkbox" {...cashDonationForm.register('smsConsent', { validate: (value) => !value || isTenDigitPhone(cashDonationForm.getValues('donorPhone')) || 'Enter a valid donor phone number to send the SMS.' })} className="mt-1 h-4 w-4 shrink-0 accent-brand-blue" />
+                  <span>Consent to send the SMS. The donor has agreed to receive this donation acknowledgement.</span>
+                </label>
+                {cashDonationForm.formState.errors.smsConsent ? <p role="alert" className="text-sm text-red-700 sm:col-span-2">{cashDonationForm.formState.errors.smsConsent.message}</p> : null}
                 {cashDonationError ? (
                   <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 sm:col-span-2" role="alert">
                     {cashDonationError}
