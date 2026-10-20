@@ -4,8 +4,8 @@ import { ArrowTopRightOnSquareIcon, ClipboardDocumentIcon, TrashIcon } from '@he
 import Card from '../../components/ui/Card';
 import StatusAlert from '../../components/common/StatusAlert';
 import recitationService from '../../services/recitationService';
-import AnnouncementTicker from '../../components/recitation/AnnouncementTicker';
 import { BRANDING_PRESETS } from '../../context/BrandingContext';
+import AnnouncementTicker from '../../components/recitation/AnnouncementTicker';
 import { formatClock, formatDay, formatSpan, useRecitationLive, useRecitationText } from '../../hooks/useRecitation';
 
 const PAGE_SIZE = 10;
@@ -56,14 +56,23 @@ const AdminRecitationsPage = () => {
   const [overlayOn, setOverlayOn] = useState(true);
   const [overlayLogo, setOverlayLogo] = useState(true);
   const [overlayLanguages, setOverlayLanguages] = useState('gpe');
-  const [overlayOpacity, setOverlayOpacity] = useState(84);
+  const [overlayOpacity, setOverlayOpacity] = useState(100);
   const [gurmukhiSize, setGurmukhiSize] = useState(100);
   const [punjabiSize, setPunjabiSize] = useState(100);
   const [englishSize, setEnglishSize] = useState(100);
   const [overlayAnnouncement, setOverlayAnnouncement] = useState('');
   const [overlayHeaderMessage, setOverlayHeaderMessage] = useState('');
   const [headerSize, setHeaderSize] = useState(100);
+  const [headerPunjabiSize, setHeaderPunjabiSize] = useState(100);
   const [punjabiAnnouncement, setPunjabiAnnouncement] = useState('');
+  const [headerPunjabi, setHeaderPunjabi] = useState('');
+  const [upperEnglish, setUpperEnglish] = useState('');
+  const [upperPunjabi, setUpperPunjabi] = useState('');
+  const [upperSpeed, setUpperSpeed] = useState(100);
+  const [lowerSpeed, setLowerSpeed] = useState(100);
+  const [tickerColors, setTickerColors] = useState({});
+  const [upperSize, setUpperSize] = useState(100);
+  const [lowerSize, setLowerSize] = useState(100);
   const brandColorsPreset = { id: 'brand-colors', label: 'Logo Brand Colors', primaryColor: '#004080', accentColor: '#F89820' };
   const overlayThemePresets = [brandColorsPreset, ...BRANDING_PRESETS];
   const [overlayThemeId, setOverlayThemeId] = useState('brand-colors');
@@ -107,11 +116,33 @@ const AdminRecitationsPage = () => {
   const index = live?.currentIndex ?? 0;
   const line = fullLines[index];
   const overlayQuery = new URLSearchParams({
-    embed: '1', on: overlayOn ? '1' : '0', logo: overlayLogo ? '1' : '0', lang: overlayLanguages,
-    opacity: String(overlayOpacity), sizeg: String(gurmukhiSize), sizep: String(punjabiSize), sizee: String(englishSize), sizeh: String(headerSize),
-    brandBlue: selectedOverlayTheme.primaryColor, brandOrange: selectedOverlayTheme.accentColor,
+    embed: '1',
+    on: overlayOn ? '1' : '0',
+    logo: overlayLogo ? '1' : '0',
+    lang: overlayLanguages,
+    opacity: String(overlayOpacity),
+    sizeg: String(gurmukhiSize),
+    sizep: String(punjabiSize),
+    sizee: String(englishSize),
+    sizehen: String(headerSize),
+    sizehpa: String(headerPunjabiSize),
+    headerpa: headerPunjabi.trim(),
+    uppermessage: upperEnglish.trim(),
+    uppermessagepa: upperPunjabi.trim(),
+    upperspeed: String(upperSpeed),
+    tickerspeed: String(lowerSpeed),
+    upperbg: tickerColors.upperbg || selectedOverlayTheme.primaryColor,
+    upperfg: tickerColors.upperfg || '#ffffff',
+    lowerbg: tickerColors.lowerbg || selectedOverlayTheme.accentColor,
+    lowerfg: tickerColors.lowerfg || selectedOverlayTheme.primaryColor,
+    uppersize: String(upperSize),
+    tickersize: String(lowerSize),
+    brandBlue: selectedOverlayTheme.primaryColor,
+    brandOrange: selectedOverlayTheme.accentColor,
     ...(overlayHeaderMessage.trim() ? { header: overlayHeaderMessage.trim() } : {}),
-    ...(overlayAnnouncement.trim() || punjabiAnnouncement.trim() ? { announcement: '1', message: overlayAnnouncement.trim(), messagepa: punjabiAnnouncement.trim() } : {})
+    ...(overlayAnnouncement.trim() || punjabiAnnouncement.trim() ? {
+      announcement: '1', message: overlayAnnouncement.trim(), messagepa: punjabiAnnouncement.trim()
+    } : {})
   }).toString();
   const streamOverlayPath = `/stream-overlay?${overlayQuery}`;
   const previewOpacity = overlayOpacity / 100;
@@ -163,29 +194,113 @@ const AdminRecitationsPage = () => {
           <CopyLinkRow label="Granthi's Recitation Controls (phone)" path="/granthi-remote" />
         </div>
         <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-bold text-slate-900">Streamlabs Bani Overlay</h3><p className="mt-0.5 text-xs text-slate-600">Transparent landscape browser source; follows each line selected by the Granthi.</p></div><button type="button" onClick={() => setOverlayOn((value) => !value)} aria-pressed={overlayOn} className={`rounded-full px-4 py-2 text-xs font-bold ${overlayOn ? 'bg-emerald-600 text-white' : 'bg-slate-300 text-slate-800'}`}>Overlay {overlayOn ? 'On' : 'Off'}</button></div>
-          <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Brand color presets">{overlayThemePresets.map((preset) => <button key={preset.id} type="button" onClick={() => setOverlayThemeId(preset.id)} aria-pressed={overlayThemeId === preset.id} className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold ${overlayThemeId === preset.id ? 'border-brand-blue ring-2 ring-brand-blue/20' : 'border-slate-200'}`}><span className="flex gap-1"><span className="h-4 w-4 rounded-full border border-black/10" style={{ backgroundColor: preset.primaryColor }} /><span className="h-4 w-4 rounded-full border border-black/10" style={{ backgroundColor: preset.accentColor }} /></span>{preset.label}</button>)}</div>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            <label className="text-xs font-semibold text-slate-700">Text shown<select value={overlayLanguages} onChange={(event) => setOverlayLanguages(event.target.value)} className={inputClass}><option value="gpe">Gurmukhi + Punjabi + English</option><option value="ge">Gurmukhi + English</option><option value="gp">Gurmukhi + Punjabi</option><option value="g">Gurmukhi only</option></select></label>
-            <label className="text-xs font-semibold text-slate-700">Background opacity: {overlayOpacity}%<input type="range" min="15" max="100" value={overlayOpacity} onChange={(event) => setOverlayOpacity(Number(event.target.value))} className="mt-3 w-full accent-brand-blue" /></label>
-            <label className="text-xs font-semibold text-slate-700">Gurbani font size: {gurmukhiSize}%<input type="range" min="50" max="150" value={gurmukhiSize} onChange={(event) => setGurmukhiSize(Number(event.target.value))} className="mt-3 w-full accent-brand-blue" /></label>
-            <label className="text-xs font-semibold text-slate-700">Punjabi translation size: {punjabiSize}%<input type="range" min="50" max="150" value={punjabiSize} onChange={(event) => setPunjabiSize(Number(event.target.value))} className="mt-3 w-full accent-brand-blue" /></label>
-            <label className="text-xs font-semibold text-slate-700">English translation size: {englishSize}%<input type="range" min="50" max="150" value={englishSize} onChange={(event) => setEnglishSize(Number(event.target.value))} className="mt-3 w-full accent-brand-blue" /></label>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="font-bold text-slate-900">Streamlabs Bani Overlay</h3>
+              <p className="mt-0.5 text-xs text-slate-600">Transparent landscape browser source; follows each line selected by the Granthi.</p>
+            </div>
+            <button type="button" onClick={() => setOverlayOn((value) => !value)} aria-pressed={overlayOn} className={`rounded-full px-4 py-2 text-xs font-bold ${overlayOn ? 'bg-emerald-600 text-white' : 'bg-slate-300 text-slate-800'}`}>Overlay {overlayOn ? 'On' : 'Off'}</button>
           </div>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <section className="mt-4 rounded-xl border border-slate-200 bg-white p-4" aria-label="Overlay themes">
+            <h4 className="font-bold text-slate-900">Themes and background</h4>
+          <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Brand color presets">
+            {overlayThemePresets.map((preset) => (
+              <button key={preset.id} type="button" onClick={() => setOverlayThemeId(preset.id)} aria-pressed={overlayThemeId === preset.id} className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold ${overlayThemeId === preset.id ? 'border-brand-blue ring-2 ring-brand-blue/20' : 'border-slate-200'}`}>
+                <span className="flex gap-1"><span className="h-4 w-4 rounded-full border border-black/10" style={{ backgroundColor: preset.primaryColor }} /><span className="h-4 w-4 rounded-full border border-black/10" style={{ backgroundColor: preset.accentColor }} /></span>
+                {preset.label}
+              </button>
+            ))}
+          </div>
+            <label className="mt-4 block max-w-sm text-xs font-semibold text-slate-700">Background opacity: {overlayOpacity}%
+              <input type="range" min="15" max="100" value={overlayOpacity} onChange={(event) => setOverlayOpacity(Number(event.target.value))} className="mt-3 w-full accent-brand-blue" />
+            </label>
+          </section>
+          <section className="mt-4 rounded-xl border border-slate-200 bg-white p-4" aria-label="Overlay text and fonts">
+            <h4 className="font-bold text-slate-900">Text and font sizes</h4>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <label className="text-xs font-semibold text-slate-700">Text shown
+              <select value={overlayLanguages} onChange={(event) => setOverlayLanguages(event.target.value)} className={inputClass}><option value="gpe">Gurmukhi + Punjabi + English</option><option value="ge">Gurmukhi + English</option><option value="gp">Gurmukhi + Punjabi</option><option value="g">Gurmukhi only</option></select>
+            </label>
+            <label className="text-xs font-semibold text-slate-700">Gurbani font size: {gurmukhiSize}%
+              <input type="range" min="0" max="100" value={gurmukhiSize} onChange={(event) => setGurmukhiSize(Number(event.target.value))} className="mt-3 w-full accent-brand-blue" />
+            </label>
+            <label className="text-xs font-semibold text-slate-700">Punjabi translation size: {punjabiSize}%
+              <input type="range" min="0" max="100" value={punjabiSize} onChange={(event) => setPunjabiSize(Number(event.target.value))} className="mt-3 w-full accent-brand-blue" />
+            </label>
+            <label className="text-xs font-semibold text-slate-700">English translation size: {englishSize}%
+              <input type="range" min="0" max="100" value={englishSize} onChange={(event) => setEnglishSize(Number(event.target.value))} className="mt-3 w-full accent-brand-blue" />
+            </label>
+          </div>
+          </section>
+          <section className="mt-4 grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2" aria-label="Header controls">
+            <h4 className="font-bold sm:col-span-2">Header — stationary text</h4>
             <label className="flex items-center gap-2 text-sm font-semibold text-slate-700"><input type="checkbox" checked={overlayLogo} onChange={(event) => setOverlayLogo(event.target.checked)} className="h-4 w-4 accent-brand-blue" />Show Gurdwara logo</label>
-            <label className="text-xs font-semibold text-slate-700">Header occasion / custom text<input value={overlayHeaderMessage} onChange={(event) => setOverlayHeaderMessage(event.target.value.slice(0, 120))} maxLength={120} placeholder="e.g. Gurpurab Diwan" className={inputClass} /></label>
-            <label className="text-xs font-semibold text-slate-700">Header occasion font size: {headerSize}%<input type="range" min="50" max="150" value={headerSize} onChange={(event) => setHeaderSize(Number(event.target.value))} className="mt-3 w-full accent-brand-blue" /></label>
-            <label className="text-xs font-semibold text-slate-700">Footer ticker — English<input value={overlayAnnouncement} onChange={(event) => setOverlayAnnouncement(event.target.value.slice(0, 180))} maxLength={180} placeholder="Leave blank to hide" className={inputClass} /></label>
-            <label className="text-xs font-semibold text-slate-700">Footer ticker — Punjabi<input lang="pa" value={punjabiAnnouncement} onChange={(event) => setPunjabiAnnouncement(event.target.value.slice(0, 180))} maxLength={180} placeholder="ਪੰਜਾਬੀ ਵਿੱਚ ਸੁਨੇਹਾ ਲਿਖੋ" className={`${inputClass} font-gurmukhi`} /></label>
+            <label className="text-xs font-semibold text-slate-700">Header occasion — English
+              <input value={overlayHeaderMessage} onChange={(event) => setOverlayHeaderMessage(event.target.value.slice(0, 120))} maxLength={120} placeholder="e.g. Gurpurab Diwan" className={inputClass} />
+            </label>
+            <label className="text-xs font-semibold text-slate-700">English header font size: {headerSize}%
+              <input type="range" min="0" max="100" value={headerSize} onChange={(event) => setHeaderSize(Number(event.target.value))} className="mt-3 w-full accent-brand-blue" />
+            </label>
+            <label className="text-xs font-semibold text-slate-700">Header occasion — Punjabi
+              <input lang="pa" value={headerPunjabi} onChange={(event) => setHeaderPunjabi(event.target.value)} maxLength={120} className={`${inputClass} font-gurmukhi`} />
+            </label>
+            <label className="text-xs font-semibold text-slate-700">Punjabi header font size: {headerPunjabiSize}%
+              <input type="range" min="0" max="100" value={headerPunjabiSize} onChange={(event) => setHeaderPunjabiSize(Number(event.target.value))} className="mt-3 w-full accent-brand-blue" />
+            </label>
+          </section>
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            {[
+              { title: 'Upper footer ticker', english: upperEnglish, setEnglish: setUpperEnglish, punjabi: upperPunjabi, setPunjabi: setUpperPunjabi, speed: upperSpeed, setSpeed: setUpperSpeed, size: upperSize, setSize: setUpperSize },
+              { title: 'Bottom footer ticker', english: overlayAnnouncement, setEnglish: setOverlayAnnouncement, punjabi: punjabiAnnouncement, setPunjabi: setPunjabiAnnouncement, speed: lowerSpeed, setSpeed: setLowerSpeed, size: lowerSize, setSize: setLowerSize }
+            ].map((ticker) => <section key={ticker.title} aria-label={`${ticker.title} controls`} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+              <h4 className="font-bold">{ticker.title}</h4>
+              <div className="flex flex-wrap gap-4">
+                {['bg', 'fg'].map((channel) => {
+                  const position = ticker.title === 'Upper footer ticker' ? 'upper' : 'lower';
+                  const key = `${position}${channel}`;
+                  const fallback = position === 'upper'
+                    ? (channel === 'bg' ? selectedOverlayTheme.primaryColor : '#ffffff')
+                    : (channel === 'bg' ? selectedOverlayTheme.accentColor : selectedOverlayTheme.primaryColor);
+                  return <label key={key} className="text-xs font-semibold">{channel === 'bg' ? 'Background color' : 'Text color'}<input type="color" value={tickerColors[key] || fallback} onChange={(event) => setTickerColors((current) => ({ ...current, [key]: event.target.value }))} className="mt-1 block h-9 w-16 cursor-pointer" /></label>;
+                })}
+              </div>
+              <label className="block text-xs font-semibold">English text<input value={ticker.english} onChange={(event) => ticker.setEnglish(event.target.value)} maxLength={180} placeholder="Leave blank to hide" className={inputClass} /></label>
+              <label className="block text-xs font-semibold">Punjabi text<input lang="pa" value={ticker.punjabi} onChange={(event) => ticker.setPunjabi(event.target.value)} maxLength={180} className={`${inputClass} font-gurmukhi`} /></label>
+              <label className="block text-xs font-semibold">Scroll speed: {ticker.speed}%{ticker.speed === 0 ? ' (paused)' : ''}<input type="range" min="0" max="100" value={ticker.speed} onChange={(event) => ticker.setSpeed(Number(event.target.value))} className="mt-2 w-full accent-brand-blue" /></label>
+              <label className="block text-xs font-semibold">Font size: {ticker.size}%<input type="range" min="0" max="100" value={ticker.size} onChange={(event) => ticker.setSize(Number(event.target.value))} className="mt-2 w-full accent-brand-blue" /></label>
+            </section>)}
           </div>
           <div className="mt-4 overflow-hidden rounded-xl border border-slate-300 bg-slate-800 shadow-inner" aria-label="Live overlay preview">
-            <div className="flex min-h-14 items-center justify-between gap-3 border-b-[3px] px-4 py-2 text-white" style={{ backgroundColor: selectedOverlayTheme.primaryColor, borderColor: selectedOverlayTheme.accentColor }}><div className="flex min-w-0 items-center gap-2">{overlayLogo ? <span aria-hidden="true" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 bg-white text-lg" style={{ borderColor: selectedOverlayTheme.accentColor, color: selectedOverlayTheme.primaryColor }}>ॴ</span> : null}<div className="min-w-0 text-left leading-tight"><p className="truncate font-heading text-sm font-medium">Gurdwara Singh Sabha</p><p className="truncate text-[10px] font-normal text-white/85">7035, Sixth Line, Milton</p></div></div><div className="min-w-0 flex-1 text-center font-heading font-bold" style={{ fontSize: `${14 * headerSize / 100}px` }}>{overlayHeaderMessage || 'Occasion / custom header text'}</div><div className="shrink-0 text-right text-[10px] leading-tight"><div>{formatDay(new Date().toISOString())}</div><div className="font-bold" style={{ color: selectedOverlayTheme.accentColor }}>{formatClock(new Date().toISOString())}</div></div></div>
-            <div className="space-y-2 border-t-[3px] px-4 py-5 text-center" style={previewFooterStyle}>{line?.g && overlayLanguages.includes('g') ? <p className="font-gurmukhi font-bold" style={{ color: selectedOverlayTheme.accentColor, fontSize: `${18 * gurmukhiSize / 100}px`, lineHeight: 1.3 }}>{line.g}</p> : <p className="font-gurmukhi font-bold" style={{ color: selectedOverlayTheme.accentColor, fontSize: `${18 * gurmukhiSize / 100}px` }}>Gurbani preview</p>}{overlayLanguages.includes('p') ? <p className="font-gurmukhi font-semibold text-white" style={{ fontSize: `${13 * punjabiSize / 100}px`, lineHeight: 1.5 }}>{line?.p || 'Punjabi translation preview'}</p> : null}{overlayLanguages.includes('e') ? <p className="font-semibold text-white" style={{ fontSize: `${13 * englishSize / 100}px`, lineHeight: 1.5 }}>{line?.e || 'English translation preview'}</p> : null}</div>
-            <AnnouncementTicker english={overlayAnnouncement} punjabi={punjabiAnnouncement} backgroundColor={selectedOverlayTheme.accentColor} color={selectedOverlayTheme.primaryColor} />
+            <div className="flex min-h-14 items-center justify-between gap-3 border-b-[3px] px-4 py-2 text-white" style={{ backgroundColor: selectedOverlayTheme.primaryColor, borderColor: selectedOverlayTheme.accentColor }}>
+              <div className="flex min-w-0 items-center gap-2">
+                {overlayLogo ? <span aria-hidden="true" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 bg-white text-lg" style={{ borderColor: selectedOverlayTheme.accentColor, color: selectedOverlayTheme.primaryColor }}>ॴ</span> : null}
+                <div className="min-w-0 text-left leading-tight"><p className="truncate font-heading text-sm font-medium">Gurdwara Singh Sabha</p><p className="truncate text-[10px] font-normal text-white/85">7035, Sixth Line, Milton</p></div>
+              </div>
+              <div className="min-w-0 flex-1 text-center font-heading font-bold"><p lang="pa" className="font-gurmukhi" style={{ fontSize: `${14 * headerPunjabiSize / 100}px` }}>{headerPunjabi}</p><p lang="en" style={{ fontSize: `${14 * headerSize / 100}px` }}>{overlayHeaderMessage || (!headerPunjabi ? 'Occasion / custom header text' : '')}</p></div>
+              <div className="shrink-0 text-right text-[10px] leading-tight"><div>{formatDay(new Date().toISOString())}</div><div className="font-bold" style={{ color: selectedOverlayTheme.accentColor }}>{formatClock(new Date().toISOString())}</div></div>
+            </div>
+            <div className="space-y-2 border-t-[3px] px-4 py-5 text-center" style={previewFooterStyle}>
+              {line?.g && overlayLanguages.includes('g') ? <p className="font-gurmukhi font-bold" style={{ color: selectedOverlayTheme.accentColor, fontSize: `${18 * gurmukhiSize / 100}px`, lineHeight: 1.3 }}>{line.g}</p> : <p className="font-gurmukhi font-bold" style={{ color: selectedOverlayTheme.accentColor, fontSize: `${18 * gurmukhiSize / 100}px` }}>Gurbani preview</p>}
+              {overlayLanguages.includes('p') ? <p className="font-gurmukhi font-semibold text-white" style={{ fontSize: `${13 * punjabiSize / 100}px`, lineHeight: 1.5 }}>{line?.p || 'Punjabi translation preview'}</p> : null}
+              {overlayLanguages.includes('e') ? <p className="font-semibold text-white" style={{ fontSize: `${13 * englishSize / 100}px`, lineHeight: 1.5 }}>{line?.e || 'English translation preview'}</p> : null}
+            </div>
+            <AnnouncementTicker english={upperEnglish} punjabi={upperPunjabi} speed={upperSpeed} fontSize={upperSize} label="Upper footer announcement ticker" backgroundColor={tickerColors.upperbg || selectedOverlayTheme.primaryColor} color={tickerColors.upperfg || '#ffffff'} />
+            <AnnouncementTicker english={overlayAnnouncement} punjabi={punjabiAnnouncement} speed={lowerSpeed} fontSize={lowerSize} backgroundColor={tickerColors.lowerbg || selectedOverlayTheme.accentColor} color={tickerColors.lowerfg || selectedOverlayTheme.primaryColor} />
           </div>
-          <p className="mt-1 text-[11px] text-slate-500">Preview updates immediately with colors, opacity, font sizes, languages, and text.</p>
-          <div className="mt-3"><CopyLinkRow label="Copy configured Streamlabs browser-source URL" path={streamOverlayPath} /></div>
+          <p className="mt-1 text-[11px] text-slate-500">Preview updates immediately as you change colors, opacity, font sizes, languages, or text. The generated Streamlabs page uses the same settings.</p>
+          <div className="mt-3">
+            <CopyLinkRow label="Copy configured Streamlabs browser-source URL" path={streamOverlayPath} />
+          </div>
+          <details className="mt-3 text-sm text-slate-700">
+            <summary className="cursor-pointer font-bold text-slate-900">Setup and compatibility</summary>
+            <ol className="mt-3 list-decimal space-y-2 pl-5">
+              <li>Add the copied URL in Streamlabs as a <strong>Browser Source</strong> or <strong>Web Overlay</strong>.</li>
+              <li>Set the source canvas to <strong>1920 × 1080</strong> for landscape and place it above the camera/video source.</li>
+              <li>Use the mobile Streamlabs app's browser/web overlay source when available, or add the same URL as a browser source in Streamlabs Desktop. Both must be online and able to reach this site.</li>
+              <li>Start the recitation with the Granthi remote. The overlay follows the same live line and translations as the LED board; toggle it off or remove the source when no text should appear.</li>
+            </ol>
+            <p className="mt-3 text-xs text-slate-600">The header and footer use the configured Gurdwara brand blue and orange. For mobile, confirm your Streamlabs app version offers a browser/web overlay source; if not, Streamlabs Desktop supports the same URL as a Browser Source. The broadcast device needs an internet connection to this site.</p>
+          </details>
         </div>
       </Card>
 

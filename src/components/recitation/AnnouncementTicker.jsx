@@ -1,10 +1,14 @@
-const AnnouncementTicker = ({ english = '', punjabi = '', backgroundColor, color }) => {
+const AnnouncementTicker = ({ english = '', punjabi = '', backgroundColor, color, speed = 100, fontSize = 100, label = 'Footer announcement ticker' }) => {
   const items = [english.trim(), punjabi.trim()].filter(Boolean);
   if (!items.length) return null;
   const repetitions = Math.max(1, Math.ceil(300 / items.join(' ').length));
-  const duration = Math.max(20, items.join(' ').length * repetitions / 5);
+  const parsedSpeed = speed == null || speed === '' ? 100 : Number(speed);
+  const safeSpeed = Number.isFinite(parsedSpeed) ? Math.min(100, Math.max(0, parsedSpeed)) : 100;
+  const parsedSize = fontSize == null || fontSize === '' ? 100 : Number(fontSize);
+  const safeSize = (Number.isFinite(parsedSize) ? Math.min(100, Math.max(0, parsedSize)) : 100) / 100;
+  const duration = Math.max(20, items.join(' ').length * repetitions / 5) * 100 / Math.max(1, safeSpeed);
   return (
-    <div className="recitation-announcement-ticker" aria-label="Footer announcement ticker" style={{ backgroundColor, color }}>
+    <div className="recitation-announcement-ticker" aria-label={label} style={{ backgroundColor, color, fontSize: `clamp(${14 * safeSize}px, ${1.5 * safeSize}vw, ${26 * safeSize}px)` }}>
       <style>{`
         .recitation-announcement-ticker{width:100%;overflow:hidden;padding:.18em 0;text-align:center;font-size:clamp(14px,1.5vw,26px);font-weight:600;line-height:1.4}
         .recitation-announcement-track{display:flex;align-items:flex-start;width:max-content;margin-inline:auto;animation:recitation-announcement-scroll var(--ticker-duration) linear infinite}
@@ -14,7 +18,7 @@ const AnnouncementTicker = ({ english = '', punjabi = '', backgroundColor, color
         @keyframes recitation-announcement-scroll{to{transform:translateX(-50%)}}
         @media(prefers-reduced-motion:reduce){.recitation-announcement-track{animation:none;width:100%}.recitation-announcement-copy{min-width:0;white-space:normal;flex-wrap:wrap}.recitation-announcement-copy[aria-hidden]{display:none}}
       `}</style>
-      <div className="recitation-announcement-track" style={{ '--ticker-duration': `${duration}s` }}>
+      <div data-testid="ticker-track" className="recitation-announcement-track" style={{ '--ticker-duration': `${duration}s`, animationPlayState: safeSpeed === 0 ? 'paused' : 'running' }}>
         {[0, 1].map((copy) => (
           <div key={copy} className="recitation-announcement-copy" aria-hidden={copy ? 'true' : undefined}>
             {Array.from({ length: repetitions }, (_, index) => (
