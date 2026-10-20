@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckCircleIcon, SpeakerWaveIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { getStreamingEmbedUrl, resolveStreamingLive } from '../../services/streamingService';
+import { getStreamingEmbedUrl, resolveStreamingLive, isYouTubeSource } from '../../services/streamingService';
 import { getYouTubeEmbedUrl } from '../../services/videoService';
 import gurdwaraLogo from '../../assets/gurdwara-logo.webp';
 
@@ -40,9 +40,6 @@ const isPlainYouTubeChannel = (value = '') => {
   const input = String(value || '').trim();
   return Boolean(input && !/^https?:\/\//i.test(input) && !input.includes('/'));
 };
-
-const isYouTubeSource = (value = '') => /youtube\.com|youtu\.be|^@|\bUC[A-Za-z0-9_-]{20,}\b/i.test(String(value || '').trim())
-  || isPlainYouTubeChannel(value);
 
 const isChannelLikeSource = (value = '') => {
   const input = String(value || '').trim();
@@ -168,7 +165,7 @@ const StreamingModal = ({ open, streams = [], initialStreamId = '', onClose }) =
 
   const sourceUrl = String(selectedStream?.streamUrl || '').trim();
   const youtubeSource = isYouTubeSource(sourceUrl);
-  const channelLikeSource = isChannelLikeSource(sourceUrl);
+  const channelLikeSource = youtubeSource && isChannelLikeSource(sourceUrl);
   const parsedYouTubeEmbedUrl = youtubeSource ? getYouTubeEmbedUrl(sourceUrl) : '';
   const directEmbedUrl = youtubeSource
     ? (isDirectYouTubeVideoSource(sourceUrl) ? parsedYouTubeEmbedUrl : '')
@@ -228,7 +225,7 @@ const StreamingModal = ({ open, streams = [], initialStreamId = '', onClose }) =
                     <CheckCircleIcon className="h-4 w-4" />
                     {selectedStream?.active ? 'Active' : 'Inactive'}
                   </span>
-                  {mobileDevice && canPlay && !mobileSoundEnabled ? (
+                  {youtubeSource && mobileDevice && canPlay && !mobileSoundEnabled ? (
                     <button
                       type="button"
                       onClick={enableMobileSound}
@@ -247,14 +244,14 @@ const StreamingModal = ({ open, streams = [], initialStreamId = '', onClose }) =
                   <>
                     <iframe
                       className="h-full w-full"
-                      src={`${resolvedEmbedUrl}${resolvedEmbedUrl.includes('?') ? '&' : '?'}${autoplayParams}&origin=${encodeURIComponent(window.location.origin)}`}
+                      src={youtubeSource ? `${resolvedEmbedUrl}${resolvedEmbedUrl.includes('?') ? '&' : '?'}${autoplayParams}&origin=${encodeURIComponent(window.location.origin)}` : resolvedEmbedUrl}
                       title={selectedStream?.title || 'Live stream'}
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                       allowFullScreen
                       referrerPolicy="strict-origin-when-cross-origin"
                       ref={(iframe) => {
                         setStreamFrameNode(iframe || null);
-                        if (!iframe) {
+                        if (!iframe || !youtubeSource) {
                           return;
                         }
 
@@ -303,6 +300,12 @@ const StreamingModal = ({ open, streams = [], initialStreamId = '', onClose }) =
                 )}
               </div>
             </div>
+            {canPlay ? (
+              <div className="border-t border-slate-100 px-5 py-3 text-sm text-slate-600">
+                {!youtubeSource ? <p className="mb-2">If this provider blocks embedded playback, open its public player below. Use the player's own audio controls.</p> : null}
+                <a href={youtubeSource ? (resolvedLiveEmbed || resolvedEmbedUrl) : resolvedEmbedUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-blue underline">Open stream in a new tab</a>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

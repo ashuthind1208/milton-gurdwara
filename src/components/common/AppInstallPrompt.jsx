@@ -28,6 +28,8 @@ const AppInstallPrompt = () => {
   const ios = isIosDevice();
 
   useEffect(() => {
+    if (pathname.startsWith('/stream-overlay')) return undefined;
+
     const captureInstallEvent = (event) => {
       event.preventDefault();
       setInstallEvent(event);
@@ -43,9 +45,9 @@ const AppInstallPrompt = () => {
       window.removeEventListener('beforeinstallprompt', captureInstallEvent);
       window.removeEventListener('appinstalled', handleInstalled);
     };
-  }, []);
+  }, [pathname]);
 
-  if (dismissed || isInstalled() || (!ios && !installEvent) || pathname.startsWith('/follow') || pathname.startsWith('/granthi-remote')) {
+  if (dismissed || isInstalled() || (!ios && !installEvent) || pathname.startsWith('/follow') || pathname.startsWith('/granthi-remote') || pathname.startsWith('/stream-overlay')) {
     return null;
   }
 

@@ -27,6 +27,7 @@ const LedBoardLauncherPage = lazy(() => import('../pages/Boards/LedBoardLauncher
 const LedAnnouncementsBoardPage = lazy(() => import('../pages/Boards/LedAnnouncementsBoardPage'));
 const LedHukamnamaBoardPage = lazy(() => import('../pages/Boards/LedHukamnamaBoardPage'));
 const RecitationLedBoardPage = lazy(() => import('../pages/Recitation/RecitationLedBoardPage'));
+const StreamOverlayPage = lazy(() => import('../pages/Recitation/StreamOverlayPage'));
 const RecitationFollowPage = lazy(() => import('../pages/Recitation/RecitationFollowPage'));
 const GranthiRemotePage = lazy(() => import('../pages/Recitation/GranthiRemotePage'));
 const AskGranthiBoardPage = lazy(() => import('../pages/AskGranthi/AskGranthiBoardPage'));
@@ -113,6 +114,7 @@ const AppRoutes = () => {
         <Route path="/special-events-board" element={<LedEmergencyGuard><LedAnnouncementsBoardPage /></LedEmergencyGuard>} />
         <Route path="/hukamnama-board" element={<LedEmergencyGuard><LedHukamnamaBoardPage /></LedEmergencyGuard>} />
         <Route path="/recitation-board" element={<LedEmergencyGuard><RecitationLedBoardPage /></LedEmergencyGuard>} />
+        <Route path="/stream-overlay" element={<LedEmergencyGuard><StreamOverlayPage /></LedEmergencyGuard>} />
         <Route path="/follow" element={<RecitationFollowPage />} />
         <Route path="/follow/:sessionId" element={<RecitationFollowPage />} />
         <Route path="/granthi-remote" element={<GranthiRemotePage />} />
