@@ -28,17 +28,21 @@ const StreamOverlayPage = () => {
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
   const enabled = params.get('on') !== '0';
   const showLogo = params.get('logo') !== '0';
-  const opacity = clamp(params.get('opacity'), 15, 100, 84) / 100;
+  const opacity = clamp(params.get('opacity'), 15, 100, 100) / 100;
   const legacyScale = params.get('size');
-  const gurmukhiScale = clamp(params.get('sizeg') || legacyScale, 50, 150, 100) / 100;
-  const punjabiScale = clamp(params.get('sizep') || legacyScale, 50, 150, 100) / 100;
-  const englishScale = clamp(params.get('sizee') || legacyScale, 50, 150, 100) / 100;
+  const gurmukhiScale = clamp(params.get('sizeg') || legacyScale, 0, 100, 100) / 100;
+  const punjabiScale = clamp(params.get('sizep') || legacyScale, 0, 100, 100) / 100;
+  const englishScale = clamp(params.get('sizee') || legacyScale, 0, 100, 100) / 100;
   const languages = params.get('lang') || 'gpe';
   const announcement = params.get('announcement') === '1' ? String(params.get('message') || '').trim().slice(0, 180) : '';
   const punjabiAnnouncement = params.get('announcement') === '1' ? String(params.get('messagepa') || '').trim().slice(0, 180) : '';
-  const headerScale = clamp(params.get('sizeh'), 50, 150, 100) / 100;
+  const headerEnglishScale = clamp(params.get('sizehen') ?? params.get('sizeh'), 0, 100, 100) / 100;
+  const headerPunjabiScale = clamp(params.get('sizehpa') ?? params.get('sizeh'), 0, 100, 100) / 100;
   const headerMessage = String(params.get('header') || '').trim().slice(0, 120);
-  const hasTicker = Boolean(announcement || punjabiAnnouncement);
+  const headerPunjabi = String(params.get('headerpa') || '').trim().slice(0, 120);
+  const upperEnglish = String(params.get('uppermessage') || '').trim().slice(0, 180);
+  const upperPunjabi = String(params.get('uppermessagepa') || '').trim().slice(0, 180);
+  const hasTicker = Boolean(announcement || punjabiAnnouncement || upperEnglish || upperPunjabi);
   const [clockNow, setClockNow] = useState(() => new Date());
   const { currentIndex = 0 } = session || {};
   const line = lines[currentIndex] || null;
@@ -102,13 +106,16 @@ const StreamOverlayPage = () => {
         .stream-overlay-date-time{flex:0 0 auto;text-align:right;color:#fff;line-height:1.35}
         .stream-overlay-date{font-size:clamp(12px,1.15vw,20px);font-weight:600;opacity:.94}
         .stream-overlay-time{margin-top:.15vh;color:${accentColor};font-size:clamp(18px,1.8vw,30px);font-weight:800;font-variant-numeric:tabular-nums}
-        .stream-overlay-footer{position:absolute;left:0;right:0;bottom:0;width:100%;min-height:clamp(190px,28vh,380px);display:flex;flex-direction:column;justify-content:center;background:${panelColor};border-top:clamp(3px,.45vh,7px) solid ${accentColor};box-shadow:0 -8px 34px rgba(0,0,0,.28);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+        .stream-overlay-footer{position:absolute;left:0;right:0;bottom:0;width:100%;min-height:clamp(190px,28vh,380px);display:flex;flex-direction:column;justify-content:flex-end;background:${panelColor};border-top:clamp(3px,.45vh,7px) solid ${accentColor};box-shadow:0 -8px 34px rgba(0,0,0,.28);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+        .stream-overlay-ticker-stack{margin-top:auto;width:100%;display:flex;flex-direction:column;gap:0;flex-shrink:0}
         .stream-overlay-footer-ticker-only{min-height:0;display:block;background:transparent;border:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
         .stream-overlay-lines{width:100%;display:flex;flex-direction:column;align-items:center;gap:1.15vh;padding:2.3vh 4vw;text-align:center}
-        .stream-overlay-g{font-family:'Noto Sans Gurmukhi',sans-serif;font-size:clamp(18px,calc(3vw * var(--gurbani-size)),calc(54px * var(--gurbani-size)));font-weight:700;line-height:1.3;color:${accentColor};text-shadow:0 2px 4px rgba(0,0,0,.6);overflow-wrap:anywhere}
-        .stream-overlay-p{font-family:'Noto Sans Gurmukhi',sans-serif;font-size:clamp(13px,calc(1.45vw * var(--punjabi-size)),calc(27px * var(--punjabi-size)));font-weight:600;line-height:1.35;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.55);overflow-wrap:anywhere}
-        .stream-overlay-e{font-size:clamp(13px,calc(1.5vw * var(--english-size)),calc(28px * var(--english-size)));font-weight:600;line-height:1.35;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6);overflow-wrap:anywhere}
+        .stream-overlay-g{font-family:'Noto Sans Gurmukhi',sans-serif;font-size:clamp(calc(18px * var(--gurbani-size)),calc(3vw * var(--gurbani-size)),calc(54px * var(--gurbani-size)));font-weight:700;line-height:1.3;color:${accentColor};text-shadow:0 2px 4px rgba(0,0,0,.6);overflow-wrap:anywhere}
+        .stream-overlay-p{font-family:'Noto Sans Gurmukhi',sans-serif;font-size:clamp(calc(13px * var(--punjabi-size)),calc(1.45vw * var(--punjabi-size)),calc(27px * var(--punjabi-size)));font-weight:600;line-height:1.35;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.55);overflow-wrap:anywhere}
+        .stream-overlay-e{font-size:clamp(calc(13px * var(--english-size)),calc(1.5vw * var(--english-size)),calc(28px * var(--english-size)));font-weight:600;line-height:1.35;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6);overflow-wrap:anywhere}
+        .stream-overlay-announcement{width:100%;padding:.8vh 4vw;background:${accentColor};color:${overlayBlue};text-align:center;font-size:clamp(15px,1.6vw,28px);font-weight:800}
         @media(max-aspect-ratio:4/3){.stream-overlay-header{min-height:54px;padding:1vh 3vw;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)}.stream-overlay-logo{width:clamp(42px,7vh,72px);height:clamp(42px,7vh,72px)}.stream-overlay-org{font-size:clamp(13px,2vw,19px)}.stream-overlay-address{font-size:clamp(9px,1.4vw,13px)}.stream-overlay-custom-header{font-size:clamp(14px,2.5vw,24px)}.stream-overlay-date{font-size:clamp(10px,1.8vw,15px)}.stream-overlay-time{font-size:clamp(15px,2.6vw,22px)}.stream-overlay-footer{min-height:clamp(160px,30vh,300px)}.stream-overlay-lines{padding-left:3vw;padding-right:3vw;gap:1vh}}
+        .stream-overlay-root .stream-overlay-footer-ticker-only{min-height:0}
       `}</style>
       <header className="stream-overlay-header" aria-label="Gurdwara broadcast header">
         <div className="stream-overlay-identity">
@@ -118,7 +125,10 @@ const StreamOverlayPage = () => {
             <p className="stream-overlay-address">{organizationAddress}</p>
           </div>
         </div>
-        <p className="stream-overlay-custom-header" style={{ fontSize: `clamp(${14 * headerScale}px, ${2 * headerScale}vw, ${34 * headerScale}px)` }}>{headerMessage}</p>
+        <div className="stream-overlay-custom-header" aria-label="Header occasion text">
+          {headerPunjabi ? <p lang="pa" className="font-gurmukhi" style={{ fontSize: `clamp(${14 * headerPunjabiScale}px, ${2 * headerPunjabiScale}vw, ${34 * headerPunjabiScale}px)` }}>{headerPunjabi}</p> : null}
+          {headerMessage ? <p lang="en" style={{ fontSize: `clamp(${14 * headerEnglishScale}px, ${2 * headerEnglishScale}vw, ${34 * headerEnglishScale}px)` }}>{headerMessage}</p> : null}
+        </div>
         <div className="stream-overlay-date-time" aria-label={`${dateTime.date}, ${dateTime.time}`}>
           <p className="stream-overlay-date">{dateTime.date}</p>
           <p className="stream-overlay-time">{dateTime.time}</p>
@@ -132,7 +142,10 @@ const StreamOverlayPage = () => {
             {showEnglish ? <p className="stream-overlay-e">{line.e}</p> : null}
           </div>
         ) : null}
-        {hasTicker ? <AnnouncementTicker english={announcement} punjabi={punjabiAnnouncement} backgroundColor={accentColor} color={overlayBlue} /> : null}
+        {hasTicker ? <div className="stream-overlay-ticker-stack">
+          <AnnouncementTicker english={upperEnglish} punjabi={upperPunjabi} speed={params.get('upperspeed')} fontSize={params.get('uppersize') || 100} label="Upper footer announcement ticker" backgroundColor={normalizeHex(params.get('upperbg'), overlayBlue)} color={normalizeHex(params.get('upperfg'), '#ffffff')} />
+          <AnnouncementTicker english={announcement} punjabi={punjabiAnnouncement} speed={params.get('tickerspeed')} fontSize={params.get('tickersize') || 100} backgroundColor={normalizeHex(params.get('lowerbg'), accentColor)} color={normalizeHex(params.get('lowerfg'), overlayBlue)} />
+        </div> : null}
       </section> : null}
     </main>
   );
