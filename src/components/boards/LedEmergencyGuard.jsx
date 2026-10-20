@@ -6,6 +6,7 @@ import ledScreenService from '../../services/ledScreenService';
 const LedEmergencyGuard = ({ children }) => {
   const [searchParams] = useSearchParams();
   const embedded = searchParams.get('embed') === '1';
+  const streamOverlay = window.location.pathname.startsWith('/stream-overlay');
   const { data: override } = useQuery({
     queryKey: ['led-emergency-override'],
     queryFn: ledScreenService.getOverride,
@@ -14,7 +15,7 @@ const LedEmergencyGuard = ({ children }) => {
     retry: 1,
     enabled: !embedded
   });
-  return <>{children}{embedded ? null : <LedEmergencyOverlay override={override} />}</>;
+  return <>{children}{embedded || streamOverlay ? null : <LedEmergencyOverlay override={override} />}</>;
 };
 
 export default LedEmergencyGuard;

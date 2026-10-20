@@ -15,10 +15,30 @@ const defaultStreaming = {
   checkedAt: new Date().toISOString()
 };
 
-const isYouTubeSource = (value = '') => {
+export const isYouTubeSource = (value = '') => {
   const input = String(value || '').trim();
-  const plainChannel = Boolean(input && !/^https?:\/\//i.test(input) && !input.includes('/'));
-  return /youtube\.com|youtu\.be|^@|\bUC[A-Za-z0-9_-]{20,}\b/i.test(input) || plainChannel;
+  if (!input) return false;
+  if (!/^[a-z][a-z\d+.-]*:/i.test(input)) return !input.includes('/');
+  try {
+    const url = new URL(input);
+    return ['http:', 'https:'].includes(url.protocol) && /(^|\.)(youtube\.com|youtube-nocookie\.com|youtu\.be)$/i.test(url.hostname);
+  } catch {
+    return false;
+  }
+};
+
+export const validateStreamingSource = (value = '') => {
+  const input = String(value || '').trim();
+  if (!input) return 'Enter a YouTube channel or public stream player URL.';
+  if (isYouTubeSource(input)) return true;
+  try {
+    const url = new URL(input);
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return 'Use a public HTTP(S) viewing URL, not an RTMP address or private stream key.';
+    if (url.pathname.replace(/\/$/, '') === '/stream-overlay') return 'Use the broadcast viewing URL. The overlay URL contains text only, not live video.';
+    return true;
+  } catch {
+    return 'Enter a complete public player URL starting with https://, or a YouTube channel.';
+  }
 };
 
 const normalizeBoolean = (value, fallback = false) => {
@@ -53,7 +73,11 @@ const normalizeStreaming = (streaming = {}, index = 0) => ({
   checkedAt: String(streaming.checkedAt ?? streaming.checked_at ?? '')
 });
 
-const resolveEmbedUrl = (streamUrl) => getYouTubeEmbedUrl(streamUrl) || String(streamUrl || '');
+const resolveEmbedUrl = (streamUrl) => {
+  const source = String(streamUrl || '').trim();
+  if (validateStreamingSource(source) !== true) return '';
+  return isYouTubeSource(source) ? getYouTubeEmbedUrl(source) : source;
+};
 
 const resolveYouTubeLive = async (sourceUrl) => {
   const response = await fetch(`/api/streaming/youtube/live?source=${encodeURIComponent(String(sourceUrl || ''))}`);
@@ -100,6 +124,7 @@ export const verifyStreamingAvailability = async (streaming) => {
   if (!normalized.active || !normalized.streamUrl) {
     return { available: false, checkedAt: new Date().toISOString(), reason: 'inactive' };
   }
+  if (validateStreamingSource(normalized.streamUrl) !== true) return { available: false, checkedAt: new Date().toISOString(), reason: 'invalid_source', embedUrl: '' };
 
   if (isYouTubeSource(normalized.streamUrl)) {
     return resolveYouTubeLive(normalized.streamUrl);
@@ -107,15 +132,7 @@ export const verifyStreamingAvailability = async (streaming) => {
 
   const embedUrl = resolveEmbedUrl(normalized.streamUrl);
 
-  try {
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 3000);
-    await fetch(normalized.streamUrl, { method: 'HEAD', mode: 'no-cors', signal: controller.signal });
-    window.clearTimeout(timer);
-    return { available: true, checkedAt: new Date().toISOString(), embedUrl };
-  } catch {
-    return { available: Boolean(embedUrl), checkedAt: new Date().toISOString(), embedUrl, reason: 'unreachable' };
-  }
+  return { available: false, checkedAt: new Date().toISOString(), embedUrl, watchUrl: embedUrl, reason: 'custom_player' };
 };
 
 const streamingService = {
@@ -130,6 +147,8 @@ const streamingService = {
   },
 
   addStreaming: async (payload) => {
+    const validation = validateStreamingSource(payload?.streamUrl);
+    if (validation !== true) throw new Error(validation);
     const record = normalizeStreaming({ ...payload, id: `stream-${Date.now()}`, updatedAt: new Date().toISOString() });
     await contentApiService.create(RESOURCE, record);
     const rows = await contentApiService.list(RESOURCE);
@@ -139,6 +158,8 @@ const streamingService = {
   updateStreaming: async (id, payload) => {
     const rows = await contentApiService.list(RESOURCE);
     const existing = rows.find((entry) => entry.id === id) || { id };
+    const validation = validateStreamingSource(payload?.streamUrl ?? existing.streamUrl);
+    if (validation !== true) throw new Error(validation);
     const updated = normalizeStreaming({ ...existing, ...payload, id, updatedAt: new Date().toISOString() });
     await contentApiService.update(RESOURCE, id, updated);
     const next = await contentApiService.list(RESOURCE);
@@ -195,6 +216,6 @@ const streamingService = {
 };
 
 export const getStreamingEmbedUrl = resolveEmbedUrl;
-export const resolveStreamingLive = async (sourceUrl) => resolveYouTubeLive(sourceUrl);
+export const resolveStreamingLive = async (sourceUrl) => isYouTubeSource(sourceUrl) ? resolveYouTubeLive(sourceUrl) : verifyStreamingAvailability({ streamUrl: sourceUrl, active: true });
 
 export default streamingService;

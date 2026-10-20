@@ -11,6 +11,20 @@ html.board-embed {
   cursor: none;
 }
 
+html.board-embed,
+html.board-embed body,
+html.board-embed #root {
+  min-height: 100%;
+  background: transparent !important;
+}
+
+html.board-embed,
+html.board-embed body,
+html.board-embed #root {
+  min-height: 100%;
+  background: transparent !important;
+}
+
 html.board-embed [data-board-control] {
   display: none !important;
 }
