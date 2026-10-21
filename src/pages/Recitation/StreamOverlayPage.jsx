@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRecitationLive, useRecitationText } from '../../hooks/useRecitation';
 import { useBranding } from '../../context/BrandingContext';
 import AnnouncementTicker from '../../components/recitation/AnnouncementTicker';
+import { readStreamOverlayVisibility, subscribeStreamOverlayVisibility } from '../../services/streamOverlayControl';
 
 const clamp = (value, min, max, fallback) => {
   if (value == null || value === '') return fallback;
@@ -22,7 +23,7 @@ const formatBroadcastDateTime = (date) => ({
 });
 
 const StreamOverlayPage = () => {
-  const { session } = useRecitationLive();
+  const { session, connectionStatus = 'connecting' } = useRecitationLive();
   const { lines } = useRecitationText(session, 'full');
   const { branding, logoSrc } = useBranding();
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
@@ -43,6 +44,7 @@ const StreamOverlayPage = () => {
   const upperEnglish = String(params.get('uppermessage') || '').trim().slice(0, 180);
   const upperPunjabi = String(params.get('uppermessagepa') || '').trim().slice(0, 180);
   const hasTicker = Boolean(announcement || punjabiAnnouncement || upperEnglish || upperPunjabi);
+  const [remoteVisible, setRemoteVisible] = useState(readStreamOverlayVisibility);
   const [clockNow, setClockNow] = useState(() => new Date());
   const { currentIndex = 0 } = session || {};
   const line = lines[currentIndex] || null;
@@ -56,6 +58,8 @@ const StreamOverlayPage = () => {
     const timer = window.setInterval(() => setClockNow(new Date()), 15000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => subscribeStreamOverlayVisibility(setRemoteVisible), []);
 
   useEffect(() => {
     const body = document.body;
@@ -78,13 +82,16 @@ const StreamOverlayPage = () => {
     };
   }, []);
 
-  if (!enabled) return <main className="stream-overlay-root" aria-hidden="true" />;
+  if (!enabled || !remoteVisible) return <main className="stream-overlay-root" aria-hidden="true" />;
 
   const showGurmukhi = languages.includes('g');
   const showPunjabi = languages.includes('p') && Boolean(line?.p);
   const showEnglish = languages.includes('e') && Boolean(line?.e);
   const organizationName = String(branding.organizationName || 'Gurdwara Singh Sabha').replace(/\s+Milton$/i, '').trim();
   const organizationAddress = branding.address || '7035, Sixth Line, Milton';
+  const liveConnectionLabel = connectionStatus === 'connected'
+    ? (session?.status === 'live' ? 'LIVE · SYNCED' : 'READY · SYNCED')
+    : connectionStatus === 'reconnecting' || connectionStatus === 'connecting' ? 'RECONNECTING' : 'OFFLINE';
 
   return (
     <main
@@ -104,10 +111,12 @@ const StreamOverlayPage = () => {
         .stream-overlay-address{min-width:0;color:rgba(255,255,255,.88);font-size:clamp(10px,.85vw,15px);font-weight:400;line-height:1.15;letter-spacing:.025em}
         .stream-overlay-custom-header{min-width:0;text-align:center;color:#fff;font-family:'Crimson Text',Georgia,serif;font-size:clamp(17px,2vw,34px);font-weight:700;line-height:1.15;text-shadow:0 2px 4px rgba(0,0,0,.3);overflow-wrap:anywhere}
         .stream-overlay-date-time{flex:0 0 auto;text-align:right;color:#fff;line-height:1.35}
+        .stream-overlay-connection{display:inline-flex;align-items:center;justify-content:flex-end;gap:.4em;margin-top:.25vh;font-size:clamp(9px,.65vw,12px);font-weight:800;letter-spacing:.08em;color:${accentColor}}
+        .stream-overlay-connection-dot{width:.55em;height:.55em;border-radius:50%;background:${connectionStatus === 'connected' ? '#22c55e' : connectionStatus === 'reconnecting' || connectionStatus === 'connecting' ? '#f59e0b' : '#ef4444'}}
         .stream-overlay-date{font-size:clamp(12px,1.15vw,20px);font-weight:600;opacity:.94}
         .stream-overlay-time{margin-top:.15vh;color:${accentColor};font-size:clamp(18px,1.8vw,30px);font-weight:800;font-variant-numeric:tabular-nums}
         .stream-overlay-footer{position:absolute;left:0;right:0;bottom:0;width:100%;min-height:clamp(190px,28vh,380px);display:flex;flex-direction:column;justify-content:flex-end;background:${panelColor};border-top:clamp(3px,.45vh,7px) solid ${accentColor};box-shadow:0 -8px 34px rgba(0,0,0,.28);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-        .stream-overlay-ticker-stack{margin-top:auto;width:100%;display:flex;flex-direction:column;gap:0;flex-shrink:0}
+        .stream-overlay-ticker-stack{position:absolute;left:0;right:0;bottom:0;margin-top:auto;width:100%;display:flex;flex-direction:column;gap:0;flex-shrink:0}
         .stream-overlay-footer-ticker-only{min-height:0;display:block;background:transparent;border:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
         .stream-overlay-lines{width:100%;display:flex;flex-direction:column;align-items:center;gap:1.15vh;padding:2.3vh 4vw;text-align:center}
         .stream-overlay-g{font-family:'Noto Sans Gurmukhi',sans-serif;font-size:clamp(calc(18px * var(--gurbani-size)),calc(3vw * var(--gurbani-size)),calc(54px * var(--gurbani-size)));font-weight:700;line-height:1.3;color:${accentColor};text-shadow:0 2px 4px rgba(0,0,0,.6);overflow-wrap:anywhere}
@@ -116,6 +125,7 @@ const StreamOverlayPage = () => {
         .stream-overlay-announcement{width:100%;padding:.8vh 4vw;background:${accentColor};color:${overlayBlue};text-align:center;font-size:clamp(15px,1.6vw,28px);font-weight:800}
         @media(max-aspect-ratio:4/3){.stream-overlay-header{min-height:54px;padding:1vh 3vw;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)}.stream-overlay-logo{width:clamp(42px,7vh,72px);height:clamp(42px,7vh,72px)}.stream-overlay-org{font-size:clamp(13px,2vw,19px)}.stream-overlay-address{font-size:clamp(9px,1.4vw,13px)}.stream-overlay-custom-header{font-size:clamp(14px,2.5vw,24px)}.stream-overlay-date{font-size:clamp(10px,1.8vw,15px)}.stream-overlay-time{font-size:clamp(15px,2.6vw,22px)}.stream-overlay-footer{min-height:clamp(160px,30vh,300px)}.stream-overlay-lines{padding-left:3vw;padding-right:3vw;gap:1vh}}
         .stream-overlay-root .stream-overlay-footer-ticker-only{min-height:0}
+        @media(max-aspect-ratio:4/3){.stream-overlay-ticker-stack{position:relative}}
       `}</style>
       <header className="stream-overlay-header" aria-label="Gurdwara broadcast header">
         <div className="stream-overlay-identity">
@@ -132,6 +142,7 @@ const StreamOverlayPage = () => {
         <div className="stream-overlay-date-time" aria-label={`${dateTime.date}, ${dateTime.time}`}>
           <p className="stream-overlay-date">{dateTime.date}</p>
           <p className="stream-overlay-time">{dateTime.time}</p>
+          <p className="stream-overlay-connection"><span className="stream-overlay-connection-dot" />{liveConnectionLabel}</p>
         </div>
       </header>
       {line || hasTicker ? <section className={`stream-overlay-footer${!line ? ' stream-overlay-footer-ticker-only' : ''}`} aria-label={line ? 'Live Gurbani broadcast footer' : 'Announcement ticker'}>
