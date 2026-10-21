@@ -6,24 +6,29 @@ const SAFETY_POLL_MS = 30000;
 
 // Live state arrives over a server-sent stream; the occasional poll only covers a dropped connection.
 export const useRecitationLive = () => {
-  const [state, setState] = useState({ session: null, last: null, ready: false });
+  const [state, setState] = useState({ session: null, last: null, ready: false, connectionStatus: 'connecting' });
 
   const apply = useCallback((payload) => {
     setState((current) => ({
       session: payload?.session ?? null,
       last: payload?.last ?? null,
-      ready: true
+      ready: true,
+      connectionStatus: 'connected'
     }));
   }, []);
 
   useEffect(() => {
     let cancelled = false;
-    const poll = () => recitationService.getState().then((payload) => { if (!cancelled) apply(payload); }).catch(() => {});
+    const poll = () => recitationService.getState()
+      .then((payload) => { if (!cancelled) apply(payload); })
+      .catch(() => { if (!cancelled) setState((current) => ({ ...current, connectionStatus: 'disconnected' })); });
     poll();
     const timer = window.setInterval(poll, SAFETY_POLL_MS);
     let source = null;
     if (typeof EventSource !== 'undefined') {
       source = new EventSource('/api/live/recitation');
+      source.onopen = () => { if (!cancelled) setState((current) => ({ ...current, connectionStatus: 'connected' })); };
+      source.onerror = () => { if (!cancelled) setState((current) => ({ ...current, connectionStatus: 'reconnecting' })); };
       source.addEventListener('state', (event) => {
         try {
           if (!cancelled) apply(JSON.parse(event.data));

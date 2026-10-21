@@ -4,9 +4,11 @@ import { ArrowTopRightOnSquareIcon, ClipboardDocumentIcon, TrashIcon } from '@he
 import Card from '../../components/ui/Card';
 import StatusAlert from '../../components/common/StatusAlert';
 import recitationService from '../../services/recitationService';
-import { BRANDING_PRESETS } from '../../context/BrandingContext';
+import { BRANDING_PRESETS, useBranding } from '../../context/BrandingContext';
 import AnnouncementTicker from '../../components/recitation/AnnouncementTicker';
 import { formatClock, formatDay, formatSpan, useRecitationLive, useRecitationText } from '../../hooks/useRecitation';
+import { publishStreamOverlayVisibility } from '../../services/streamOverlayControl';
+import { readStreamOverlaySettings, saveStreamOverlaySettings } from '../../services/streamOverlaySettings';
 
 const PAGE_SIZE = 10;
 const inputClass = 'mt-1 block w-full min-w-0 rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case text-slate-700 outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20';
@@ -46,37 +48,56 @@ const CopyLinkRow = ({ label, path }) => {
 
 const AdminRecitationsPage = () => {
   const queryClient = useQueryClient();
-  const { session: live, setSession } = useRecitationLive();
+  const { session: live, setSession, connectionStatus = 'connecting' } = useRecitationLive();
+  const { branding, logoSrc } = useBranding();
   const { lines: fullLines } = useRecitationText(live, 'full');
+  const [savedOverlaySettings] = useState(readStreamOverlaySettings);
   const [status, setStatus] = useState({ type: 'success', message: '' });
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
   const [page, setPage] = useState(1);
-  const [overlayOn, setOverlayOn] = useState(true);
-  const [overlayLogo, setOverlayLogo] = useState(true);
-  const [overlayLanguages, setOverlayLanguages] = useState('gpe');
-  const [overlayOpacity, setOverlayOpacity] = useState(100);
-  const [gurmukhiSize, setGurmukhiSize] = useState(100);
-  const [punjabiSize, setPunjabiSize] = useState(100);
-  const [englishSize, setEnglishSize] = useState(100);
-  const [overlayAnnouncement, setOverlayAnnouncement] = useState('');
-  const [overlayHeaderMessage, setOverlayHeaderMessage] = useState('');
-  const [headerSize, setHeaderSize] = useState(100);
-  const [headerPunjabiSize, setHeaderPunjabiSize] = useState(100);
-  const [punjabiAnnouncement, setPunjabiAnnouncement] = useState('');
-  const [headerPunjabi, setHeaderPunjabi] = useState('');
-  const [upperEnglish, setUpperEnglish] = useState('');
-  const [upperPunjabi, setUpperPunjabi] = useState('');
-  const [upperSpeed, setUpperSpeed] = useState(100);
-  const [lowerSpeed, setLowerSpeed] = useState(100);
-  const [tickerColors, setTickerColors] = useState({});
-  const [upperSize, setUpperSize] = useState(100);
-  const [lowerSize, setLowerSize] = useState(100);
+  const [overlayOn, setOverlayOn] = useState(savedOverlaySettings.overlayOn);
+  const [overlayLogo, setOverlayLogo] = useState(savedOverlaySettings.overlayLogo);
+  const [overlayLanguages, setOverlayLanguages] = useState(savedOverlaySettings.overlayLanguages);
+  const [overlayOpacity, setOverlayOpacity] = useState(savedOverlaySettings.overlayOpacity);
+  const [gurmukhiSize, setGurmukhiSize] = useState(savedOverlaySettings.gurmukhiSize);
+  const [punjabiSize, setPunjabiSize] = useState(savedOverlaySettings.punjabiSize);
+  const [englishSize, setEnglishSize] = useState(savedOverlaySettings.englishSize);
+  const [overlayAnnouncement, setOverlayAnnouncement] = useState(savedOverlaySettings.overlayAnnouncement);
+  const [overlayHeaderMessage, setOverlayHeaderMessage] = useState(savedOverlaySettings.overlayHeaderMessage);
+  const [headerSize, setHeaderSize] = useState(savedOverlaySettings.headerSize);
+  const [headerPunjabiSize, setHeaderPunjabiSize] = useState(savedOverlaySettings.headerPunjabiSize);
+  const [punjabiAnnouncement, setPunjabiAnnouncement] = useState(savedOverlaySettings.punjabiAnnouncement);
+  const [headerPunjabi, setHeaderPunjabi] = useState(savedOverlaySettings.headerPunjabi);
+  const [upperEnglish, setUpperEnglish] = useState(savedOverlaySettings.upperEnglish);
+  const [upperPunjabi, setUpperPunjabi] = useState(savedOverlaySettings.upperPunjabi);
+  const [upperSpeed, setUpperSpeed] = useState(savedOverlaySettings.upperSpeed);
+  const [lowerSpeed, setLowerSpeed] = useState(savedOverlaySettings.lowerSpeed);
+  const [tickerColors, setTickerColors] = useState(savedOverlaySettings.tickerColors);
+  const [upperSize, setUpperSize] = useState(savedOverlaySettings.upperSize);
+  const [lowerSize, setLowerSize] = useState(savedOverlaySettings.lowerSize);
   const brandColorsPreset = { id: 'brand-colors', label: 'Logo Brand Colors', primaryColor: '#004080', accentColor: '#F89820' };
   const overlayThemePresets = [brandColorsPreset, ...BRANDING_PRESETS];
-  const [overlayThemeId, setOverlayThemeId] = useState('brand-colors');
+  const [overlayThemeId, setOverlayThemeId] = useState(savedOverlaySettings.overlayThemeId);
   const selectedOverlayTheme = overlayThemePresets.find((preset) => preset.id === overlayThemeId) || brandColorsPreset;
+
+  useEffect(() => {
+    const settings = {
+      overlayOn, overlayLogo, overlayLanguages, overlayOpacity, gurmukhiSize, punjabiSize, englishSize,
+      overlayAnnouncement, overlayHeaderMessage, headerSize, headerPunjabiSize, punjabiAnnouncement,
+      headerPunjabi, upperEnglish, upperPunjabi, upperSpeed, lowerSpeed, tickerColors, upperSize, lowerSize,
+      overlayThemeId
+    };
+    saveStreamOverlaySettings(settings);
+  }, [overlayOn, overlayLogo, overlayLanguages, overlayOpacity, gurmukhiSize, punjabiSize, englishSize,
+    overlayAnnouncement, overlayHeaderMessage, headerSize, headerPunjabiSize, punjabiAnnouncement,
+    headerPunjabi, upperEnglish, upperPunjabi, upperSpeed, lowerSpeed, tickerColors, upperSize, lowerSize,
+    overlayThemeId]);
+
+  useEffect(() => {
+    publishStreamOverlayVisibility(overlayOn);
+  }, [overlayOn]);
 
   const { data: sessions = [] } = useQuery({ queryKey: ['recitation-sessions'], queryFn: () => recitationService.listSessions(), refetchInterval: 30000 });
 
@@ -117,7 +138,7 @@ const AdminRecitationsPage = () => {
   const line = fullLines[index];
   const overlayQuery = new URLSearchParams({
     embed: '1',
-    on: overlayOn ? '1' : '0',
+    on: '1',
     logo: overlayLogo ? '1' : '0',
     lang: overlayLanguages,
     opacity: String(overlayOpacity),
@@ -200,6 +221,9 @@ const AdminRecitationsPage = () => {
               <p className="mt-0.5 text-xs text-slate-600">Transparent landscape browser source; follows each line selected by the Granthi.</p>
             </div>
             <button type="button" onClick={() => setOverlayOn((value) => !value)} aria-pressed={overlayOn} className={`rounded-full px-4 py-2 text-xs font-bold ${overlayOn ? 'bg-emerald-600 text-white' : 'bg-slate-300 text-slate-800'}`}>Overlay {overlayOn ? 'On' : 'Off'}</button>
+            <span role="status" className={`rounded-full px-3 py-2 text-xs font-bold ${connectionStatus === 'connected' ? 'bg-emerald-100 text-emerald-800' : connectionStatus === 'reconnecting' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'}`}>
+              {connectionStatus === 'connected' ? (live?.status === 'live' ? 'Recitation LIVE · SYNCED' : 'SYNCED · Waiting for recitation') : connectionStatus === 'reconnecting' || connectionStatus === 'connecting' ? 'Reconnecting to recitation…' : 'Recitation connection offline'}
+            </span>
           </div>
           <section className="mt-4 rounded-xl border border-slate-200 bg-white p-4" aria-label="Overlay themes">
             <h4 className="font-bold text-slate-900">Themes and background</h4>
@@ -270,22 +294,24 @@ const AdminRecitationsPage = () => {
               <label className="block text-xs font-semibold">Font size: {ticker.size}%<input type="range" min="0" max="100" value={ticker.size} onChange={(event) => ticker.setSize(Number(event.target.value))} className="mt-2 w-full accent-brand-blue" /></label>
             </section>)}
           </div>
-          <div className="mt-4 overflow-hidden rounded-xl border border-slate-300 bg-slate-800 shadow-inner" aria-label="Live overlay preview">
-            <div className="flex min-h-14 items-center justify-between gap-3 border-b-[3px] px-4 py-2 text-white" style={{ backgroundColor: selectedOverlayTheme.primaryColor, borderColor: selectedOverlayTheme.accentColor }}>
+          <div className="relative mx-auto mt-4 aspect-video w-full max-w-5xl overflow-hidden rounded-lg border border-slate-300 bg-slate-800 shadow-inner" aria-label="Live overlay preview">
+            <div className="absolute inset-x-0 top-0 grid min-h-[12%] grid-cols-[1fr_1.2fr_1fr] items-center gap-2 border-b-2 px-[3%] py-1 text-white" style={{ backgroundColor: selectedOverlayTheme.primaryColor, borderColor: selectedOverlayTheme.accentColor }}>
               <div className="flex min-w-0 items-center gap-2">
-                {overlayLogo ? <span aria-hidden="true" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 bg-white text-lg" style={{ borderColor: selectedOverlayTheme.accentColor, color: selectedOverlayTheme.primaryColor }}>ॴ</span> : null}
-                <div className="min-w-0 text-left leading-tight"><p className="truncate font-heading text-sm font-medium">Gurdwara Singh Sabha</p><p className="truncate text-[10px] font-normal text-white/85">7035, Sixth Line, Milton</p></div>
+                {overlayLogo ? <img src={logoSrc} alt="" className="h-[clamp(18px,4vw,40px)] w-[clamp(18px,4vw,40px)] shrink-0 rounded-full border-2 bg-white object-contain p-0.5" style={{ borderColor: selectedOverlayTheme.accentColor }} /> : null}
+                <div className="min-w-0 text-left leading-tight"><p className="truncate font-heading text-xs font-medium sm:text-sm">{branding.organizationName?.replace(/\s+Milton$/i, '') || 'Gurdwara Singh Sabha'}</p><p className="truncate text-[9px] font-normal text-white/85 sm:text-[10px]">{branding.address || '7035, Sixth Line, Milton'}</p></div>
               </div>
-              <div className="min-w-0 flex-1 text-center font-heading font-bold"><p lang="pa" className="font-gurmukhi" style={{ fontSize: `${14 * headerPunjabiSize / 100}px` }}>{headerPunjabi}</p><p lang="en" style={{ fontSize: `${14 * headerSize / 100}px` }}>{overlayHeaderMessage || (!headerPunjabi ? 'Occasion / custom header text' : '')}</p></div>
-              <div className="shrink-0 text-right text-[10px] leading-tight"><div>{formatDay(new Date().toISOString())}</div><div className="font-bold" style={{ color: selectedOverlayTheme.accentColor }}>{formatClock(new Date().toISOString())}</div></div>
+              <div className="min-w-0 flex-1 text-center font-heading font-bold"><p lang="pa" className="font-gurmukhi" style={{ fontSize: `${12 * headerPunjabiSize / 100}px` }}>{headerPunjabi}</p><p lang="en" style={{ fontSize: `${12 * headerSize / 100}px` }}>{overlayHeaderMessage || (!headerPunjabi ? 'Occasion / custom header text' : '')}</p></div>
+              <div className="shrink-0 text-right text-[9px] leading-tight sm:text-[10px]"><div>{formatDay(new Date().toISOString())}</div><div className="font-bold" style={{ color: selectedOverlayTheme.accentColor }}>{formatClock(new Date().toISOString())}</div><div className="mt-0.5 font-bold" style={{ color: connectionStatus === 'connected' ? '#22c55e' : '#f59e0b' }}>{connectionStatus === 'connected' ? (live?.status === 'live' ? '● LIVE · SYNCED' : '● READY · WAITING') : '● RECONNECTING'}</div></div>
             </div>
-            <div className="space-y-2 border-t-[3px] px-4 py-5 text-center" style={previewFooterStyle}>
-              {line?.g && overlayLanguages.includes('g') ? <p className="font-gurmukhi font-bold" style={{ color: selectedOverlayTheme.accentColor, fontSize: `${18 * gurmukhiSize / 100}px`, lineHeight: 1.3 }}>{line.g}</p> : <p className="font-gurmukhi font-bold" style={{ color: selectedOverlayTheme.accentColor, fontSize: `${18 * gurmukhiSize / 100}px` }}>Gurbani preview</p>}
-              {overlayLanguages.includes('p') ? <p className="font-gurmukhi font-semibold text-white" style={{ fontSize: `${13 * punjabiSize / 100}px`, lineHeight: 1.5 }}>{line?.p || 'Punjabi translation preview'}</p> : null}
-              {overlayLanguages.includes('e') ? <p className="font-semibold text-white" style={{ fontSize: `${13 * englishSize / 100}px`, lineHeight: 1.5 }}>{line?.e || 'English translation preview'}</p> : null}
+            {line ? <div className="absolute inset-x-0 top-[13%] bottom-[30%] flex flex-col items-center justify-center gap-1 px-[4%] text-center">
+              {line.g && overlayLanguages.includes('g') ? <p className="font-gurmukhi font-bold" style={{ color: selectedOverlayTheme.accentColor, fontSize: `clamp(8px, ${1.5 * gurmukhiSize / 100}vw, 24px)`, lineHeight: 1.3 }}>{line.g}</p> : null}
+              {overlayLanguages.includes('p') ? <p className="font-gurmukhi font-semibold text-white" style={{ fontSize: `clamp(7px, ${.9 * punjabiSize / 100}vw, 16px)`, lineHeight: 1.5 }}>{line.p || 'Punjabi translation preview'}</p> : null}
+              {overlayLanguages.includes('e') ? <p className="font-semibold text-white" style={{ fontSize: `clamp(7px, ${.9 * englishSize / 100}vw, 16px)`, lineHeight: 1.5 }}>{line.e || 'English translation preview'}</p> : null}
+            </div> : null}
+            <div className="absolute inset-x-0 bottom-0 flex flex-col justify-end border-t-2" style={{ ...previewFooterStyle, minHeight: '27%' }}>
+              <AnnouncementTicker english={upperEnglish} punjabi={upperPunjabi} speed={upperSpeed} fontSize={upperSize} label="Upper footer announcement ticker" backgroundColor={tickerColors.upperbg || selectedOverlayTheme.primaryColor} color={tickerColors.upperfg || '#ffffff'} />
+              <AnnouncementTicker english={overlayAnnouncement} punjabi={punjabiAnnouncement} speed={lowerSpeed} fontSize={lowerSize} backgroundColor={tickerColors.lowerbg || selectedOverlayTheme.accentColor} color={tickerColors.lowerfg || selectedOverlayTheme.primaryColor} />
             </div>
-            <AnnouncementTicker english={upperEnglish} punjabi={upperPunjabi} speed={upperSpeed} fontSize={upperSize} label="Upper footer announcement ticker" backgroundColor={tickerColors.upperbg || selectedOverlayTheme.primaryColor} color={tickerColors.upperfg || '#ffffff'} />
-            <AnnouncementTicker english={overlayAnnouncement} punjabi={punjabiAnnouncement} speed={lowerSpeed} fontSize={lowerSize} backgroundColor={tickerColors.lowerbg || selectedOverlayTheme.accentColor} color={tickerColors.lowerfg || selectedOverlayTheme.primaryColor} />
           </div>
           <p className="mt-1 text-[11px] text-slate-500">Preview updates immediately as you change colors, opacity, font sizes, languages, or text. The generated Streamlabs page uses the same settings.</p>
           <div className="mt-3">
@@ -296,10 +322,10 @@ const AdminRecitationsPage = () => {
             <ol className="mt-3 list-decimal space-y-2 pl-5">
               <li>Add the copied URL in Streamlabs as a <strong>Browser Source</strong> or <strong>Web Overlay</strong>.</li>
               <li>Set the source canvas to <strong>1920 × 1080</strong> for landscape and place it above the camera/video source.</li>
-              <li>Use the mobile Streamlabs app's browser/web overlay source when available, or add the same URL as a browser source in Streamlabs Desktop. Both must be online and able to reach this site.</li>
+              <li>Use a 16:9 (1920 × 1080) Browser Source and choose “Fit to screen” or preserve aspect ratio—do not stretch the source. Streamlabs Mobile browser-source support varies by app/version; test the Web Overlay feature first.</li>
               <li>Start the recitation with the Granthi remote. The overlay follows the same live line and translations as the LED board; toggle it off or remove the source when no text should appear.</li>
             </ol>
-            <p className="mt-3 text-xs text-slate-600">The header and footer use the configured Gurdwara brand blue and orange. For mobile, confirm your Streamlabs app version offers a browser/web overlay source; if not, Streamlabs Desktop supports the same URL as a Browser Source. The broadcast device needs an internet connection to this site.</p>
+            <p className="mt-3 text-xs text-slate-600">The header and footer use the configured Gurdwara brand blue and orange. Custom streaming providers may block embedded playback; test the provider URL and use the “Open stream” fallback where needed.</p>
           </details>
         </div>
       </Card>
