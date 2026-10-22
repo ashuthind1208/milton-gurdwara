@@ -184,7 +184,7 @@ const AdminRecitationsPage = () => {
 
   return (
     <div className="admin-recitations w-full min-w-0 max-w-full space-y-6 overflow-x-clip">
-      <h1 className="sr-only">Live Recitation</h1>
+      <h1 className="sr-only">Recitation &amp; Stream Overlay</h1>
       <StatusAlert type={status.type} message={status.message} />
 
       <Card className="w-full min-w-0 max-w-full">
