@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useRecitationLive, useRecitationText } from '../../hooks/useRecitation';
-import { useBranding } from '../../context/BrandingContext';
+import { BRANDING_PRESETS, useBranding } from '../../context/BrandingContext';
 import AnnouncementTicker from '../../components/recitation/AnnouncementTicker';
 import { readStreamOverlayVisibility, subscribeStreamOverlayVisibility } from '../../services/streamOverlayControl';
+import { getPublishedStreamOverlaySettings } from '../../services/streamOverlaySettings';
 
 const clamp = (value, min, max, fallback) => {
   if (value == null || value === '') return fallback;
@@ -23,33 +25,47 @@ const formatBroadcastDateTime = (date) => ({
 });
 
 const StreamOverlayPage = () => {
-  const { session, connectionStatus = 'connecting' } = useRecitationLive();
+  const { session } = useRecitationLive();
   const { lines } = useRecitationText(session, 'full');
   const { branding, logoSrc } = useBranding();
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
-  const enabled = params.get('on') !== '0';
-  const showLogo = params.get('logo') !== '0';
-  const opacity = clamp(params.get('opacity'), 15, 100, 100) / 100;
+  const { data: publishedSettings = {} } = useQuery({
+    queryKey: ['published-stream-overlay-settings'],
+    queryFn: getPublishedStreamOverlaySettings,
+    refetchInterval: 2500,
+    refetchIntervalInBackground: true,
+    staleTime: 0,
+    retry: 1
+  });
+  const setting = (queryKey, settingsKey, fallback) => params.has(queryKey) ? params.get(queryKey) : (publishedSettings?.[settingsKey] ?? fallback);
+  const enabledValue = setting('on', 'overlayOn', true);
+  const enabled = enabledValue !== false && enabledValue !== '0' && enabledValue !== 'false';
+  const logoValue = setting('logo', 'overlayLogo', true);
+  const showLogo = logoValue !== false && logoValue !== '0' && logoValue !== 'false';
+  const opacity = clamp(setting('opacity', 'overlayOpacity', 100), 15, 100, 100) / 100;
   const legacyScale = params.get('size');
-  const gurmukhiScale = clamp(params.get('sizeg') || legacyScale, 0, 100, 100) / 100;
-  const punjabiScale = clamp(params.get('sizep') || legacyScale, 0, 100, 100) / 100;
-  const englishScale = clamp(params.get('sizee') || legacyScale, 0, 100, 100) / 100;
-  const languages = params.get('lang') || 'gpe';
-  const announcement = params.get('announcement') === '1' ? String(params.get('message') || '').trim().slice(0, 180) : '';
-  const punjabiAnnouncement = params.get('announcement') === '1' ? String(params.get('messagepa') || '').trim().slice(0, 180) : '';
-  const headerEnglishScale = clamp(params.get('sizehen') ?? params.get('sizeh'), 0, 100, 100) / 100;
-  const headerPunjabiScale = clamp(params.get('sizehpa') ?? params.get('sizeh'), 0, 100, 100) / 100;
-  const headerMessage = String(params.get('header') || '').trim().slice(0, 120);
-  const headerPunjabi = String(params.get('headerpa') || '').trim().slice(0, 120);
-  const upperEnglish = String(params.get('uppermessage') || '').trim().slice(0, 180);
-  const upperPunjabi = String(params.get('uppermessagepa') || '').trim().slice(0, 180);
+  const gurmukhiScale = clamp(setting('sizeg', 'gurmukhiSize', legacyScale ?? 100), 0, 100, 100) / 100;
+  const punjabiScale = clamp(setting('sizep', 'punjabiSize', legacyScale ?? 100), 0, 100, 100) / 100;
+  const englishScale = clamp(setting('sizee', 'englishSize', legacyScale ?? 100), 0, 100, 100) / 100;
+  const languages = String(setting('lang', 'overlayLanguages', 'gpe'));
+  const announcement = String(setting('message', 'overlayAnnouncement', '') || '').trim().slice(0, 180);
+  const punjabiAnnouncement = String(setting('messagepa', 'punjabiAnnouncement', '') || '').trim().slice(0, 180);
+  const headerEnglishScale = clamp(setting('sizehen', 'headerSize', params.get('sizeh') ?? 100), 0, 100, 100) / 100;
+  const headerPunjabiScale = clamp(setting('sizehpa', 'headerPunjabiSize', params.get('sizeh') ?? 100), 0, 100, 100) / 100;
+  const headerMessage = String(setting('header', 'overlayHeaderMessage', '') || '').trim().slice(0, 120);
+  const headerPunjabi = String(setting('headerpa', 'headerPunjabi', '') || '').trim().slice(0, 120);
+  const upperEnglish = String(setting('uppermessage', 'upperEnglish', '') || '').trim().slice(0, 180);
+  const upperPunjabi = String(setting('uppermessagepa', 'upperPunjabi', '') || '').trim().slice(0, 180);
   const hasTicker = Boolean(announcement || punjabiAnnouncement || upperEnglish || upperPunjabi);
   const [remoteVisible, setRemoteVisible] = useState(readStreamOverlayVisibility);
   const [clockNow, setClockNow] = useState(() => new Date());
   const { currentIndex = 0 } = session || {};
   const line = lines[currentIndex] || null;
-  const overlayBlue = normalizeHex(params.get('brandBlue'), normalizeHex(branding.primaryColor, '#0B4EA2'));
-  const accentColor = normalizeHex(params.get('brandOrange'), normalizeHex(branding.accentColor, '#F4A300'));
+  const selectedTheme = publishedSettings?.overlayThemeId === 'brand-colors'
+    ? { primaryColor: '#004080', accentColor: '#F89820' }
+    : BRANDING_PRESETS.find((preset) => preset.id === publishedSettings?.overlayThemeId);
+  const overlayBlue = normalizeHex(setting('brandBlue', 'brandBlue', selectedTheme?.primaryColor || branding.primaryColor), '#0B4EA2');
+  const accentColor = normalizeHex(setting('brandOrange', 'brandOrange', selectedTheme?.accentColor || branding.accentColor), '#F4A300');
   const [blueRed, blueGreen, blueBlue] = hexToRgb(overlayBlue);
   const panelColor = `rgba(${blueRed}, ${blueGreen}, ${blueBlue}, ${opacity})`;
   const dateTime = formatBroadcastDateTime(clockNow);
@@ -82,16 +98,13 @@ const StreamOverlayPage = () => {
     };
   }, []);
 
-  if (!enabled || !remoteVisible) return <main className="stream-overlay-root" aria-hidden="true" />;
+  if (!enabled || (typeof publishedSettings?.overlayOn !== 'boolean' && !remoteVisible)) return <main className="stream-overlay-root" aria-hidden="true" />;
 
   const showGurmukhi = languages.includes('g');
   const showPunjabi = languages.includes('p') && Boolean(line?.p);
   const showEnglish = languages.includes('e') && Boolean(line?.e);
   const organizationName = String(branding.organizationName || 'Gurdwara Singh Sabha').replace(/\s+Milton$/i, '').trim();
   const organizationAddress = branding.address || '7035, Sixth Line, Milton';
-  const liveConnectionLabel = connectionStatus === 'connected'
-    ? (session?.status === 'live' ? 'LIVE · SYNCED' : 'READY · SYNCED')
-    : connectionStatus === 'reconnecting' || connectionStatus === 'connecting' ? 'RECONNECTING' : 'OFFLINE';
 
   return (
     <main
@@ -111,12 +124,10 @@ const StreamOverlayPage = () => {
         .stream-overlay-address{min-width:0;color:rgba(255,255,255,.88);font-size:clamp(10px,.85vw,15px);font-weight:400;line-height:1.15;letter-spacing:.025em}
         .stream-overlay-custom-header{min-width:0;text-align:center;color:#fff;font-family:'Crimson Text',Georgia,serif;font-size:clamp(17px,2vw,34px);font-weight:700;line-height:1.15;text-shadow:0 2px 4px rgba(0,0,0,.3);overflow-wrap:anywhere}
         .stream-overlay-date-time{flex:0 0 auto;text-align:right;color:#fff;line-height:1.35}
-        .stream-overlay-connection{display:inline-flex;align-items:center;justify-content:flex-end;gap:.4em;margin-top:.25vh;font-size:clamp(9px,.65vw,12px);font-weight:800;letter-spacing:.08em;color:${accentColor}}
-        .stream-overlay-connection-dot{width:.55em;height:.55em;border-radius:50%;background:${connectionStatus === 'connected' ? '#22c55e' : connectionStatus === 'reconnecting' || connectionStatus === 'connecting' ? '#f59e0b' : '#ef4444'}}
         .stream-overlay-date{font-size:clamp(12px,1.15vw,20px);font-weight:600;opacity:.94}
         .stream-overlay-time{margin-top:.15vh;color:${accentColor};font-size:clamp(18px,1.8vw,30px);font-weight:800;font-variant-numeric:tabular-nums}
         .stream-overlay-footer{position:absolute;left:0;right:0;bottom:0;width:100%;min-height:clamp(190px,28vh,380px);display:flex;flex-direction:column;justify-content:flex-end;background:${panelColor};border-top:clamp(3px,.45vh,7px) solid ${accentColor};box-shadow:0 -8px 34px rgba(0,0,0,.28);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-        .stream-overlay-ticker-stack{position:absolute;left:0;right:0;bottom:0;margin-top:auto;width:100%;display:flex;flex-direction:column;gap:0;flex-shrink:0}
+        .stream-overlay-ticker-stack{margin-top:auto;width:100%;display:flex;flex-direction:column;gap:0;flex-shrink:0}
         .stream-overlay-footer-ticker-only{min-height:0;display:block;background:transparent;border:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
         .stream-overlay-lines{width:100%;display:flex;flex-direction:column;align-items:center;gap:1.15vh;padding:2.3vh 4vw;text-align:center}
         .stream-overlay-g{font-family:'Noto Sans Gurmukhi',sans-serif;font-size:clamp(calc(18px * var(--gurbani-size)),calc(3vw * var(--gurbani-size)),calc(54px * var(--gurbani-size)));font-weight:700;line-height:1.3;color:${accentColor};text-shadow:0 2px 4px rgba(0,0,0,.6);overflow-wrap:anywhere}
@@ -125,7 +136,6 @@ const StreamOverlayPage = () => {
         .stream-overlay-announcement{width:100%;padding:.8vh 4vw;background:${accentColor};color:${overlayBlue};text-align:center;font-size:clamp(15px,1.6vw,28px);font-weight:800}
         @media(max-aspect-ratio:4/3){.stream-overlay-header{min-height:54px;padding:1vh 3vw;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)}.stream-overlay-logo{width:clamp(42px,7vh,72px);height:clamp(42px,7vh,72px)}.stream-overlay-org{font-size:clamp(13px,2vw,19px)}.stream-overlay-address{font-size:clamp(9px,1.4vw,13px)}.stream-overlay-custom-header{font-size:clamp(14px,2.5vw,24px)}.stream-overlay-date{font-size:clamp(10px,1.8vw,15px)}.stream-overlay-time{font-size:clamp(15px,2.6vw,22px)}.stream-overlay-footer{min-height:clamp(160px,30vh,300px)}.stream-overlay-lines{padding-left:3vw;padding-right:3vw;gap:1vh}}
         .stream-overlay-root .stream-overlay-footer-ticker-only{min-height:0}
-        @media(max-aspect-ratio:4/3){.stream-overlay-ticker-stack{position:relative}}
       `}</style>
       <header className="stream-overlay-header" aria-label="Gurdwara broadcast header">
         <div className="stream-overlay-identity">
@@ -142,7 +152,6 @@ const StreamOverlayPage = () => {
         <div className="stream-overlay-date-time" aria-label={`${dateTime.date}, ${dateTime.time}`}>
           <p className="stream-overlay-date">{dateTime.date}</p>
           <p className="stream-overlay-time">{dateTime.time}</p>
-          <p className="stream-overlay-connection"><span className="stream-overlay-connection-dot" />{liveConnectionLabel}</p>
         </div>
       </header>
       {line || hasTicker ? <section className={`stream-overlay-footer${!line ? ' stream-overlay-footer-ticker-only' : ''}`} aria-label={line ? 'Live Gurbani broadcast footer' : 'Announcement ticker'}>
@@ -154,8 +163,8 @@ const StreamOverlayPage = () => {
           </div>
         ) : null}
         {hasTicker ? <div className="stream-overlay-ticker-stack">
-          <AnnouncementTicker english={upperEnglish} punjabi={upperPunjabi} speed={params.get('upperspeed')} fontSize={params.get('uppersize') || 100} label="Upper footer announcement ticker" backgroundColor={normalizeHex(params.get('upperbg'), overlayBlue)} color={normalizeHex(params.get('upperfg'), '#ffffff')} />
-          <AnnouncementTicker english={announcement} punjabi={punjabiAnnouncement} speed={params.get('tickerspeed')} fontSize={params.get('tickersize') || 100} backgroundColor={normalizeHex(params.get('lowerbg'), accentColor)} color={normalizeHex(params.get('lowerfg'), overlayBlue)} />
+          <AnnouncementTicker english={upperEnglish} punjabi={upperPunjabi} speed={setting('upperspeed', 'upperSpeed', 100)} fontSize={setting('uppersize', 'upperSize', 100)} label="Upper footer announcement ticker" backgroundColor={normalizeHex(setting('upperbg', 'upperbg', publishedSettings?.tickerColors?.upperbg), overlayBlue)} color={normalizeHex(setting('upperfg', 'upperfg', publishedSettings?.tickerColors?.upperfg), '#ffffff')} />
+          <AnnouncementTicker english={announcement} punjabi={punjabiAnnouncement} speed={setting('tickerspeed', 'lowerSpeed', 100)} fontSize={setting('tickersize', 'lowerSize', 100)} backgroundColor={normalizeHex(setting('lowerbg', 'lowerbg', publishedSettings?.tickerColors?.lowerbg), accentColor)} color={normalizeHex(setting('lowerfg', 'lowerfg', publishedSettings?.tickerColors?.lowerfg), overlayBlue)} />
         </div> : null}
       </section> : null}
     </main>
