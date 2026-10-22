@@ -3,7 +3,8 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import PublicLayout from './PublicLayout';
 
 jest.mock('@tanstack/react-query', () => ({
-  useQuery: () => ({ data: [] })
+  useQuery: () => ({ data: [] }),
+  useMutation: () => ({ mutate: jest.fn(), reset: jest.fn(), isPending: false, isError: false, error: null })
 }));
 
 jest.mock('../components/layout/Navbar', () => {
@@ -43,4 +44,19 @@ test('keeps the live kirtan audio mounted while a public route loads', async () 
 
   expect(await screen.findByText('Loading page...')).toBeInTheDocument();
   expect(screen.getByTestId('live-kirtan-audio')).toBe(audio);
+});
+
+test('shows the floating Ask a Granthi assistant without adding a navigation link', () => {
+  render(
+    <MemoryRouter initialEntries={['/']}>
+      <Routes>
+        <Route element={<PublicLayout />}>
+          <Route index element={<div>Home page</div>} />
+        </Route>
+      </Routes>
+    </MemoryRouter>
+  );
+
+  expect(screen.getByRole('button', { name: 'Ask a Granthi Ji a question' })).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /ask a granthi/i })).not.toBeInTheDocument();
 });

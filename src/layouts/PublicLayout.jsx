@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
 import phase2Service from '../services/phase2Service';
+import FloatingAskGranthi from '../components/askGranthi/FloatingAskGranthi';
 
 const PublicLayout = () => {
   const location = useLocation();
@@ -78,6 +79,7 @@ const PublicLayout = () => {
         </Suspense>
       </main>
       <Footer />
+      <FloatingAskGranthi />
     </div>
   );
 };
