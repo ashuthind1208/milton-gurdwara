@@ -6418,6 +6418,56 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (requestUrl.pathname === '/api/stream-overlay/settings' && request.method === 'GET') {
+    try {
+      assertInput(eventsDb.hasDatabaseConnection, 'Stream overlay settings are temporarily unavailable.', 503);
+      const data = await eventsDb.getSingleton('stream_overlay_settings', {});
+      sendJson(response, 200, { ok: true, data: data && typeof data === 'object' ? data : {} });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to load stream overlay settings.' });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/stream-overlay/settings' && request.method === 'PUT') {
+    try {
+      assertInput(await canManageAdminPage(request, '/admin/recitations'), 'Live Recitation admin access is required to update the stream overlay.', 403);
+      assertInput(eventsDb.hasDatabaseConnection, 'Stream overlay settings are temporarily unavailable.', 503);
+      const body = await parseJsonObjectBody(request, { maxBytes: 8192, allowEmpty: false });
+      const allowedKeys = [
+        'overlayOn', 'overlayLogo', 'overlayLanguages', 'overlayOpacity', 'gurmukhiSize', 'punjabiSize', 'englishSize',
+        'overlayAnnouncement', 'overlayHeaderMessage', 'headerSize', 'headerPunjabiSize', 'punjabiAnnouncement', 'headerPunjabi',
+        'upperEnglish', 'upperPunjabi', 'upperSpeed', 'lowerSpeed', 'tickerColors', 'upperSize', 'lowerSize', 'overlayThemeId'
+      ];
+      ensureNoUnknownKeys(body, allowedKeys);
+      const booleans = ['overlayOn', 'overlayLogo'];
+      booleans.forEach((key) => assertInput(typeof body[key] === 'boolean', `${key} must be a boolean.`));
+      const numericRanges = {
+        overlayOpacity: [15, 100], gurmukhiSize: [0, 100], punjabiSize: [0, 100], englishSize: [0, 100],
+        headerSize: [0, 100], headerPunjabiSize: [0, 100], upperSpeed: [0, 100], lowerSpeed: [0, 100], upperSize: [0, 100], lowerSize: [0, 100]
+      };
+      Object.entries(numericRanges).forEach(([key, [min, max]]) => {
+        assertInput(typeof body[key] === 'number' && Number.isFinite(body[key]) && body[key] >= min && body[key] <= max, `${key} must be between ${min} and ${max}.`);
+      });
+      assertInput(['gpe', 'ge', 'gp', 'g'].includes(String(body.overlayLanguages)), 'overlayLanguages is invalid.');
+      assertInput(typeof body.overlayThemeId === 'string' && body.overlayThemeId.length <= 80, 'overlayThemeId must be text up to 80 characters.');
+      const textLimits = {
+        overlayAnnouncement: 180, overlayHeaderMessage: 120, punjabiAnnouncement: 180, headerPunjabi: 120,
+        upperEnglish: 180, upperPunjabi: 180
+      };
+      Object.entries(textLimits).forEach(([key, max]) => assertInput(typeof body[key] === 'string' && body[key].length <= max, `${key} must be text up to ${max} characters.`));
+      assertInput(body.tickerColors && typeof body.tickerColors === 'object' && !Array.isArray(body.tickerColors), 'tickerColors must be an object.');
+      const tickerColorKeys = ['upperbg', 'upperfg', 'lowerbg', 'lowerfg'];
+      ensureNoUnknownKeys(body.tickerColors, tickerColorKeys);
+      tickerColorKeys.forEach((key) => assertInput(/^#[0-9a-f]{6}$/i.test(String(body.tickerColors[key] || '')), `tickerColors.${key} must be a hex color.`));
+      const data = await eventsDb.setSingleton('stream_overlay_settings', body);
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to save stream overlay settings.' });
+    }
+    return;
+  }
+
   if (requestUrl.pathname === '/api/ask-granthi/board' && request.method === 'GET') {
     try {
       assertInput(eventsDb.hasDatabaseConnection, 'Ask a Granthi is temporarily unavailable.', 503);
@@ -7481,7 +7531,7 @@ const server = http.createServer(async (request, response) => {
   }
 
   const contentGuardMatch = requestUrl.pathname.match(/^\/api\/content(?:-single)?\/([a-z0-9_-]+)/i);
-  if (contentGuardMatch && recitationService.isProtectedResource(contentGuardMatch[1])) {
+  if (contentGuardMatch && (recitationService.isProtectedResource(contentGuardMatch[1]) || contentGuardMatch[1].toLowerCase() === 'stream_overlay_settings')) {
     sendJson(response, 404, { ok: false, message: 'Not found.' });
     return;
   }

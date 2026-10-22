@@ -1,4 +1,7 @@
+import apiClient from './apiClient';
+
 export const STREAM_OVERLAY_SETTINGS_KEY = 'ssm-stream-overlay-settings-v1';
+export const STREAM_OVERLAY_SETTINGS_URL = '/api/stream-overlay/settings';
 
 export const DEFAULT_STREAM_OVERLAY_SETTINGS = Object.freeze({
   overlayOn: true,
@@ -18,7 +21,7 @@ export const DEFAULT_STREAM_OVERLAY_SETTINGS = Object.freeze({
   upperPunjabi: '',
   upperSpeed: 100,
   lowerSpeed: 100,
-  tickerColors: {},
+  tickerColors: { upperbg: '#004080', upperfg: '#ffffff', lowerbg: '#F89820', lowerfg: '#004080' },
   upperSize: 100,
   lowerSize: 100,
   overlayThemeId: 'brand-colors'
@@ -45,4 +48,16 @@ export const saveStreamOverlaySettings = (settings, storage = window.localStorag
   } catch {
     return false;
   }
+};
+
+export const getPublishedStreamOverlaySettings = async () => {
+  const response = await fetch(STREAM_OVERLAY_SETTINGS_URL, { cache: 'no-store', headers: { Accept: 'application/json' } });
+  if (!response.ok) throw new Error(`Overlay settings request failed (${response.status}).`);
+  const payload = await response.json();
+  return payload?.data && typeof payload.data === 'object' ? payload.data : {};
+};
+
+export const publishStreamOverlaySettings = async (settings) => {
+  const response = await apiClient.put('/stream-overlay/settings', settings);
+  return response.data?.data || settings;
 };

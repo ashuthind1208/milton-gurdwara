@@ -4,11 +4,10 @@ import { ArrowTopRightOnSquareIcon, ClipboardDocumentIcon, TrashIcon } from '@he
 import Card from '../../components/ui/Card';
 import StatusAlert from '../../components/common/StatusAlert';
 import recitationService from '../../services/recitationService';
-import { BRANDING_PRESETS, useBranding } from '../../context/BrandingContext';
-import AnnouncementTicker from '../../components/recitation/AnnouncementTicker';
+import { BRANDING_PRESETS } from '../../context/BrandingContext';
 import { formatClock, formatDay, formatSpan, useRecitationLive, useRecitationText } from '../../hooks/useRecitation';
 import { publishStreamOverlayVisibility } from '../../services/streamOverlayControl';
-import { readStreamOverlaySettings, saveStreamOverlaySettings } from '../../services/streamOverlaySettings';
+import { getPublishedStreamOverlaySettings, readStreamOverlaySettings, saveStreamOverlaySettings, publishStreamOverlaySettings } from '../../services/streamOverlaySettings';
 
 const PAGE_SIZE = 10;
 const inputClass = 'mt-1 block w-full min-w-0 rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal normal-case text-slate-700 outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20';
@@ -49,9 +48,9 @@ const CopyLinkRow = ({ label, path }) => {
 const AdminRecitationsPage = () => {
   const queryClient = useQueryClient();
   const { session: live, setSession, connectionStatus = 'connecting' } = useRecitationLive();
-  const { branding, logoSrc } = useBranding();
   const { lines: fullLines } = useRecitationText(live, 'full');
   const [savedOverlaySettings] = useState(readStreamOverlaySettings);
+  const [overlaySettingsLoaded, setOverlaySettingsLoaded] = useState(false);
   const [status, setStatus] = useState({ type: 'success', message: '' });
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -83,6 +82,43 @@ const AdminRecitationsPage = () => {
   const selectedOverlayTheme = overlayThemePresets.find((preset) => preset.id === overlayThemeId) || brandColorsPreset;
 
   useEffect(() => {
+    let active = true;
+    getPublishedStreamOverlaySettings()
+      .then((published) => {
+        if (!active) return;
+        const settings = { ...savedOverlaySettings, ...(published || {}) };
+        setOverlayOn(settings.overlayOn);
+        setOverlayLogo(settings.overlayLogo);
+        setOverlayLanguages(settings.overlayLanguages);
+        setOverlayOpacity(settings.overlayOpacity);
+        setGurmukhiSize(settings.gurmukhiSize);
+        setPunjabiSize(settings.punjabiSize);
+        setEnglishSize(settings.englishSize);
+        setOverlayAnnouncement(settings.overlayAnnouncement);
+        setOverlayHeaderMessage(settings.overlayHeaderMessage);
+        setHeaderSize(settings.headerSize);
+        setHeaderPunjabiSize(settings.headerPunjabiSize);
+        setPunjabiAnnouncement(settings.punjabiAnnouncement);
+        setHeaderPunjabi(settings.headerPunjabi);
+        setUpperEnglish(settings.upperEnglish);
+        setUpperPunjabi(settings.upperPunjabi);
+        setUpperSpeed(settings.upperSpeed);
+        setLowerSpeed(settings.lowerSpeed);
+        setTickerColors(settings.tickerColors);
+        setUpperSize(settings.upperSize);
+        setLowerSize(settings.lowerSize);
+        setOverlayThemeId(settings.overlayThemeId);
+        setOverlaySettingsLoaded(true);
+      })
+      .catch(() => {
+        if (active) setStatus({ type: 'error', message: 'Unable to load published overlay settings. Reload this page before making broadcast changes.' });
+      });
+    return () => { active = false; };
+  // Read the server once on mount. The local snapshot is only a fallback if it is unavailable.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     const settings = {
       overlayOn, overlayLogo, overlayLanguages, overlayOpacity, gurmukhiSize, punjabiSize, englishSize,
       overlayAnnouncement, overlayHeaderMessage, headerSize, headerPunjabiSize, punjabiAnnouncement,
@@ -90,10 +126,17 @@ const AdminRecitationsPage = () => {
       overlayThemeId
     };
     saveStreamOverlaySettings(settings);
+    if (!overlaySettingsLoaded) return undefined;
+    const timer = window.setTimeout(() => {
+      publishStreamOverlaySettings(settings).catch((error) => {
+        setStatus({ type: 'error', message: error?.response?.data?.message || 'Unable to publish overlay settings.' });
+      });
+    }, 450);
+    return () => window.clearTimeout(timer);
   }, [overlayOn, overlayLogo, overlayLanguages, overlayOpacity, gurmukhiSize, punjabiSize, englishSize,
     overlayAnnouncement, overlayHeaderMessage, headerSize, headerPunjabiSize, punjabiAnnouncement,
     headerPunjabi, upperEnglish, upperPunjabi, upperSpeed, lowerSpeed, tickerColors, upperSize, lowerSize,
-    overlayThemeId]);
+    overlayThemeId, overlaySettingsLoaded]);
 
   useEffect(() => {
     publishStreamOverlayVisibility(overlayOn);
@@ -136,41 +179,8 @@ const AdminRecitationsPage = () => {
 
   const index = live?.currentIndex ?? 0;
   const line = fullLines[index];
-  const overlayQuery = new URLSearchParams({
-    embed: '1',
-    on: '1',
-    logo: overlayLogo ? '1' : '0',
-    lang: overlayLanguages,
-    opacity: String(overlayOpacity),
-    sizeg: String(gurmukhiSize),
-    sizep: String(punjabiSize),
-    sizee: String(englishSize),
-    sizehen: String(headerSize),
-    sizehpa: String(headerPunjabiSize),
-    headerpa: headerPunjabi.trim(),
-    uppermessage: upperEnglish.trim(),
-    uppermessagepa: upperPunjabi.trim(),
-    upperspeed: String(upperSpeed),
-    tickerspeed: String(lowerSpeed),
-    upperbg: tickerColors.upperbg || selectedOverlayTheme.primaryColor,
-    upperfg: tickerColors.upperfg || '#ffffff',
-    lowerbg: tickerColors.lowerbg || selectedOverlayTheme.accentColor,
-    lowerfg: tickerColors.lowerfg || selectedOverlayTheme.primaryColor,
-    uppersize: String(upperSize),
-    tickersize: String(lowerSize),
-    brandBlue: selectedOverlayTheme.primaryColor,
-    brandOrange: selectedOverlayTheme.accentColor,
-    ...(overlayHeaderMessage.trim() ? { header: overlayHeaderMessage.trim() } : {}),
-    ...(overlayAnnouncement.trim() || punjabiAnnouncement.trim() ? {
-      announcement: '1', message: overlayAnnouncement.trim(), messagepa: punjabiAnnouncement.trim()
-    } : {})
-  }).toString();
-  const streamOverlayPath = `/stream-overlay?${overlayQuery}`;
-  const previewOpacity = overlayOpacity / 100;
-  const previewFooterStyle = {
-    backgroundColor: `rgba(${Number.parseInt(selectedOverlayTheme.primaryColor.slice(1, 3), 16)}, ${Number.parseInt(selectedOverlayTheme.primaryColor.slice(3, 5), 16)}, ${Number.parseInt(selectedOverlayTheme.primaryColor.slice(5, 7), 16)}, ${previewOpacity})`,
-    borderColor: selectedOverlayTheme.accentColor
-  };
+  const streamOverlayPath = '/stream-overlay';
+  const streamOverlayPreviewPath = streamOverlayPath;
 
   return (
     <div className="admin-recitations w-full min-w-0 max-w-full space-y-6 overflow-x-clip">
@@ -294,26 +304,13 @@ const AdminRecitationsPage = () => {
               <label className="block text-xs font-semibold">Font size: {ticker.size}%<input type="range" min="0" max="100" value={ticker.size} onChange={(event) => ticker.setSize(Number(event.target.value))} className="mt-2 w-full accent-brand-blue" /></label>
             </section>)}
           </div>
-          <div className="relative mx-auto mt-4 aspect-video w-full max-w-5xl overflow-hidden rounded-lg border border-slate-300 bg-slate-800 shadow-inner" aria-label="Live overlay preview">
-            <div className="absolute inset-x-0 top-0 grid min-h-[12%] grid-cols-[1fr_1.2fr_1fr] items-center gap-2 border-b-2 px-[3%] py-1 text-white" style={{ backgroundColor: selectedOverlayTheme.primaryColor, borderColor: selectedOverlayTheme.accentColor }}>
-              <div className="flex min-w-0 items-center gap-2">
-                {overlayLogo ? <img src={logoSrc} alt="" className="h-[clamp(18px,4vw,40px)] w-[clamp(18px,4vw,40px)] shrink-0 rounded-full border-2 bg-white object-contain p-0.5" style={{ borderColor: selectedOverlayTheme.accentColor }} /> : null}
-                <div className="min-w-0 text-left leading-tight"><p className="truncate font-heading text-xs font-medium sm:text-sm">{branding.organizationName?.replace(/\s+Milton$/i, '') || 'Gurdwara Singh Sabha'}</p><p className="truncate text-[9px] font-normal text-white/85 sm:text-[10px]">{branding.address || '7035, Sixth Line, Milton'}</p></div>
-              </div>
-              <div className="min-w-0 flex-1 text-center font-heading font-bold"><p lang="pa" className="font-gurmukhi" style={{ fontSize: `${12 * headerPunjabiSize / 100}px` }}>{headerPunjabi}</p><p lang="en" style={{ fontSize: `${12 * headerSize / 100}px` }}>{overlayHeaderMessage || (!headerPunjabi ? 'Occasion / custom header text' : '')}</p></div>
-              <div className="shrink-0 text-right text-[9px] leading-tight sm:text-[10px]"><div>{formatDay(new Date().toISOString())}</div><div className="font-bold" style={{ color: selectedOverlayTheme.accentColor }}>{formatClock(new Date().toISOString())}</div><div className="mt-0.5 font-bold" style={{ color: connectionStatus === 'connected' ? '#22c55e' : '#f59e0b' }}>{connectionStatus === 'connected' ? (live?.status === 'live' ? '● LIVE · SYNCED' : '● READY · WAITING') : '● RECONNECTING'}</div></div>
-            </div>
-            {line ? <div className="absolute inset-x-0 top-[13%] bottom-[30%] flex flex-col items-center justify-center gap-1 px-[4%] text-center">
-              {line.g && overlayLanguages.includes('g') ? <p className="font-gurmukhi font-bold" style={{ color: selectedOverlayTheme.accentColor, fontSize: `clamp(8px, ${1.5 * gurmukhiSize / 100}vw, 24px)`, lineHeight: 1.3 }}>{line.g}</p> : null}
-              {overlayLanguages.includes('p') ? <p className="font-gurmukhi font-semibold text-white" style={{ fontSize: `clamp(7px, ${.9 * punjabiSize / 100}vw, 16px)`, lineHeight: 1.5 }}>{line.p || 'Punjabi translation preview'}</p> : null}
-              {overlayLanguages.includes('e') ? <p className="font-semibold text-white" style={{ fontSize: `clamp(7px, ${.9 * englishSize / 100}vw, 16px)`, lineHeight: 1.5 }}>{line.e || 'English translation preview'}</p> : null}
-            </div> : null}
-            <div className="absolute inset-x-0 bottom-0 flex flex-col justify-end border-t-2" style={{ ...previewFooterStyle, minHeight: '27%' }}>
-              <AnnouncementTicker english={upperEnglish} punjabi={upperPunjabi} speed={upperSpeed} fontSize={upperSize} label="Upper footer announcement ticker" backgroundColor={tickerColors.upperbg || selectedOverlayTheme.primaryColor} color={tickerColors.upperfg || '#ffffff'} />
-              <AnnouncementTicker english={overlayAnnouncement} punjabi={punjabiAnnouncement} speed={lowerSpeed} fontSize={lowerSize} backgroundColor={tickerColors.lowerbg || selectedOverlayTheme.accentColor} color={tickerColors.lowerfg || selectedOverlayTheme.primaryColor} />
+          <div className="mx-auto mt-4 w-full max-w-5xl">
+            <div className="mb-1 flex items-center justify-between text-[11px] font-semibold text-slate-600"><span>Exact overlay preview</span><span>16:9 · 1920 × 1080</span></div>
+            <div className="relative aspect-video w-full overflow-hidden rounded-lg border border-slate-300 bg-transparent shadow-inner" aria-label="Live overlay preview">
+              <iframe key={streamOverlayPreviewPath} title="Exact 16:9 Streamlabs overlay preview" src={streamOverlayPreviewPath} className="absolute inset-0 h-full w-full border-0" loading="lazy" />
             </div>
           </div>
-          <p className="mt-1 text-[11px] text-slate-500">Preview updates immediately as you change colors, opacity, font sizes, languages, or text. The generated Streamlabs page uses the same settings.</p>
+          <p className="mt-1 text-[11px] text-slate-500">This is the actual overlay page at 16:9. Published changes reach the preview and Streamlabs automatically within a few seconds; the source URL stays unchanged.</p>
           <div className="mt-3">
             <CopyLinkRow label="Copy configured Streamlabs browser-source URL" path={streamOverlayPath} />
           </div>

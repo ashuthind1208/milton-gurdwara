@@ -1,7 +1,18 @@
-import { render, screen } from '@testing-library/react';
+import { render as baseRender, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import StreamOverlayPage from './StreamOverlayPage';
 import { useRecitationLive, useRecitationText } from '../../hooks/useRecitation';
 import { useBranding } from '../../context/BrandingContext';
+import { getPublishedStreamOverlaySettings } from '../../services/streamOverlaySettings';
+
+const render = (ui, options = {}) => baseRender(ui, {
+  wrapper: ({ children }) => <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>,
+  ...options
+});
+
+jest.mock('../../services/streamOverlaySettings', () => ({
+  getPublishedStreamOverlaySettings: jest.fn()
+}));
 
 jest.mock('../../hooks/useRecitation', () => ({
   useRecitationLive: jest.fn(),
@@ -9,15 +20,46 @@ jest.mock('../../hooks/useRecitation', () => ({
 }));
 
 jest.mock('../../context/BrandingContext', () => ({
+  BRANDING_PRESETS: [],
   useBranding: jest.fn()
 }));
 
 describe('StreamOverlayPage', () => {
   beforeEach(() => {
+    getPublishedStreamOverlaySettings.mockResolvedValue({});
+    window.localStorage.removeItem('ssm-stream-overlay-visible');
     window.history.replaceState({}, '', '/stream-overlay?embed=1&lang=gpe');
-    useRecitationLive.mockReturnValue({ session: { currentIndex: 0 } });
+    useRecitationLive.mockReturnValue({ session: { currentIndex: 0, status: 'live' }, connectionStatus: 'connected' });
     useRecitationText.mockReturnValue({ lines: [{ g: 'ਗੁਰਬਾਣੀ ਦੀ ਪੰਕਤੀ', p: 'ਪੰਜਾਬੀ ਅਰਥ', e: 'English meaning' }] });
     useBranding.mockReturnValue({ branding: { organizationName: 'Gurdwara Singh Sabha Milton', shortName: 'Singh Sabha', primaryColor: '#0B4EA2', accentColor: '#F4A300', address: '7035, Sixth Line, Milton' }, logoSrc: '/logo.png' });
+  });
+
+  test('loads published header, ticker and theme from the stable URL', async () => {
+    window.history.replaceState({}, '', '/stream-overlay');
+    getPublishedStreamOverlaySettings.mockResolvedValue({
+      overlayOn: true,
+      overlayHeaderMessage: 'Published Diwan',
+      upperEnglish: 'Published announcement',
+      overlayThemeId: 'brand-colors'
+    });
+    render(<StreamOverlayPage />);
+    expect(await screen.findByText('Published Diwan')).toBeInTheDocument();
+    expect(screen.getAllByText('Published announcement').length).toBeGreaterThan(0);
+    expect(screen.getByRole('banner')).toHaveStyle({ backgroundColor: '#004080' });
+    expect(window.location.search).toBe('');
+  });
+
+  test('published visibility overrides a stale local hidden flag', async () => {
+    window.localStorage.setItem('ssm-stream-overlay-visible', '0');
+    getPublishedStreamOverlaySettings.mockResolvedValue({ overlayOn: true });
+    render(<StreamOverlayPage />);
+    expect(await screen.findByRole('banner')).toBeInTheDocument();
+  });
+
+  test('published visibility hides an external browser source', async () => {
+    getPublishedStreamOverlaySettings.mockResolvedValue({ overlayOn: false });
+    render(<StreamOverlayPage />);
+    await waitFor(() => expect(screen.queryByRole('banner')).not.toBeInTheDocument());
   });
 
   test('renders the current Gurbani line in a full-width branded footer with date and time', () => {
@@ -29,9 +71,18 @@ describe('StreamOverlayPage', () => {
     expect(screen.queryByText('Gurdwara Singh Sabha Milton')).not.toBeInTheDocument();
     expect(screen.getByText('7035, Sixth Line, Milton')).toBeInTheDocument();
     expect(screen.getByText(/\d{1,2}:\d{2}/)).toBeInTheDocument();
+    expect(screen.queryByText('LIVE · SYNCED')).not.toBeInTheDocument();
     expect(screen.getByRole('banner', { name: 'Gurdwara broadcast header' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Live Gurbani broadcast footer' })).toBeInTheDocument();
     expect(screen.getByRole('main', { name: 'Live Gurbani broadcast overlay' })).toHaveStyle({ background: 'transparent' });
+  });
+
+  test('never renders connection status in the broadcast header', () => {
+    window.history.replaceState({}, '', '/stream-overlay?lang=gpe');
+    expect(screen.queryByText('LIVE · SYNCED')).not.toBeInTheDocument();
+    window.history.replaceState({}, '', '/stream-overlay?lang=gpe&status=1');
+    render(<StreamOverlayPage />);
+    expect(screen.queryByText('LIVE · SYNCED')).not.toBeInTheDocument();
   });
 
   test('ignores legacy custom themes and split layout while filtering languages', () => {
