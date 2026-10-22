@@ -73,6 +73,7 @@ describe('StreamOverlayPage', () => {
     expect(screen.getByText(/\d{1,2}:\d{2}/)).toBeInTheDocument();
     expect(screen.queryByText('LIVE · SYNCED')).not.toBeInTheDocument();
     expect(screen.getByRole('banner', { name: 'Gurdwara broadcast header' })).toBeInTheDocument();
+    expect(screen.getByRole('main')).toHaveStyle({ '--overlay-middle-background': 'rgba(5, 10, 20, 0.9)' });
     expect(screen.getByRole('region', { name: 'Live Gurbani broadcast footer' })).toBeInTheDocument();
     expect(screen.getByRole('main', { name: 'Live Gurbani broadcast overlay' })).toHaveStyle({ background: 'transparent' });
   });

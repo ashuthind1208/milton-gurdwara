@@ -111,12 +111,13 @@ const StreamOverlayPage = () => {
       className="stream-overlay-root"
       aria-live="polite"
       aria-label="Live Gurbani broadcast overlay"
-      style={{ '--gurbani-size': gurmukhiScale, '--punjabi-size': punjabiScale, '--english-size': englishScale }}
+      style={{ '--gurbani-size': gurmukhiScale, '--punjabi-size': punjabiScale, '--english-size': englishScale, '--overlay-middle-background': 'rgba(5, 10, 20, 0.9)' }}
     >
       <style>{`
-        .stream-overlay-root{position:fixed;inset:0;width:100vw;height:100vh;overflow:hidden;background:transparent;color:#fff;pointer-events:none;font-family:Manrope,Arial,sans-serif}
+        .stream-overlay-root{--overlay-header-height:clamp(62px,10vh,112px);--overlay-footer-height:clamp(190px,28vh,380px);position:fixed;inset:0;width:100vw;height:100vh;overflow:hidden;background:transparent;color:#fff;pointer-events:none;font-family:Manrope,Arial,sans-serif}
         .stream-overlay-root *{box-sizing:border-box}
-        .stream-overlay-header{position:absolute;top:0;left:0;right:0;min-height:clamp(62px,10vh,112px);width:100%;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) minmax(0,1fr);align-items:center;gap:2vw;padding:1vh 4vw;background-color:${overlayBlue};border-bottom:clamp(3px,.45vh,7px) solid ${accentColor};box-shadow:0 8px 28px rgba(0,0,0,.2)}
+        .stream-overlay-middle-background{position:absolute;top:var(--overlay-header-height);right:0;bottom:var(--overlay-footer-height);left:0;background:var(--overlay-middle-background);z-index:0}
+        .stream-overlay-header{position:absolute;z-index:1;top:0;left:0;right:0;min-height:var(--overlay-header-height);width:100%;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) minmax(0,1fr);align-items:center;gap:2vw;padding:1vh 4vw;background-color:${overlayBlue};border-bottom:clamp(3px,.45vh,7px) solid ${accentColor};box-shadow:0 8px 28px rgba(0,0,0,.2)}
         .stream-overlay-identity{display:flex;min-width:0;align-items:center;gap:clamp(12px,1.8vw,28px)}
         .stream-overlay-logo{width:clamp(52px,8vh,92px);height:clamp(52px,8vh,92px);flex:0 0 auto;border:2px solid ${accentColor};border-radius:50%;background:#fff;object-fit:contain;padding:3px}
         .stream-overlay-org-block{min-width:0;display:flex;flex-direction:column;gap:.15vh}
@@ -126,7 +127,7 @@ const StreamOverlayPage = () => {
         .stream-overlay-date-time{flex:0 0 auto;text-align:right;color:#fff;line-height:1.35}
         .stream-overlay-date{font-size:clamp(12px,1.15vw,20px);font-weight:600;opacity:.94}
         .stream-overlay-time{margin-top:.15vh;color:${accentColor};font-size:clamp(18px,1.8vw,30px);font-weight:800;font-variant-numeric:tabular-nums}
-        .stream-overlay-footer{position:absolute;left:0;right:0;bottom:0;width:100%;min-height:clamp(190px,28vh,380px);display:flex;flex-direction:column;justify-content:flex-end;background:${panelColor};border-top:clamp(3px,.45vh,7px) solid ${accentColor};box-shadow:0 -8px 34px rgba(0,0,0,.28);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+        .stream-overlay-footer{position:absolute;z-index:1;left:0;right:0;bottom:0;width:100%;min-height:var(--overlay-footer-height);display:flex;flex-direction:column;justify-content:flex-end;background:${panelColor};border-top:clamp(3px,.45vh,7px) solid ${accentColor};box-shadow:0 -8px 34px rgba(0,0,0,.28);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
         .stream-overlay-ticker-stack{margin-top:auto;width:100%;display:flex;flex-direction:column;gap:0;flex-shrink:0}
         .stream-overlay-footer-ticker-only{min-height:0;display:block;background:transparent;border:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
         .stream-overlay-lines{width:100%;display:flex;flex-direction:column;align-items:center;gap:1.15vh;padding:2.3vh 4vw;text-align:center}
@@ -134,9 +135,10 @@ const StreamOverlayPage = () => {
         .stream-overlay-p{font-family:'Noto Sans Gurmukhi',sans-serif;font-size:clamp(calc(13px * var(--punjabi-size)),calc(1.45vw * var(--punjabi-size)),calc(27px * var(--punjabi-size)));font-weight:600;line-height:1.35;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.55);overflow-wrap:anywhere}
         .stream-overlay-e{font-size:clamp(calc(13px * var(--english-size)),calc(1.5vw * var(--english-size)),calc(28px * var(--english-size)));font-weight:600;line-height:1.35;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6);overflow-wrap:anywhere}
         .stream-overlay-announcement{width:100%;padding:.8vh 4vw;background:${accentColor};color:${overlayBlue};text-align:center;font-size:clamp(15px,1.6vw,28px);font-weight:800}
-        @media(max-aspect-ratio:4/3){.stream-overlay-header{min-height:54px;padding:1vh 3vw;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)}.stream-overlay-logo{width:clamp(42px,7vh,72px);height:clamp(42px,7vh,72px)}.stream-overlay-org{font-size:clamp(13px,2vw,19px)}.stream-overlay-address{font-size:clamp(9px,1.4vw,13px)}.stream-overlay-custom-header{font-size:clamp(14px,2.5vw,24px)}.stream-overlay-date{font-size:clamp(10px,1.8vw,15px)}.stream-overlay-time{font-size:clamp(15px,2.6vw,22px)}.stream-overlay-footer{min-height:clamp(160px,30vh,300px)}.stream-overlay-lines{padding-left:3vw;padding-right:3vw;gap:1vh}}
+        @media(max-aspect-ratio:4/3){.stream-overlay-root{--overlay-header-height:clamp(54px,10vh,88px);--overlay-footer-height:clamp(160px,30vh,300px)}.stream-overlay-header{padding:1vh 3vw;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)}.stream-overlay-logo{width:clamp(42px,7vh,72px);height:clamp(42px,7vh,72px)}.stream-overlay-org{font-size:clamp(13px,2vw,19px)}.stream-overlay-address{font-size:clamp(9px,1.4vw,13px)}.stream-overlay-custom-header{font-size:clamp(14px,2.5vw,24px)}.stream-overlay-date{font-size:clamp(10px,1.8vw,15px)}.stream-overlay-time{font-size:clamp(15px,2.6vw,22px)}.stream-overlay-lines{padding-left:3vw;padding-right:3vw;gap:1vh}}
         .stream-overlay-root .stream-overlay-footer-ticker-only{min-height:0}
       `}</style>
+      <div className="stream-overlay-middle-background" aria-hidden="true" />
       <header className="stream-overlay-header" aria-label="Gurdwara broadcast header">
         <div className="stream-overlay-identity">
           {showLogo ? <img className="stream-overlay-logo" src={logoSrc} alt="" /> : null}
