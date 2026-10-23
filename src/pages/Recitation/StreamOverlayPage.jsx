@@ -111,7 +111,7 @@ const StreamOverlayPage = () => {
       className="stream-overlay-root"
       aria-live="polite"
       aria-label="Live Gurbani broadcast overlay"
-      style={{ '--gurbani-size': gurmukhiScale, '--punjabi-size': punjabiScale, '--english-size': englishScale, '--overlay-middle-background': 'rgba(5, 10, 20, 0.9)' }}
+      style={{ '--gurbani-size': gurmukhiScale, '--punjabi-size': punjabiScale, '--english-size': englishScale, '--overlay-middle-background': 'transparent' }}
     >
       <style>{`
         .stream-overlay-root{--overlay-header-height:clamp(62px,10vh,112px);--overlay-footer-height:clamp(190px,28vh,380px);position:fixed;inset:0;width:100vw;height:100vh;overflow:hidden;background:transparent;color:#fff;pointer-events:none;font-family:Manrope,Arial,sans-serif}
