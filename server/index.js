@@ -26,6 +26,13 @@ const { createAiQuiz } = require('./aiQuiz');
 const { findDailyAiQuiz, listStoredAiQuizzes, storeDailyAiQuiz } = require('./aiQuizStore');
 const { createGranthiAnswer, normalizeGranthiQuestion } = require('./askGranthi');
 const {
+  COMMUNITY_ANNOUNCEMENT_CATEGORIES,
+  isCommunityAnnouncementCurrentlyPublished,
+  normalizeCommunityAnnouncementReview,
+  normalizeCommunityAnnouncementSubmission,
+  projectPublicCommunityAnnouncement
+} = require('./communityAnnouncements');
+const {
   completeGranthiAnswer,
   createThinkingQuestion,
   failGranthiAnswer,
@@ -196,6 +203,7 @@ const uploadServiceMimePolicies = {
   sponsors: ['image/*'],
   advertisements: ['image/*'],
   users: ['image/*'],
+  'community-notices': ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
   default: ['image/*']
 };
 const maxJsonBodyBytes = 2 * 1024 * 1024;
@@ -2641,6 +2649,31 @@ const canManageBookingDuties = (request) => {
 const canManageGranthiQuestions = (request) => {
   const role = String(getRequestActor(request).role || '').trim().toLowerCase();
   return role === 'admin' || role === 'super admin';
+};
+
+const resolveCommunityAnnouncementSubmitter = async (request) => {
+  const actor = getRequestActor(request);
+  const actorEmail = String(actor.email || '').trim().toLowerCase();
+  assertInput(Boolean(actorEmail), 'Sign in to submit a community notice.', 401);
+  const users = await eventsDb.listItems('users');
+  const user = (Array.isArray(users) ? users : []).find((entry) => String(entry.email || '').trim().toLowerCase() === actorEmail);
+  const role = String(user?.role || '').trim().toLowerCase();
+  assertInput(Boolean(user) && user.isActive !== false
+    && String(user.approvalStatus || 'approved').trim().toLowerCase() === 'approved', 'An active approved account is required to submit a community notice.', 403);
+  assertInput(!actor.role || String(actor.role).trim().toLowerCase() === role, 'Your session permissions changed. Please sign in again.', 403);
+  assertInput(['family', 'member', 'admin', 'super admin'].includes(role), 'A Family or Member account is required to submit a community notice.', 403);
+  return { id: user.id, name: user.name, email: actorEmail, role };
+};
+
+const getCommunityAnnouncementCategoryCatalog = async () => {
+  const stored = await eventsDb.getSingleton('community_announcement_categories', []);
+  const custom = (Array.isArray(stored) ? stored : [])
+    .filter((entry) => entry && /^[a-z0-9-]{2,40}$/.test(String(entry.value || '')))
+    .map((entry) => ({ value: String(entry.value), label: String(entry.label || entry.value).trim().slice(0, 100) }))
+    .filter((entry) => entry.label);
+  const defaults = COMMUNITY_ANNOUNCEMENT_CATEGORIES.map((value) => ({ value, label: value }));
+  const byValue = new Map([...defaults, ...custom].map((entry) => [entry.value, entry]));
+  return Array.from(byValue.values());
 };
 
 const isSuperAdmin = (request) => String(getRequestActor(request).role || '')
@@ -7058,6 +7091,7 @@ const server = http.createServer(async (request, response) => {
         sendJson(response, 400, { ok: false, message: 'Invalid upload service.' });
         return;
       }
+      if (service === 'community-notices') await resolveCommunityAnnouncementSubmitter(request);
 
       const body = await parseJsonObjectBody(request, { maxBytes: maxUploadBytes * 2, allowEmpty: false });
       ensureNoUnknownKeys(body, ['fileName', 'mimeType', 'dataUrl', 'base64Data']);
@@ -7530,8 +7564,225 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (requestUrl.pathname === '/api/community-announcements/categories' && request.method === 'GET') {
+    try {
+      assertInput(eventsDb.hasDatabaseConnection, 'Community announcement types are temporarily unavailable.', 503);
+      sendJson(response, 200, { ok: true, data: await getCommunityAnnouncementCategoryCatalog() });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to load community announcement types.' });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/community-announcements/categories' && request.method === 'PUT') {
+    try {
+      assertInput(await canManageAdminPage(request, '/admin/community-announcements'), 'Community notice admin access is required.', 403);
+      assertInput(eventsDb.hasDatabaseConnection, 'Community announcement types are temporarily unavailable.', 503);
+      const body = await parseJsonObjectBody(request, { maxBytes: 8 * 1024, allowEmpty: false });
+      ensureNoUnknownKeys(body, ['categories']);
+      assertInput(Array.isArray(body.categories) && body.categories.length <= 40, 'Provide up to 40 custom announcement types.');
+      const seen = new Set();
+      const categories = body.categories.map((entry) => {
+        assertInput(entry && typeof entry === 'object' && !Array.isArray(entry), 'Each notice type must have a value and label.');
+        ensureNoUnknownKeys(entry, ['value', 'label']);
+        const value = String(entry.value || '').trim().toLowerCase();
+        const label = String(entry.label || '').trim();
+        assertInput(/^[a-z0-9][a-z0-9-]{1,39}$/.test(value), 'Notice type key must use 2-40 lowercase letters, numbers, or hyphens.');
+        assertInput(label.length >= 2 && label.length <= 100, 'Notice type label must be 2-100 characters.');
+        assertInput(!COMMUNITY_ANNOUNCEMENT_CATEGORIES.includes(value) && !seen.has(value), 'Notice type keys must be unique and cannot replace built-in types.');
+        seen.add(value);
+        return { value, label };
+      });
+      const submissions = await eventsDb.listItems('community_announcement_submissions');
+      const savedCategories = await eventsDb.getSingleton('community_announcement_categories', []);
+      const removedInUse = (Array.isArray(savedCategories) ? savedCategories : [])
+        .filter((entry) => !seen.has(entry.value) && submissions.some((notice) => notice.category === entry.value && notice.status !== 'rejected'));
+      assertInput(removedInUse.length === 0, `Cannot remove a type used by active notices: ${removedInUse.map((entry) => entry.label).join(', ')}.`);
+      const saved = await eventsDb.setSingleton('community_announcement_categories', categories);
+      sendJson(response, 200, { ok: true, data: saved });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to save community announcement types.' });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/community-announcements/settings' && request.method === 'GET') {
+    try {
+      const settings = await eventsDb.getSingleton('community_announcement_settings', { slideDurationSeconds: 24 });
+      const slideDurationSeconds = Number(settings?.slideDurationSeconds);
+      sendJson(response, 200, { ok: true, data: { slideDurationSeconds: Number.isInteger(slideDurationSeconds) && slideDurationSeconds >= 5 && slideDurationSeconds <= 120 ? slideDurationSeconds : 24 } });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to load community notice board settings.' });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/community-announcements/settings' && request.method === 'PUT') {
+    try {
+      assertInput(await canManageAdminPage(request, '/admin/community-announcements'), 'Community notice admin access is required.', 403);
+      assertInput(eventsDb.hasDatabaseConnection, 'Community notice board settings are temporarily unavailable.', 503);
+      const body = await parseJsonObjectBody(request, { maxBytes: 1024, allowEmpty: false });
+      ensureNoUnknownKeys(body, ['slideDurationSeconds']);
+      const slideDurationSeconds = Number(body.slideDurationSeconds);
+      assertInput(Number.isInteger(slideDurationSeconds) && slideDurationSeconds >= 5 && slideDurationSeconds <= 120, 'Slide duration must be between 5 and 120 seconds.');
+      const settings = await eventsDb.setSingleton('community_announcement_settings', { slideDurationSeconds });
+      sendJson(response, 200, { ok: true, data: settings });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to save community notice board settings.' });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/community-announcements' && request.method === 'GET') {
+    try {
+      assertInput(eventsDb.hasDatabaseConnection, 'Community announcements are temporarily unavailable.', 503);
+      const records = await eventsDb.listItems('community_announcement_submissions');
+      const data = (Array.isArray(records) ? records : [])
+        .filter((entry) => isCommunityAnnouncementCurrentlyPublished(entry))
+        .sort((left, right) => Number(right.featured === true) - Number(left.featured === true)
+          || String(left.publishUntil || '').localeCompare(String(right.publishUntil || ''))
+          || String(right.submittedAt || '').localeCompare(String(left.submittedAt || '')))
+        .slice(0, 60)
+        .map(projectPublicCommunityAnnouncement);
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to load community announcements.' });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/community-announcements/submissions' && request.method === 'POST') {
+    try {
+      assertInput(eventsDb.hasDatabaseConnection, 'Community announcements are temporarily unavailable.', 503);
+      const actor = await resolveCommunityAnnouncementSubmitter(request);
+      const body = await parseJsonObjectBody(request, { maxBytes: 16 * 1024, allowEmpty: false });
+      ensureNoUnknownKeys(body, [
+        'noticeFormat', 'titleEnglish', 'titlePunjabi', 'descriptionEnglish', 'descriptionPunjabi', 'category', 'audience',
+        'contactPreference', 'contactValue', 'imageUrl', 'publishFrom', 'publishUntil', 'consent'
+      ]);
+      const categories = (await getCommunityAnnouncementCategoryCatalog()).map((entry) => entry.value);
+      const normalized = normalizeCommunityAnnouncementSubmission(body, actor, new Date(), categories);
+      const id = `community-notice-${Date.now()}-${crypto.randomBytes(5).toString('hex')}`;
+      const data = await eventsDb.createItem('community_announcement_submissions', {
+        id,
+        ...normalized,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      await appendAuditLog(request, {
+        action: 'community_announcement.submitted',
+        targetType: 'community_announcement',
+        targetId: id,
+        description: `Community announcement submitted for moderation: ${normalized.titleEnglish || normalized.titlePunjabi}`
+      });
+      sendJson(response, 201, { ok: true, data: { id: data.id, status: 'pending', submittedAt: data.submittedAt } });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to submit the community announcement.' });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/community-announcements/admin' && request.method === 'GET') {
+    try {
+      assertInput(await canManageAdminPage(request, '/admin/community-announcements'), 'Community notice admin access is required.', 403);
+      assertInput(eventsDb.hasDatabaseConnection, 'Community announcements are temporarily unavailable.', 503);
+      const data = (await eventsDb.listItems('community_announcement_submissions'))
+        .sort((left, right) => String(right.submittedAt || '').localeCompare(String(left.submittedAt || '')));
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to load submitted community announcements.' });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/community-announcements/admin' && request.method === 'POST') {
+    try {
+      assertInput(await canManageAdminPage(request, '/admin/community-announcements'), 'Community notice admin access is required.', 403);
+      assertInput(eventsDb.hasDatabaseConnection, 'Community announcements are temporarily unavailable.', 503);
+      const actor = await resolveCommunityAnnouncementSubmitter(request);
+      const body = await parseJsonObjectBody(request, { maxBytes: 16 * 1024, allowEmpty: false });
+      ensureNoUnknownKeys(body, [
+        'noticeFormat', 'titleEnglish', 'titlePunjabi', 'descriptionEnglish', 'descriptionPunjabi', 'category', 'audience',
+        'contactPreference', 'contactValue', 'imageUrl', 'publishFrom', 'publishUntil', 'publisherName', 'showContact'
+      ]);
+      if (body.showContact !== undefined) assertInput(typeof body.showContact === 'boolean', 'showContact must be a boolean.');
+      const categories = (await getCommunityAnnouncementCategoryCatalog()).map((entry) => entry.value);
+      const normalized = normalizeCommunityAnnouncementSubmission({ ...body, consent: true }, actor, new Date(), categories);
+      const reviewer = getRequestActor(request);
+      const now = new Date().toISOString();
+      const id = `community-notice-${Date.now()}-${crypto.randomBytes(5).toString('hex')}`;
+      const data = await eventsDb.createItem('community_announcement_submissions', {
+        id,
+        ...normalized,
+        status: 'approved',
+        showContact: normalized.contactPreference !== 'none' && body.showContact !== false,
+        reviewedAt: now,
+        reviewedBy: String(reviewer.email || '').trim().toLowerCase(),
+        createdAt: now,
+        updatedAt: now
+      });
+      await appendAuditLog(request, { action: 'community_announcement.created', targetType: 'community_announcement', targetId: id, description: `Admin created community notice: ${normalized.titleEnglish || normalized.titlePunjabi}` });
+      sendJson(response, 201, { ok: true, data });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to create the community announcement.' });
+    }
+    return;
+  }
+
+  const communityAnnouncementReviewMatch = requestUrl.pathname.match(/^\/api\/community-announcements\/admin\/([^/]+)$/);
+  if (communityAnnouncementReviewMatch && request.method === 'PATCH') {
+    try {
+      assertInput(await canManageAdminPage(request, '/admin/community-announcements'), 'Community notice admin access is required.', 403);
+      assertInput(eventsDb.hasDatabaseConnection, 'Community announcements are temporarily unavailable.', 503);
+      const id = decodeURIComponent(communityAnnouncementReviewMatch[1]);
+      const records = await eventsDb.listItems('community_announcement_submissions');
+      const existing = records.find((entry) => String(entry.id) === id);
+      assertInput(Boolean(existing), 'Community announcement not found.', 404);
+      const body = await parseJsonObjectBody(request, { maxBytes: 16 * 1024, allowEmpty: false });
+      ensureNoUnknownKeys(body, [
+        'status', 'publishFrom', 'publishUntil', 'audience', 'featured', 'showContact', 'noticeFormat', 'publisherName', 'titleEnglish', 'titlePunjabi',
+        'descriptionEnglish', 'descriptionPunjabi', 'category', 'contactPreference', 'contactValue', 'imageUrl'
+      ]);
+      ['featured', 'showContact'].forEach((key) => {
+        if (body[key] !== undefined) assertInput(typeof body[key] === 'boolean', `${key} must be a boolean.`);
+      });
+      if (body.status !== undefined) assertInput(['pending', 'approved', 'rejected'].includes(body.status), 'Choose pending, approved, or rejected status.');
+      const categories = (await getCommunityAnnouncementCategoryCatalog()).map((entry) => entry.value);
+      const reviewed = normalizeCommunityAnnouncementReview(body, existing, getRequestActor(request), new Date(), categories);
+      const data = await eventsDb.updateItem('community_announcement_submissions', id, reviewed);
+      await appendAuditLog(request, {
+        action: `community_announcement.${reviewed.status}`,
+        targetType: 'community_announcement',
+        targetId: id,
+        description: `Community announcement review status changed to ${reviewed.status}: ${existing.titleEnglish || existing.titlePunjabi}`
+      });
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to review the community announcement.' });
+    }
+    return;
+  }
+
+  if (communityAnnouncementReviewMatch && request.method === 'DELETE') {
+    try {
+      assertInput(await canManageAdminPage(request, '/admin/community-announcements'), 'Community notice admin access is required.', 403);
+      assertInput(eventsDb.hasDatabaseConnection, 'Community announcements are temporarily unavailable.', 503);
+      const id = decodeURIComponent(communityAnnouncementReviewMatch[1]);
+      const records = await eventsDb.listItems('community_announcement_submissions');
+      const existing = records.find((entry) => String(entry.id) === id);
+      assertInput(Boolean(existing), 'Community announcement not found.', 404);
+      await eventsDb.removeItem('community_announcement_submissions', id);
+      await appendAuditLog(request, { action: 'community_announcement.deleted', targetType: 'community_announcement', targetId: id, description: `Community notice deleted: ${existing.titleEnglish || existing.titlePunjabi}` });
+      sendJson(response, 200, { ok: true, data: { id, deleted: true } });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to delete the community announcement.' });
+    }
+    return;
+  }
+
   const contentGuardMatch = requestUrl.pathname.match(/^\/api\/content(?:-single)?\/([a-z0-9_-]+)/i);
-  if (contentGuardMatch && (recitationService.isProtectedResource(contentGuardMatch[1]) || contentGuardMatch[1].toLowerCase() === 'stream_overlay_settings')) {
+  if (contentGuardMatch && (recitationService.isProtectedResource(contentGuardMatch[1])
+    || ['stream_overlay_settings', 'community_announcement_submissions'].includes(contentGuardMatch[1].toLowerCase()))) {
     sendJson(response, 404, { ok: false, message: 'Not found.' });
     return;
   }

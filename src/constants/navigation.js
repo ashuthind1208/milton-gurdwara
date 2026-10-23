@@ -33,6 +33,7 @@ export const adminNav = [
   { label: 'Sponsors', path: '/admin/sponsors' },
   { label: 'LED Board', path: '/admin/led-announcements' },
   { label: 'Recitation & Stream Overlay', path: '/admin/recitations' },
+  { label: 'Community Notices', path: '/admin/community-announcements' },
   { label: 'Social Posts', path: '/admin/social-posts' },
   { label: 'Events', path: '/admin/events' },
   { label: 'Bookings', path: '/admin/bookings' },

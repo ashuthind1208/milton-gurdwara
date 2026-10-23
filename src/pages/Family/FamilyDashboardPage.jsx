@@ -16,6 +16,7 @@ import { siteConfig } from '../../constants/siteConfig';
 import { isEventCurrent } from '../../utils/eventAvailability';
 import { bookingBelongsToProfile, isBookingPaymentDonation, sortBookingsBySchedule } from '../../utils/profileBookings';
 import langarService, { LANGAR_CONTRIBUTIONS_RESOURCE } from '../../services/langarService';
+import CommunityAnnouncementRequestCard from '../../components/communityAnnouncements/CommunityAnnouncementRequestCard';
 
 const toDateKey = (value) => {
   const parsed = new Date(value);
@@ -608,6 +609,8 @@ const FamilyDashboardPage = () => {
 
         </div>
       </section>
+
+      <CommunityAnnouncementRequestCard />
 
       <section className="grid gap-5 lg:grid-cols-2">
         <div className="space-y-5">

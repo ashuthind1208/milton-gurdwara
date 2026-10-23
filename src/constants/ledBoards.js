@@ -7,7 +7,8 @@ export const LED_BOARDS = [
   { key: 'schedule', title: 'Daily Schedule Board', description: 'Today\'s activities with the ongoing program highlighted.', path: '/daily-schedule-board', icon: Squares2X2Icon, accent: 'border-blue-300 bg-blue-50 text-blue-800' },
   { key: 'hukamnama', title: 'Daily Hukamnama Board', description: 'Today\'s hukamnama with translations, sized to fit the screen.', path: '/hukamnama-board', icon: BookOpenIcon, accent: 'border-orange-300 bg-orange-50 text-orange-800', hasOwnDuration: true },
   { key: 'granthi', title: 'Ask a Granthi Board', description: 'A public question screen for the sangat.', path: '/ask-a-granthi?screen=welcome', icon: SparklesIcon, accent: 'border-violet-300 bg-violet-50 text-violet-800' },
-  { key: 'special', title: 'Special Events Board', description: 'Event photos and formatted announcements managed below.', path: '/special-events-board', icon: MegaphoneIcon, accent: 'border-rose-300 bg-rose-50 text-rose-800', isAnnouncementBoard: true }
+  { key: 'special', title: 'Special Events Board', description: 'Event photos and formatted announcements managed below.', path: '/special-events-board', icon: MegaphoneIcon, accent: 'border-rose-300 bg-rose-50 text-rose-800', isAnnouncementBoard: true },
+  { key: 'community', title: 'Community Announcements Board', description: 'Moderated bilingual community notices and services.', path: '/community-announcements-board', icon: MegaphoneIcon, accent: 'border-amber-300 bg-amber-50 text-amber-900' }
 ];
 
 export const LED_SCREENS = [

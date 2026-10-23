@@ -25,6 +25,7 @@ const LangarItemContributionPage = lazy(() => import('../pages/Langar/LangarItem
 const DailyScheduleDisplayBoardPage = lazy(() => import('../pages/Schedule/DailyScheduleDisplayBoardPage'));
 const LedBoardLauncherPage = lazy(() => import('../pages/Boards/LedBoardLauncherPage'));
 const LedAnnouncementsBoardPage = lazy(() => import('../pages/Boards/LedAnnouncementsBoardPage'));
+const CommunityAnnouncementsBoardPage = lazy(() => import('../pages/Boards/CommunityAnnouncementsBoardPage'));
 const LedHukamnamaBoardPage = lazy(() => import('../pages/Boards/LedHukamnamaBoardPage'));
 const RecitationLedBoardPage = lazy(() => import('../pages/Recitation/RecitationLedBoardPage'));
 const StreamOverlayPage = lazy(() => import('../pages/Recitation/StreamOverlayPage'));
@@ -58,6 +59,7 @@ const AdminStreamingPage = lazy(() => import('../admin/Streaming/AdminStreamingP
 const AdminAdvertisementsPage = lazy(() => import('../admin/Advertisements/AdminAdvertisementsPage'));
 const AdminSponsorsPage = lazy(() => import('../admin/Sponsors/AdminSponsorsPage'));
 const AdminLedAnnouncementsPage = lazy(() => import('../admin/LedAnnouncements/AdminLedAnnouncementsPage'));
+const AdminCommunityAnnouncementsPage = lazy(() => import('../admin/LedAnnouncements/AdminCommunityAnnouncementsPage'));
 const AdminRecitationsPage = lazy(() => import('../admin/Recitations/AdminRecitationsPage'));
 const AdminSocialPostsPage = lazy(() => import('../admin/SocialPosts/AdminSocialPostsPage'));
 const AdminEventsPage = lazy(() => import('../admin/Events/AdminEventsPage'));
@@ -112,6 +114,7 @@ const AppRoutes = () => {
         <Route path="/daily-schedule-board" element={<LedEmergencyGuard><DailyScheduleDisplayBoardPage /></LedEmergencyGuard>} />
         <Route path="/led-boards" element={<LedEmergencyGuard><LedBoardLauncherPage /></LedEmergencyGuard>} />
         <Route path="/special-events-board" element={<LedEmergencyGuard><LedAnnouncementsBoardPage /></LedEmergencyGuard>} />
+        <Route path="/community-announcements-board" element={<LedEmergencyGuard><CommunityAnnouncementsBoardPage /></LedEmergencyGuard>} />
         <Route path="/hukamnama-board" element={<LedEmergencyGuard><LedHukamnamaBoardPage /></LedEmergencyGuard>} />
         <Route path="/recitation-board" element={<LedEmergencyGuard><RecitationLedBoardPage /></LedEmergencyGuard>} />
         <Route path="/stream-overlay" element={<LedEmergencyGuard><StreamOverlayPage /></LedEmergencyGuard>} />
@@ -141,6 +144,7 @@ const AppRoutes = () => {
             <Route path="/admin/advertisements" element={<AdminAdvertisementsPage />} />
             <Route path="/admin/sponsors" element={<AdminSponsorsPage />} />
             <Route path="/admin/led-announcements" element={<AdminLedAnnouncementsPage />} />
+            <Route path="/admin/community-announcements" element={<AdminCommunityAnnouncementsPage />} />
             <Route path="/admin/recitations" element={<AdminRecitationsPage />} />
             <Route path="/admin/social-posts" element={<AdminSocialPostsPage />} />
             <Route path="/admin/seva-opportunities" element={<AdminSevaOpportunitiesPage />} />
