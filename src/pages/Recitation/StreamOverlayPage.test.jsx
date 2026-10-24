@@ -78,6 +78,14 @@ describe('StreamOverlayPage', () => {
     expect(screen.getByRole('main', { name: 'Live Gurbani broadcast overlay' })).toHaveStyle({ background: 'transparent' });
   });
 
+  test('keeps the recitation footer content-sized without an automatic ticker spacer', () => {
+    window.history.replaceState({}, '', '/stream-overlay?announcement=1&message=Welcome');
+    const { container } = render(<StreamOverlayPage />);
+    expect(getComputedStyle(container.querySelector('.stream-overlay-footer')).minHeight).toBe('0');
+    expect(getComputedStyle(container.querySelector('.stream-overlay-ticker-stack')).marginTop).toBe('0px');
+    expect(getComputedStyle(container.querySelector('.stream-overlay-lines')).flexShrink).toBe('0');
+  });
+
   test('never renders connection status in the broadcast header', () => {
     window.history.replaceState({}, '', '/stream-overlay?lang=gpe');
     expect(screen.queryByText('LIVE · SYNCED')).not.toBeInTheDocument();
