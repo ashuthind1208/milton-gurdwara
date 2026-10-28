@@ -29,29 +29,15 @@ test('shows a floating Granthi button and opens the question modal', async () =>
   expect(screen.getByLabelText('Your question')).toHaveFocus();
 });
 
-test('drags the launcher, keeps it within the viewport, and persists its position', () => {
-  const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
-  const originalPointerEvent = window.PointerEvent;
-  window.PointerEvent = MouseEvent;
-  HTMLElement.prototype.getBoundingClientRect = function getBoundingClientRect() {
-    if (this.dataset?.testid === 'floating-granthi-widget') return { left: 20, top: 30, width: 220, height: 70 };
-    return originalGetBoundingClientRect.call(this);
-  };
-
-  try {
-    renderAssistant();
-    const widget = screen.getByTestId('floating-granthi-widget');
-    fireEvent.pointerDown(widget, { pointerId: 1, pointerType: 'mouse', button: 0, clientX: 30, clientY: 40 });
-    fireEvent.pointerMove(widget, { pointerId: 1, pointerType: 'mouse', clientX: 90, clientY: 100 });
-    fireEvent.pointerUp(widget, { pointerId: 1, pointerType: 'mouse', clientX: 90, clientY: 100 });
-    expect(widget).toHaveStyle({ left: '80px', top: '90px' });
-    expect(JSON.parse(window.localStorage.getItem('ssm-floating-ask-granthi-position-v1'))).toEqual({ left: 80, top: 90 });
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  } finally {
-    HTMLElement.prototype.getBoundingClientRect = originalGetBoundingClientRect;
-    if (originalPointerEvent) window.PointerEvent = originalPointerEvent;
-    else delete window.PointerEvent;
-  }
+test('keeps only the avatar fixed bottom-right and ignores an old saved drag position', () => {
+  window.localStorage.setItem('ssm-floating-ask-granthi-position-v1', JSON.stringify({ left: 80, top: 90 }));
+  renderAssistant();
+  const widget = screen.getByTestId('floating-granthi-widget');
+  expect(widget).toHaveClass('fixed', 'right-4', 'bottom-[max(1rem,env(safe-area-inset-bottom))]');
+  expect(widget.style.left).toBe('');
+  expect(screen.queryByText('Questions about Sikhi')).not.toBeInTheDocument();
+  expect(screen.queryByText('Ask a Granthi Ji')).not.toBeInTheDocument();
+  window.localStorage.removeItem('ssm-floating-ask-granthi-position-v1');
 });
 
 test('keeps a normal pointer click on the avatar opening the popup', async () => {

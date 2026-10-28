@@ -5,50 +5,16 @@ import { useBranding } from '../../context/BrandingContext';
 import askGranthiService from '../../services/askGranthiService';
 import granthiWelcomePortrait from '../../assets/granthi-welcome-cutout.png';
 
-const WIDGET_POSITION_KEY = 'ssm-floating-ask-granthi-position-v1';
-
-const clampWidgetPosition = (left, top, width, height) => ({
-  left: Math.max(8, Math.min(left, window.innerWidth - width - 8)),
-  top: Math.max(8, Math.min(top, window.innerHeight - height - 8))
-});
-
 const FloatingAskGranthi = () => {
   const { branding } = useBranding();
   const [isOpen, setIsOpen] = useState(false);
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState(null);
-  const [widgetPosition, setWidgetPosition] = useState(null);
-  const widgetRef = useRef(null);
-  const dragRef = useRef(null);
-  const suppressClickRef = useRef(false);
   const questionRef = useRef(null);
   const askMutation = useMutation({
     mutationFn: (value) => askGranthiService.askQuestion(value),
     onSuccess: (response) => setAnswer(response.data)
   });
-
-  useEffect(() => {
-    try {
-      const saved = JSON.parse(window.localStorage.getItem(WIDGET_POSITION_KEY) || 'null');
-      if (Number.isFinite(saved?.left) && Number.isFinite(saved?.top)) {
-        const rect = widgetRef.current?.getBoundingClientRect();
-        setWidgetPosition(clampWidgetPosition(saved.left, saved.top, rect?.width || 220, rect?.height || 70));
-      }
-    } catch {
-      // The default bottom-right placement still works when storage is unavailable.
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!widgetPosition) return undefined;
-    const keepWidgetVisible = () => {
-      const rect = widgetRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      setWidgetPosition((current) => clampWidgetPosition(current.left, current.top, rect.width, rect.height));
-    };
-    window.addEventListener('resize', keepWidgetVisible);
-    return () => window.removeEventListener('resize', keepWidgetVisible);
-  }, [widgetPosition]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -66,62 +32,10 @@ const FloatingAskGranthi = () => {
   }, [isOpen, askMutation.isPending]);
 
   const openAssistant = () => {
-    if (suppressClickRef.current) {
-      suppressClickRef.current = false;
-      return;
-    }
     setQuestion('');
     setAnswer(null);
     askMutation.reset();
     setIsOpen(true);
-  };
-
-  const startDragging = (event) => {
-    if (!Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) return;
-    if (event.pointerType === 'mouse' && event.button !== 0) return;
-    const rect = widgetRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const captureTarget = event.target.closest?.('button') || event.currentTarget;
-    dragRef.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      originX: rect.left,
-      originY: rect.top,
-      moved: false,
-      startedOnButton: Boolean(event.target.closest?.('button')),
-      captureTarget
-    };
-    captureTarget.setPointerCapture?.(event.pointerId);
-  };
-
-  const moveWidget = (event) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId || !Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) return;
-    const deltaX = event.clientX - drag.startX;
-    const deltaY = event.clientY - drag.startY;
-    if (!drag.moved && Math.hypot(deltaX, deltaY) < 6) return;
-    drag.moved = true;
-    const rect = widgetRef.current?.getBoundingClientRect();
-    const next = clampWidgetPosition(drag.originX + deltaX, drag.originY + deltaY, rect?.width || 220, rect?.height || 70);
-    setWidgetPosition(next);
-  };
-
-  const finishDragging = (event) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    if (drag.moved) {
-      if (drag.startedOnButton) suppressClickRef.current = true;
-      const rect = widgetRef.current?.getBoundingClientRect();
-      const saved = clampWidgetPosition(widgetPosition?.left ?? drag.originX, widgetPosition?.top ?? drag.originY, rect?.width || 220, rect?.height || 70);
-      try {
-        window.localStorage.setItem(WIDGET_POSITION_KEY, JSON.stringify(saved));
-      } catch {
-        // Moving the launcher remains available for this page view.
-      }
-    }
-    dragRef.current = null;
-    drag.captureTarget?.releasePointerCapture?.(event.pointerId);
   };
 
   const askErrorMessage = askMutation.error?.response?.data?.message;
@@ -150,24 +64,14 @@ const FloatingAskGranthi = () => {
   return (
     <>
       <div
-        ref={widgetRef}
         data-testid="floating-granthi-widget"
-        onPointerDown={startDragging}
-        onPointerMove={moveWidget}
-        onPointerUp={finishDragging}
-        onPointerCancel={finishDragging}
-        className={`fixed z-[80] flex items-center gap-2 touch-none select-none cursor-grab active:cursor-grabbing ${widgetPosition ? '' : 'bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 sm:bottom-6 sm:right-6'}`}
-        style={widgetPosition ? { left: widgetPosition.left, top: widgetPosition.top } : undefined}
+        className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-[80] sm:right-6"
       >
-        <div className="rounded-full border border-slate-200/80 bg-white/95 px-3 py-2 shadow-lg backdrop-blur-sm sm:px-4" aria-hidden="true">
-          <p className="text-xs font-extrabold leading-tight text-slate-900 sm:text-sm">Ask a Granthi Ji</p>
-          <p className="mt-0.5 text-[10px] leading-tight text-slate-600 sm:text-[11px]">Questions about Sikhi</p>
-        </div>
         <button
           type="button"
           onClick={openAssistant}
           aria-label="Ask a Granthi Ji a question"
-          title="Drag to move · Click to ask"
+          title="Ask a Granthi Ji"
           className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-[3px] border-[#e6b64c] bg-[#07162b] shadow-[0_5px_22px_rgba(15,23,42,.32)] transition-transform hover:scale-105 focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-300/70 sm:h-16 sm:w-16"
         >
           <img src={granthiWelcomePortrait} alt="" className="absolute inset-x-0 bottom-0 h-[118%] w-full object-contain object-bottom" />
