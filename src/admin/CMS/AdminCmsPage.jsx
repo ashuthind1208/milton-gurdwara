@@ -55,6 +55,17 @@ const isImageUrl = (value = '') => /\.(png|jpe?g|gif|webp|svg|avif)(\?.*)?$/i.te
 const AdminCmsPage = () => {
   const queryClient = useQueryClient();
   const [selectedPage, setSelectedPage] = useState('about');
+  const [newPagePath, setNewPagePath] = useState('');
+  const [pageError, setPageError] = useState('');
+  const { data: savedPages = {} } = useQuery({ queryKey: ['cms-pages-admin'], queryFn: () => cmsService.getAllPageContent().then((res) => res.data) });
+  const availablePages = useMemo(() => {
+    const options = new Map(pageOptions.map((item) => [item.value, item]));
+    Object.entries(savedPages).forEach(([key, page]) => {
+      if (!options.has(key)) options.set(key, { value: key, label: `${page.heroTitle || key} (/${key})` });
+    });
+    if (!options.has(selectedPage)) options.set(selectedPage, { value: selectedPage, label: `/${selectedPage}` });
+    return [...options.values()];
+  }, [savedPages, selectedPage]);
   const [slideModal, setSlideModal] = useState({ open: false, mode: 'view', slideId: null });
   const [sectionModal, setSectionModal] = useState({ open: false, mode: 'view', sectionId: null });
   const [pageUploadPending, setPageUploadPending] = useState(false);
@@ -214,8 +225,11 @@ const AdminCmsPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['page-content-admin', selectedPage] });
       queryClient.invalidateQueries({ queryKey: ['page-content', selectedPage] });
+      queryClient.invalidateQueries({ queryKey: ['cms-pages-admin'] });
+      queryClient.invalidateQueries({ queryKey: ['cms-pages-public'] });
       window.alert('Page details updated successfully.');
-    }
+    },
+    onError: (error) => setPageError(error?.response?.data?.message || error.message || 'Unable to save page content.')
   });
 
   const saveSectionsMutation = useMutation({
@@ -227,7 +241,10 @@ const AdminCmsPage = () => {
       queryClient.invalidateQueries({ queryKey: ['page-content-admin', selectedPage] });
       queryClient.invalidateQueries({ queryKey: ['page-content', selectedPage] });
       setSectionModal({ open: false, mode: 'view', sectionId: null });
-    }
+      queryClient.invalidateQueries({ queryKey: ['cms-pages-admin'] });
+      queryClient.invalidateQueries({ queryKey: ['cms-pages-public'] });
+    },
+    onError: (error) => setPageError(error?.response?.data?.message || error.message || 'Unable to save page sections.')
   });
 
   const onSlideSubmit = (values) => {
@@ -407,12 +424,24 @@ const AdminCmsPage = () => {
           <label className="text-sm font-medium">
             Page
             <select value={selectedPage} onChange={(event) => setSelectedPage(event.target.value)} className="ml-2 rounded-lg border border-slate-300 p-2 text-sm">
-              {pageOptions.map((option) => (
+              {availablePages.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
           </label>
         </div>
+
+        <div className="mt-4 flex flex-wrap items-end gap-2 rounded-xl border border-blue-100 bg-blue-50/50 p-3">
+          <label className="min-w-0 flex-1 text-sm font-semibold">New page path<input aria-label="New CMS page path" value={newPagePath} onChange={(event) => setNewPagePath(event.target.value)} placeholder="/panjpyaare" className="mt-1 w-full rounded-lg border border-slate-300 p-2" /></label>
+          <button type="button" className="rounded-lg bg-brand-blue px-4 py-2 text-sm font-bold text-white" onClick={() => {
+            const key = newPagePath.trim().replace(/^\/+|\/+$/g, '');
+            if (!/^[a-z0-9][a-z0-9/-]*$/.test(key) || /^(admin|api|login|family-dashboard)(\/|$)/.test(key)) { setPageError('Enter a lowercase public path such as /panjpyaare.'); return; }
+            setPageError(''); setSelectedPage(key); setNewPagePath('');
+          }}>Manage page</button>
+          <a href={`/${selectedPage}`} target="_blank" rel="noreferrer" className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold">Preview page</a>
+          <p className="w-full text-xs text-slate-600">Enter a lowercase public path to create or edit a custom page. Save page details to publish it, then manage its sections below.</p>
+        </div>
+        <StatusAlert type="error" message={pageError} />
 
         <form className="mt-4 space-y-4" onSubmit={pageForm.handleSubmit((values) => savePageBasicsMutation.mutate(values))}>
           <div className="grid gap-3 md:grid-cols-2">

@@ -428,6 +428,7 @@ const normalizePageEntry = (pageValue = {}, fallback = {}) => ({
 });
 
 const normalizeAllPageContent = (allContent = {}) => ({
+  ...Object.fromEntries(Object.entries(allContent).filter(([key, value]) => /^[a-z0-9][a-z0-9/-]*$/.test(key) && value && typeof value === 'object' && !Array.isArray(value)).map(([key, value]) => [key, normalizePageEntry(value)])),
   about: normalizePageEntry(allContent.about, defaultPageContent.about),
   sikhism: normalizePageEntry(allContent.sikhism, defaultPageContent.sikhism),
   events: normalizePageEntry(allContent.events, defaultPageContent.events),
@@ -777,11 +778,12 @@ const cmsService = {
   getAllPageContent: async () => serviceResponse(await readAllPageContent()),
   getPageContent: async (pageKey) => {
     const allContent = await readAllPageContent();
-    return serviceResponse(allContent[pageKey] || allContent.about);
+    return serviceResponse(allContent[pageKey] || { heroTitle: pageKey.split('/').pop().replace(/-/g, ' '), heroDescription: '', intro: '', mediaUrl: '', sections: [] });
   },
   updatePageContent: async (pageKey, payload) => {
     const allContent = await readAllPageContent();
-    const fallback = defaultPageContent[pageKey] || defaultPageContent.about;
+    if (!/^[a-z0-9][a-z0-9/-]*$/.test(pageKey)) throw new Error('Use a lowercase page path with letters, numbers, and hyphens.');
+    const fallback = defaultPageContent[pageKey] || {};
     const nextValue = {
       ...allContent,
       [pageKey]: normalizePageEntry({

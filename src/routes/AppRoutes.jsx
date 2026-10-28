@@ -77,6 +77,8 @@ const LIMITED_ADMIN_ROLES = [userRoles.SUPER_ADMIN, userRoles.ADMIN, userRoles.M
 const ROLES_ACCESS_ALLOWED_ROLES = [userRoles.SUPER_ADMIN, userRoles.ADMIN];
 const SUPER_ADMIN_ONLY_ROLES = [userRoles.SUPER_ADMIN];
 
+const CustomCmsPage = lazy(() => import('../pages/CMS/CustomCmsPage'));
+
 const AppRoutes = () => {
   return (
     <Suspense fallback={<LoadingFallback />}>
@@ -103,6 +105,7 @@ const AppRoutes = () => {
           <Route path="/faq" element={<FaqPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="*" element={<CustomCmsPage />} />
         </Route>
 
         <Route path="/donationsuccess" element={<DonationSuccessPage />} />

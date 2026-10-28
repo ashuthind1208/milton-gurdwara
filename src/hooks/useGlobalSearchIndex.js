@@ -112,7 +112,7 @@ const normalizeSeva = (opportunities = []) => (Array.isArray(opportunities) ? op
 const normalizeCmsPages = (payload = {}) => {
   const source = payload && typeof payload === 'object' ? payload : {};
 
-  return Object.keys(CMS_PAGE_ROUTE_MAP)
+  return Object.keys(source)
     .map((pageKey) => {
       const page = source[pageKey] || null;
       if (!page) {
@@ -130,7 +130,7 @@ const normalizeCmsPages = (payload = {}) => {
         subtitle: String(page.heroDescription || '').trim(),
         body: `${String(page.intro || '').trim()} ${sectionText}`.trim(),
         keywords: [pageKey, page.address, page.phone, page.email].filter(Boolean),
-        route: CMS_PAGE_ROUTE_MAP[pageKey],
+        route: CMS_PAGE_ROUTE_MAP[pageKey] || `/${pageKey}`,
         updatedAt: ''
       };
     })
