@@ -10,6 +10,8 @@ import StatusAlert from '../../components/common/StatusAlert';
 import PhoneInput from '../../components/forms/PhoneInput';
 import RichTextEditor from '../../components/forms/RichTextEditor';
 import { isTenDigitPhone, TEN_DIGIT_PHONE_ERROR } from '../../utils/phone';
+import WebsiteNavigationEditor from './WebsiteNavigationEditor';
+import siteNavigationService from '../../services/siteNavigationService';
 
 const emptySlide = {
   image: '',
@@ -58,14 +60,19 @@ const AdminCmsPage = () => {
   const [newPagePath, setNewPagePath] = useState('');
   const [pageError, setPageError] = useState('');
   const { data: savedPages = {} } = useQuery({ queryKey: ['cms-pages-admin'], queryFn: () => cmsService.getAllPageContent().then((res) => res.data) });
+  const { data: navigationItems = [] } = useQuery({ queryKey: ['site-navigation'], queryFn: siteNavigationService.get });
   const availablePages = useMemo(() => {
     const options = new Map(pageOptions.map((item) => [item.value, item]));
     Object.entries(savedPages).forEach(([key, page]) => {
       if (!options.has(key)) options.set(key, { value: key, label: `${page.heroTitle || key} (/${key})` });
     });
+    navigationItems.flatMap((item) => [item, ...(item.children || [])]).forEach((item) => {
+      const key = item.path?.split(/[?#]/)[0].replace(/^\/+|\/+$/g, '');
+      if (item.path?.startsWith('/') && key && !options.has(key) && /^[a-z0-9][a-z0-9/-]*$/.test(key) && !/^(admin|api|login|family-dashboard)(\/|$)/.test(key)) options.set(key, { value: key, label: `${item.label} (/${key})` });
+    });
     if (!options.has(selectedPage)) options.set(selectedPage, { value: selectedPage, label: `/${selectedPage}` });
     return [...options.values()];
-  }, [savedPages, selectedPage]);
+  }, [savedPages, navigationItems, selectedPage]);
   const [slideModal, setSlideModal] = useState({ open: false, mode: 'view', slideId: null });
   const [sectionModal, setSectionModal] = useState({ open: false, mode: 'view', sectionId: null });
   const [pageUploadPending, setPageUploadPending] = useState(false);
@@ -347,6 +354,8 @@ const AdminCmsPage = () => {
     <div className="admin-cms-page space-y-6">
       <h1 className="sr-only">CMS Management</h1>
 
+      <WebsiteNavigationEditor />
+
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -439,7 +448,7 @@ const AdminCmsPage = () => {
             setPageError(''); setSelectedPage(key); setNewPagePath('');
           }}>Manage page</button>
           <a href={`/${selectedPage}`} target="_blank" rel="noreferrer" className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold">Preview page</a>
-          <p className="w-full text-xs text-slate-600">Enter a lowercase public path to create or edit a custom page. Save page details to publish it, then manage its sections below.</p>
+          <p className="w-full text-xs text-slate-600">Custom menu links appear in the Page selector automatically. Save page details to publish a custom page, then manage its sections below.</p>
         </div>
         <StatusAlert type="error" message={pageError} />
 

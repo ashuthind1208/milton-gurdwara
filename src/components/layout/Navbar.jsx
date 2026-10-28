@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createPortal } from 'react-dom';
 import jsPDF from 'jspdf';
@@ -13,20 +13,16 @@ import {
   PlayIcon,
   PlayCircleIcon,
   ArrowDownTrayIcon,
-  HomeIcon,
-  InformationCircleIcon,
-  BookOpenIcon,
   CalendarDaysIcon,
   HandRaisedIcon,
   GiftIcon,
-  PhoneIcon,
-  FilmIcon,
   UserCircleIcon,
   ArrowRightOnRectangleIcon,
   HeartIcon,
   SparklesIcon
 } from '@heroicons/react/24/outline';
-import { publicNav } from '../../constants/navigation';
+import siteNavigationService, { DEFAULT_SITE_NAVIGATION } from '../../services/siteNavigationService';
+import WebsiteNavigationItem from './WebsiteNavigationItem';
 import { siteConfig } from '../../constants/siteConfig';
 import NotificationPermissionPrompt from '../common/NotificationPermissionPrompt';
 import notoSansGurmukhiRegular from '../../assets/fonts/NotoSansGurmukhi-Regular.ttf';
@@ -70,7 +66,7 @@ const compactNavClass = ({ isActive }) =>
   `border-b-[2px] px-2.5 py-2 text-[13px] font-bold tracking-tight text-blue-100 transition ${isActive ? 'border-brand-saffron text-white' : 'border-transparent hover:border-blue-200/50 hover:text-white'}`;
 
 const mobileDrawerNavClass = ({ isActive }) =>
-  `rounded-xl border px-3 py-2.5 text-sm font-semibold transition ${isActive ? 'border-brand-blue/45 bg-brand-blue/10 text-brand-blue' : 'border-slate-200 bg-white text-slate-800 hover:border-brand-blue/35 hover:text-brand-blue'}`;
+  `block min-w-0 flex-1 px-5 py-4 text-base font-semibold transition ${isActive ? 'bg-brand-blue/5 text-brand-blue' : 'text-slate-800 hover:bg-slate-50 hover:text-brand-blue'}`;
 
 const WhatsAppIcon = ({ className = 'h-4 w-4' }) => (
   <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
@@ -78,7 +74,6 @@ const WhatsAppIcon = ({ className = 'h-4 w-4' }) => (
   </svg>
 );
 
-const iconClass = 'h-4.5 w-4.5';
 const streamGlyphClass = 'h-6 w-6';
 const NANAKSHAHI_WEEKDAY_LABELS_PA = ['ਐ', 'ਸੋ', 'ਮੰ', 'ਬੁੱ', 'ਵੀ', 'ਸ਼ੁੱ', 'ਸ਼ੱ'];
 const CALENDAR_NAV_DAY_MS = 24 * 60 * 60 * 1000;
@@ -399,22 +394,6 @@ const LiveStreamGlyph = ({ className = streamGlyphClass }) => (
     <path d="M8 5v14l11-7z" />
   </svg>
 );
-
-const leftMenu = [
-  { label: 'Home', path: '/', icon: HomeIcon },
-  { label: 'About', path: '/about', icon: InformationCircleIcon },
-  { label: 'Sikhism', path: '/sikhism', icon: BookOpenIcon },
-  { label: 'Events', path: '/events', icon: CalendarDaysIcon }
-];
-
-const rightMenu = [
-  { label: 'Library', path: '/library', icon: BookOpenIcon },
-  { label: 'Media', path: '/media', icon: FilmIcon },
-  { label: 'Bookings', path: '/bookings', icon: CalendarDaysIcon },
-  { label: 'Seva', path: '/seva', icon: HandRaisedIcon },
-  { label: 'Donation', path: '/donation', icon: GiftIcon },
-  { label: 'Contact', path: '/contact', icon: PhoneIcon }
-];
 
 const FULL_ACCESS_ROLES = new Set(['Super Admin', 'Admin']);
 const PENDING_APPROVAL_MESSAGE = 'Access is pending till your status is approved by an admin.';
@@ -759,22 +738,23 @@ const Navbar = () => {
     });
   }, [calendarViewDate, queryClient]);
 
-  const leftMenuBalanced = useMemo(() => {
-    const libraryFromRight = rightMenu.find((item) => item.path === '/library');
-    return libraryFromRight ? [...leftMenu, libraryFromRight] : leftMenu;
-  }, []);
-  const rightMenuBalanced = useMemo(() => rightMenu.filter((item) => item.path !== '/library'), []);
+  const { data: navigationItems = DEFAULT_SITE_NAVIGATION } = useQuery({
+    queryKey: ['site-navigation'], queryFn: siteNavigationService.get, refetchInterval: 60000, retry: 1
+  });
+  const menuItems = useMemo(() => navigationItems.slice(0, 10), [navigationItems]);
+  const leftMenuBalanced = useMemo(() => menuItems.slice(0, Math.ceil(menuItems.length / 2)), [menuItems]);
+  const rightMenuBalanced = useMemo(() => menuItems.slice(Math.ceil(menuItems.length / 2)), [menuItems]);
   const compactMenuItems = useMemo(
-    () => [...leftMenuBalanced, ...rightMenuBalanced].filter((item) => item.path !== '/'),
+    () => [...leftMenuBalanced, ...rightMenuBalanced].filter((item) => item.path !== '/' || item.children?.length),
     [leftMenuBalanced, rightMenuBalanced]
   );
   const compactDesktopMenuItems = useMemo(
-    () => compactMenuItems.filter((item) => item.path !== '/donation'),
+    () => compactMenuItems.filter((item) => item.path !== '/donation' || item.children?.length),
     [compactMenuItems]
   );
   const mobileMenuItems = useMemo(
-    () => publicNav.filter((item) => item.path !== '/gurbani-library' && item.path !== '/faq' && item.path !== '/family-dashboard'),
-    []
+    () => navigationItems.slice(0, 10),
+    [navigationItems]
   );
 
   const renderNanakshahiCalendar = (compact = false) => (
@@ -2813,28 +2793,14 @@ const Navbar = () => {
             inert={isCompact || !isHomePage}
           >
               <nav className="flex w-full items-center justify-start gap-2 pr-10" aria-label="Left navigation">
-                {leftMenuBalanced.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <NavLink key={item.path} to={item.path} className={navClass}>
-                      <span className="inline-flex items-center gap-2"><Icon className={iconClass} /> {item.label}</span>
-                    </NavLink>
-                  );
-                })}
+                {leftMenuBalanced.map((item) => <WebsiteNavigationItem key={item.id} item={item} linkClass={navClass} />)}
               </nav>
 
               <div className="w-[7.5rem] shrink-0" aria-hidden="true" />
 
               <div className="flex w-full items-center justify-end pl-10">
                 <nav className="flex w-full items-center justify-end gap-2" aria-label="Right navigation">
-                  {rightMenuBalanced.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <NavLink key={item.path} to={item.path} preventScrollReset className={navClass}>
-                        <span className="inline-flex items-center gap-2"><Icon className={iconClass} /> {item.label}</span>
-                      </NavLink>
-                    );
-                  })}
+                  {rightMenuBalanced.map((item) => <WebsiteNavigationItem key={item.id} item={item} alignEnd linkClass={navClass} />)}
                 </nav>
               </div>
           </div>
@@ -2844,19 +2810,17 @@ const Navbar = () => {
             aria-hidden={!(isCompact || !isHomePage)}
             inert={!(isCompact || !isHomePage)}
           >
-              <nav className="flex min-w-0 items-center overflow-x-auto pr-2" aria-label="Compact navigation">
+              <nav className="flex min-w-0 items-center overflow-visible pr-2" aria-label="Compact navigation">
                 {compactDesktopMenuItems.map((item) => {
                   const isLastItem = item.path === compactDesktopMenuItems[compactDesktopMenuItems.length - 1]?.path;
 
                   return (
-                    <span key={item.path} className="inline-flex items-center whitespace-nowrap">
-                      <NavLink to={item.path} preventScrollReset onClick={handleCompactNavClick} className={compactNavClass}>
-                        {item.label}
-                      </NavLink>
+                    <div key={item.id} className="inline-flex min-w-0 items-center whitespace-nowrap">
+                      <WebsiteNavigationItem item={item} alignEnd={compactDesktopMenuItems.indexOf(item) >= compactDesktopMenuItems.length / 2} linkClass={compactNavClass} onNavigate={handleCompactNavClick} />
                       {!isLastItem ? (
                         <span aria-hidden="true" className="mx-2 inline-flex items-center justify-center text-[18px] font-black leading-none text-brand-blue">·</span>
                       ) : null}
-                    </span>
+                    </div>
                   );
                 })}
               </nav>
@@ -3733,8 +3697,8 @@ const Navbar = () => {
       , document.body) : null}
 
       {open ? (
-        <div className="h-[calc(100dvh-6.5rem)] overflow-y-auto border-t border-slate-100 bg-gradient-to-b from-white to-slate-50 px-4 py-3 pb-10 xl:hidden">
-          <div className="mb-3 grid gap-2">
+        <div className="absolute inset-x-0 top-full h-[calc(100dvh-100%)] w-full overflow-y-auto overscroll-contain border-t border-slate-200 bg-white pb-[max(2rem,env(safe-area-inset-bottom))] xl:hidden">
+          <div className="grid gap-2 p-4">
             {!isAuthenticated ? (
               <Link
                 to={getBecomeMemberLoginTarget('/family-dashboard')}
@@ -3751,11 +3715,9 @@ const Navbar = () => {
           {isApprovalPending ? (
             <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">{PENDING_APPROVAL_MESSAGE}</p>
           ) : null}
-          <div className="grid gap-2">
+          <div className="grid w-full divide-y divide-slate-100 border-y border-slate-100">
             {mobileMenuItems.map((item) => (
-              <NavLink key={item.path} to={item.path} className={mobileDrawerNavClass} onClick={() => setOpen(false)}>
-                {item.path === '/hukamnama' ? 'Hukamnama' : item.label}
-              </NavLink>
+              <WebsiteNavigationItem key={item.id} item={item} mobile linkClass={mobileDrawerNavClass} onNavigate={() => setOpen(false)} />
             ))}
           </div>
         </div>

@@ -25,6 +25,7 @@ const {
 const { createAiQuiz } = require('./aiQuiz');
 const { findDailyAiQuiz, listStoredAiQuizzes, storeDailyAiQuiz } = require('./aiQuizStore');
 const { createGranthiAnswer, normalizeGranthiQuestion } = require('./askGranthi');
+const { DEFAULT_SITE_NAVIGATION, normalizeSiteNavigation } = require('./siteNavigation');
 const {
   COMMUNITY_ANNOUNCEMENT_CATEGORIES,
   isCommunityAnnouncementCurrentlyPublished,
@@ -7564,6 +7565,32 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (requestUrl.pathname === '/api/site-navigation' && request.method === 'GET') {
+    try {
+      const items = await eventsDb.getSingleton('site_navigation', DEFAULT_SITE_NAVIGATION);
+      sendJson(response, 200, { ok: true, data: normalizeSiteNavigation(items) });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: 'Unable to load website navigation.' });
+    }
+    return;
+  }
+
+  if (requestUrl.pathname === '/api/site-navigation' && request.method === 'PUT') {
+    try {
+      assertInput(await canManageAdminPage(request, '/admin/cms'), 'CMS admin access is required.', 403);
+      assertInput(eventsDb.hasDatabaseConnection, 'Navigation settings are temporarily unavailable.', 503);
+      const body = await parseJsonObjectBody(request, { maxBytes: 512 * 1024, allowEmpty: false });
+      ensureNoUnknownKeys(body, ['items']);
+      const items = normalizeSiteNavigation(body.items);
+      const data = await eventsDb.setSingleton('site_navigation', items);
+      await appendAuditLog(request, { action: 'site_navigation.updated', targetType: 'site_navigation', targetId: 'default', description: 'Updated website menu labels and submenu links.' });
+      sendJson(response, 200, { ok: true, data });
+    } catch (error) {
+      sendJson(response, error.status || 500, { ok: false, message: error.message || 'Unable to save website navigation.' });
+    }
+    return;
+  }
+
   if (requestUrl.pathname === '/api/community-announcements/categories' && request.method === 'GET') {
     try {
       assertInput(eventsDb.hasDatabaseConnection, 'Community announcement types are temporarily unavailable.', 503);
@@ -7782,7 +7809,7 @@ const server = http.createServer(async (request, response) => {
 
   const contentGuardMatch = requestUrl.pathname.match(/^\/api\/content(?:-single)?\/([a-z0-9_-]+)/i);
   if (contentGuardMatch && (recitationService.isProtectedResource(contentGuardMatch[1])
-    || ['stream_overlay_settings', 'community_announcement_submissions'].includes(contentGuardMatch[1].toLowerCase()))) {
+    || ['stream_overlay_settings', 'community_announcement_submissions', 'site_navigation'].includes(contentGuardMatch[1].toLowerCase()))) {
     sendJson(response, 404, { ok: false, message: 'Not found.' });
     return;
   }
