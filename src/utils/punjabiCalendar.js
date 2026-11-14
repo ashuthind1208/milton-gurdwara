@@ -134,16 +134,77 @@ const FIXED_OBSERVANCES = [
   { date: '2027-06-30', title: 'Guru Hargobind Sahib Ji', type: 'Prakash' }
 ];
 
-export const getFallbackNanakshahiObservances = () => FIXED_OBSERVANCES.map((item, index) => ({
+// Astronomical phase instants expressed as Toronto civil dates, not traditional
+// Sikh observance dates or sunrise-tithi calculations. Source:
+// https://www.timeanddate.com/moon/phases/canada/toronto?year=2026 (and 2027).
+const TORONTO_MOON_PHASE_DATES = {
+  2026: {
+    newMoon: ['01-18', '02-17', '03-18', '04-17', '05-16', '06-14', '07-14', '08-12', '09-10', '10-10', '11-09', '12-08'],
+    fullMoon: ['01-03', '02-01', '03-03', '04-01', '05-01', '05-31', '06-29', '07-29', '08-28', '09-26', '10-26', '11-24', '12-23']
+  },
+  2027: {
+    newMoon: ['01-07', '02-06', '03-08', '04-06', '05-06', '06-04', '07-03', '08-02', '08-31', '09-29', '10-29', '11-27', '12-27'],
+    fullMoon: ['01-22', '02-20', '03-22', '04-20', '05-20', '06-18', '07-18', '08-17', '09-15', '10-15', '11-13', '12-13']
+  }
+};
+
+const TORONTO_MOON_PHASES = Object.entries(TORONTO_MOON_PHASE_DATES).flatMap(([year, phases]) =>
+  Object.entries(phases).flatMap(([phase, dates]) => dates.map((day) => {
+    const date = `${year}-${day}`;
+    const isNew = phase === 'newMoon';
+    return {
+      id: `toronto-${phase}-${date}`,
+      date,
+      gregorianDate: date,
+      title: isNew ? 'Masya (new moon)' : 'Puranmaasi (full moon)',
+      type: isNew ? 'Masya' : 'Puranmashi',
+      blurb: 'Astronomical moon phase date in Toronto. Traditional Sikh observance dates may differ; this is not a sunrise-tithi calculation.',
+      blurbPa: 'ਟੋਰਾਂਟੋ ਵਿੱਚ ਖਗੋਲੀ ਚੰਦਰ ਕਲਾ ਦੀ ਮਿਤੀ। ਰਵਾਇਤੀ ਸਿੱਖ ਦਿਹਾੜੇ ਦੀ ਮਿਤੀ ਵੱਖ ਹੋ ਸਕਦੀ ਹੈ; ਇਹ ਸੂਰਜ ਚੜ੍ਹਨ ਦੀ ਤਿਥੀ ਦੀ ਗਣਨਾ ਨਹੀਂ ਹੈ।'
+    };
+  }))
+);
+
+const standalonePhase = (item) => {
+  if (!item || item.isGurpurab) return '';
+  const newPhase = '(?:masya|maseya|massia|amavasya|new\\s+moon)';
+  const fullPhase = '(?:puranmaasi|puranmashi|purnima|full\\s+moon)';
+  const matchPhase = (value) => {
+    const text = String(value || '').trim().toLowerCase();
+    if (new RegExp(`^${newPhase}(?:\\s*\\(\\s*${newPhase}\\s*\\))?$`).test(text)) return 'newMoon';
+    if (new RegExp(`^${fullPhase}(?:\\s*\\(\\s*${fullPhase}\\s*\\))?$`).test(text)) return 'fullMoon';
+    return '';
+  };
+  const title = String(item.title || '').trim();
+  const titlePhase = matchPhase(title);
+  if (titlePhase) return titlePhase;
+  // A phase type alone is insufficient when the title names a historical event.
+  if (title && !/^(?:moon phase|lunar phase|observance)$/i.test(title)) return '';
+  return matchPhase(item.type) || matchPhase(item.eventType);
+};
+
+const isVerifiedYearPhase = (item) => {
+  const date = String(item?.date || item?.gregorianDate || '').trim();
+  return /^\d{4}-\d{2}-\d{2}(?:$|T)/.test(date)
+    && Object.prototype.hasOwnProperty.call(TORONTO_MOON_PHASE_DATES, date.slice(0, 4))
+    && Boolean(standalonePhase(item));
+};
+
+// Preserve the original non-phase records and their IDs; discard only the old
+// standalone phase entries before appending the verified astronomical dates.
+const LOCAL_OBSERVANCES = FIXED_OBSERVANCES.map((item, index) => ({
   ...item,
   id: `local-nanakshahi-${item.date}-${index}`,
   gregorianDate: item.date
-}));
+})).filter((item) => !isVerifiedYearPhase(item)).concat(TORONTO_MOON_PHASES);
+
+export const getFallbackNanakshahiObservances = () => LOCAL_OBSERVANCES.map((item) => ({ ...item }));
 
 export const mergeNanakshahiObservances = (remote = [], fallback = getFallbackNanakshahiObservances()) => {
-  const primary = Array.isArray(remote) ? remote : [];
+  const primary = (Array.isArray(remote) ? remote : []).filter((item) => !isVerifiedYearPhase(item));
   const known = new Set(primary.map((item) => `${String(item.date || item.gregorianDate || '').slice(0, 10)}::${String(item.title || '').trim().toLowerCase()}`));
-  return [...primary, ...(Array.isArray(fallback) ? fallback : []).filter((item) => !known.has(`${String(item.date || item.gregorianDate || '').slice(0, 10)}::${String(item.title || '').trim().toLowerCase()}`))];
+  const secondary = (Array.isArray(fallback) ? fallback : []).filter((item) => !isVerifiedYearPhase(item)
+    && !known.has(`${String(item.date || item.gregorianDate || '').slice(0, 10)}::${String(item.title || '').trim().toLowerCase()}`));
+  return [...primary, ...secondary, ...TORONTO_MOON_PHASES.map((item) => ({ ...item }))];
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -489,7 +550,7 @@ export const getNanakshahiDate = (inputDate = new Date()) => {
   };
 };
 
-export const getNanakshahiMonthCalendar = (inputDate = new Date(), observanceSource = FIXED_OBSERVANCES) => {
+export const getNanakshahiMonthCalendar = (inputDate = new Date(), observanceSource = LOCAL_OBSERVANCES) => {
   const target = toDateOnly(inputDate);
   const candidates = [
     ...buildMonthStartCandidates(target.getFullYear() - 1),
@@ -514,7 +575,7 @@ export const getNanakshahiMonthCalendar = (inputDate = new Date(), observanceSou
   const totalDays = Math.max(1, Math.round((nextMonthStart.date.getTime() - monthStart.date.getTime()) / DAY_MS));
   const activeDate = getNanakshahiDate(target);
   const startWeekday = monthStart.date.getDay();
-  const source = Array.isArray(observanceSource) ? observanceSource : FIXED_OBSERVANCES;
+  const source = Array.isArray(observanceSource) ? observanceSource : LOCAL_OBSERVANCES;
   const observancesByDate = buildObservancesByDate(source);
   const activeMonthIndex = NANAKSHAHI_MONTH_INDEX_BY_NAME[activeDate.month];
 
@@ -609,11 +670,11 @@ export const getNanakshahiMonthCalendar = (inputDate = new Date(), observanceSou
 export const getUpcomingPunjabiObservances = (
   daysAhead = 10,
   now = new Date(),
-  observanceSource = FIXED_OBSERVANCES
+  observanceSource = LOCAL_OBSERVANCES
 ) => {
   const today = toDateOnly(now);
   const windowEnd = new Date(today.getTime() + daysAhead * DAY_MS);
-  const source = (Array.isArray(observanceSource) ? observanceSource : FIXED_OBSERVANCES)
+  const source = (Array.isArray(observanceSource) ? observanceSource : LOCAL_OBSERVANCES)
     .map((entry) => normalizeObservanceEntry(entry));
 
   return source
